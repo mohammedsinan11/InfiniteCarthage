@@ -17,9 +17,9 @@ import { createWorld, revealChunks } from '../../core/world';
 import type { World } from '../../core/world';
 import { describeEvent } from '../log';
 
-const TOKEN_KEY = 'infinitecatharge.token';
-const ROOM_KEY = 'infinitecatharge.room';
-const NAME_KEY = 'infinitecatharge.name';
+const TOKEN_KEY = 'infinitecarthage.token';
+const ROOM_KEY = 'infinitecarthage.room';
+const NAME_KEY = 'infinitecarthage.name';
 
 /**
  * Das Wiedereinstiegs-Token liegt im sessionStorage, NICHT im localStorage.

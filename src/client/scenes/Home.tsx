@@ -19,7 +19,7 @@ export function Home() {
   const status = useStore((s) => s.status);
   const [name, setName] = useState(() => {
     try {
-      return localStorage.getItem('infinitecatharge.name') ?? '';
+      return localStorage.getItem('infinitecarthage.name') ?? '';
     } catch {
       return '';
     }
@@ -29,7 +29,7 @@ export function Home() {
   const remember = (n: string) => {
     setName(n);
     try {
-      localStorage.setItem('infinitecatharge.name', n);
+      localStorage.setItem('infinitecarthage.name', n);
     } catch {
       // Privater Modus - dann eben jedes Mal neu eintippen.
     }
@@ -40,7 +40,7 @@ export function Home() {
   return (
     <div className="home">
       <div className="home-card">
-        <h1>InfiniteCatharge</h1>
+        <h1>InfiniteCarthage</h1>
         <p className="sub">
           Siedeln auf einer Karte ohne Rand. Sie waechst weiter, sobald jemand nach
           aussen baut.

@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 // GitHub Project Pages liegen unter /<repo>/, nicht unter /.
 // Im Dev-Server soll die Basis '/' bleiben.
 export default defineConfig(({ command }) => ({
-  base: command === 'build' ? '/InfiniteCatharge/' : '/',
+  base: command === 'build' ? '/InfiniteCarthage/' : '/',
   plugins: [react()],
   // Port aus der Umgebung, damit ein bereits belegter Standardport nicht
   // den Start verhindert.

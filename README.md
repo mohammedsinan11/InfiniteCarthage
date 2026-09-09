@@ -1,4 +1,4 @@
-# InfiniteCatharge
+# InfiniteCarthage
 
 Catan-Klon fuer den Browser auf einer Karte **ohne Rand**, mit Pixel-Art-
 Gelaende. Das Brett besteht nicht aus 19 festen Feldern, sondern waechst
