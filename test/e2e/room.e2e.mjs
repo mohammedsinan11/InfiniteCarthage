@@ -12,7 +12,7 @@
  */
 // Standard ist der lokale wrangler-Port; mit CATAN_SERVER laesst sich derselbe
 // Test gegen den veroeffentlichten Worker fahren:
-//   CATAN_SERVER=https://infinite-catan.msinan.workers.dev npm run test:e2e
+//   CATAN_SERVER=https://infinite-catharge.msinan.workers.dev npm run test:e2e
 const BASE = (process.env.CATAN_SERVER ?? 'ws://127.0.0.1:8787')
   .replace(/^http/, 'ws')
   .replace(/\/$/, '');

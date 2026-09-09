@@ -139,7 +139,14 @@ export function createGame(
   secretSeed: number,
   targetPoints = 10,
 ): Game {
-  if (players.length < 2) throw new Error('Mindestens zwei Spieler');
+  /**
+   * Ein Spieler genuegt - allein siedeln ist der Sandkasten.
+   *
+   * Der Ablauf traegt das ohne Sonderfall: die Aufbau-Schlange laeuft bei
+   * einem Spieler zweimal ueber denselben, der Zugwechsel landet wieder bei
+   * ihm, und Raeuber wie Monopol finden schlicht niemanden zum Bestehlen.
+   */
+  if (players.length < 1) throw new Error('Mindestens ein Spieler');
 
   const world = createWorld(worldSeed);
   const added = ensureGenerated(world, { q: 0, r: 0 });
@@ -216,8 +223,15 @@ function nextTurn(state: GameState): void {
   state.phase = { t: 'roll' };
 }
 
-/** Sieg pruefen. Gewonnen wird nur im eigenen Zug. */
+/**
+ * Sieg pruefen. Gewonnen wird nur im eigenen Zug.
+ *
+ * targetPoints = 0 heisst Sandkasten: die Partie kennt kein Ende. Das ist
+ * kein Sonderfall im Ablauf, sondern schlicht eine Schwelle, die nie
+ * erreicht wird.
+ */
 function checkWin(state: GameState, events: GameEvent[]): void {
+  if (state.targetPoints <= 0) return;
   const id = state.order[state.current]!;
   if (totalPoints(state, id) >= state.targetPoints) {
     state.phase = { t: 'finished', winner: id };

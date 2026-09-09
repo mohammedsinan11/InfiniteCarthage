@@ -13,6 +13,7 @@ import {
   edgeAdjacentHexes,
   hexCornerPixel,
   vertexToPixel,
+  layoutFromSize,
   hexesInRange,
   hexDistance,
   neighbors,
@@ -40,12 +41,12 @@ describe('Ecken-Kanonisierung', () => {
   });
 
   it('stimmt geometrisch: dieselbe Ecke liegt von jedem Hex aus am selben Punkt', () => {
-    const S = 10;
+    const L = layoutFromSize(10);
     for (const h of FIELD) {
       for (let c = 0; c < 6; c++) {
         const v = cornerVertex(h.q, h.r, c);
-        const viaHex = hexCornerPixel(h.q, h.r, c, S);
-        const viaVertex = vertexToPixel(v, S);
+        const viaHex = hexCornerPixel(h.q, h.r, c, L);
+        const viaVertex = vertexToPixel(v, L);
         expect(viaVertex.x).toBeCloseTo(viaHex.x, 9);
         expect(viaVertex.y).toBeCloseTo(viaHex.y, 9);
       }
@@ -142,12 +143,12 @@ describe('Kanten-Kanonisierung', () => {
   });
 
   it('Endpunkte einer Kante liegen geometrisch eine Kantenlaenge auseinander', () => {
-    const S = 10;
-    const expected = S; // Seitenlaenge eines Hexes = Radius
+    const L = layoutFromSize(10);
+    const expected = 10; // Seitenlaenge eines Hexes = Radius
     for (const h of FIELD) {
       for (let s = 0; s < 6; s++) {
         const e = sideEdge(h.q, h.r, s);
-        const [p, q] = edgeEndpoints(e).map((v) => vertexToPixel(v, S));
+        const [p, q] = edgeEndpoints(e).map((v) => vertexToPixel(v, L));
         const d = Math.hypot(p!.x - q!.x, p!.y - q!.y);
         expect(d).toBeCloseTo(expected, 9);
       }

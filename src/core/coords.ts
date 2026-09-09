@@ -222,37 +222,60 @@ export function edgeAdjacentHexes(e: Edge): [Hex, Hex] {
 
 // --- Pixel -----------------------------------------------------------------
 
+/**
+ * Ein Hex in Pixeln, beschrieben durch Breite und Hoehe statt durch einen
+ * Radius.
+ *
+ * Der Grund ist die Grafik: die Kacheln sind 26 x 32 Pixel, also etwas
+ * schmaler als ein mathematisch exaktes Hex (0,8125 statt 0,866). Mit einem
+ * einzelnen Radius liesse sich das nur durch Verzerren der Bilder abbilden -
+ * bei Pixel-Art die eine Suende, die sofort auffaellt. Ueber Breite und Hoehe
+ * folgt das Raster stattdessen der Grafik.
+ *
+ * Die Kacheln liegen dabei trotzdem lueckenlos: der Spaltenabstand ist genau
+ * die Breite, der Zeilenabstand drei Viertel der Hoehe.
+ */
+export type Layout = { w: number; h: number };
+
+/** Layout eines exakten Hexes mit gegebenem Radius. */
+export const layoutFromSize = (size: number): Layout => ({
+  w: Math.sqrt(3) * size,
+  h: 2 * size,
+});
+
 /** Mittelpunkt eines Hexes in Pixeln (Pointy-Top, y nach unten). */
-export function hexToPixel(q: number, r: number, size: number): { x: number; y: number } {
+export function hexToPixel(q: number, r: number, L: Layout): { x: number; y: number } {
   return {
-    x: size * Math.sqrt(3) * (q + r / 2),
-    y: size * 1.5 * r,
+    x: L.w * (q + r / 2),
+    y: L.h * 0.75 * r,
   };
 }
 
-/** Ecke 0..5 eines Hexes in Pixeln, gleiche Reihenfolge wie hexVertices. */
-const SQRT3_2 = Math.sqrt(3) / 2;
+/**
+ * Ecke 0..5 als Vielfache von halber Breite und Hoehe, gleiche Reihenfolge
+ * wie hexVertices: N, NO, SO, S, SW, NW.
+ */
 const CORNER_OFFSETS: ReadonlyArray<readonly [number, number]> = [
-  [0, -1],
-  [SQRT3_2, -0.5],
-  [SQRT3_2, 0.5],
-  [0, 1],
-  [-SQRT3_2, 0.5],
-  [-SQRT3_2, -0.5],
+  [0, -0.5],
+  [0.5, -0.25],
+  [0.5, 0.25],
+  [0, 0.5],
+  [-0.5, 0.25],
+  [-0.5, -0.25],
 ];
 
 export function hexCornerPixel(
   q: number,
   r: number,
   corner: number,
-  size: number,
+  L: Layout,
 ): { x: number; y: number } {
-  const c = hexToPixel(q, r, size);
+  const c = hexToPixel(q, r, L);
   const o = CORNER_OFFSETS[corner]!;
-  return { x: c.x + o[0] * size, y: c.y + o[1] * size };
+  return { x: c.x + o[0] * L.w, y: c.y + o[1] * L.h };
 }
 
 /** Mittelpunkt einer Ecke in Pixeln - unabhaengig davon, ueber welches Hex sie kam. */
-export function vertexToPixel(v: Vertex, size: number): { x: number; y: number } {
-  return hexCornerPixel(v.q, v.r, v.d === 'N' ? 0 : 3, size);
+export function vertexToPixel(v: Vertex, L: Layout): { x: number; y: number } {
+  return hexCornerPixel(v.q, v.r, v.d === 'N' ? 0 : 3, L);
 }

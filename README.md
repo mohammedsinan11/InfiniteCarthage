@@ -1,8 +1,13 @@
-# InfiniteCatan
+# InfiniteCatharge
 
-Catan-Klon fuer den Browser auf einer Karte **ohne Rand**. Das Brett besteht
-nicht aus 19 festen Feldern, sondern waechst weiter, sobald jemand nach aussen
-baut. Mehrspieler ueber Raumcode, mit Lobby.
+Catan-Klon fuer den Browser auf einer Karte **ohne Rand**, mit Pixel-Art-
+Gelaende. Das Brett besteht nicht aus 19 festen Feldern, sondern waechst
+weiter, sobald jemand nach aussen baut. Allein spielbar oder zu mehreren
+ueber einen Raumcode.
+
+Hervorgegangen aus [InfiniteCatan](https://github.com/mohammedsinan11/InfiniteCatan);
+die Regel-Engine ist dieselbe, dazugekommen sind Kachelgrafik, Klimazonen,
+Einzelspieler und ein Sandkasten ohne Siegbedingung.
 
 ## Loslegen
 
@@ -12,14 +17,14 @@ npm run dev:worker   # Spielserver auf :8787
 npm run dev          # Oberflaeche auf :5173
 ```
 
-Dann zwei Browserfenster oeffnen: im ersten einen Raum eroeffnen, den
-angezeigten Code ins zweite eintragen.
+Dann einen Raum eroeffnen und **Allein starten** - oder den angezeigten Code
+weitergeben und zu mehreren spielen.
 
 | Befehl | Wirkung |
 | --- | --- |
 | `npm run dev` | Vite-Entwicklungsserver |
 | `npm run dev:worker` | Cloudflare Worker lokal (wrangler) |
-| `npm test` | Testsuite (83 Tests, ohne Browser und ohne Worker) |
+| `npm test` | Testsuite (90 Tests, ohne Browser und ohne Worker) |
 | `npm run test:e2e` | End-to-End gegen einen laufenden Worker (lokal, oder mit `CATAN_SERVER=<url>` gegen den veroeffentlichten) |
 | `npm run typecheck` | TypeScript fuer Client und Worker |
 | `npm run build` | Typecheck plus Produktionsbuild nach `dist/` |
@@ -57,6 +62,29 @@ Rand nie erreichbar ist.
 | Raeuber | Genau einer, Start auf der Wueste im Ursprungschunk. |
 | Bank | Bleibt endlich (19 je Rohstoff) - auf unbegrenzter Flaeche die einzige verbleibende Knappheit. |
 | Entwicklungskarten | Paecke zu 25 Karten in klassischer Verteilung. Ist eines leer, wird das naechste gemischt, statt dass das Spiel karten los endet. |
+
+## Grafik
+
+Das Gelaende besteht aus 48 Pixel-Art-Kacheln aus
+[hexmap von Astropulse](https://github.com/Astropulse/hexmap) (MIT). Herkunft
+und Lizenzpflichten stehen in [THIRD_PARTY.md](THIRD_PARTY.md) - dort auch,
+warum der Generator jenes Projekts bewusst NICHT uebernommen wurde.
+
+Zwei Dinge, die dabei leicht schiefgehen:
+
+- Das Bild ist 26 x 32 Pixel, das Sechseck darin aber nur **24 x 25** und
+  sitzt bei x 1..24, y 7..31. Die freien Zeilen oben tragen Aufbauten, die
+  ueber das Feld hinausragen. Wer Bild und Sechseck gleichsetzt, bekommt
+  schwarze Fugen zwischen den Feldern.
+- Deshalb ist das Raster ueber Breite und Hoehe beschrieben
+  (`Layout` in `coords.ts`) statt ueber einen Radius: die Kacheln sind
+  schmaler als ein mathematisch exaktes Hex, und Pixel-Art zu verzerren
+  faellt sofort auf.
+
+`src/core/biome.ts` legt zwei langwellige Rauschfelder - Waerme und Feuchte -
+ueber die Karte. Sie bestimmen, WIE ein Feld aussieht (Wald wird zu Taiga
+oder Dschungel), nie WAS es liefert. Auf die Regeln hat das Klima keinerlei
+Wirkung.
 
 ## Aufbau
 
@@ -112,6 +140,12 @@ und veroeffentlicht bei jedem Push auf `main` nach GitHub Pages. Vorher unter
 `https://infinite-catan.<konto>.workers.dev`.
 
 ## Regelumfang
+
+**Allein spielen** geht ohne Mitspieler; in der Lobby laesst sich als Ziel
+"ohne Ziel" waehlen, dann endet die Partie nie und man siedelt einfach vor
+sich hin. Die Aufbau-Schlange laeuft dabei zweimal ueber denselben Spieler,
+der Zug kehrt zu ihm zurueck, und Raeuber wie Monopol finden schlicht
+niemanden - dafuer braucht es keinen Sonderfall im Ablauf.
 
 Enthalten: Aufbau als Schlange, Wuerfeln und Ertrag, Strasse/Siedlung/Stadt,
 Raeuber mit Abwerfen und Klauen, Bank- und Hafenhandel, Handel zwischen

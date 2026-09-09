@@ -1,4 +1,4 @@
-name = "infinite-catan"
+name = "infinite-catharge"
 main = "src/worker/index.ts"
 compatibility_date = "2025-01-01"
 

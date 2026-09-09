@@ -192,9 +192,12 @@ export function Game() {
             Der Handel steht bewusst ausserhalb des isMine-Blocks: ein Angebot
             geht alle an, nicht nur den Spieler am Zug.
           */}
-          {hand && you && (state.trade !== null || (isMine && phase.t === 'main')) && (
-            <TradePanel state={state} you={you} hand={hand} act={act} />
-          )}
+          {hand &&
+            you &&
+            state.order.length > 1 &&
+            (state.trade !== null || (isMine && phase.t === 'main')) && (
+              <TradePanel state={state} you={you} hand={hand} act={act} />
+            )}
 
           {isMine && phase.t === 'roll' && (
             <div className="actions">

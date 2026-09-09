@@ -1,7 +1,12 @@
 /** Warteraum: Mitspieler sammeln, Zielpunkte waehlen, starten. */
 
 import { useStore } from '../net/store';
-import { MIN_PLAYERS, MAX_PLAYERS, TARGET_POINTS_CHOICES } from '../../core/protocol';
+import {
+  MIN_PLAYERS,
+  MAX_PLAYERS,
+  TARGET_POINTS_CHOICES,
+  targetPointsLabel,
+} from '../../core/protocol';
 import { playerColor } from '../theme';
 
 export function Lobby() {
@@ -19,7 +24,8 @@ export function Lobby() {
       <div className="home-card">
         <h1>Raum {room.code}</h1>
         <p className="sub">
-          Code weitergeben, damit andere beitreten koennen. {MIN_PLAYERS} bis {MAX_PLAYERS} Spieler.
+          Code weitergeben, damit andere beitreten koennen. {MIN_PLAYERS} bis{' '}
+          {MAX_PLAYERS} Spieler - allein geht auch.
         </p>
 
         <ul className="members">
@@ -44,7 +50,7 @@ export function Lobby() {
                 disabled={!isHost}
                 onClick={() => send({ t: 'setOptions', targetPoints: n })}
               >
-                {n}
+                {targetPointsLabel(n)}
               </button>
             ))}
           </div>
@@ -52,7 +58,7 @@ export function Lobby() {
 
         {isHost ? (
           <button className="primary" disabled={!canStart} onClick={() => send({ t: 'start' })}>
-            {canStart ? 'Partie starten' : `Mindestens ${MIN_PLAYERS} Spieler noetig`}
+            {room.members.length === 1 ? 'Allein starten' : 'Partie starten'}
           </button>
         ) : (
           <p className="note">Warten auf den Gastgeber...</p>

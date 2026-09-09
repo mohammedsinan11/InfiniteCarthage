@@ -1,35 +1,20 @@
-/** Farben fuer Gelaende und Spieler. Nur Darstellung, keine Regeln. */
+/** Spielerfarben. Nur Darstellung, keine Regeln. */
 
-import type { Terrain } from '../core/types';
-
-export const TERRAIN_COLOR: Record<Terrain, string> = {
-  forest: '#2f6b3a',
-  pasture: '#7fbf5f',
-  field: '#e3bd4d',
-  hill: '#bc7448',
-  mountain: '#8a8f97',
-  desert: '#ddd0a6',
-  water: '#3f74a8',
-};
-
-export const TERRAIN_NAME: Record<Terrain, string> = {
-  forest: 'Wald',
-  pasture: 'Weide',
-  field: 'Feld',
-  hill: 'Huegel',
-  mountain: 'Berg',
-  desert: 'Wueste',
-  water: 'Wasser',
-};
-
-/** Sechs klar unterscheidbare Spielerfarben. */
+/**
+ * Sechs Spielerfarben, abgestimmt auf die Kachelgrafik.
+ *
+ * Kraeftig genug, um sich auf jedem Gelaende abzuheben, aber nicht so grell,
+ * dass sie neben der gedaempften Pixel-Art wie Fremdkoerper wirken. Die
+ * Reihenfolge ist so gewaehlt, dass die ersten beiden - Rot und Blau - auch
+ * bei Rot-Gruen-Schwaeche klar auseinandergehen.
+ */
 export const PLAYER_COLORS = [
-  '#d94f4f',
-  '#3b7dd8',
-  '#e8a33d',
-  '#43a566',
-  '#9b59b6',
-  '#e8e2d6',
+  '#c8402f', // Rot
+  '#3a7ac2', // Blau
+  '#e2a730', // Gold
+  '#4f9e5c', // Gruen
+  '#8f5bb0', // Violett
+  '#efe3c8', // Elfenbein
 ];
 
 export const playerColor = (i: number): string =>

@@ -25,9 +25,20 @@ export type RoomInfo = {
   members: Member[];
 };
 
-export const MIN_PLAYERS = 2;
+/**
+ * Ein Spieler reicht. Allein zu siedeln ist kein Wettkampf, aber ein guter
+ * Sandkasten: man sieht der Karte beim Wachsen zu, ohne auf Mitspieler zu
+ * warten.
+ */
+export const MIN_PLAYERS = 1;
 export const MAX_PLAYERS = 6;
-export const TARGET_POINTS_CHOICES = [10, 12, 15] as const;
+
+/** 0 bedeutet: kein Siegpunktziel, die Partie endet nie von selbst. */
+export const NO_TARGET = 0;
+export const TARGET_POINTS_CHOICES = [NO_TARGET, 10, 12, 15] as const;
+
+export const targetPointsLabel = (n: number): string =>
+  n === NO_TARGET ? 'ohne Ziel' : String(n);
 
 export type ClientMsg =
   /** token stammt aus einer frueheren Sitzung und holt den Platz zurueck. */
