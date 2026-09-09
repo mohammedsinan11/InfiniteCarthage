@@ -204,3 +204,18 @@ em.off { color: #c0705c; }
   .side { grid-template-rows: auto auto auto; border-right: none; border-bottom: 1px solid var(--line); }
   .log { display: none; }
 }
+
+.warn {
+  margin: 0;
+  background: #4a2f28;
+  border: 1px solid #8a5344;
+  border-radius: 8px;
+  padding: 11px 13px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.warn code {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1px 5px;
+  border-radius: 4px;
+}

@@ -8,25 +8,43 @@
 
 import type { ClientMsg, ServerMsg } from '../../core/protocol';
 
-/** In der Produktion per VITE_SERVER_URL gesetzt, lokal der wrangler-Port. */
-const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? 'ws://127.0.0.1:8787';
+/**
+ * Serveradresse aus dem Build.
+ *
+ * Der Trim ist kein Schoenheitsfehler-Fang, sondern der eigentliche Fall:
+ * der Pages-Workflow setzt VITE_SERVER_URL aus `${{ vars.VITE_SERVER_URL }}`.
+ * Fehlt die Repository-Variable, expandiert das nicht zu "nicht gesetzt",
+ * sondern zum LEEREN STRING. Ein `??` faengt das nicht ab - es reagiert nur
+ * auf null und undefined - und Vite kompiliert die leere Adresse ein.
+ *
+ * Die Folge war eine Seite, die `new WebSocket("/room/ABC123/ws")` oeffnet.
+ * Das loest relativ zur Seite auf, landet auf github.io statt beim Worker
+ * und scheitert ohne erkennbaren Grund.
+ */
+const CONFIGURED = (import.meta.env.VITE_SERVER_URL ?? '').trim();
+
+const DEV_FALLBACK = 'ws://127.0.0.1:8787';
+
+const SERVER_URL = CONFIGURED === '' ? DEV_FALLBACK : CONFIGURED;
+
+/** Ist eine echte Serveradresse hinterlegt, oder laufen wir auf dem Notnagel? */
+export const SERVER_CONFIGURED = CONFIGURED !== '';
+
+const onLocalhost =
+  typeof location !== 'undefined' &&
+  (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
 
 /**
- * Fehlt die Variable im Pages-Build, zeigt die Seite sonst stumm eine
- * Verbindung, die nie zustande kommt - der haeufigste Stolperstein beim
- * ersten Bereitstellen. Lieber einmal laut im Log.
+ * Ausserhalb der Entwicklung ist der Notnagel wertlos. Das gehoert nicht nur
+ * ins Log, sondern auch auf den Bildschirm - siehe Home.tsx.
  */
-if (
-  import.meta.env.VITE_SERVER_URL === undefined &&
-  typeof location !== 'undefined' &&
-  location.hostname !== 'localhost' &&
-  location.hostname !== '127.0.0.1'
-) {
+export const SERVER_MISSING = !SERVER_CONFIGURED && !onLocalhost;
+
+if (SERVER_MISSING) {
   console.error(
-    'VITE_SERVER_URL ist nicht gesetzt. Der Client versucht, sich mit ' +
-      SERVER_URL +
-      ' zu verbinden, was ausserhalb der Entwicklung nicht funktioniert. ' +
-      'Die Variable im Pages-Workflow hinterlegen (siehe README).',
+    'VITE_SERVER_URL ist leer oder nicht gesetzt. Ohne Serveradresse laesst ' +
+      'sich kein Raum oeffnen. Die Repository-Variable hinterlegen und den ' +
+      'Pages-Workflow neu laufen lassen (siehe README).',
   );
 }
 

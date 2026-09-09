@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useStore } from '../net/store';
 import { ROOM_CODE_LENGTH, isRoomCode } from '../../core/protocol';
+import { SERVER_MISSING } from '../net/socket';
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -34,7 +35,7 @@ export function Home() {
     }
   };
 
-  const ready = name.trim().length > 0;
+  const ready = name.trim().length > 0 && !SERVER_MISSING;
 
   return (
     <div className="home">
@@ -44,6 +45,16 @@ export function Home() {
           Siedeln auf einer Karte ohne Rand. Sie waechst weiter, sobald jemand nach
           aussen baut.
         </p>
+
+        {SERVER_MISSING && (
+          <p className="warn">
+            <strong>Kein Spielserver hinterlegt.</strong> Diese Seite ist
+            veroeffentlicht, aber die Variable <code>VITE_SERVER_URL</code>
+            zeigt auf nichts - deshalb laesst sich kein Raum oeffnen. Der
+            Worker muss bereitgestellt und seine Adresse als
+            Repository-Variable gesetzt sein (siehe README).
+          </p>
+        )}
 
         <label>
           Dein Name
