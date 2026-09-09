@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Worker-Code sieht die Worker-Laufzeit, nicht das DOM. Beide definieren
+    // fetch, Response und WebSocket unterschiedlich - deshalb zwei Projekte
+    // statt eines gemeinsamen mit vermischten Typen.
+    "lib": ["ES2022"],
+    "types": ["@cloudflare/workers-types"]
+  },
+  "include": ["src/worker", "src/core"]
+}

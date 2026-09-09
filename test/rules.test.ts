@@ -230,6 +230,18 @@ function resolveSeven(game: Game): void {
   }
 }
 
+/**
+ * Aktuelle Phase als reiner String.
+ *
+ * TypeScript verengt game.state.phase.t nach einer Zusicherung und sieht
+ * nicht, dass applyAction den Zustand ersetzt. Ueber diesen Umweg bleiben
+ * die Laufzeitpruefungen erhalten, ohne dass der Compiler sie fuer
+ * unmoeglich haelt.
+ */
+function phaseOf(game: Game): string {
+  return game.state.phase.t;
+}
+
 function stealFree(game: Game, hk: string, thief: PlayerId): boolean {
   return stealCandidates(game.state, hk, thief).length === 0;
 }
@@ -524,12 +536,12 @@ describe('Dauerlauf', () => {
     runSetup(game);
 
     for (let turn = 0; turn < 80; turn++) {
-      if (game.state.phase.t === 'finished') break;
+      if (phaseOf(game) === 'finished') break;
       const pid = currentPlayerId(game.state);
       must(game, { t: 'roll' }, pid);
       resolveSeven(game);
-      if (game.state.phase.t === 'finished') break;
-      expect(game.state.phase.t).toBe('main');
+      if (phaseOf(game) === 'finished') break;
+      expect(phaseOf(game)).toBe('main');
 
       // Bauen, wann immer es geht - sonst passiert nie etwas.
       const p = playerById(game.state, pid)!;
@@ -537,7 +549,7 @@ describe('Dauerlauf', () => {
       if (p.hand.lumber >= 1 && p.hand.brick >= 1 && es.length > 0 && p.pieces.roads > 0) {
         must(game, { t: 'buildRoad', edge: es[0]! }, pid);
       }
-      if (game.state.phase.t === 'main') must(game, { t: 'endTurn' }, pid);
+      if (phaseOf(game) === 'main') must(game, { t: 'endTurn' }, pid);
     }
 
     // Buchhaltung: keine negativen Beststaende, Bank plus Haende bleiben im Rahmen.
@@ -562,7 +574,7 @@ describe('Dauerlauf', () => {
       const pid = currentPlayerId(game.state);
       must(game, { t: 'roll' }, pid);
       resolveSeven(game);
-      if (game.state.phase.t !== 'main') break;
+      if (phaseOf(game) !== 'main') break;
       give(game, pid, { lumber: 2, brick: 2 });
       const es = legalRoadEdges(game.state, game.world, pid);
       if (es.length > 0) must(game, { t: 'buildRoad', edge: es[es.length - 1]! }, pid);

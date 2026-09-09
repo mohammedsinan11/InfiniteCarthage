@@ -9,3 +9,7 @@ class_name = "GameRoom"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["GameRoom"]
+
+[vars]
+# Kommagetrennt. Leer bedeutet: keine Einschraenkung. localhost ist immer erlaubt.
+ALLOWED_ORIGINS = "https://mohammedsinan11.github.io"
