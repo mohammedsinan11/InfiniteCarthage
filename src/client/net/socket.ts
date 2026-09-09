@@ -11,6 +11,25 @@ import type { ClientMsg, ServerMsg } from '../../core/protocol';
 /** In der Produktion per VITE_SERVER_URL gesetzt, lokal der wrangler-Port. */
 const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? 'ws://127.0.0.1:8787';
 
+/**
+ * Fehlt die Variable im Pages-Build, zeigt die Seite sonst stumm eine
+ * Verbindung, die nie zustande kommt - der haeufigste Stolperstein beim
+ * ersten Bereitstellen. Lieber einmal laut im Log.
+ */
+if (
+  import.meta.env.VITE_SERVER_URL === undefined &&
+  typeof location !== 'undefined' &&
+  location.hostname !== 'localhost' &&
+  location.hostname !== '127.0.0.1'
+) {
+  console.error(
+    'VITE_SERVER_URL ist nicht gesetzt. Der Client versucht, sich mit ' +
+      SERVER_URL +
+      ' zu verbinden, was ausserhalb der Entwicklung nicht funktioniert. ' +
+      'Die Variable im Pages-Workflow hinterlegen (siehe README).',
+  );
+}
+
 export type SocketHandlers = {
   onMessage: (msg: ServerMsg) => void;
   onOpen: () => void;
