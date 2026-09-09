@@ -10,6 +10,7 @@ import { portAt } from '../world';
 import type { World } from '../world';
 import type { Resource } from '../types';
 import type { GameState, PlayerId } from '../state';
+import type { BoardView } from './placement';
 
 export const DEFAULT_RATIO = 4;
 
@@ -18,7 +19,7 @@ export const DEFAULT_RATIO = 4;
  * hinlegen muss: 2 mit passendem 2:1-Hafen, 3 mit 3:1-Hafen, sonst 4.
  */
 export function tradeRatio(
-  state: GameState,
+  state: BoardView,
   world: World,
   player: PlayerId,
   give: Resource,
@@ -36,7 +37,7 @@ export function tradeRatio(
 
 /** Alle Haefen, an denen dieser Spieler sitzt - fuer die Anzeige. */
 export function playerPorts(
-  state: GameState,
+  state: BoardView,
   world: World,
   player: PlayerId,
 ): string[] {

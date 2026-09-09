@@ -11,7 +11,7 @@ import { currentPlayerId, playerById, totalPoints, handSize } from '../src/core/
 import type { Hand, PlayerId } from '../src/core/state';
 import { redactStateFor, redactEventsFor } from '../src/core/redact';
 import { tradeRatio } from '../src/core/rules/trade';
-import { discardCount, stealCandidates } from '../src/core/rules/robber';
+import { discardCount, stealCandidatesServer } from '../src/core/rules/robber';
 import { RESOURCES } from '../src/core/types';
 import type { Resource } from '../src/core/types';
 import { vertexNeighborVertices, parseVertexKey, vertexKey, hexEdges, edgeKey } from '../src/core/coords';
@@ -243,7 +243,7 @@ function phaseOf(game: Game): string {
 }
 
 function stealFree(game: Game, hk: string, thief: PlayerId): boolean {
-  return stealCandidates(game.state, hk, thief).length === 0;
+  return stealCandidatesServer(game.state, hk, thief).length === 0;
 }
 
 describe('Bauen und Kosten', () => {

@@ -61,7 +61,7 @@ import {
   canMoveRobber,
   discardCount,
   playersMustDiscard,
-  stealCandidates,
+  stealCandidatesServer,
 } from './robber';
 import { canBankTrade, tradeRatio } from './trade';
 import { drawDevCard, largestArmyHolder } from './dev';
@@ -393,7 +393,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       s.robber = action.hex;
       events.push({ t: 'robber', player: actor, hex: action.hex });
 
-      const candidates = stealCandidates(s, action.hex, actor);
+      const candidates = stealCandidatesServer(s, action.hex, actor);
       if (action.victim !== undefined) {
         if (!candidates.includes(action.victim)) return fail('Dort ist nichts zu holen.');
         const victim = playerById(s, action.victim)!;

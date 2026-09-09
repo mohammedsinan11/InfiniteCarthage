@@ -6,5 +6,8 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ command }) => ({
   base: command === 'build' ? '/InfiniteCatan/' : '/',
   plugins: [react()],
+  // Port aus der Umgebung, damit ein bereits belegter Standardport nicht
+  // den Start verhindert.
+  server: { port: Number(process.env.PORT) || 5173 },
   build: { target: 'es2022', outDir: 'dist' },
 }));

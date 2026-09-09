@@ -26,6 +26,15 @@ import { isGenerated, tileAt } from '../world';
 import type { World } from '../world';
 import type { GameState, PlayerId } from '../state';
 
+/**
+ * Was die Bauregeln vom Zustand wirklich lesen: belegte Ecken und Kanten.
+ *
+ * Bewusst so eng gefasst, damit auch die REDIGIERTE Sicht des Clients passt.
+ * Sonst muesste der Client die Regeln nachbauen, um legale Bauplaetze zu
+ * markieren - und genau diese Verdopplung soll es nicht geben.
+ */
+export type BoardView = Pick<GameState, 'buildings' | 'roads'>;
+
 /** Land = erzeugt und kein Wasser. Auf Wasser wird nicht gebaut. */
 export function isLand(world: World, q: number, r: number): boolean {
   const t = tileAt(world, q, r);
@@ -55,7 +64,7 @@ export function edgeBuildable(world: World, e: Edge): boolean {
 }
 
 /** Abstandsregel: an den drei Nachbarecken darf nichts stehen. */
-function distanceRuleOk(state: GameState, v: Vertex): boolean {
+function distanceRuleOk(state: BoardView, v: Vertex): boolean {
   return vertexNeighborVertices(v).every((n) => state.buildings[vertexKey(n)] === undefined);
 }
 
@@ -65,14 +74,14 @@ function distanceRuleOk(state: GameState, v: Vertex): boolean {
  * Eine fremde Siedlung unterbricht die eigene Strasse - das ist die klassische
  * Blockaderegel und der Grund, warum hier nicht einfach nach Strassen gesucht wird.
  */
-function connectsAt(state: GameState, player: PlayerId, v: Vertex): boolean {
+function connectsAt(state: BoardView, player: PlayerId, v: Vertex): boolean {
   const b = state.buildings[vertexKey(v)];
   if (b !== undefined) return b.owner === player;
   return vertexAdjacentEdges(v).some((e) => state.roads[edgeKey(e)] === player);
 }
 
 export function canPlaceSettlement(
-  state: GameState,
+  state: BoardView,
   world: World,
   player: PlayerId,
   vk: string,
@@ -92,7 +101,7 @@ export function canPlaceSettlement(
 }
 
 export function canPlaceRoad(
-  state: GameState,
+  state: BoardView,
   world: World,
   player: PlayerId,
   ek: string,
@@ -115,7 +124,7 @@ export function canPlaceRoad(
 }
 
 export function canPlaceCity(
-  state: GameState,
+  state: BoardView,
   player: PlayerId,
   vk: string,
 ): string | null {
@@ -158,7 +167,7 @@ function allEdges(world: World): Edge[] {
 }
 
 export function legalSettlementVertices(
-  state: GameState,
+  state: BoardView,
   world: World,
   player: PlayerId,
   opts: { setup: boolean },
@@ -169,7 +178,7 @@ export function legalSettlementVertices(
 }
 
 export function legalRoadEdges(
-  state: GameState,
+  state: BoardView,
   world: World,
   player: PlayerId,
   mustTouchVertex?: string,
@@ -179,7 +188,7 @@ export function legalRoadEdges(
     .filter((ek) => canPlaceRoad(state, world, player, ek, mustTouchVertex) === null);
 }
 
-export function legalCityVertices(state: GameState, player: PlayerId): string[] {
+export function legalCityVertices(state: BoardView, player: PlayerId): string[] {
   return Object.entries(state.buildings)
     .filter(([, b]) => b.owner === player && b.type === 'settlement')
     .map(([vk]) => vk);

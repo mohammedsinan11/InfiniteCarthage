@@ -11,6 +11,7 @@ import { isGenerated } from '../world';
 import type { World } from '../world';
 import { handSize } from '../state';
 import type { GameState, PlayerId } from '../state';
+import type { BoardView } from './placement';
 
 /** Ab dieser Handgrosse wird bei einer 7 abgeworfen. */
 export const DISCARD_LIMIT = 7;
@@ -44,17 +45,34 @@ export function canMoveRobber(
  * Feld, die auch wirklich Karten haben - und nie sich selbst.
  */
 export function stealCandidates(
-  state: GameState,
+  state: BoardView,
   hk: string,
   thief: PlayerId,
+  /**
+   * Ob dieser Spieler ueberhaupt Karten hat. Als Funktion uebergeben, weil
+   * der Server die Haende kennt, der Client aber nur deren Anzahl - so
+   * benutzen beide dieselbe Regel statt zweier Nachbauten.
+   */
+  hasCards: (id: PlayerId) => boolean,
 ): PlayerId[] {
   const h = parseHexKey(hk);
   const out = new Set<PlayerId>();
   for (const v of hexVertices(h.q, h.r)) {
     const b = state.buildings[vertexKey(v)];
     if (b === undefined || b.owner === thief) continue;
-    const p = state.players.find((x) => x.id === b.owner);
-    if (p && handSize(p.hand) > 0) out.add(b.owner);
+    if (hasCards(b.owner)) out.add(b.owner);
   }
   return [...out];
+}
+
+/** Bequemer Aufruf auf dem Server, wo die Haende bekannt sind. */
+export function stealCandidatesServer(
+  state: GameState,
+  hk: string,
+  thief: PlayerId,
+): PlayerId[] {
+  return stealCandidates(state, hk, thief, (id) => {
+    const p = state.players.find((x) => x.id === id);
+    return p !== undefined && handSize(p.hand) > 0;
+  });
 }

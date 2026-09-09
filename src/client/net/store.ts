@@ -18,6 +18,18 @@ import type { World } from '../../core/world';
 import { describeEvent } from '../log';
 
 const TOKEN_KEY = 'infinitecatan.token';
+const ROOM_KEY = 'infinitecatan.room';
+const NAME_KEY = 'infinitecatan.name';
+
+/**
+ * Das Wiedereinstiegs-Token liegt im sessionStorage, NICHT im localStorage.
+ *
+ * localStorage teilen sich alle Tabs derselben Herkunft. Ein zweiter Tab
+ * haette damit das Token des ersten geschickt und dessen Platz uebernommen,
+ * statt als neuer Spieler beizutreten - auf einem geteilten Rechner koennte
+ * so niemand mitspielen. sessionStorage gilt je Tab: ein Tab ist ein
+ * Spieler, und ein Neuladen behaelt den Platz trotzdem.
+ */
 
 type Status = 'idle' | 'connecting' | 'lobby' | 'playing' | 'closed';
 
@@ -33,6 +45,8 @@ export type Store = {
   ws: WebSocket | null;
 
   connect: (code: string, name: string, create: boolean) => void;
+  /** Nach einem Neuladen zurueck in die laufende Partie, falls moeglich. */
+  resume: () => void;
   disconnect: () => void;
   send: (msg: ClientMsg) => void;
   act: (action: Action) => void;
@@ -44,7 +58,7 @@ const tokenKey = (code: string) => `${TOKEN_KEY}.${code}`;
 
 function loadToken(code: string): string | undefined {
   try {
-    return localStorage.getItem(tokenKey(code)) ?? undefined;
+    return sessionStorage.getItem(tokenKey(code)) ?? undefined;
   } catch {
     return undefined;
   }
@@ -52,7 +66,8 @@ function loadToken(code: string): string | undefined {
 
 function saveToken(code: string, token: string): void {
   try {
-    localStorage.setItem(tokenKey(code), token);
+    sessionStorage.setItem(tokenKey(code), token);
+    sessionStorage.setItem(ROOM_KEY, code);
   } catch {
     // Privater Modus: dann eben kein Wiedereinstieg nach Neuladen.
   }
@@ -126,8 +141,34 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   disconnect: () => {
+    try {
+      sessionStorage.removeItem(ROOM_KEY);
+    } catch {
+      // nichts zu tun
+    }
     get().ws?.close();
     set({ ws: null, status: 'idle', room: null, state: null, world: null, you: null, log: [] });
+  },
+
+  /**
+   * Ein Neuladen soll niemanden aus der Partie werfen. Raumcode und Token
+   * liegen im sessionStorage des Tabs, also kann derselbe Tab den Platz
+   * ohne Zutun zurueckholen. Ohne das waere die Wiedereinstiegsmoeglichkeit
+   * zwar vorhanden, aber fuer den haeufigsten Fall - versehentliches
+   * Neuladen - nutzlos.
+   */
+  resume: () => {
+    if (get().status !== 'idle') return;
+    let code: string | null = null;
+    let name = '';
+    try {
+      code = sessionStorage.getItem(ROOM_KEY);
+      name = localStorage.getItem(NAME_KEY) ?? '';
+    } catch {
+      return;
+    }
+    if (!code || !loadToken(code)) return;
+    get().connect(code, name || 'Spieler', false);
   },
 
   send: (msg) => sendMsg(get().ws, msg),
