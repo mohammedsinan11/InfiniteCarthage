@@ -42,6 +42,7 @@ import {
 } from '../state';
 import type { GameState, Hand, PlayerId, Player } from '../state';
 import type { DevCardType } from '../state';
+import type { Bundle } from '../types';
 import {
   COST_CITY,
   COST_DEV,
@@ -63,7 +64,14 @@ import {
   playersMustDiscard,
   stealCandidatesServer,
 } from './robber';
-import { canBankTrade, tradeRatio } from './trade';
+import {
+  canAcceptTrade,
+  canBankTrade,
+  canOfferTrade,
+  canSettleTrade,
+  moveBundle,
+  tradeRatio,
+} from './trade';
 import { drawDevCard, largestArmyHolder } from './dev';
 
 export type Action =
@@ -81,6 +89,14 @@ export type Action =
   | { t: 'playYearOfPlenty'; a: Resource; b: Resource }
   | { t: 'playMonopoly'; resource: Resource }
   | { t: 'bankTrade'; give: Resource; receive: Resource }
+  /** Angebot an alle Mitspieler stellen. Nur der Spieler am Zug. */
+  | { t: 'offerTrade'; give: Bundle; want: Bundle }
+  /** Zusagen oder ablehnen. Nur die Mitspieler. */
+  | { t: 'respondTrade'; accept: boolean }
+  /** Anbieter waehlt einen der Zusagenden aus und schliesst ab. */
+  | { t: 'settleTrade'; partner: PlayerId }
+  /** Anbieter zieht sein Angebot zurueck. */
+  | { t: 'cancelTrade' }
   | { t: 'endTurn' };
 
 export type GameEvent =
@@ -96,6 +112,10 @@ export type GameEvent =
   | { t: 'yearOfPlenty'; player: PlayerId; a: Resource; b: Resource }
   | { t: 'monopoly'; player: PlayerId; resource: Resource; taken: number }
   | { t: 'trade'; player: PlayerId; give: Resource; receive: Resource; ratio: number }
+  | { t: 'tradeOffer'; player: PlayerId; give: Bundle; want: Bundle }
+  | { t: 'tradeResponse'; player: PlayerId; accept: boolean }
+  | { t: 'tradeSettled'; from: PlayerId; to: PlayerId; give: Bundle; want: Bundle }
+  | { t: 'tradeCancelled'; player: PlayerId }
   | { t: 'largestArmy'; player: PlayerId }
   | { t: 'chunks'; coords: ChunkCoord[] }
   | { t: 'turn'; player: PlayerId }
@@ -159,6 +179,7 @@ export function createGame(
     lastRoll: null,
     targetPoints,
     largestArmy: null,
+    trade: null,
     chunks: added,
   };
 
@@ -190,6 +211,8 @@ function nextTurn(state: GameState): void {
   state.current = (state.current + 1) % state.order.length;
   state.turn += 1;
   state.devPlayedThisTurn = false;
+  // Ein Angebot gehoert zum Zug seines Anbieters und verfaellt mit ihm.
+  state.trade = null;
   state.phase = { t: 'roll' };
 }
 
@@ -255,9 +278,13 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
   if (!actorPlayer) return fail('Unbekannter Spieler.');
   if (s.phase.t === 'finished') return fail('Die Partie ist beendet.');
 
-  // Abwerfen ist die einzige Aktion, die nicht der Spieler am Zug ausfuehrt.
-  const isDiscard = action.t === 'discard';
-  if (!isDiscard && actor !== currentPlayerId(s)) return fail('Du bist nicht am Zug.');
+  /**
+   * Zwei Aktionen kommen bewusst NICHT vom Spieler am Zug: das Abwerfen nach
+   * einer Sieben und die Antwort auf ein Handelsangebot. Alles andere darf
+   * nur, wer dran ist.
+   */
+  const fromOthers = action.t === 'discard' || action.t === 'respondTrade';
+  if (!fromOthers && actor !== currentPlayerId(s)) return fail('Du bist nicht am Zug.');
 
   const phase = s.phase;
 
@@ -590,6 +617,69 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       s.bank[action.receive] -= 1;
       actorPlayer.hand[action.receive] += 1;
       events.push({ t: 'trade', player: actor, give: action.give, receive: action.receive, ratio });
+      break;
+    }
+
+    case 'offerTrade': {
+      if (phase.t !== 'main') return fail('Jetzt kann nicht gehandelt werden.');
+      const why = canOfferTrade(s, actor, action.give, action.want);
+      if (why) return fail(why);
+      s.trade = {
+        from: actor,
+        give: { ...action.give },
+        want: { ...action.want },
+        accepted: [],
+        declined: [],
+      };
+      events.push({ t: 'tradeOffer', player: actor, give: action.give, want: action.want });
+      break;
+    }
+
+    case 'respondTrade': {
+      const offer = s.trade;
+      if (offer === null) return fail('Es liegt kein Angebot vor.');
+      if (offer.from === actor) return fail('Das ist dein eigenes Angebot.');
+      if (action.accept) {
+        const why = canAcceptTrade(s, actor);
+        if (why) return fail(why);
+      }
+      // Eine Antwort ersetzt die vorherige - Meinungsaenderung ist erlaubt.
+      offer.accepted = offer.accepted.filter((id) => id !== actor);
+      offer.declined = offer.declined.filter((id) => id !== actor);
+      (action.accept ? offer.accepted : offer.declined).push(actor);
+      events.push({ t: 'tradeResponse', player: actor, accept: action.accept });
+      break;
+    }
+
+    case 'settleTrade': {
+      const offer = s.trade;
+      if (offer === null) return fail('Es liegt kein Angebot vor.');
+      if (offer.from !== actor) return fail('Nur der Anbieter kann abschliessen.');
+      const why = canSettleTrade(s, action.partner);
+      if (why) return fail(why);
+
+      const partner = playerById(s, action.partner)!;
+      // Beide Richtungen direkt zwischen den Haenden - die Bank ist nicht beteiligt.
+      moveBundle(actorPlayer.hand, partner.hand, offer.give);
+      moveBundle(partner.hand, actorPlayer.hand, offer.want);
+
+      events.push({
+        t: 'tradeSettled',
+        from: actor,
+        to: action.partner,
+        give: offer.give,
+        want: offer.want,
+      });
+      s.trade = null;
+      break;
+    }
+
+    case 'cancelTrade': {
+      const offer = s.trade;
+      if (offer === null) return fail('Es liegt kein Angebot vor.');
+      if (offer.from !== actor) return fail('Nur der Anbieter kann zurueckziehen.');
+      s.trade = null;
+      events.push({ t: 'tradeCancelled', player: actor });
       break;
     }
 

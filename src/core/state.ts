@@ -8,7 +8,7 @@
  * gespeichert und nie uebertragen.
  */
 
-import type { Resource } from './types';
+import type { Bundle, Resource } from './types';
 import type { ChunkCoord } from './chunks';
 
 export type PlayerId = string;
@@ -75,6 +75,30 @@ export type Phase =
   | { t: 'roadBuilding'; remaining: number }
   | { t: 'finished'; winner: PlayerId };
 
+/**
+ * Ein offenes Handelsangebot des Spielers am Zug.
+ *
+ * Bewusst KEINE eigene Phase: waehrend ein Angebot liegt, darf weitergebaut
+ * werden. Das ist naeher am Brettspiel, wo nebenher verhandelt wird - und es
+ * verhindert, dass ein unbeantwortetes Angebot die Partie blockiert.
+ *
+ * Weil sich Haende bis zur Bestaetigung aendern koennen (der Anbieter baut,
+ * ein Monopol raeumt ab), wird beim Abschluss erneut geprueft. Eine Zusage
+ * ist eine Absichtserklaerung, keine Reservierung.
+ */
+export type TradeOffer = {
+  /** Immer der Spieler am Zug. */
+  from: PlayerId;
+  /** Was der Anbieter hergibt. */
+  give: Bundle;
+  /** Was er dafuer haben will. */
+  want: Bundle;
+  /** Wer zugesagt hat. Oeffentlich - eine Zusage verraet ohnehin, dass man liefern kann. */
+  accepted: PlayerId[];
+  /** Wer abgelehnt hat. Nur fuer die Anzeige, damit niemand zweimal gefragt wird. */
+  declined: PlayerId[];
+};
+
 export type GameState = {
   /** Oeffentlich: die Clients rechnen das Gelaende daraus selbst aus. */
   worldSeed: number;
@@ -103,6 +127,8 @@ export type GameState = {
   targetPoints: number;
   largestArmy: PlayerId | null;
   chunks: ChunkCoord[];
+  /** Offenes Angebot, oder null. Hoechstens eines gleichzeitig. */
+  trade: TradeOffer | null;
 };
 
 /** Die Bank haelt 19 Karten je Rohstoff - auch auf unendlicher Karte. */

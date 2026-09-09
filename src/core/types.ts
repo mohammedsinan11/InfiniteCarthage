@@ -34,6 +34,13 @@ export const PRODUCTIVE_TERRAIN: readonly Terrain[] = [
   'mountain',
 ];
 
+/**
+ * Eine Menge Rohstoffe. Dient als Baukosten, als Handelsangebot und als
+ * Abwurfliste - ueberall dort, wo "so und so viel von diesen Sorten" gemeint
+ * ist. Fehlende Schluessel zaehlen als null.
+ */
+export type Bundle = Partial<Record<Resource, number>>;
+
 /** 'any' ist der 3:1-Hafen, ein Rohstoff der jeweilige 2:1-Hafen. */
 export type PortType = Resource | 'any';
 

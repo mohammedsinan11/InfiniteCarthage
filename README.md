@@ -19,7 +19,7 @@ angezeigten Code ins zweite eintragen.
 | --- | --- |
 | `npm run dev` | Vite-Entwicklungsserver |
 | `npm run dev:worker` | Cloudflare Worker lokal (wrangler) |
-| `npm test` | Testsuite (65 Tests, ohne Browser und ohne Worker) |
+| `npm test` | Testsuite (83 Tests, ohne Browser und ohne Worker) |
 | `npm run test:e2e` | End-to-End gegen einen laufenden Worker (lokal, oder mit `CATAN_SERVER=<url>` gegen den veroeffentlichten) |
 | `npm run typecheck` | TypeScript fuer Client und Worker |
 | `npm run build` | Typecheck plus Produktionsbuild nach `dist/` |
@@ -114,11 +114,25 @@ und veroeffentlicht bei jedem Push auf `main` nach GitHub Pages. Vorher unter
 ## Regelumfang
 
 Enthalten: Aufbau als Schlange, Wuerfeln und Ertrag, Strasse/Siedlung/Stadt,
-Raeuber mit Abwerfen und Klauen, Bank- und Hafenhandel, alle
-Entwicklungskarten, Groesste Rittermacht, 10/12/15 Siegpunkte, 2 bis 6 Spieler.
+Raeuber mit Abwerfen und Klauen, Bank- und Hafenhandel, Handel zwischen
+Spielern, alle Entwicklungskarten, Groesste Rittermacht, 10/12/15 Siegpunkte,
+2 bis 6 Spieler.
 
-Noch nicht enthalten: Handel zwischen Spielern, Laengste Handelsstrasse,
-Accounts und Statistiken, KI-Gegner.
+Noch nicht enthalten: Laengste Handelsstrasse, Accounts und Statistiken,
+KI-Gegner.
+
+### Handel zwischen Spielern
+
+Der Spieler am Zug stellt ein Angebot, die anderen sagen zu oder lehnen ab,
+der Anbieter waehlt einen der Zusagenden aus. Das laeuft **ohne eigene
+Phase** nebenher: waehrend ein Angebot liegt, darf weitergebaut werden, und
+ein unbeantwortetes Angebot blockiert nichts. Es verfaellt mit dem Zugende.
+
+Eine Zusage ist eine Absichtserklaerung, keine Reservierung. Zwischen Zusage
+und Abschluss kann der Anbieter das Angebotene verbaut oder ein Monopol die
+Hand des Partners geleert haben, deshalb prueft `canSettleTrade` beim
+Abschluss beide Seiten erneut. Karten wandern direkt zwischen den Haenden;
+die Bank ist nicht beteiligt.
 
 ## Anmerkungen
 

@@ -9,9 +9,10 @@
 import type { Hand } from '../state';
 import { emptyHand } from '../state';
 import { RESOURCES } from '../types';
-import type { Resource } from '../types';
+import type { Bundle } from '../types';
 
-export type Cost = Partial<Record<Resource, number>>;
+/** Baukosten sind nur ein Rohstoffbuendel mit anderem Namen. */
+export type Cost = Bundle;
 
 export const COST_ROAD: Cost = { lumber: 1, brick: 1 };
 export const COST_SETTLEMENT: Cost = { lumber: 1, brick: 1, wool: 1, grain: 1 };

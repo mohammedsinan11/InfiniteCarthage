@@ -18,6 +18,7 @@ import type { Targets } from '../board/Board';
 import { PlayerList } from '../ui/PlayerList';
 import { HandPanel } from '../ui/HandPanel';
 import { LogPanel } from '../ui/LogPanel';
+import { TradePanel } from '../ui/TradePanel';
 import {
   legalCityVertices,
   legalRoadEdges,
@@ -186,6 +187,14 @@ export function Game() {
 
         <div className="bar">
           {hand && <HandPanel hand={hand} />}
+
+          {/*
+            Der Handel steht bewusst ausserhalb des isMine-Blocks: ein Angebot
+            geht alle an, nicht nur den Spieler am Zug.
+          */}
+          {hand && you && (state.trade !== null || (isMine && phase.t === 'main')) && (
+            <TradePanel state={state} you={you} hand={hand} act={act} />
+          )}
 
           {isMine && phase.t === 'roll' && (
             <div className="actions">

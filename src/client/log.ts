@@ -5,7 +5,7 @@
 
 import type { GameEvent } from '../core/rules/reducer';
 import type { PublicState } from '../core/redact';
-import type { Resource } from '../core/types';
+import type { Bundle, Resource } from '../core/types';
 
 const RES_NAME: Record<Resource, string> = {
   lumber: 'Holz',
@@ -30,6 +30,14 @@ export const devName = (d: keyof typeof DEV_NAME): string => DEV_NAME[d];
 
 function who(state: PublicState | null, id: string): string {
   return state?.players.find((p) => p.id === id)?.name ?? 'Jemand';
+}
+
+/** Ein Rohstoffbuendel als Text, z.B. "2x Holz, 1x Erz". */
+export function bundleText(b: Bundle): string {
+  const parts = (Object.entries(b) as [Resource, number][])
+    .filter(([, n]) => n > 0)
+    .map(([r, n]) => `${n}x ${RES_NAME[r]}`);
+  return parts.length > 0 ? parts.join(', ') : 'nichts';
 }
 
 export function describeEvent(e: GameEvent, state: PublicState | null): string {
@@ -70,6 +78,16 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
       return `${who(state, e.player)} zieht ${e.taken}x ${RES_NAME[e.resource]} ein.`;
     case 'trade':
       return `${who(state, e.player)} tauscht ${e.ratio}x ${RES_NAME[e.give]} gegen ${RES_NAME[e.receive]}.`;
+    case 'tradeOffer':
+      return `${who(state, e.player)} bietet ${bundleText(e.give)} fuer ${bundleText(e.want)}.`;
+    case 'tradeResponse':
+      return e.accept
+        ? `${who(state, e.player)} sagt zu.`
+        : `${who(state, e.player)} lehnt ab.`;
+    case 'tradeSettled':
+      return `${who(state, e.from)} gibt ${bundleText(e.give)} an ${who(state, e.to)} und erhaelt ${bundleText(e.want)}.`;
+    case 'tradeCancelled':
+      return `${who(state, e.player)} zieht das Angebot zurueck.`;
     case 'largestArmy':
       return `${who(state, e.player)} hat die Groesste Rittermacht.`;
     case 'chunks':

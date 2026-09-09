@@ -13,7 +13,7 @@
  */
 
 import { handSize, publicPoints } from './state';
-import type { DevCard, GameState, Hand, Phase, PlayerId } from './state';
+import type { DevCard, GameState, Hand, Phase, PlayerId, TradeOffer } from './state';
 import type { ChunkCoord } from './chunks';
 import type { GameEvent } from './rules/reducer';
 
@@ -54,6 +54,13 @@ export type PublicState = {
   lastRoll: [number, number] | null;
   targetPoints: number;
   largestArmy: PlayerId | null;
+  /**
+   * Das offene Handelsangebot. Bewusst unredigiert: alle muessen sehen,
+   * was geboten wird, sonst laesst sich nicht darauf antworten. Auch die
+   * Zusagen sind oeffentlich - wer zusagt, verraet ohnehin, dass er
+   * liefern kann.
+   */
+  trade: TradeOffer | null;
   /** Eigene Punkte inklusive verdeckter Karten - nur fuer den Empfaenger. */
   myPoints: number;
 };
@@ -106,6 +113,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     lastRoll: state.lastRoll,
     targetPoints: state.targetPoints,
     largestArmy: state.largestArmy,
+    trade: state.trade,
     myPoints: (me ? publicPoints(state, viewer) : 0) + hidden,
   };
 }
