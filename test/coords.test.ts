@@ -14,6 +14,8 @@ import {
   hexCornerPixel,
   vertexToPixel,
   layoutFromSize,
+  pixelToHex,
+  hexToPixel,
   hexesInRange,
   hexDistance,
   neighbors,
@@ -173,6 +175,50 @@ describe('Kanten-Kanonisierung', () => {
         for (const e of es) {
           expect(edgeEndpoints(e).map(vertexKey)).toContain(vertexKey(v));
         }
+      }
+    }
+  });
+});
+
+describe('Pixel zurueck zu Hex', () => {
+  const L = layoutFromSize(20);
+
+  it('findet aus dem Mittelpunkt wieder dasselbe Feld', () => {
+    for (const h of hexesInRange({ q: 0, r: 0 }, 6)) {
+      const p = hexToPixel(h.q, h.r, L);
+      expect(pixelToHex(p.x, p.y, L)).toEqual({ q: h.q, r: h.r });
+    }
+  });
+
+  it('trifft auch abseits der Mitte das richtige Feld', () => {
+    // Punkte dicht um den Mittelpunkt muessen beim eigenen Feld bleiben.
+    for (const h of hexesInRange({ q: 0, r: 0 }, 4)) {
+      const p = hexToPixel(h.q, h.r, L);
+      for (const [dx, dy] of [
+        [6, 0],
+        [-6, 0],
+        [0, 8],
+        [0, -8],
+        [5, 5],
+        [-5, -5],
+      ] as const) {
+        expect(
+          pixelToHex(p.x + dx, p.y + dy, L),
+          `Versatz ${dx},${dy} bei ${h.q},${h.r}`,
+        ).toEqual({ q: h.q, r: h.r });
+      }
+    }
+  });
+
+  it('liefert fuer jeden Punkt eines Rasters ein benachbartes Feld', () => {
+    // Kein Punkt darf auf ein weit entferntes Feld zeigen - das waere ein
+    // Vorzeichen- oder Rundungsfehler.
+    for (let x = -200; x <= 200; x += 7) {
+      for (let y = -200; y <= 200; y += 7) {
+        const h = pixelToHex(x, y, L);
+        const back = hexToPixel(h.q, h.r, L);
+        const dist = Math.hypot(back.x - x, back.y - y);
+        expect(dist, `Punkt ${x},${y} landet zu weit weg`).toBeLessThan(L.h * 0.6);
       }
     }
   });

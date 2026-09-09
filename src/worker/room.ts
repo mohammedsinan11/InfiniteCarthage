@@ -22,6 +22,7 @@ import type { Game, GameEvent } from '../core/rules/reducer';
 import { redactEventsFor, redactStateFor } from '../core/redact';
 import type { GameState, PlayerId } from '../core/state';
 import {
+  DEFAULT_TARGET_POINTS,
   MAX_PLAYERS,
   MIN_PLAYERS,
   TARGET_POINTS_CHOICES,
@@ -91,7 +92,7 @@ export class GameRoom implements DurableObject {
       code,
       hostId: null,
       members: [],
-      targetPoints: 10,
+      targetPoints: DEFAULT_TARGET_POINTS,
       started: false,
       tokens: {},
     };

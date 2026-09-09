@@ -714,3 +714,8 @@ em.off {
   font-size: 16px;
   color: var(--accent);
 }
+
+/* Schatten unter dem angehobenen Feld - ohne ihn wirkt es verschoben statt gehoben. */
+.lift-shadow {
+  fill: rgba(0, 0, 0, 0.45);
+}

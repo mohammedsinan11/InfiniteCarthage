@@ -252,6 +252,38 @@ export function hexToPixel(q: number, r: number, L: Layout): { x: number; y: num
 }
 
 /**
+ * Auf welchem Hex liegt dieser Punkt? Umkehrung von hexToPixel.
+ *
+ * Die Rechnung liefert Bruchkoordinaten; das Runden passiert in Wuerfel-
+ * koordinaten, weil dort q + r + s = 0 gilt. Naiv jede Achse einzeln zu
+ * runden trifft nahe der Kanten das falsche Feld - deshalb wird die Achse
+ * mit dem groessten Rundungsfehler aus den beiden anderen zurueckgerechnet.
+ */
+export function pixelToHex(x: number, y: number, L: Layout): Hex {
+  const rf = y / (0.75 * L.h);
+  const qf = x / L.w - rf / 2;
+  return axialRound(qf, rf);
+}
+
+function axialRound(qf: number, rf: number): Hex {
+  const sf = -qf - rf;
+  let q = Math.round(qf);
+  let r = Math.round(rf);
+  const s = Math.round(sf);
+
+  const dq = Math.abs(q - qf);
+  const dr = Math.abs(r - rf);
+  const ds = Math.abs(s - sf);
+
+  if (dq > dr && dq > ds) q = -r - s;
+  else if (dr > ds) r = -q - s;
+
+  // | 0 macht aus -0 eine 0. Math.round(-0.2) liefert negative Null, und die
+  // vergleicht sich zwar gleich, faellt aber in strengen Pruefungen auf.
+  return { q: q | 0, r: r | 0 };
+}
+
+/**
  * Ecke 0..5 als Vielfache von halber Breite und Hoehe, gleiche Reihenfolge
  * wie hexVertices: N, NO, SO, S, SW, NW.
  */

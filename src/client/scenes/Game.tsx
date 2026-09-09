@@ -59,6 +59,8 @@ export function Game() {
   const [yopA, setYopA] = useState<Resource>('lumber');
   const [yopB, setYopB] = useState<Resource>('brick');
   const [discard, setDiscard] = useState<Partial<Record<Resource, number>>>({});
+  /** Zahlen festpinnen - fuer alle, die sie lieber dauerhaft sehen. */
+  const [pinNumbers, setPinNumbers] = useState(false);
 
   const me = state.players.find((p) => p.id === you);
   const hand = me?.hand;
@@ -141,6 +143,15 @@ export function Game() {
 
   const ratio = you ? tradeRatio(state, world, you, tradeGive) : 4;
 
+  /*
+   * Waehrend eine Bauwahl offen ist, muss man Felder vergleichen koennen -
+   * dann helfen einzeln eingeblendete Zahlen nicht weiter.
+   */
+  const waehltGerade =
+    (targets.vertices?.length ?? 0) > 0 ||
+    (targets.edges?.length ?? 0) > 0 ||
+    (targets.hexes?.length ?? 0) > 0;
+
   return (
     <div className="game">
       <main className="main">
@@ -168,6 +179,13 @@ export function Game() {
               {state.lastRoll[0]} + {state.lastRoll[1]} = {state.lastRoll[0] + state.lastRoll[1]}
             </span>
           )}
+          <button
+            className={pinNumbers ? 'small chosen' : 'ghost small'}
+            title="Zahlen dauerhaft anzeigen"
+            onClick={() => setPinNumbers((v) => !v)}
+          >
+            zahlen
+          </button>
           <button className="ghost small" onClick={disconnect}>
             verlassen
           </button>
@@ -179,7 +197,13 @@ export function Game() {
           </div>
         )}
 
-        <Board world={world} state={state} targets={targets} onPick={onPick} />
+        <Board
+          world={world}
+          state={state}
+          targets={targets}
+          showAllNumbers={pinNumbers || waehltGerade}
+          onPick={onPick}
+        />
 
         <div className="bar">
           {hand && <HandPanel hand={hand} />}

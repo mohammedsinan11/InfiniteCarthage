@@ -33,9 +33,21 @@ export type RoomInfo = {
 export const MIN_PLAYERS = 1;
 export const MAX_PLAYERS = 6;
 
-/** 0 bedeutet: kein Siegpunktziel, die Partie endet nie von selbst. */
+/**
+ * 0 bedeutet: kein Siegpunktziel, die Partie endet nie von selbst.
+ *
+ * Der Mechanismus bleibt - checkWin prueft weiterhin auf <= 0 - aber als
+ * Auswahl steht er nicht mehr zur Verfuegung. "Ohne Ziel" verwirrt mehr, als
+ * es hilft; wer endlos siedeln will, nimmt 30 und hoert auf, wann er mag.
+ */
 export const NO_TARGET = 0;
-export const TARGET_POINTS_CHOICES = [NO_TARGET, 10, 12, 15] as const;
+
+/**
+ * Hoehere Ziele als im Original, weil dies kein Catan ist: die Karte hat
+ * keinen Rand, also darf eine Partie laenger laufen und weiter hinausfuehren.
+ */
+export const TARGET_POINTS_CHOICES = [15, 30] as const;
+export const DEFAULT_TARGET_POINTS = 15;
 
 export const targetPointsLabel = (n: number): string =>
   n === NO_TARGET ? 'ohne Ziel' : String(n);

@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   hexToPixel,
+  pixelToHex,
   parseEdgeKey,
   parseVertexKey,
   edgeEndpoints,
@@ -30,7 +31,7 @@ import { playerColor } from '../theme';
 import { HEX_CX, HEX_CY, HEX_H, HEX_W, IMG_H, IMG_W, tileUrl } from '../tiles';
 
 /** Wie stark die Kacheln vergroessert werden. */
-const SCALE = 2.8;
+const SCALE = 2.0;
 
 /** Das Raster richtet sich nach dem SECHSECK, nicht nach dem Bild. */
 const LAYOUT: Layout = { w: HEX_W * SCALE, h: HEX_H * SCALE };
@@ -47,8 +48,21 @@ const IMG = {
   dy: HEX_CY * SCALE,
 };
 
-const MIN_ZOOM = 0.3;
-const MAX_ZOOM = 2.5;
+/**
+ * Zoomstufen statt stufenlosem Zoom.
+ *
+ * Pixel-Art bleibt nur scharf, wenn ein Bildpunkt der Vorlage auf eine GANZE
+ * Zahl Bildschirmpunkte faellt. Bei krummen Faktoren wird ein Teil der Punkte
+ * doppelt so gross wie der Rest, und die Kachel wirkt krisselig - genau das
+ * war der Eindruck beim vorherigen Massstab 2,8.
+ *
+ * Mit SCALE = 2 ergeben diese Stufen die Faktoren 1, 2, 3, 4 und 5.
+ */
+const ZOOM_STEPS = [0.5, 1, 1.5, 2, 2.5] as const;
+const DEFAULT_ZOOM_INDEX = 1;
+
+/** Wie weit sich ein Feld unter dem Zeiger hebt. */
+const LIFT = 3 * SCALE;
 
 export type Targets = {
   vertices?: string[];
@@ -60,6 +74,8 @@ type Props = {
   world: World;
   state: PublicState;
   targets: Targets;
+  /** Alle Zahlen dauerhaft zeigen - sonst erscheinen sie nur unter dem Zeiger. */
+  showAllNumbers: boolean;
   onPick: (kind: 'vertex' | 'edge' | 'hex', key: string) => void;
 };
 
@@ -68,12 +84,18 @@ type Camera = { cx: number; cy: number; scale: number };
 /** Augenzahl als Punkte: sagt schneller als die Ziffer, wie oft ein Feld trifft. */
 const pips = (n: number): string => '.'.repeat(6 - Math.abs(7 - n));
 
-export function Board({ world, state, targets, onPick }: Props) {
+export function Board({ world, state, targets, showAllNumbers, onPick }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
-  const [cam, setCam] = useState<Camera>({ cx: 0, cy: 0, scale: 1 });
+  const [cam, setCam] = useState<Camera>({
+    cx: 0,
+    cy: 0,
+    scale: ZOOM_STEPS[DEFAULT_ZOOM_INDEX]!,
+  });
   const drag = useRef<{ x: number; y: number; cx: number; cy: number } | null>(null);
   const moved = useRef(false);
+  /** Feld unter dem Zeiger - nur dessen Zahl wird eingeblendet. */
+  const [hover, setHover] = useState<string | null>(null);
 
   useEffect(() => {
     const el = ref.current;
@@ -122,8 +144,16 @@ export function Board({ world, state, targets, onPick }: Props) {
   const onWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
     setCam((c) => {
-      const factor = Math.exp(-e.deltaY * 0.0015);
-      const scale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, c.scale * factor));
+      // Eine Stufe pro Raddreh, nicht stufenlos - siehe ZOOM_STEPS.
+      const i = ZOOM_STEPS.indexOf(c.scale as (typeof ZOOM_STEPS)[number]);
+      const cur = i < 0 ? DEFAULT_ZOOM_INDEX : i;
+      const next = Math.min(
+        ZOOM_STEPS.length - 1,
+        Math.max(0, cur + (e.deltaY < 0 ? 1 : -1)),
+      );
+      const scale = ZOOM_STEPS[next]!;
+      if (scale === c.scale) return c;
+
       const rect = ref.current?.getBoundingClientRect();
       if (!rect) return { ...c, scale };
       // Der Punkt unter dem Zeiger soll stehen bleiben.
@@ -145,15 +175,32 @@ export function Board({ world, state, targets, onPick }: Props) {
 
   const onPointerMove = (e: React.PointerEvent) => {
     const d = drag.current;
-    if (!d) return;
-    const dx = e.clientX - d.x;
-    const dy = e.clientY - d.y;
-    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved.current = true;
-    setCam((c) => ({ ...c, cx: d.cx - dx / c.scale, cy: d.cy - dy / c.scale }));
+    if (d) {
+      const dx = e.clientX - d.x;
+      const dy = e.clientY - d.y;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved.current = true;
+      setCam((c) => ({ ...c, cx: d.cx - dx / c.scale, cy: d.cy - dy / c.scale }));
+      return;
+    }
+    // Welches Feld liegt unter dem Zeiger? Bildschirm- in Weltkoordinaten,
+    // dann zurueckrechnen - genauer als Trefferflaechen, weil die Kacheln
+    // durchsichtige Ecken haben und sich ueberlappen.
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+    const wx = view.x + (e.clientX - rect.left) / cam.scale;
+    const wy = view.y + (e.clientY - rect.top) / cam.scale;
+    const h = pixelToHex(wx, wy, LAYOUT);
+    const key = hexKey(h.q, h.r);
+    setHover((prev) => (prev === key ? prev : key));
   };
 
   const onPointerUp = () => {
     drag.current = null;
+  };
+
+  const onPointerLeave = () => {
+    drag.current = null;
+    setHover(null);
   };
 
   /** Klicks nur werten, wenn nicht gerade geschoben wurde. */
@@ -177,20 +224,30 @@ export function Board({ world, state, targets, onPick }: Props) {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
+      onPointerLeave={onPointerLeave}
     >
       <svg
         viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
         width={size.w}
         height={size.h}
       >
-        {/* Gelaendekacheln */}
+        {/*
+          Gelaendekacheln.
+
+          Das Feld unter dem Zeiger wird hier UEBERSPRUNGEN und ganz zum
+          Schluss gezeichnet - angehoben und damit ueber allen anderen. Zoege
+          man es in der normalen Reihenfolge hoch, wuerde die Reihe darunter
+          es sofort wieder ueberdecken, denn die Kacheln ueberlappen sich.
+        */}
         {visible.map((t) => {
+          const hk = hexKey(t.q, t.r);
+          if (hk === hover) return null;
           const url = tileUrl(state.worldSeed, t.terrain, t.q, t.r);
           if (url === null) return null;
           const c = hexToPixel(t.q, t.r, LAYOUT);
           return (
             <image
-              key={'t' + hexKey(t.q, t.r)}
+              key={'t' + hk}
               href={url}
               x={c.x - IMG.dx}
               y={c.y - IMG.dy}
@@ -201,31 +258,67 @@ export function Board({ world, state, targets, onPick }: Props) {
           );
         })}
 
+        {/* Das angehobene Feld, zuletzt und damit obenauf. */}
+        {(() => {
+          if (hover === null) return null;
+          const t = world.tiles.get(hover);
+          if (!t) return null;
+          const url = tileUrl(state.worldSeed, t.terrain, t.q, t.r);
+          if (url === null) return null;
+          const c = hexToPixel(t.q, t.r, LAYOUT);
+          return (
+            <g pointerEvents="none">
+              <ellipse
+                cx={c.x}
+                cy={c.y + LAYOUT.h * 0.42}
+                rx={LAYOUT.w * 0.34}
+                ry={LAYOUT.h * 0.09}
+                className="lift-shadow"
+              />
+              <image
+                href={url}
+                x={c.x - IMG.dx}
+                y={c.y - IMG.dy - LIFT}
+                width={IMG.w}
+                height={IMG.h}
+                className="tile"
+              />
+            </g>
+          );
+        })()}
+
         {/* Zahlenmarker und Raeuber */}
         {visible.map((t) => {
           const hk = hexKey(t.q, t.r);
           const c = hexToPixel(t.q, t.r, LAYOUT);
           const red = t.number === 6 || t.number === 8;
+          /*
+           * Zahlen liegen nicht dauerhaft auf der Karte, sondern erscheinen
+           * unter dem Zeiger. Dauerhaft eingeblendet verdecken sie genau die
+           * Landschaft, wegen der die Kacheln ueberhaupt da sind.
+           *
+           * Zwei Ausnahmen, sonst waere es laestig: waehrend eine Bauwahl
+           * offen ist, braucht man den Vergleich ueber mehrere Felder - da
+           * werden alle gezeigt. Und der Nutzer kann sie festpinnen.
+           */
+          const showNumber = t.number !== null && (showAllNumbers || hover === hk);
+          // Liegt das Feld oben, wandern Zahl und Raeuber mit.
+          const lift = hover === hk ? LIFT : 0;
           return (
-            <g key={'n' + hk} pointerEvents="none">
-              {t.number !== null && (
+            <g key={'n' + hk} pointerEvents="none" transform={`translate(0 ${-lift})`}>
+              {showNumber && (
                 <>
-                  {/*
-                    Klein halten: der Marker muss lesbar sein, darf aber die
-                    Kachel nicht zudecken - sonst haette man sich die Grafik
-                    sparen koennen.
-                  */}
-                  <circle cx={c.x} cy={c.y} r={11} className="token" />
+                  <circle cx={c.x} cy={c.y} r={9} className="token" />
                   <text
                     x={c.x}
-                    y={c.y + 2}
+                    y={c.y + 1}
                     textAnchor="middle"
                     className={red ? 'token-num red' : 'token-num'}
                   >
                     {t.number}
                   </text>
-                  <text x={c.x} y={c.y + 9} textAnchor="middle" className="token-pips">
-                    {pips(t.number)}
+                  <text x={c.x} y={c.y + 8} textAnchor="middle" className="token-pips">
+                    {pips(t.number!)}
                   </text>
                 </>
               )}

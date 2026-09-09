@@ -138,7 +138,7 @@ export function createGame(
   players: NewPlayer[],
   worldSeed: number,
   secretSeed: number,
-  targetPoints = 10,
+  targetPoints = 15,
 ): Game {
   /**
    * Ein Spieler genuegt - allein siedeln ist der Sandkasten.
