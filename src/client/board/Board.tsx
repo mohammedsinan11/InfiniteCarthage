@@ -49,20 +49,56 @@ const IMG = {
 };
 
 /**
- * Zoomstufen statt stufenlosem Zoom.
+ * Zoomstufen, abgeleitet aus der Bildschirmskalierung.
  *
- * Pixel-Art bleibt nur scharf, wenn ein Bildpunkt der Vorlage auf eine GANZE
- * Zahl Bildschirmpunkte faellt. Bei krummen Faktoren wird ein Teil der Punkte
- * doppelt so gross wie der Rest, und die Kachel wirkt krisselig - genau das
- * war der Eindruck beim vorherigen Massstab 2,8.
+ * Pixel-Art bleibt nur scharf, wenn ein Bildpunkt der Vorlage auf eine ganze
+ * Zahl GERAETEPIXEL faellt. Entscheidend ist das Geraet, nicht das CSS: bei
+ * 125 % Windows-Skalierung ist devicePixelRatio 1,25, und ein sauberer
+ * CSS-Faktor 2 wird dort zu 2,5 Geraetepixeln - der Browser interpoliert,
+ * das Bild wirkt verwaschen. Genau dieser Fall trat auf einem PC auf,
+ * waehrend es bei devicePixelRatio 2 tadellos aussah.
  *
- * Mit SCALE = 2 ergeben diese Stufen die Faktoren 1, 2, 3, 4 und 5.
+ * Deshalb werden die Stufen rueckwaerts gerechnet: erst festlegen, wie viele
+ * Geraetepixel ein Kunstpixel bedecken soll (ganzzahlig), daraus ergibt sich
+ * der Zoomfaktor.
  */
-const ZOOM_STEPS = [0.5, 1, 1.5, 2, 2.5] as const;
-const DEFAULT_ZOOM_INDEX = 1;
+const DPR = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
+
+/** Geraetepixel je Kunstpixel. Ganze Zahlen, sonst wird interpoliert. */
+const DEVICE_FACTORS = [1, 2, 3, 4, 6, 8] as const;
+
+const ZOOM_STEPS = DEVICE_FACTORS.map((f) => f / (SCALE * DPR));
+
+/**
+ * Startstufe: rund zwei CSS-Pixel je Kunstpixel, also Kacheln von etwa 48
+ * Pixeln Breite. Bei hoher Bildschirmskalierung entspricht das mehr
+ * Geraetepixeln - die Kachel bleibt dabei gleich gross, nur schaerfer.
+ */
+const DEFAULT_ZOOM_INDEX = (() => {
+  const wunsch = 2 * DPR;
+  let best = 0;
+  for (let i = 1; i < DEVICE_FACTORS.length; i++) {
+    if (Math.abs(DEVICE_FACTORS[i]! - wunsch) < Math.abs(DEVICE_FACTORS[best]! - wunsch)) {
+      best = i;
+    }
+  }
+  return best;
+})();
 
 /** Wie weit sich ein Feld unter dem Zeiger hebt. */
 const LIFT = 3 * SCALE;
+
+/*
+ * Einmal in die Konsole, damit sich Schaerfeprobleme nachvollziehen lassen,
+ * ohne raten zu muessen: bei welcher Bildschirmskalierung laeuft das Geraet,
+ * und wie viele Geraetepixel bedeckt ein Kunstpixel gerade.
+ */
+if (typeof console !== 'undefined') {
+  console.info(
+    `InfiniteCarthage: devicePixelRatio ${DPR}, Zoomstufen als Geraetepixel je ` +
+      `Kunstpixel: ${DEVICE_FACTORS.join(', ')} (Start: ${DEVICE_FACTORS[DEFAULT_ZOOM_INDEX]})`,
+  );
+}
 
 export type Targets = {
   vertices?: string[];
@@ -79,7 +115,9 @@ type Props = {
   onPick: (kind: 'vertex' | 'edge' | 'hex', key: string) => void;
 };
 
-type Camera = { cx: number; cy: number; scale: number };
+/** zi ist der Index in ZOOM_STEPS - nicht der Faktor selbst, weil sich
+ *  Fliesskommawerte schlecht wiederfinden lassen. */
+type Camera = { cx: number; cy: number; zi: number };
 
 /** Augenzahl als Punkte: sagt schneller als die Ziffer, wie oft ein Feld trifft. */
 const pips = (n: number): string => '.'.repeat(6 - Math.abs(7 - n));
@@ -87,11 +125,8 @@ const pips = (n: number): string => '.'.repeat(6 - Math.abs(7 - n));
 export function Board({ world, state, targets, showAllNumbers, onPick }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
-  const [cam, setCam] = useState<Camera>({
-    cx: 0,
-    cy: 0,
-    scale: ZOOM_STEPS[DEFAULT_ZOOM_INDEX]!,
-  });
+  const [cam, setCam] = useState<Camera>({ cx: 0, cy: 0, zi: DEFAULT_ZOOM_INDEX });
+  const scale = ZOOM_STEPS[cam.zi]!;
   const drag = useRef<{ x: number; y: number; cx: number; cy: number } | null>(null);
   const moved = useRef(false);
   /** Feld unter dem Zeiger - nur dessen Zahl wird eingeblendet. */
@@ -108,15 +143,24 @@ export function Board({ world, state, targets, showAllNumbers, onPick }: Props) 
     return () => ro.disconnect();
   }, []);
 
-  const view = useMemo(
-    () => ({
-      x: cam.cx - size.w / 2 / cam.scale,
-      y: cam.cy - size.h / 2 / cam.scale,
-      w: size.w / cam.scale,
-      h: size.h / cam.scale,
-    }),
-    [cam, size],
-  );
+  const view = useMemo(() => {
+    /*
+     * Der Ausschnitt wird auf das Geraetepixel-Raster gerastet.
+     *
+     * Ein ganzzahliger Vergroesserungsfaktor allein genuegt nicht: faengt der
+     * Ausschnitt auf einem halben Geraetepixel an, liegt jede Kachel um einen
+     * halben Pixel daneben und der Browser interpoliert trotzdem. Ein
+     * Geraetepixel entspricht 1/(scale*DPR) Welteinheiten.
+     */
+    const raster = 1 / (scale * DPR);
+    const snap = (v: number) => Math.round(v / raster) * raster;
+    return {
+      x: snap(cam.cx - size.w / 2 / scale),
+      y: snap(cam.cy - size.h / 2 / scale),
+      w: size.w / scale,
+      h: size.h / scale,
+    };
+  }, [cam, size, scale]);
 
   /**
    * Sichtbare Felder, zeilenweise sortiert. Der Rand von einer Kachelgroesse
@@ -145,24 +189,23 @@ export function Board({ world, state, targets, showAllNumbers, onPick }: Props) 
     e.preventDefault();
     setCam((c) => {
       // Eine Stufe pro Raddreh, nicht stufenlos - siehe ZOOM_STEPS.
-      const i = ZOOM_STEPS.indexOf(c.scale as (typeof ZOOM_STEPS)[number]);
-      const cur = i < 0 ? DEFAULT_ZOOM_INDEX : i;
-      const next = Math.min(
+      const zi = Math.min(
         ZOOM_STEPS.length - 1,
-        Math.max(0, cur + (e.deltaY < 0 ? 1 : -1)),
+        Math.max(0, c.zi + (e.deltaY < 0 ? 1 : -1)),
       );
-      const scale = ZOOM_STEPS[next]!;
-      if (scale === c.scale) return c;
+      if (zi === c.zi) return c;
 
+      const alt = ZOOM_STEPS[c.zi]!;
+      const neu = ZOOM_STEPS[zi]!;
       const rect = ref.current?.getBoundingClientRect();
-      if (!rect) return { ...c, scale };
+      if (!rect) return { ...c, zi };
       // Der Punkt unter dem Zeiger soll stehen bleiben.
       const mx = e.clientX - rect.left - rect.width / 2;
       const my = e.clientY - rect.top - rect.height / 2;
       return {
-        scale,
-        cx: c.cx + mx / c.scale - mx / scale,
-        cy: c.cy + my / c.scale - my / scale,
+        zi,
+        cx: c.cx + mx / alt - mx / neu,
+        cy: c.cy + my / alt - my / neu,
       };
     });
   }, []);
@@ -179,7 +222,7 @@ export function Board({ world, state, targets, showAllNumbers, onPick }: Props) 
       const dx = e.clientX - d.x;
       const dy = e.clientY - d.y;
       if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved.current = true;
-      setCam((c) => ({ ...c, cx: d.cx - dx / c.scale, cy: d.cy - dy / c.scale }));
+      setCam((c) => ({ ...c, cx: d.cx - dx / scale, cy: d.cy - dy / scale }));
       return;
     }
     // Welches Feld liegt unter dem Zeiger? Bildschirm- in Weltkoordinaten,
@@ -187,8 +230,8 @@ export function Board({ world, state, targets, showAllNumbers, onPick }: Props) 
     // durchsichtige Ecken haben und sich ueberlappen.
     const rect = ref.current?.getBoundingClientRect();
     if (!rect) return;
-    const wx = view.x + (e.clientX - rect.left) / cam.scale;
-    const wy = view.y + (e.clientY - rect.top) / cam.scale;
+    const wx = view.x + (e.clientX - rect.left) / scale;
+    const wy = view.y + (e.clientY - rect.top) / scale;
     const h = pixelToHex(wx, wy, LAYOUT);
     const key = hexKey(h.q, h.r);
     setHover((prev) => (prev === key ? prev : key));

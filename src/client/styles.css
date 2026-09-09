@@ -357,8 +357,17 @@ em.off {
   opacity: 0.65;
 }
 
-/* Ohne das wird aus vergroesserter Pixel-Art Matsch. */
+/*
+ * Ohne das wird aus vergroesserter Pixel-Art Matsch.
+ *
+ * Drei Schreibweisen, weil die Browser sich nie einig wurden: Firefox kennt
+ * crisp-edges, aeltere WebKit-Versionen nur -webkit-optimize-contrast,
+ * Chrome und die uebrigen pixelated. Die letzte unterstuetzte gewinnt,
+ * deshalb steht die modernste unten.
+ */
 .tile {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
   image-rendering: pixelated;
 }
 
