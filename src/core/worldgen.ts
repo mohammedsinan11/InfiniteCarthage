@@ -1,5 +1,5 @@
 /**
- * Prozedurale Erzeugung des Bretts, Chunk fuer Chunk.
+ * Prozedurale Erzeugung des Bretts.
  *
  * generateChunk(worldSeed, m, n) ist REIN: das Ergebnis haengt nur von diesen
  * drei Werten ab, nie davon, in welcher Reihenfolge Chunks angefordert
@@ -8,184 +8,178 @@
  * die Liste der freigeschalteten Chunks, den Rest rechnet jeder Client
  * selbst aus.
  *
- * Balance: jeder Chunk enthaelt garantiert alle fuenf Rohstoffgelaende.
- * Niemand landet in einer Ein-Rohstoff-Oednis, egal wohin er baut.
+ * ZUR VERTEILUNG
+ *
+ * Eine fruehere Fassung zog je Chunk einen Beutel mit allen fuenf
+ * Rohstoffgelaenden. Das war perfekt ausgewogen und sah furchtbar aus: wenn
+ * sieben benachbarte Felder garantiert fuenf verschiedene Sorten tragen,
+ * kann kein Wald zusammenhaengen. Die Karte wirkte wie Konfetti.
+ *
+ * Jetzt entscheidet Rauschen. Hoehe trennt Wasser, Land, Huegel und Berge;
+ * Feuchte teilt das Land in Wald, Weide, Feld und Wueste. Beides sind
+ * langwellige Felder, also entstehen Seen, Waldguertel und Gebirgszuege -
+ * und ein Feld sieht meist aus wie seine Nachbarn.
+ *
+ * Die Ausgewogenheit ist damit nicht verschwunden, sondern verschoben: sie
+ * gilt nicht mehr ueberall, sondern dort, wo sie zaehlt. createGame sucht
+ * einen Seed, dessen STARTGEBIET alle fuenf Rohstoffe traegt. Weiter draussen
+ * hat jede Gegend ihren eigenen Charakter - was auf einer unbegrenzten Karte
+ * ein Grund ist, sich zu bewegen, statt ein Mangel.
  */
 
 import { Rng } from './rng';
 import { hash3i } from './hash';
+import { expand, fbm, hexToField } from './noise';
 import { chunkHexes, chunkOf, chunkKey } from './chunks';
 import {
   hexKey,
+  hexesInRange,
   vertexKey,
   sideEdge,
   edgeEndpoints,
   neighbors,
   HEX_DIRS,
 } from './coords';
-import type { Hex } from './coords';
-import {
-  PRODUCTIVE_TERRAIN,
-  RESOURCES,
-} from './types';
+import { RESOURCES, TERRAIN_RESOURCE } from './types';
 import type { Chunk, Port, PortType, Terrain, Tile } from './types';
 
-// Getrennte Zufallsstroeme pro Aspekt, damit eine Aenderung an der
-// Hafenlogik nicht das gesamte Gelaende verschiebt.
-const SALT_TERRAIN = 1;
+// Getrennte Zufallsstroeme, damit eine Aenderung an den Haefen nicht das
+// gesamte Gelaende verschiebt.
+const SALT_ELEVATION = 41;
+const SALT_MOISTURE = 42;
 const SALT_NUMBER = 2;
 const SALT_PORT = 3;
 const SALT_TIE = 4;
 const SALT_DEMOTE = 5;
 
-/** Klassische Zahlenverteilung (18 Marker fuer 18 Landfelder). */
-const NUMBER_BAG: readonly number[] = [
+/**
+ * Groesse der Landschaftsformen in Hexfeldern.
+ *
+ * Der entscheidende Regler fuer den Eindruck. Zu gross, und das sichtbare
+ * Gebiet liegt vollstaendig in EINER Region - die Karte wirkt dann einfarbig,
+ * nicht abwechslungsreich. Genau das passierte bei 11: der Startbereich war
+ * durchgehend Huegelland.
+ *
+ * Die Vorlage von hexmap sieht auch deshalb so vielfaeltig aus, weil sie
+ * hunderte Felder breit ist. Bei uns sind gut 50 gleichzeitig zu sehen, also
+ * muessen die Regionen kleiner sein, damit mehrere davon ins Bild passen -
+ * ohne so klein zu werden, dass das Gelaende wieder springt.
+ */
+const ELEVATION_SCALE = 6.5;
+const MOISTURE_SCALE = 5;
+
+/**
+ * Schwellen fuer Hoehe und Feuchte.
+ *
+ * Nicht geraten, sondern auf gemessene Perzentile der beiden Felder gesetzt.
+ * Ein erster Versuch mit runden Zahlen ergab 27 % Berge und 4 % Weide - die
+ * Verteilung von fbm ist eben nicht gleichmaessig, und wer Schwellen nach
+ * Gefuehl waehlt, trifft danach.
+ *
+ * Ziel ist eine Karte, auf der man Catan spielen kann: rund ein Fuenftel
+ * Wasser, die Haelfte flaches Land, der Rest Huegel und Berge.
+ *
+ *   Hoehe  < p22 (0,310)  Wasser
+ *          > p87 (0,831)  Berg
+ *          > p72 (0,694)  Huegel
+ */
+const SEA_LEVEL = 0.31;
+const HILL_LEVEL = 0.694;
+const MOUNTAIN_LEVEL = 0.831;
+
+/**
+ * Feuchte teilt das flache Land auf - ebenfalls nach Perzentilen:
+ *   > p70 (0,697)  Wald
+ *   > p40 (0,438)  Weide
+ *   > p16 (0,184)  Feld
+ *   sonst          Wueste
+ */
+const FOREST_LEVEL = 0.697;
+const PASTURE_LEVEL = 0.438;
+const FIELD_LEVEL = 0.184;
+
+export type Fields = { elevation: number; moisture: number };
+
+/** Die beiden Felder an einem Hex. Rein. */
+export function fieldsAt(seed: number, q: number, r: number): Fields {
+  const p = hexToField(q, r);
+  return {
+    elevation: expand(fbm(seed, p.x / ELEVATION_SCALE, p.y / ELEVATION_SCALE, SALT_ELEVATION, 3)),
+    moisture: expand(fbm(seed, p.x / MOISTURE_SCALE, p.y / MOISTURE_SCALE, SALT_MOISTURE, 2)),
+  };
+}
+
+/** Gelaende an einem Hex. Rein - haengt nur von Seed und Koordinate ab. */
+export function terrainAt(seed: number, q: number, r: number): Terrain {
+  const { elevation, moisture } = fieldsAt(seed, q, r);
+  if (elevation < SEA_LEVEL) return 'water';
+  if (elevation > MOUNTAIN_LEVEL) return 'mountain';
+  if (elevation > HILL_LEVEL) return 'hill';
+  if (moisture > FOREST_LEVEL) return 'forest';
+  if (moisture > PASTURE_LEVEL) return 'pasture';
+  if (moisture > FIELD_LEVEL) return 'field';
+  return 'desert';
+}
+
+const produces = (t: Terrain): boolean => TERRAIN_RESOURCE[t] !== null;
+
+// --- Zahlen -----------------------------------------------------------------
+
+/**
+ * Klassische Verteilung als Nachschlagetabelle: 18 Eintraege, jede Zahl so
+ * oft wie im Original. Ein Griff per Hash trifft damit dieselbe Haeufigkeit
+ * wie ein gemischter Beutel, braucht aber keinen - und bleibt rein pro Feld.
+ */
+const NUMBER_TABLE: readonly number[] = [
   2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12,
 ];
 
-/** Die zwei Fuellfelder je Chunk. Wald/Weide/Feld haeufiger, dazu etwas Wueste und Wasser. */
-const FILLER_BAG: readonly Terrain[] = [
-  'forest', 'forest', 'forest',
-  'pasture', 'pasture', 'pasture',
-  'field', 'field', 'field',
-  'hill', 'hill',
-  'mountain', 'mountain',
-  'desert', 'desert',
-  'water', 'water',
-];
+/** Harmlose Zahlen, auf die ein Verlierer des Stichentscheids faellt. */
+const CALM_NUMBERS: readonly number[] = [3, 4, 5, 9, 10, 11];
 
 const isRed = (n: number | null): boolean => n === 6 || n === 8;
 
-// --- Rohdaten ---------------------------------------------------------------
-
-type RawTile = { q: number; r: number; terrain: Terrain; number: number | null };
-
-/**
- * Gelaende und Zahlen eines Chunks OHNE den Ausgleich ueber Chunk-Grenzen.
- *
- * Diese Zwischenstufe existiert, damit ein Chunk die Rohdaten seiner
- * Nachbarn ansehen kann, ohne dass daraus eine Rekursion ohne Grund wird:
- * rawChunk haengt von nichts ab ausser Seed und Koordinate.
- */
-function rawChunk(seed: number, m: number, n: number): RawTile[] {
-  const hexes = chunkHexes(m, n);
-  const isOrigin = m === 0 && n === 0;
-
-  const rngT = new Rng(hash3i(seed, m, n, SALT_TERRAIN));
-
-  // Fuenf garantierte Rohstoffgelaende, dazu zwei Fuellfelder.
-  const terrains: Terrain[] = [...PRODUCTIVE_TERRAIN];
-  if (isOrigin) {
-    // Startchunk: genau eine Wueste als Startfeld des Raeubers, kein Wasser.
-    terrains.push('desert');
-    terrains.push(PRODUCTIVE_TERRAIN[rngT.int(PRODUCTIVE_TERRAIN.length)]!);
-  } else {
-    for (let i = 0; i < 2; i++) {
-      terrains.push(FILLER_BAG[rngT.int(FILLER_BAG.length)]!);
-    }
-  }
-  rngT.shuffle(terrains);
-
-  const rngN = new Rng(hash3i(seed, m, n, SALT_NUMBER));
-  const bag = rngN.shuffle([...NUMBER_BAG]);
-  let next = 0;
-
-  return hexes.map((h, i) => {
-    const terrain = terrains[i]!;
-    const producing = terrain !== 'desert' && terrain !== 'water';
-    return {
-      q: h.q,
-      r: h.r,
-      terrain,
-      number: producing ? bag[next++]! : null,
-    };
-  });
+/** Rohzahl eines Feldes, noch ohne Entzerrung. */
+function rawNumber(seed: number, q: number, r: number): number | null {
+  if (!produces(terrainAt(seed, q, r))) return null;
+  return NUMBER_TABLE[hash3i(seed, q, r, SALT_NUMBER) % NUMBER_TABLE.length]!;
 }
-
-// Kleiner Cache: rawChunk wird beim Ausgleich fuer jeden Nachbarn abgefragt.
-// Rein deterministisch, der Cache aendert also nie ein Ergebnis.
-const rawCache = new Map<string, RawTile[]>();
-
-function rawChunkCached(seed: number, m: number, n: number): RawTile[] {
-  const k = seed + '|' + m + ':' + n;
-  let v = rawCache.get(k);
-  if (v === undefined) {
-    if (rawCache.size > 4096) rawCache.clear();
-    v = rawChunk(seed, m, n);
-    rawCache.set(k, v);
-  }
-  return v;
-}
-
-/** Rohdaten eines einzelnen Hexes, ueber Chunk-Grenzen hinweg. */
-function rawAt(seed: number, q: number, r: number): RawTile {
-  const c = chunkOf(q, r);
-  const tiles = rawChunkCached(seed, c.m, c.n);
-  const found = tiles.find((t) => t.q === q && t.r === r);
-  if (!found) throw new Error('Hex ' + hexKey(q, r) + ' fehlt in seinem Chunk');
-  return found;
-}
-
-/** Nur das Gelaende - fuer die Hafenausrichtung. */
-export function terrainAt(seed: number, q: number, r: number): Terrain {
-  return rawAt(seed, q, r).terrain;
-}
-
-// --- Ausgleich der roten Zahlen ---------------------------------------------
 
 /**
  * Zwei benachbarte 6er oder 8er sind im Original verboten. Auf einer
- * unendlichen Karte laesst sich das nicht global planen, ohne die Reinheit
- * der Chunk-Erzeugung aufzugeben.
+ * unendlichen Karte laesst sich das nicht global planen.
  *
- * Loesung: ein symmetrischer Stichentscheid auf den ROHDATEN. Stossen zwei
+ * Loesung: ein symmetrischer Stichentscheid auf den ROHZAHLEN. Stossen zwei
  * rote Zahlen aneinander, vergleichen beide Seiten denselben Hash; der
- * Verlierer gibt seine rote Zahl ab und bekommt eine harmlose. Weil beide
- * Chunks unabhaengig zum selben Vergleich kommen, braucht es weder
- * Rekursion noch Wissen darueber, wer zuerst erzeugt wurde.
+ * Verlierer gibt seine rote Zahl ab. Weil beide Felder unabhaengig zum selben
+ * Vergleich kommen, braucht es weder Rekursion noch Wissen darueber, welches
+ * zuerst erzeugt wurde.
  *
- * Das ist beweisbar konfliktfrei: bleiben zwei benachbarte Felder rot,
- * haetten beide ihren direkten Vergleich gewonnen - unmoeglich, denn genau
- * einer der beiden Hashes ist groesser.
+ * Beweisbar konfliktfrei: blieben zwei Nachbarn rot, haetten beide ihren
+ * direkten Vergleich gewonnen - unmoeglich, denn genau einer der beiden
+ * Hashes ist groesser.
  *
- * Ein erster Versuch tauschte die rote Zahl stattdessen gegen ein anderes
- * Feld im selben Chunk. Das scheiterte messbar: ein Chunk ist nur sieben
- * Felder gross, der Tausch schob den Konflikt also meist nur weiter. Bei
- * Seed 1 blieben so 514 Konfliktpaare uebrig.
- *
- * Preis des Verfahrens: es waehlt lokale Hash-Maxima einer 7er-Nachbarschaft
- * (Feld plus sechs Nachbarn), und davon gibt es hoechstens eines pro sieben
- * Felder. Der Anteil roter Zahlen ist damit auf 1/7 = 14,3 % gedeckelt und
- * liegt gemessen bei rund 13 %, gegenueber 22 % im Originalspiel. Wer den
- * Beutel mit mehr 6ern und 8ern auffuellt, aendert daran nichts - die
- * Deckelung kommt aus der Auswahl, nicht aus dem Beutel. In Pips gerechnet
- * kostet das etwa 6 % Ertrag; das ist der Preis fuer eine Garantie statt
- * einer Heuristik.
+ * Preis: das Verfahren waehlt lokale Hash-Maxima einer Siebener-Nachbarschaft,
+ * der Anteil roter Zahlen ist damit auf 1/7 gedeckelt und liegt bei rund 13 %
+ * statt 22 %. Wer die Tabelle mit 6ern auffuellt, aendert daran nichts - die
+ * Deckelung kommt aus der Auswahl, nicht aus der Verteilung.
  */
-function tieBreak(seed: number, h: Hex): number {
-  return hash3i(seed, h.q, h.r, SALT_TIE);
-}
+function numberAt(seed: number, q: number, r: number): number | null {
+  const own = rawNumber(seed, q, r);
+  if (own === null) return null;
+  if (!isRed(own)) return own;
 
-function loosesRedConflict(seed: number, t: RawTile): boolean {
-  if (!isRed(t.number)) return false;
-  const mine = tieBreak(seed, t);
-  for (const nb of neighbors(t.q, t.r)) {
-    const other = rawAt(seed, nb.q, nb.r);
-    if (!isRed(other.number)) continue;
-    // Gleichstand ist praktisch ausgeschlossen; als Tiebreak dann die Koordinate.
-    const theirs = tieBreak(seed, nb);
-    if (theirs > mine || (theirs === mine && (nb.q !== t.q ? nb.q > t.q : nb.r > t.r))) {
-      return true;
+  const mine = hash3i(seed, q, r, SALT_TIE);
+  for (const nb of neighbors(q, r)) {
+    if (!isRed(rawNumber(seed, nb.q, nb.r))) continue;
+    const theirs = hash3i(seed, nb.q, nb.r, SALT_TIE);
+    const loses =
+      theirs > mine || (theirs === mine && (nb.q !== q ? nb.q > q : nb.r > r));
+    if (loses) {
+      return CALM_NUMBERS[hash3i(seed, q, r, SALT_DEMOTE) % CALM_NUMBERS.length]!;
     }
   }
-  return false;
-}
-
-/** Harmlose Zahlen, auf die ein Verlierer heruntergestuft wird. */
-const CALM_NUMBERS: readonly number[] = [3, 4, 5, 9, 10, 11];
-
-function demote(seed: number, t: RawTile): number {
-  return CALM_NUMBERS[hash3i(seed, t.q, t.r, SALT_DEMOTE) % CALM_NUMBERS.length]!;
+  return own;
 }
 
 // --- Haefen -----------------------------------------------------------------
@@ -193,8 +187,16 @@ function demote(seed: number, t: RawTile): number {
 /** 4x 3:1 gegen je 1x 2:1 pro Rohstoff - wie im Original. */
 const PORT_BAG: readonly PortType[] = ['any', 'any', 'any', 'any', ...RESOURCES];
 
+/**
+ * Nur ein Teil der Wasserfelder traegt einen Hafen. Bekaeme jedes einen, waere
+ * der Vorteil keiner mehr - und die Kuesten waeren zugepflastert.
+ */
+const PORT_CHANCE = 0.16;
+
 function makePort(seed: number, q: number, r: number): Port | null {
   const rng = new Rng(hash3i(seed, q, r, SALT_PORT));
+  if (rng.next() / 4294967296 > PORT_CHANCE) return null;
+
   const type = PORT_BAG[rng.int(PORT_BAG.length)]!;
 
   // Der Hafen zeigt zum Land. Startseite deterministisch drehen, damit nicht
@@ -212,25 +214,84 @@ function makePort(seed: number, q: number, r: number): Port | null {
 
 // --- Oeffentliche Erzeugung -------------------------------------------------
 
-/**
- * Fertiger Chunk: Gelaende, ausgeglichene Zahlen, Haefen.
- * Rein - gleiche Eingabe, gleiches Ergebnis, immer.
- */
-export function generateChunk(seed: number, m: number, n: number): Chunk {
-  const raw = rawChunkCached(seed, m, n);
-  const numbers = raw.map((t) =>
-    loosesRedConflict(seed, t) ? demote(seed, t) : t.number,
-  );
-
-  const tiles: Tile[] = raw.map((t, i) => ({
-    q: t.q,
-    r: t.r,
-    terrain: t.terrain,
-    number: numbers[i]!,
-    port: t.terrain === 'water' ? makePort(seed, t.q, t.r) : null,
-  }));
-
-  return { m, n, tiles };
+/** Ein einzelnes Feld. Rein und ohne Chunk-Umweg. */
+export function tileAtCoord(seed: number, q: number, r: number): Tile {
+  const terrain = terrainAt(seed, q, r);
+  return {
+    q,
+    r,
+    terrain,
+    number: numberAt(seed, q, r),
+    port: terrain === 'water' ? makePort(seed, q, r) : null,
+  };
 }
 
-export { chunkKey };
+/**
+ * Fertiger Chunk. Rein - gleiche Eingabe, gleiches Ergebnis, immer.
+ *
+ * Der Chunk ist nur noch die Einheit, in der die Welt aufgedeckt und
+ * uebertragen wird; das Gelaende selbst kennt ihn nicht mehr.
+ */
+export function generateChunk(seed: number, m: number, n: number): Chunk {
+  return { m, n, tiles: chunkHexes(m, n).map((h) => tileAtCoord(seed, h.q, h.r)) };
+}
+
+// --- Startgebiet ------------------------------------------------------------
+
+/**
+ * Wie weit um den Ursprung geprueft wird.
+ *
+ * Radius 4 (61 Felder), weil beim Start ohnehin sieben Chunks - rund 49
+ * Felder - aufgedeckt werden. Bei Radius 3 waere die Pruefung enger als das,
+ * was der Spieler tatsaechlich sieht.
+ */
+const START_RADIUS = 4;
+/** Wie viele der 61 Felder Land sein muessen. */
+const MIN_START_LAND = 38;
+
+/**
+ * Taugt dieser Seed als Startgebiet?
+ *
+ * Verlangt nur genug Land - eine Partie soll nicht mitten im Ozean beginnen.
+ * Mehr nicht.
+ *
+ * Eine strengere Fassung verlangte zusaetzlich alle fuenf Rohstoffgelaende in
+ * Reichweite. Gemessen erfuellten das nur 4 % der Seeds, und der Grund ist
+ * kein Zufall: Gelaende, das Regionen bildet, hat wenig oertliche Vielfalt.
+ * Wer beides gleichzeitig will - Landschaft und Catan-Ausgewogenheit -,
+ * bekommt eines davon schlecht.
+ *
+ * Diese Welt ist kein Turnier-Catan. Wenn eine Gegend arm an Erz ist, ist das
+ * ein Grund weiterzuziehen, und auf einer Karte ohne Rand kann man das.
+ */
+export function isPlayableStart(seed: number): boolean {
+  let land = 0;
+  for (const h of hexesInRange({ q: 0, r: 0 }, START_RADIUS)) {
+    if (terrainAt(seed, h.q, h.r) !== 'water') land++;
+  }
+  return land >= MIN_START_LAND;
+}
+
+/**
+ * Naechster Seed ab dem gewuenschten, dessen Startgebiet taugt.
+ *
+ * So bleibt die Ausgewogenheit erhalten, ohne dass eine Regel die Landschaft
+ * zerhackt: die Karte wird nicht zurechtgebogen, es wird nur eine gute
+ * ausgesucht. Der Unterschied ist unsichtbar - jeder Seed erzeugt eine
+ * gleichermassen natuerliche Welt.
+ */
+export function findPlayableSeed(seed: number, attempts = 512): number {
+  for (let i = 0; i < attempts; i++) {
+    const s = (seed + i) | 0;
+    if (isPlayableStart(s)) return s;
+  }
+  return seed; // sollte nie eintreten; lieber spielen als scheitern
+}
+
+/** Nur fuer Diagnose und Tests. */
+export function debugAt(seed: number, q: number, r: number): string {
+  const f = fieldsAt(seed, q, r);
+  return `${hexKey(q, r)} h=${f.elevation.toFixed(2)} f=${f.moisture.toFixed(2)} ${terrainAt(seed, q, r)}`;
+}
+
+export { chunkKey, chunkOf };

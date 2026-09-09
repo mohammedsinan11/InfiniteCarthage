@@ -16,35 +16,10 @@
  * Wer das Klima aendert, aendert kein einziges Spielergebnis.
  */
 
-import { hash3i } from './hash';
+import { hexToField, noise2 } from './noise';
 
 const SALT_TEMP = 21;
 const SALT_MOIST = 22;
-
-/** Gitterwert in [0,1). */
-function lattice(seed: number, xi: number, yi: number, salt: number): number {
-  return hash3i(seed, xi, yi, salt) / 4294967296;
-}
-
-/** Weiche Ueberblendung - ohne sie sieht man das Gitter als Rautenmuster. */
-const smooth = (t: number): number => t * t * (3 - 2 * t);
-
-/** Wertrauschen mit bilinearer, geglaetteter Interpolation. Liefert [0,1). */
-function noise2(seed: number, x: number, y: number, salt: number): number {
-  const x0 = Math.floor(x);
-  const y0 = Math.floor(y);
-  const fx = smooth(x - x0);
-  const fy = smooth(y - y0);
-
-  const a = lattice(seed, x0, y0, salt);
-  const b = lattice(seed, x0 + 1, y0, salt);
-  const c = lattice(seed, x0, y0 + 1, salt);
-  const d = lattice(seed, x0 + 1, y0 + 1, salt);
-
-  const top = a + (b - a) * fx;
-  const bottom = c + (d - c) * fx;
-  return top + (bottom - top) * fy;
-}
 
 /**
  * Wie gross eine Klimazone ist, in Hexfeldern. Bewusst gross gewaehlt: bei
@@ -69,10 +44,9 @@ export type Climate = {
  * jede Zeile die Spalte um eine halbe Breite.
  */
 export function climateAt(seed: number, q: number, r: number): Climate {
-  const x = q + r / 2;
-  const y = r * 0.866;
+  const p = hexToField(q, r);
   return {
-    temp: noise2(seed, x / TEMP_SCALE, y / TEMP_SCALE, SALT_TEMP),
-    moist: noise2(seed, x / MOIST_SCALE, y / MOIST_SCALE, SALT_MOIST),
+    temp: noise2(seed, p.x / TEMP_SCALE, p.y / TEMP_SCALE, SALT_TEMP),
+    moist: noise2(seed, p.x / MOIST_SCALE, p.y / MOIST_SCALE, SALT_MOIST),
   };
 }

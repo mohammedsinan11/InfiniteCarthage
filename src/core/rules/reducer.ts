@@ -22,11 +22,12 @@ import {
 import {
   createWorld,
   ensureGenerated,
-  originDesert,
+  robberStart,
   revealChunks,
   tileAt,
 } from '../world';
 import type { World } from '../world';
+import { findPlayableSeed } from '../worldgen';
 import type { ChunkCoord } from '../chunks';
 import { RESOURCES, TERRAIN_RESOURCE } from '../types';
 import type { Resource } from '../types';
@@ -148,12 +149,14 @@ export function createGame(
    */
   if (players.length < 1) throw new Error('Mindestens ein Spieler');
 
-  const world = createWorld(worldSeed);
+  // Nicht jede Gegend taugt als Startplatz - siehe findPlayableSeed.
+  const seed = findPlayableSeed(worldSeed);
+  const world = createWorld(seed);
   const added = ensureGenerated(world, { q: 0, r: 0 });
-  const robber = originDesert(world);
+  const robber = robberStart(world);
 
   const state: GameState = {
-    worldSeed,
+    worldSeed: seed,
     secretSeed,
     rngState: secretSeed | 0,
     players: players.map((p, i) => ({

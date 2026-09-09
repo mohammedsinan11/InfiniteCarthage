@@ -14,9 +14,9 @@
  */
 
 import { generateChunk } from './worldgen';
-import { chunkKey, chunkOf, chunksCovering } from './chunks';
+import { chunkKey, chunksCovering } from './chunks';
 import type { ChunkCoord, ChunkKey } from './chunks';
-import { hexKey, hexesInRange } from './coords';
+import { hexDistance, hexKey, hexesInRange } from './coords';
 import type { Hex } from './coords';
 import type { Chunk, PortType, Tile } from './types';
 
@@ -94,12 +94,34 @@ export function chunkCoords(world: World): ChunkCoord[] {
   return [...world.chunks.values()].map((c) => ({ m: c.m, n: c.n }));
 }
 
-/** Das Wuestenfeld im Startchunk. Startplatz des Raeubers. */
-export function originDesert(world: World): Hex {
-  const c = chunkOf(0, 0);
-  const chunk = world.chunks.get(chunkKey(c.m, c.n));
-  if (!chunk) throw new Error('Startchunk ist noch nicht erzeugt');
-  const desert = chunk.tiles.find((t) => t.terrain === 'desert');
-  if (!desert) throw new Error('Startchunk ohne Wueste');
-  return { q: desert.q, r: desert.r };
+/**
+ * Startplatz des Raeubers.
+ *
+ * Im Original steht er auf der Wueste. Seit das Gelaende aus Rauschen kommt,
+ * ist keine garantiert in der Naehe - Wuesten liegen dort, wo es trocken ist,
+ * nicht dort, wo das Spiel beginnt. Deshalb in dieser Reihenfolge:
+ *
+ *   1. die naechste Wueste,
+ *   2. sonst das naechste Feld, das ohnehin nichts liefert,
+ *   3. sonst das naechste Feld ueberhaupt.
+ *
+ * Fall 3 blockiert zum Start einen Ertrag. Das ist verschmerzbar und tritt
+ * nur ein, wenn ringsum alles produziert - eine ausgesprochen gute Startlage.
+ */
+export function robberStart(world: World): Hex {
+  const byDistance = [...world.tiles.values()].sort(
+    (a, b) =>
+      hexDistance({ q: a.q, r: a.r }, ORIGIN) - hexDistance({ q: b.q, r: b.r }, ORIGIN),
+  );
+  const desert = byDistance.find((t) => t.terrain === 'desert');
+  if (desert) return { q: desert.q, r: desert.r };
+
+  const barren = byDistance.find((t) => t.number === null && t.terrain !== 'water');
+  if (barren) return { q: barren.q, r: barren.r };
+
+  const any = byDistance[0];
+  if (!any) throw new Error('Welt ist leer');
+  return { q: any.q, r: any.r };
 }
+
+const ORIGIN: Hex = { q: 0, r: 0 };

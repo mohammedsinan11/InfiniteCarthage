@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { generateChunk, terrainAt } from '../src/core/worldgen';
+import {
+  generateChunk,
+  terrainAt,
+  findPlayableSeed,
+  isPlayableStart,
+} from '../src/core/worldgen';
 import { chunkOf, chunkHexes } from '../src/core/chunks';
-import { neighbors, hexKey } from '../src/core/coords';
+import { neighbors, hexKey, hexesInRange } from '../src/core/coords';
 import { PRODUCTIVE_TERRAIN, TERRAIN_RESOURCE } from '../src/core/types';
 import type { Tile } from '../src/core/types';
 
@@ -46,15 +51,37 @@ describe('Determinismus', () => {
 });
 
 describe('Chunk-Balance', () => {
-  it('jeder Chunk enthaelt alle fuenf Rohstoffgelaende', () => {
+  /**
+   * Frueher stand hier "jeder Chunk enthaelt alle fuenf Rohstoffe". Genau die
+   * Regel machte die Karte zu Konfetti und ist bewusst entfallen. Geprueft
+   * wird jetzt das Gegenteil: dass Gelaende zusammenhaengt.
+   */
+  it('bildet Regionen statt Konfetti', () => {
     for (const seed of SEEDS) {
-      for (let m = -6; m <= 6; m++) {
-        for (let n = -6; n <= 6; n++) {
-          const terrains = new Set(generateChunk(seed, m, n).tiles.map((t) => t.terrain));
-          for (const p of PRODUCTIVE_TERRAIN) {
-            expect(terrains.has(p), `Chunk ${m},${n} ohne ${p}`).toBe(true);
+      let same = 0;
+      let checked = 0;
+      for (let q = -25; q <= 25; q++) {
+        for (let r = -25; r <= 25; r++) {
+          const t = terrainAt(seed, q, r);
+          for (const nb of neighbors(q, r)) {
+            checked++;
+            if (terrainAt(seed, nb.q, nb.r) === t) same++;
           }
         }
+      }
+      const anteil = same / checked;
+      // Bei zufaelliger Verteilung laege der Wert bei rund 1/7.
+      expect(anteil, `Seed ${seed} klumpt zu wenig: ${anteil.toFixed(2)}`).toBeGreaterThan(0.5);
+    }
+  });
+
+  it('bringt ueber groessere Flaechen alle fuenf Rohstoffe hervor', () => {
+    for (const seed of SEEDS) {
+      const found = new Set(
+        hexesInRange({ q: 0, r: 0 }, 20).map((h) => terrainAt(seed, h.q, h.r)),
+      );
+      for (const p of PRODUCTIVE_TERRAIN) {
+        expect(found.has(p), `Seed ${seed} ohne ${p} im Umkreis 20`).toBe(true);
       }
     }
   });
@@ -111,13 +138,17 @@ describe('Zahlen', () => {
   });
 });
 
-describe('Startchunk', () => {
-  it('enthaelt genau eine Wueste und kein Wasser', () => {
-    for (const seed of SEEDS) {
-      const tiles = generateChunk(seed, 0, 0).tiles;
-      expect(tiles.filter((t) => t.terrain === 'desert')).toHaveLength(1);
-      expect(tiles.filter((t) => t.terrain === 'water')).toHaveLength(0);
+describe('Startgebiet', () => {
+  it('findPlayableSeed liefert einen Seed mit genug Land', () => {
+    for (const wunsch of [1, 2, 3, 500, -42]) {
+      const seed = findPlayableSeed(wunsch);
+      expect(isPlayableStart(seed)).toBe(true);
     }
+  });
+
+  it('liefert denselben Seed zurueck, wenn er schon taugt', () => {
+    const seed = findPlayableSeed(1);
+    expect(findPlayableSeed(seed)).toBe(seed);
   });
 });
 
@@ -139,7 +170,7 @@ describe('Haefen', () => {
 
   it('erzeugt ueberhaupt Haefen und mehr als einen Typ', () => {
     const ports = [...field(1, 8).values()].map((t) => t.port).filter((p) => p !== null);
-    expect(ports.length).toBeGreaterThan(20);
+    expect(ports.length).toBeGreaterThan(5);
     expect(new Set(ports.map((p) => p!.type)).size).toBeGreaterThan(1);
   });
 });

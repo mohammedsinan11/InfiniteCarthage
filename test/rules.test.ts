@@ -429,6 +429,7 @@ describe('Entwicklungskarten', () => {
     toMain(game, 'p0');
 
     const roadsBefore = playerById(game.state, 'p0')!.pieces.roads;
+    const handBefore = handSize(playerById(game.state, 'p0')!.hand);
     must(game, { t: 'playRoadBuilding' }, 'p0');
     expect(game.state.phase).toMatchObject({ t: 'roadBuilding', remaining: 2 });
 
@@ -439,8 +440,9 @@ describe('Entwicklungskarten', () => {
     }
     expect(game.state.phase.t).toBe('main');
     expect(playerById(game.state, 'p0')!.pieces.roads).toBe(roadsBefore - 2);
-    // Nichts bezahlt.
-    expect(handSize(playerById(game.state, 'p0')!.hand)).toBe(0);
+    // Nichts bezahlt - gegen den Stand VOR dem Kartenspiel geprueft, nicht
+    // gegen null: der Wurf davor kann Ertrag gebracht haben.
+    expect(handSize(playerById(game.state, 'p0')!.hand)).toBe(handBefore);
   });
 });
 

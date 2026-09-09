@@ -231,7 +231,6 @@ em.off {
 
 .game {
   display: grid;
-  grid-template-columns: 300px 1fr;
   height: 100vh;
 }
 
@@ -670,4 +669,48 @@ em.off {
   .trade-cols {
     gap: 12px;
   }
+}
+
+/* --- Schilder ueber der Karte --- */
+
+.main {
+  position: relative;
+}
+
+.hud {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 5;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  font-family: var(--pixel);
+  font-size: 10px;
+}
+.hud > span {
+  background: rgba(23, 18, 12, 0.86);
+  border: 2px solid var(--line);
+  padding: 6px 9px;
+}
+.hud-room {
+  color: var(--accent);
+  letter-spacing: 1px;
+}
+.hud-roll {
+  color: var(--muted);
+}
+
+.hud-win {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 6;
+  background: var(--panel);
+  border: 3px solid var(--accent);
+  padding: 20px 30px;
+  font-family: var(--pixel);
+  font-size: 16px;
+  color: var(--accent);
 }

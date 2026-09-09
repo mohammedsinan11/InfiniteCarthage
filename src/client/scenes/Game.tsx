@@ -15,9 +15,7 @@ import { useMemo, useState } from 'react';
 import { useStore } from '../net/store';
 import { Board } from '../board/Board';
 import type { Targets } from '../board/Board';
-import { PlayerList } from '../ui/PlayerList';
 import { HandPanel } from '../ui/HandPanel';
-import { LogPanel } from '../ui/LogPanel';
 import { TradePanel } from '../ui/TradePanel';
 import {
   legalCityVertices,
@@ -52,7 +50,6 @@ export function Game() {
   const world = useStore((s) => s.world)!;
   const you = useStore((s) => s.you);
   const act = useStore((s) => s.act);
-  const log = useStore((s) => s.log);
   const disconnect = useStore((s) => s.disconnect);
 
   const [mode, setMode] = useState<BuildMode>(null);
@@ -146,43 +143,42 @@ export function Game() {
 
   return (
     <div className="game">
-      <aside className="side">
-        <header className="side-head">
-          <strong>Raum {useStore.getState().code}</strong>
-          <button className="ghost small" onClick={disconnect}>
-            verlassen
-          </button>
-        </header>
+      <main className="main">
+        {/*
+          Die Karte bekommt den ganzen Platz. Was frueher in einer linken
+          Spalte stand - Protokoll, Zuganzeige, Spielerliste - ist weg: allein
+          weiss man ohnehin, dass man dran ist, und die Landschaft ist das,
+          was man sehen will.
 
-        <PlayerList state={state} you={you} />
-
-        <div className="phase">
-          {phase.t === 'finished' ? (
-            <strong>
-              {state.players.find((p) => p.id === phase.winner)?.name} gewinnt mit{' '}
-              {state.targetPoints} Punkten!
-            </strong>
-          ) : isMine ? (
-            <strong>Du bist am Zug - {phaseText(phase.t)}</strong>
-          ) : (
-            <span>
-              {state.players.find((p) => p.id === state.currentPlayer)?.name} ist am Zug
-              {' - '}
-              {phaseText(phase.t)}
+          Nur zwei Dinge legen sich als kleine Schilder darueber: der Raumcode
+          zum Weitergeben und, sobald mehr als einer mitspielt, wer am Zug ist.
+          Ohne das waere eine Partie zu mehreren nicht spielbar.
+        */}
+        <div className="hud">
+          <span className="hud-room">{useStore.getState().code}</span>
+          {state.order.length > 1 && (
+            <span className="hud-turn">
+              {isMine
+                ? 'du bist dran'
+                : `${state.players.find((p) => p.id === state.currentPlayer)?.name} ist dran`}
             </span>
           )}
           {state.lastRoll && (
-            <span className="roll">
-              Wurf: {state.lastRoll[0]} + {state.lastRoll[1]} ={' '}
-              {state.lastRoll[0] + state.lastRoll[1]}
+            <span className="hud-roll">
+              {state.lastRoll[0]} + {state.lastRoll[1]} = {state.lastRoll[0] + state.lastRoll[1]}
             </span>
           )}
+          <button className="ghost small" onClick={disconnect}>
+            verlassen
+          </button>
         </div>
 
-        <LogPanel log={log} />
-      </aside>
+        {phase.t === 'finished' && (
+          <div className="hud-win">
+            {state.players.find((p) => p.id === phase.winner)?.name} gewinnt!
+          </div>
+        )}
 
-      <main className="main">
         <Board world={world} state={state} targets={targets} onPick={onPick} />
 
         <div className="bar">
@@ -365,25 +361,6 @@ export function Game() {
       )}
     </div>
   );
-}
-
-function phaseText(t: string): string {
-  switch (t) {
-    case 'setup':
-      return 'Aufbau';
-    case 'roll':
-      return 'wuerfeln';
-    case 'discard':
-      return 'abwerfen';
-    case 'moveRobber':
-      return 'Raeuber setzen';
-    case 'roadBuilding':
-      return 'Strassenbau';
-    case 'main':
-      return 'bauen und handeln';
-    default:
-      return '';
-  }
 }
 
 function ResSelect({

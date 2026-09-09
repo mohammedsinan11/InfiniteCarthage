@@ -5,7 +5,7 @@ import {
   revealChunks,
   tileAt,
   isGenerated,
-  originDesert,
+  robberStart,
   chunkCoords,
   GROWTH_RADIUS,
 } from '../src/core/world';
@@ -94,12 +94,18 @@ describe('Endloses Wachstum', () => {
 });
 
 describe('Startbedingungen', () => {
-  it('findet die Wueste im Startchunk als Raeuberfeld', () => {
-    for (const seed of [1, 2, 3, 4, 5]) {
+  it('findet fuer den Raeuber ein Feld, das moeglichst nichts liefert', () => {
+    // Seit das Gelaende aus Rauschen kommt, gibt es nicht immer eine Wueste in
+    // Reichweite. Verlangt wird deshalb nur: das Feld existiert, und wenn eine
+    // Wueste da ist, steht der Raeuber auch darauf.
+    for (const seed of [1, 2, 3, 4, 5, 99, 1234]) {
       const w = createWorld(seed);
       ensureGenerated(w, { q: 0, r: 0 });
-      const d = originDesert(w);
-      expect(tileAt(w, d.q, d.r)?.terrain).toBe('desert');
+      const d = robberStart(w);
+      const tile = tileAt(w, d.q, d.r);
+      expect(tile).toBeDefined();
+      const gibtWueste = [...w.tiles.values()].some((t) => t.terrain === 'desert');
+      if (gibtWueste) expect(tile!.terrain).toBe('desert');
     }
   });
 
