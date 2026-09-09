@@ -10,7 +10,12 @@
  * rngState noch fremde Handkarten noch ein einziges Gelaendefeld duerfen in
  * einer Nachricht auftauchen.
  */
-const BASE = 'ws://127.0.0.1:8787';
+// Standard ist der lokale wrangler-Port; mit CATAN_SERVER laesst sich derselbe
+// Test gegen den veroeffentlichten Worker fahren:
+//   CATAN_SERVER=https://infinite-catan.msinan.workers.dev npm run test:e2e
+const BASE = (process.env.CATAN_SERVER ?? 'ws://127.0.0.1:8787')
+  .replace(/^http/, 'ws')
+  .replace(/\/$/, '');
 // Nur Zeichen aus dem Raumcode-Alphabet - 0/O und 1/I fehlen dort absichtlich.
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE = Array.from({ length: 6 }, () =>

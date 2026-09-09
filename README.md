@@ -20,7 +20,7 @@ angezeigten Code ins zweite eintragen.
 | `npm run dev` | Vite-Entwicklungsserver |
 | `npm run dev:worker` | Cloudflare Worker lokal (wrangler) |
 | `npm test` | Testsuite (65 Tests, ohne Browser und ohne Worker) |
-| `npm run test:e2e` | End-to-End gegen einen laufenden Worker |
+| `npm run test:e2e` | End-to-End gegen einen laufenden Worker (lokal, oder mit `CATAN_SERVER=<url>` gegen den veroeffentlichten) |
 | `npm run typecheck` | TypeScript fuer Client und Worker |
 | `npm run build` | Typecheck plus Produktionsbuild nach `dist/` |
 | `npm run deploy:worker` | Worker zu Cloudflare hochladen |
