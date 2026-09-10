@@ -49,6 +49,25 @@ type Attachment = { playerId: PlayerId | null };
 
 const STORAGE_ROOM = 'room';
 const STORAGE_GAME = 'game';
+const STORAGE_SCHEMA = 'schema';
+
+/**
+ * Form des gespeicherten Spielstands.
+ *
+ * Ein Raum kann beliebig lange schlafen - laenger als zwischen zwei Deploys.
+ * Wacht er unter neuem Code mit altem Snapshot auf, passt der Zustand nicht
+ * mehr zur Engine, und weil der Spielstand bei JEDER Meldung durch die
+ * Redaktion laeuft, wirft der Raum dann dauerhaft: er kaeme aus dem Fehler nie
+ * wieder heraus.
+ *
+ * Darum: Version mitschreiben, beim Laden vergleichen, bei Abweichung die
+ * Partie verwerfen und den Raum in die Lobby zurueckstellen. Eine laufende
+ * Partie zu verlieren ist bitter, ein toter Raum ist schlimmer - aus der Lobby
+ * kommt man wieder heraus.
+ *
+ * Hochzaehlen, sobald sich GameState aendert.
+ */
+const SCHEMA_VERSION = 2;
 
 function randomId(bytes = 16): string {
   const a = new Uint8Array(bytes);
@@ -107,13 +126,28 @@ export class GameRoom implements DurableObject {
     if (this.game) return this.game;
     const state = await this.ctx.storage.get<GameState>(STORAGE_GAME);
     if (!state) return null;
+
+    const version = await this.ctx.storage.get<number>(STORAGE_SCHEMA);
+    if (version !== SCHEMA_VERSION) {
+      // Snapshot aus einer aelteren Fassung: unbrauchbar, aber loeschbar.
+      await this.ctx.storage.delete(STORAGE_GAME);
+      const room = await this.loadRoom('');
+      room.started = false;
+      await this.ctx.storage.put(STORAGE_ROOM, room);
+      await this.ctx.storage.put(STORAGE_SCHEMA, SCHEMA_VERSION);
+      return null;
+    }
+
     this.game = { state, world: rebuildWorld(state) };
     return this.game;
   }
 
   private async save(): Promise<void> {
     if (this.room) await this.ctx.storage.put(STORAGE_ROOM, this.room);
-    if (this.game) await this.ctx.storage.put(STORAGE_GAME, this.game.state);
+    if (this.game) {
+      await this.ctx.storage.put(STORAGE_GAME, this.game.state);
+      await this.ctx.storage.put(STORAGE_SCHEMA, SCHEMA_VERSION);
+    }
   }
 
   // --- Verbindungen ---------------------------------------------------------

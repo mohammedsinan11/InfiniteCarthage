@@ -3,13 +3,14 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { applyAction, createGame } from '../src/core/rules/reducer';
+import { applyAction, createGame, rebuildWorld } from '../src/core/rules/reducer';
 import type { Action, Game } from '../src/core/rules/reducer';
 import {
   legalRoadEdges,
   legalSettlementVertices,
 } from '../src/core/rules/placement';
 import { currentPlayerId, playerById } from '../src/core/state';
+import { redactStateFor } from '../src/core/redact';
 import type { PlayerId } from '../src/core/state';
 import { discardCount, limitFor } from '../src/core/rules/discard';
 import { DRAFT_SIZE, draftOptions } from '../src/core/cards/draft';
@@ -270,5 +271,37 @@ describe('Karten wirken auf die Regeln', () => {
     const vorher = limitFor(game.state, 'p0');
     p.cards.push('vorratskammer');
     expect(limitFor(game.state, 'p0')).toBe(vorher + 3);
+  });
+});
+
+describe('Der Spielstand ueberlebt den Schlaf', () => {
+  // Ein Durable Object kann jederzeit hibernieren. Beim Aufwachen kommt der
+  // Zustand aus dem Storage - also durch JSON und zurueck. Was diesen Weg
+  // nicht uebersteht, faellt erst in Produktion auf, und dann dauerhaft:
+  // die Redaktion laeuft bei JEDER Meldung.
+  it('geht durch JSON und danach durch Redaktion und Reducer', () => {
+    const game = solo();
+    runSetup(game);
+    expect(wuerfelBisSieben(game)).toBe(true);
+
+    const wieder: Game = {
+      state: JSON.parse(JSON.stringify(game.state)),
+      world: game.world,
+    };
+    wieder.world = rebuildWorld(wieder.state);
+
+    // Die Redaktion darf nicht werfen - sie ist der Weg jeder Meldung.
+    const sicht = redactStateFor(wieder.state, 'p0');
+    expect(sicht.draft?.options).toHaveLength(3);
+
+    // Und die Partie muss weiterlaufen.
+    must(wieder, { t: 'chooseCard', card: wieder.state.draft!.options[0]! }, 'p0');
+    expect(phaseOf(wieder)).toBe('main');
+  });
+
+  it('haelt jeden Spieler mit einer Kartenliste - die Redaktion liest sie', () => {
+    const game = solo();
+    runSetup(game);
+    for (const p of game.state.players) expect(Array.isArray(p.cards)).toBe(true);
   });
 });
