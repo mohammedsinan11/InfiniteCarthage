@@ -223,6 +223,7 @@ export function Game() {
 
         <SideMenu
           turn={state.turn}
+          cards={me?.cards ?? []}
           showNumbers={pinNumbers}
           onToggleNumbers={() => setPinNumbers((v) => !v)}
         />

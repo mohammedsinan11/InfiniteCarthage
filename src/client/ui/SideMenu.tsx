@@ -11,6 +11,11 @@
  * Bevoelkerung, Beliebtheit, Technologien, Auftraege, Helden. Die Reiter
  * dafuer stehen schon, ihr Inhalt sagt ehrlich, dass er noch fehlt - ein
  * leerer Reiter ist besser als eine erfundene Zahl.
+ *
+ * Der Kartenreiter ist der erste, der wirklich etwas zeigt. Er muss es auch:
+ * eine Karte wirkt dauerhaft und verschwindet nach der Wahl vom Bildschirm.
+ * Ohne Ablage waere jeder Vorteil nach ein paar Runden vergessen - man haette
+ * gewaehlt, ohne je nachsehen zu koennen, was man gewaehlt hat.
  */
 
 import { useState } from 'react';
@@ -22,18 +27,51 @@ import {
   seasonOf,
   yearOf,
 } from '../../core/season';
+import { cardById } from '../../core/cards/catalog';
+import { modifiersOf } from '../../core/cards/effects';
+import type { Terrain } from '../../core/types';
 import { getVolume, initAudio, setVolume } from '../audio';
 import { TRACKS, getMusicMode, setMusicMode } from '../music';
 import type { MusicMode } from '../music';
 
-type Reiter = 'reich' | 'technik' | 'auftraege' | 'ton';
+type Reiter = 'reich' | 'karten' | 'technik' | 'auftraege' | 'ton';
 
 const REITER: ReadonlyArray<{ id: Reiter; kurz: string; titel: string }> = [
   { id: 'reich', kurz: 'RE', titel: 'Reich' },
+  { id: 'karten', kurz: 'KA', titel: 'Karten' },
   { id: 'technik', kurz: 'TE', titel: 'Technik' },
   { id: 'auftraege', kurz: 'AU', titel: 'Auftraege' },
   { id: 'ton', kurz: 'TO', titel: 'Ton' },
 ];
+
+/** Gelaendenamen fuers Auge - der Kern kennt nur die englischen Kennungen. */
+const GELAENDE: Partial<Record<Terrain, string>> = {
+  forest: 'Waelder',
+  pasture: 'Weiden',
+  field: 'Felder',
+  hill: 'Huegel',
+  mountain: 'Berge',
+};
+
+/**
+ * Was die Karten zusammen bewirken, in Worten.
+ *
+ * Die einzelnen Kartentexte stehen darueber - hier interessiert die Summe,
+ * denn zwei Karten auf dasselbe Gelaende addieren sich, und das sieht man
+ * den Einzeltexten nicht an.
+ */
+function wirkungen(cardIds: readonly string[]): string[] {
+  const m = modifiersOf(cardIds);
+  const zeilen: string[] = [];
+  for (const [terrain, wert] of Object.entries(m.terrainBonus)) {
+    if (!wert) continue;
+    const name = GELAENDE[terrain as Terrain] ?? terrain;
+    zeilen.push(`${name}: ${wert > 0 ? '+' : ''}${wert} je Ertrag`);
+  }
+  if (m.tradeDiscount > 0) zeilen.push(`Bankhandel: ${m.tradeDiscount} guenstiger`);
+  if (m.handLimitBonus > 0) zeilen.push(`Handkarten: ${m.handLimitBonus} mehr erlaubt`);
+  return zeilen;
+}
 
 /** Was es noch nicht gibt, sagt das auch. */
 function NochNicht({ was }: { was: string }) {
@@ -42,10 +80,13 @@ function NochNicht({ was }: { was: string }) {
 
 export function SideMenu({
   turn,
+  cards,
   showNumbers,
   onToggleNumbers,
 }: {
   turn: number;
+  /** Die eigenen genommenen Karten, in der Reihenfolge der Wahl. */
+  cards: readonly string[];
   showNumbers: boolean;
   onToggleNumbers: () => void;
 }) {
@@ -106,6 +147,45 @@ export function SideMenu({
           <>
             <h3>Reich</h3>
             <NochNicht was="Bevoelkerung und Beliebtheit" />
+          </>
+        )}
+
+        {reiter === 'karten' && (
+          <>
+            <h3>Karten</h3>
+            {cards.length === 0 ? (
+              <p className="menu-leer">
+                Noch keine. Bei einer Sieben findest du welche.
+              </p>
+            ) : (
+              <>
+                <ul className="menu-karten">
+                  {cards.map((id, i) => {
+                    const karte = cardById(id);
+                    if (!karte) return null;
+                    return (
+                      // Dieselbe Karte kann mehrfach vorkommen - der Index
+                      // gehoert dazu, sonst kollidieren die Schluessel.
+                      <li key={`${id}-${i}`} className={`menu-karte selt-${karte.rarity}`}>
+                        <span className="menu-karte-name">{karte.name}</span>
+                        <span className="menu-karte-text">{karte.text}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+
+                {wirkungen(cards).length > 0 && (
+                  <>
+                    <h3>Zusammen</h3>
+                    <ul className="menu-wirkung">
+                      {wirkungen(cards).map((z) => (
+                        <li key={z}>{z}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </>
+            )}
           </>
         )}
 
