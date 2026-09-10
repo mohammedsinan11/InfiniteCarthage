@@ -11,10 +11,15 @@
  * Sonderwuerfel oder andere Augenzahlen aendern spaeter die Regel, nicht
  * diese Datei.
  *
- * Ein Klick ueberspringt. Wer hundert Runden spielt, will das.
+ * Ein Klick ueberspringt das ROLLEN, nicht das ERGEBNIS. Wer hundert Runden
+ * spielt, will nicht jedes Mal zusehen - aber wissen, was gefallen ist, will er
+ * immer. Frueher schloss der Klick das Fenster sofort, und ein Doppelklick auf
+ * "Wuerfeln" (der zweite Klick landet auf diesem Fenster) liess die Augenzahl
+ * nie sehen. Jetzt springt der Klick zum Ergebnis; es steht dann wie nach dem
+ * normalen Ablauf, und erst ein weiterer Klick schliesst.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { playDiceLand, playDiceRoll } from '../audio';
 
 /** Wie lange die Wuerfel rollen, bevor das Ergebnis steht. */
@@ -88,55 +93,69 @@ export function DiceOverlay({ dice, onDone }: Props) {
   const [shown, setShown] = useState<[number, number]>([1, 1]);
   const [settled, setSettled] = useState(false);
   const fertig = useRef(false);
+  const gelandet = useRef(false);
+  /** Die laufenden Zeitgeber - das Ueberspringen muss sie anhalten koennen. */
+  const zeit = useRef<{ flackern?: number; landen?: number; schliessen?: number }>({});
 
-  /** Sofort zum Ergebnis springen und schliessen. */
-  const skip = () => {
+  const schliessen = useCallback(() => {
     if (fertig.current) return;
     fertig.current = true;
     onDone();
+  }, [onDone]);
+
+  /**
+   * Das Ergebnis zeigen - aus dem normalen Ablauf wie aus dem Ueberspringen.
+   * Beide Wege enden gleich: Augen stehen, Summe steht, HOLD_MS lang.
+   */
+  const landen = useCallback(() => {
+    if (gelandet.current) return;
+    gelandet.current = true;
+    const z = zeit.current;
+    window.clearInterval(z.flackern);
+    window.clearTimeout(z.landen);
+    setShown(dice);
+    setSettled(true);
+    playDiceLand();
+    window.clearTimeout(z.schliessen);
+    z.schliessen = window.setTimeout(schliessen, HOLD_MS);
+  }, [dice, schliessen]);
+
+  /** Rollt es noch, springt der Klick zum Ergebnis. Steht es, schliesst er. */
+  const klick = () => {
+    if (!gelandet.current) landen();
+    else schliessen();
   };
 
   useEffect(() => {
     fertig.current = false;
+    gelandet.current = false;
     setSettled(false);
     playDiceRoll(ROLL_MS / 1000);
 
+    const z = zeit.current;
     // Waehrend des Rollens flackern zufaellige Augen - nur Optik.
-    const flackern = window.setInterval(() => {
+    z.flackern = window.setInterval(() => {
       setShown([1 + Math.floor(Math.random() * 6), 1 + Math.floor(Math.random() * 6)]);
     }, 70);
-
-    const landen = window.setTimeout(() => {
-      window.clearInterval(flackern);
-      setShown(dice);
-      setSettled(true);
-      playDiceLand();
-    }, ROLL_MS);
-
-    const schliessen = window.setTimeout(() => {
-      if (!fertig.current) {
-        fertig.current = true;
-        onDone();
-      }
-    }, ROLL_MS + HOLD_MS);
+    z.landen = window.setTimeout(landen, ROLL_MS);
 
     return () => {
-      window.clearInterval(flackern);
-      window.clearTimeout(landen);
-      window.clearTimeout(schliessen);
+      window.clearInterval(z.flackern);
+      window.clearTimeout(z.landen);
+      window.clearTimeout(z.schliessen);
     };
-  }, [dice, onDone]);
+  }, [dice, landen]);
 
   const summe = shown[0] + shown[1];
 
   return (
-    <div className="dice-overlay" onClick={skip} role="presentation">
+    <div className="dice-overlay" onClick={klick} role="presentation">
       <div className={settled ? 'dice-pair settled' : 'dice-pair'}>
         <Die value={shown[0]} />
         <Die value={shown[1]} />
       </div>
-      <div className="dice-sum">{settled ? summe : ' '}</div>
-      <div className="dice-hint">Klicken zum Ueberspringen</div>
+      <div className="dice-sum">{settled ? summe : ' '}</div>
+      <div className="dice-hint">{settled ? 'Klicken zum Schliessen' : 'Klicken zum Ueberspringen'}</div>
     </div>
   );
 }

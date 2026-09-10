@@ -22,7 +22,8 @@
  * Wassertiefe, die wir nicht treffen koennen.
  */
 
-import { HEX_DIRS, neighbors } from './coords';
+import { HEX_DIRS, hexesInRange, neighbors } from './coords';
+import { expand, fbm, hexToField } from './noise';
 import { SEA_LEVEL, fieldsAt, terrainAt } from './worldgen';
 
 /**
@@ -107,6 +108,88 @@ function berechneRelief(seed: number, q: number, r: number): number {
   return Math.min(1, ueber) ** GAMMA;
 }
 
+// --- Wohin das Relief strebt -------------------------------------------------
+
+/**
+ * Breite Grundhebung: eine sehr langsame Welle ueber dem Land.
+ *
+ * Das rohe Relief folgt dem Gelaende und wechselt alle paar Felder. Mit
+ * begrenzter Steigung reicht das nicht fuer grosse Hoehen: jede Niederung
+ * zieht die Umgebung mit herunter. Die Welle hebt ganze Landstriche an, auch
+ * ihre Weiden und Felder - so entstehen Hochebenen statt einzelner Kuppen.
+ * Weil sie so langsam ist, erzeugt sie selbst keine steilen Stufen.
+ */
+const SALT_BREIT = 97;
+const BREIT_SKALA = 28;
+const BREIT_ANTEIL = 0.5;
+
+/**
+ * Meer oder See?
+ *
+ * hexmap legt nur das MEER auf Hoehe null; Seen im Landesinneren liegen, wo das
+ * Land liegt. Hier lag bisher jedes Wasserfeld auf null - und weil ein Viertel
+ * der Karte Wasser ist, war nie ein Feld weit genug vom Wasser entfernt, um hoch
+ * zu kommen. Gemessen stieg das Hochland mit schwebenden Seen um ein Viertel.
+ *
+ * Ob Meer oder See, entscheidet ohne Kartenrand der Umkreis: ist dort mindestens
+ * die Haelfte Wasser, ist es Meer. Eine enge Bucht kann dadurch als See gelten
+ * und etwas angehoben werden - die begrenzte Steigung haelt sie trotzdem dicht
+ * am Meer daneben.
+ */
+const MEER_RADIUS = 3;
+const MEER_ANTEIL = 0.5;
+
+let meerSeed = Number.NaN;
+const meerCache = new Map<string, boolean>();
+
+function istMeer(seed: number, q: number, r: number): boolean {
+  if (seed !== meerSeed) {
+    meerCache.clear();
+    meerSeed = seed;
+  }
+  const k = q + ':' + r;
+  const da = meerCache.get(k);
+  if (da !== undefined) return da;
+  const umkreis = hexesInRange({ q, r }, MEER_RADIUS);
+  let wasser = 0;
+  for (const h of umkreis) if (terrainAt(seed, h.q, h.r) === 'water') wasser++;
+  const v = wasser / umkreis.length >= MEER_ANTEIL;
+  if (meerCache.size >= GEDAECHTNIS_MAX) meerCache.clear();
+  meerCache.set(k, v);
+  return v;
+}
+
+let zielSeed = Number.NaN;
+const zielCache = new Map<string, number>();
+
+/**
+ * Die Hoehe, die ein Feld haette, gaebe es keine Steigungsgrenze. 0 bis 1.
+ *
+ * Land: halb Gelaende, halb breite Welle. Meer: 0. See: unendlich - ein See
+ * zieht niemanden herunter, er liegt einfach, wo seine Ufer liegen.
+ */
+export function reliefTargetAt(seed: number, q: number, r: number): number {
+  if (seed !== zielSeed) {
+    zielCache.clear();
+    zielSeed = seed;
+  }
+  const k = q + ':' + r;
+  const da = zielCache.get(k);
+  if (da !== undefined) return da;
+
+  let v: number;
+  if (terrainAt(seed, q, r) === 'water') {
+    v = istMeer(seed, q, r) ? 0 : Number.POSITIVE_INFINITY;
+  } else {
+    const p = hexToField(q, r);
+    const breit = expand(fbm(seed, p.x / BREIT_SKALA, p.y / BREIT_SKALA, SALT_BREIT, 2));
+    v = Math.min(1, (1 - BREIT_ANTEIL) * reliefAt(seed, q, r) + BREIT_ANTEIL * breit);
+  }
+  if (zielCache.size >= GEDAECHTNIS_MAX) zielCache.clear();
+  zielCache.set(k, v);
+  return v;
+}
+
 /**
  * Relief mit begrenzter Steigung - so wie hexmap zeichnet.
  *
@@ -121,6 +204,8 @@ function berechneRelief(seed: number, q: number, r: number): number {
  * springt. Die hat eine geschlossene Form:
  *
  *   begrenzt(h) = min ueber alle Felder c von  roh(c) + slope * abstand(h, c)
+ *
+ * (roh ist hier reliefTargetAt: Land mit Grundhebung, Meer 0, Seen ohne Einfluss.)
  *
  * Und sie ist LOKAL. roh ist nie negativ, also kann ein Feld im Abstand d den
  * Wert hoechstens auf slope * d druecken. Sobald slope * d das bisher Beste
@@ -142,7 +227,10 @@ let begrenztSlope = Number.NaN;
 const begrenztCache = new Map<string, number>();
 
 export function reliefLimitedAt(seed: number, q: number, r: number, slope: number): number {
-  if (!(slope > 0)) return reliefAt(seed, q, r);
+  if (!(slope > 0)) {
+    const z = reliefTargetAt(seed, q, r);
+    return Number.isFinite(z) ? z : 0;
+  }
   if (seed !== begrenztSeed || slope !== begrenztSlope) {
     begrenztCache.clear();
     begrenztSeed = seed;
@@ -152,16 +240,19 @@ export function reliefLimitedAt(seed: number, q: number, r: number, slope: numbe
   const da = begrenztCache.get(k);
   if (da !== undefined) return da;
 
-  let best = reliefAt(seed, q, r);
+  let best = reliefTargetAt(seed, q, r);
   const ecke = HEX_DIRS[4]!;
-  for (let d = 1; d * slope < best; d++) {
+  // Ein See beginnt bei unendlich; weiter als 1/slope muss trotzdem niemand
+  // suchen, denn jedes Ufer liegt hoechstens auf 1.
+  const weitester = Math.ceil(1 / slope) + 1;
+  for (let d = 1; d <= weitester && d * slope < best; d++) {
     // Ring im Abstand d: an einer Ecke beginnen, die sechs Seiten ablaufen.
     let x = q + ecke[0] * d;
     let y = r + ecke[1] * d;
     for (let seite = 0; seite < 6; seite++) {
       const [dq, dr] = HEX_DIRS[seite]!;
       for (let j = 0; j < d; j++) {
-        const v = reliefAt(seed, x, y) + slope * d;
+        const v = reliefTargetAt(seed, x, y) + slope * d;
         if (v < best) best = v;
         x += dq;
         y += dr;
@@ -169,6 +260,7 @@ export function reliefLimitedAt(seed: number, q: number, r: number, slope: numbe
     }
   }
 
+  if (!Number.isFinite(best)) best = 0;
   if (begrenztCache.size >= GEDAECHTNIS_MAX) begrenztCache.clear();
   begrenztCache.set(k, best);
   return best;

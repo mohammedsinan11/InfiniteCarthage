@@ -110,20 +110,22 @@ const LIFT = 3 * SCALE;
 /**
  * Wie hoch das Gelaende hoechstens gezeichnet wird, in Welteinheiten.
  *
- * Seit die Steigung begrenzt ist (RELIEF_SLOPE), erreicht kaum ein Feld diesen
- * Wert - dafuer muesste es weit genug im Landesinneren liegen, um bei zwei
- * Kunstpixeln je Feld so hoch zu kommen. Die Grenze deckelt nur noch, sie formt
- * nicht mehr; deshalb ist sie grosszuegiger als vorher.
+ * Ein Deckel, keine Form: tatsaechlich begrenzt die Hoehe der Abstand zum Meer
+ * (siehe reliefLimitedAt). Gemessen erreicht das Hochland 15 bis 20 Kunstpixel;
+ * der Deckel liegt weit darueber, damit er nirgends abschneidet, wo eine grosse
+ * Landmasse doch einmal hoeher kaeme.
  */
-const RELIEF_MAX = 64;
+const RELIEF_MAX = 180;
 
 /**
- * Wie weit ein Feld hoechstens ueber oder unter seinem Nachbarn stehen darf.
+ * Wie weit ein Feld hoechstens ueber seinem Nachbarn stehen darf.
  *
- * Zwei Kunstpixel, genau wie hexmap (height_max_neighbor_delta = 2). So viel
- * verdeckt die gemalte Unterkante der Kachel - mehr, und es klaffen Fugen.
+ * 1,5 Kunstpixel. hexmap erlaubt 2; das wirkte hier etwas zu stufig. Weil die
+ * Hoehe danach auf ganze Kunstpixel abgerundet wird (liftHex), wechseln sich
+ * Stufen von 1 und 2 Pixeln ab - im Schnitt ein Viertel flacher als vorher, und
+ * nie ueber 2, also weiter von der gemalten Kachelunterkante verdeckt.
  */
-const RELIEF_SLOPE = 2 * SCALE;
+const RELIEF_SLOPE = 1.5 * SCALE;
 
 /** Aufgelaufene Raddrehung, ab der eine Zoomstufe geschaltet wird. */
 const WHEEL_THRESHOLD = 120;
@@ -255,7 +257,11 @@ export function Board({
    */
   const liftHex = useCallback(
     (q: number, r: number) =>
-      reliefLimitedAt(state.worldSeed, q, r, RELIEF_SLOPE / RELIEF_MAX) * RELIEF_MAX,
+      // Auf ganze Kunstpixel abrunden, wie hexmap mit ganzzahligem Versatz: so
+      // liegen alle Kacheln auf demselben Pixelraster.
+      Math.floor(
+        (reliefLimitedAt(state.worldSeed, q, r, RELIEF_SLOPE / RELIEF_MAX) * RELIEF_MAX) / SCALE + 1e-6,
+      ) * SCALE,
     [state.worldSeed],
   );
 

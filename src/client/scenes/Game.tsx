@@ -73,6 +73,27 @@ export function Game() {
   /** Zahlen festpinnen - fuer alle, die sie lieber dauerhaft sehen. */
   const [pinNumbers, setPinNumbers] = useState(false);
 
+  /**
+   * Ein Wurf ist abgeschickt, das Ergebnis aber noch nicht da.
+   *
+   * Der Server schickt erst den neuen Zustand, dann die Ereignisse (room.ts).
+   * Bis der Wurf in pendingRoll steht, war der Knopf noch erreichbar - und der
+   * zweite Klick eines Doppelklicks traf ihn: meist mit "Jetzt wird nicht
+   * gewuerfelt", allein gespielt in einem ungluecklichen Moment aber als "Zug
+   * beenden und neu wuerfeln", und der ganze Zug war weg.
+   */
+  const [wurfUnterwegs, setWurfUnterwegs] = useState(false);
+  useEffect(() => {
+    if (pendingRoll !== null) setWurfUnterwegs(false);
+  }, [pendingRoll]);
+  useEffect(() => {
+    if (!wurfUnterwegs) return;
+    // Faellt der Wurf aus - Fehler, Verbindung weg -, soll der Knopf nicht
+    // dauerhaft verschwinden.
+    const t = window.setTimeout(() => setWurfUnterwegs(false), 2500);
+    return () => window.clearTimeout(t);
+  }, [wurfUnterwegs]);
+
   const me = state.players.find((p) => p.id === you);
   /**
    * Wie viele Nester mich bei der naechsten Pluenderung erreichen. Dieselbe
@@ -277,10 +298,13 @@ export function Game() {
           */}
           {isMine &&
             pendingRoll === null &&
+            !wurfUnterwegs &&
             (phase.t === 'roll' || (phase.t === 'main' && state.order.length === 1)) && (
               <button
                 className="roll-button"
                 onClick={() => {
+                  if (wurfUnterwegs) return;
+                  setWurfUnterwegs(true);
                   initAudio();
                   if (phase.t === 'main') act({ t: 'endTurn' });
                   act({ t: 'roll' });
