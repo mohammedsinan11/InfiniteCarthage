@@ -6,10 +6,14 @@
  * Waldfeld, ob es als Taiga, Mischwald oder Dschungel gezeichnet wird.
  *
  * Diese Trennung ist Absicht. Die Vorlage (hexmap von Astropulse) leitet
- * Biome aus Hoehe, Fluessen und Kuestenabstand ab - alles globale Groessen,
- * die eine endliche Karte voraussetzen. Hier haengt das Klima nur von Seed
- * und Koordinate ab, ist also genauso unbegrenzt und reihenfolgeunabhaengig
- * wie die Weltgenerierung selbst.
+ * Biome aus Hoehe, Fluessen und Kuestenabstand ab. Wirklich global davon sind
+ * nur die Fluesse: sie folgen dem Gefaelle bis zum Meer, und das hat auf einer
+ * Karte ohne Rand kein Ende. Hoehe und Kuestennaehe lassen sich dagegen aus den
+ * Nachbarn ablesen und werden inzwischen genutzt (relief.ts, tiles.ts) - eine
+ * fruehere Fassung dieses Kommentars hatte auch sie fuer global erklaert.
+ *
+ * Das Klima selbst haengt nur von Seed und Koordinate ab, ist also genauso
+ * unbegrenzt und reihenfolgeunabhaengig wie die Weltgenerierung.
  *
  * Warum nicht in den Regelteil: weil es keine Regel ist. worldgen.ts
  * entscheidet ueber Rohstoffe und Zahlen, diese Datei nur ueber die Optik.
