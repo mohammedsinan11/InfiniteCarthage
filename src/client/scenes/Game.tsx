@@ -19,6 +19,9 @@ import { HandPanel } from '../ui/HandPanel';
 import { TradePanel } from '../ui/TradePanel';
 import { DiceOverlay } from '../ui/DiceOverlay';
 import { getVolume, initAudio, playBuild, setVolume } from '../audio';
+import { getMusicMode, playFile, setMusicMode } from '../music';
+import type { MusicMode } from '../music';
+import { SEASON_NAME, bigRoundOf, roundOf, seasonOf } from '../../core/season';
 import {
   legalCityVertices,
   legalRoadEdges,
@@ -66,6 +69,7 @@ export function Game() {
   /** Zahlen festpinnen - fuer alle, die sie lieber dauerhaft sehen. */
   const [pinNumbers, setPinNumbers] = useState(false);
   const [lautstaerke, setLautstaerke] = useState(getVolume);
+  const [musik, setMusik] = useState<MusicMode>(getMusicMode);
 
   const me = state.players.find((p) => p.id === you);
   const hand = me?.hand;
@@ -181,6 +185,16 @@ export function Game() {
                 : `${state.players.find((p) => p.id === state.currentPlayer)?.name} ist dran`}
             </span>
           )}
+          {/* Zeitrechnung: Runde, grosse Runde, Jahreszeit - alles aus der
+              Zugnummer abgeleitet, siehe core/season.ts. */}
+          <span className="hud-zeit" title="Runde / grosse Runde">
+            R{roundOf(state.turn)}
+            <em>·</em>
+            GR{bigRoundOf(state.turn)}
+          </span>
+          <span className={`hud-saison saison-${seasonOf(state.turn)}`}>
+            {SEASON_NAME[seasonOf(state.turn)]}
+          </span>
           {state.lastRoll && (
             <span className="hud-roll">
               {state.lastRoll[0]} + {state.lastRoll[1]} = {state.lastRoll[0] + state.lastRoll[1]}
@@ -198,6 +212,34 @@ export function Game() {
           >
             {lautstaerke === 0 ? 'ton aus' : 'ton an'}
           </button>
+          <span className="hud-musik">
+            <button
+              className={musik === 'erzeugt' ? 'small chosen' : 'ghost small'}
+              title="Erzeugte Musik an oder aus"
+              onClick={() => {
+                initAudio();
+                const neu: MusicMode = musik === 'erzeugt' ? 'aus' : 'erzeugt';
+                setMusicMode(neu);
+                setMusik(neu);
+              }}
+            >
+              musik
+            </button>
+            <label className="ghost small dateiknopf" title="Eigene Musikdatei waehlen">
+              clip
+              <input
+                type="file"
+                accept="audio/*"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  initAudio();
+                  playFile(f);
+                  setMusik('datei');
+                }}
+              />
+            </label>
+          </span>
           <button
             className={pinNumbers ? 'small chosen' : 'ghost small'}
             title="Zahlen dauerhaft anzeigen"

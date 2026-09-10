@@ -27,7 +27,8 @@ import {
 import type { Layout } from '../../core/coords';
 import type { World } from '../../core/world';
 import type { PublicState } from '../../core/redact';
-import { playerColor } from '../theme';
+import { SEASON_TINT, playerColor } from '../theme';
+import { seasonOf } from '../../core/season';
 import { playHover } from '../audio';
 import {
   HEX_CX,
@@ -272,6 +273,7 @@ export function Board({ world, state, targets, showAllNumbers, onPick, children 
       if (hexKey(t.q, t.r) === hover) continue; // kommt zuletzt, angehoben
       zeichne(t, 0);
     }
+
     if (hover !== null) {
       const t = world.tiles.get(hover);
       if (t) {
@@ -294,7 +296,28 @@ export function Board({ world, state, targets, showAllNumbers, onPick, children 
         zeichne(t, LIFT);
       }
     }
-  }, [visible, view, scale, size, hover, world, state.worldSeed, tilesReady]);
+
+    /*
+     * Jahreszeit als Schicht ueber dem Gelaende, nicht in den Kacheln.
+     *
+     * So bleibt jede Sorte erkennbar - eine Wiese sieht im Herbst warm aus,
+     * ist aber weiter als Wiese zu lesen. Waeren die Farben eingerechnet,
+     * braeuchte es vier Kachelsaetze, und man muesste bei jedem Wechsel neu
+     * lernen, was was ist.
+     *
+     * Ganz zuletzt, damit auch das angehobene Feld mitgefaerbt wird - sonst
+     * leuchtete ausgerechnet das Feld unter dem Zeiger aus der Reihe.
+     */
+    const tint = SEASON_TINT[seasonOf(state.turn)];
+    if (tint.alpha > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = tint.mode;
+      ctx.globalAlpha = tint.alpha;
+      ctx.fillStyle = tint.color;
+      ctx.fillRect(0, 0, bw, bh);
+      ctx.restore();
+    }
+  }, [visible, view, scale, size, hover, world, state.worldSeed, state.turn, tilesReady]);
 
   const onWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();

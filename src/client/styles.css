@@ -768,7 +768,8 @@ em.off {
 .roll-button {
   position: absolute;
   left: 50%;
-  bottom: 28px;
+  /* Ueber dem Handblatt, sonst ueberdecken sie sich auf schmalen Fenstern. */
+  bottom: 104px;
   transform: translateX(-50%);
   z-index: 6;
   display: flex;
@@ -835,4 +836,50 @@ em.off {
   font-family: var(--pixel);
   font-size: 9px;
   color: var(--muted);
+}
+
+/* --- Zeitrechnung und Musik im Kopfbereich --- */
+
+.hud-zeit {
+  color: var(--text);
+  letter-spacing: 0.5px;
+}
+.hud-zeit em {
+  color: var(--muted);
+  margin: 0 4px;
+}
+
+.hud-saison {
+  border-width: 2px;
+  border-style: solid;
+}
+/* Die Farbe sagt die Jahreszeit, bevor man das Wort gelesen hat. */
+.saison-spring { color: #a8e08a; border-color: #4f7a3c !important; }
+.saison-summer { color: #ffe08a; border-color: #8a7030 !important; }
+.saison-autumn { color: #e8a05a; border-color: #8a552a !important; }
+.saison-winter { color: #bcd6f0; border-color: #4a6480 !important; }
+
+.hud-musik {
+  display: inline-flex;
+  gap: 5px;
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+}
+/* Ein Label, das wie ein Knopf aussieht - die Dateiauswahl selbst bleibt verborgen. */
+.dateiknopf {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--pixel);
+  font-size: 9px;
+  padding: 4px 8px;
+  border: 2px solid var(--line);
+  cursor: pointer;
+  color: var(--text);
+}
+.dateiknopf:hover {
+  border-color: var(--accent);
+}
+.dateiknopf input {
+  display: none;
 }
