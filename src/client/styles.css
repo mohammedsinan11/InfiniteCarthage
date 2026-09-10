@@ -488,12 +488,19 @@ em.off {
 
 .hand {
   position: absolute;
-  left: 12px;
-  bottom: 12px;
+  left: 10px;
+  bottom: 10px;
   z-index: 6;
   display: flex;
-  gap: 5px;
+  gap: 6px;
   align-items: flex-end;
+  /*
+   * Ruhiger Untergrund. Ohne ihn liegen die Karten direkt auf dem Gelaende
+   * und gehen darin unter - besonders ueber hellem Sand oder Getreide.
+   */
+  padding: 10px 12px 12px;
+  background: rgba(18, 14, 9, 0.72);
+  border: 2px solid var(--line);
 }
 
 /*
@@ -502,45 +509,47 @@ em.off {
  * am hoechsten.
  */
 .hand-card {
-  width: 54px;
-  background: linear-gradient(180deg, #f2e7d0 0%, #ddceb0 100%);
-  border: 2px solid #2a2016;
-  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5);
-  padding: 5px 3px 3px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1px;
+  position: relative;
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  display: block;
   transition: transform 0.09s;
 }
 .hand-card:hover {
-  transform: translateY(-6px);
+  transform: translateY(-8px);
 }
+/* Leichter Faecher: die mittleren Karten stehen hoeher. */
 .hand-card:nth-child(2),
 .hand-card:nth-child(4) {
-  margin-bottom: 5px;
+  margin-bottom: 6px;
 }
 .hand-card:nth-child(3) {
-  margin-bottom: 9px;
+  margin-bottom: 11px;
 }
 .hand-card.leer {
-  opacity: 0.4;
+  /* Sichtbar bleiben, aber zurueckgenommen - die Reihenfolge soll stehen. */
+  opacity: 0.45;
+  filter: grayscale(0.6);
 }
-.hand-symbol {
-  width: 28px;
-  height: 28px;
+.res-card {
+  display: block;
+  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.5));
 }
+/* Die Anzahl sitzt als Marke in der Kartenecke. */
 .hand-zahl {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  min-width: 24px;
+  padding: 3px 5px;
+  text-align: center;
   font-family: var(--pixel);
-  font-size: 15px;
+  font-size: 13px;
   color: #2a2016;
-  line-height: 1;
-}
-.hand-name {
-  font-family: var(--pixel);
-  font-size: 7px;
-  color: #6a5741;
-  letter-spacing: 0.3px;
+  background: #f2e7d0;
+  border: 2px solid #2a2016;
 }
 
 .actions {
@@ -692,6 +701,15 @@ em.off {
 @media (max-width: 860px) {
   .trade-cols {
     gap: 12px;
+  }
+  /*
+   * Das Blatt als Ganzes verkleinern statt jede Karte einzeln: so bleiben
+   * Faecher, Marke und Abstaende im Verhaeltnis, und es gibt nur einen
+   * Regler statt fuenf.
+   */
+  .hand {
+    transform: scale(0.72);
+    transform-origin: bottom left;
   }
   /* Die Schilder untereinander statt nebeneinander, sonst ueberlappen sie. */
   .hud {
@@ -882,4 +900,103 @@ em.off {
 }
 .dateiknopf input {
   display: none;
+}
+
+/* --- Meldungen, Aufleuchten, fliegende Karten --- */
+
+.meldungen {
+  position: absolute;
+  left: 0;
+  top: 96px;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+
+/*
+ * Kommt von links herein, bleibt stehen, geht wieder.
+ *
+ * Der Balken sitzt buendig am Rand statt frei zu schweben - so wirkt er wie
+ * ein Schild, das hereingeschoben wird, und nicht wie ein verrutschtes
+ * Fenster.
+ */
+.meldung {
+  font-family: var(--pixel);
+  font-size: 11px;
+  padding: 9px 16px 9px 12px;
+  background: rgba(23, 18, 12, 0.94);
+  border: 2px solid var(--line);
+  border-left-width: 6px;
+  color: var(--text);
+  white-space: nowrap;
+  animation: meldung-rein 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.2) both,
+    meldung-raus 0.4s ease-in 2.8s both;
+}
+.meldung-robber { border-left-color: var(--danger); color: #f0b8a8; }
+.meldung-season { border-left-color: var(--accent); color: var(--accent); }
+.meldung-gain { border-left-color: #4f9e5c; }
+.meldung-info { border-left-color: var(--line-bright); }
+
+@keyframes meldung-rein {
+  from { transform: translateX(-110%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes meldung-raus {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(-110%); opacity: 0; }
+}
+
+/* Getroffenes Feld: kurz hell auf, dann zurueck. */
+.hex-flash {
+  fill: #fff6c8;
+  stroke: var(--accent);
+  stroke-width: 3;
+  pointer-events: none;
+  animation: aufleuchten 0.9s ease-out forwards;
+}
+@keyframes aufleuchten {
+  0% { opacity: 0; }
+  18% { opacity: 0.75; }
+  100% { opacity: 0; }
+}
+
+/* Der Raeuber sucht ein Feld: die Auswahl pulsiert, damit sie auffaellt. */
+.hex-target {
+  animation: pulsieren 1.1s ease-in-out infinite;
+}
+@keyframes pulsieren {
+  0%, 100% { fill: rgba(217, 164, 65, 0.16); }
+  50% { fill: rgba(217, 164, 65, 0.42); }
+}
+
+/* Eine Karte auf dem Weg zur Hand - dieselbe Darstellung wie in der Hand,
+   damit erkennbar ist, WAS da ankommt. */
+.flug {
+  position: absolute;
+  left: 0;
+  top: 0;
+  margin: -24px 0 0 -18px;
+  z-index: 14;
+  pointer-events: none;
+  animation: fliegen 0.78s cubic-bezier(0.4, 0, 0.3, 1) forwards;
+  filter: drop-shadow(2px 3px 0 rgba(0, 0, 0, 0.55));
+}
+
+@keyframes fliegen {
+  0% { transform: translate(var(--x0), var(--y0)) scale(0.5); opacity: 0; }
+  15% { transform: translate(var(--x0), var(--y0)) scale(1.15); opacity: 1; }
+  100% { transform: translate(var(--x1), var(--y1)) scale(0.55); opacity: 0.9; }
+}
+
+/* Die Zahl auf der Karte springt kurz, wenn etwas ankommt. */
+.hand-card.zugewinn .hand-zahl {
+  animation: zaehler 0.4s ease-out;
+  color: #2f6b2f;
+}
+@keyframes zaehler {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.6); }
+  100% { transform: scale(1); }
 }

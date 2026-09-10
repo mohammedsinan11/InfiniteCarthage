@@ -11,14 +11,15 @@
  * erneut geprueft.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../net/store';
 import { Board } from '../board/Board';
-import type { Targets } from '../board/Board';
+import type { Flight, Targets } from '../board/Board';
 import { HandPanel } from '../ui/HandPanel';
 import { TradePanel } from '../ui/TradePanel';
 import { DiceOverlay } from '../ui/DiceOverlay';
-import { getVolume, initAudio, playBuild, setVolume } from '../audio';
+import { Announcements } from '../ui/Announcements';
+import { getVolume, initAudio, playBuild, playGain, playRobber, setVolume } from '../audio';
 import { getMusicMode, playFile, setMusicMode } from '../music';
 import type { MusicMode } from '../music';
 import { SEASON_NAME, bigRoundOf, roundOf, seasonOf } from '../../core/season';
@@ -28,6 +29,7 @@ import {
   legalSettlementVertices,
 } from '../../core/rules/placement';
 import { stealCandidates } from '../../core/rules/robber';
+import { productionSources } from '../../core/rules/production';
 import { tradeRatio } from '../../core/rules/trade';
 import {
   COST_CITY,
@@ -58,6 +60,10 @@ export function Game() {
   const disconnect = useStore((s) => s.disconnect);
   const pendingRoll = useStore((s) => s.pendingRoll);
   const clearPendingRoll = useStore((s) => s.clearPendingRoll);
+  const announcements = useStore((s) => s.announcements);
+  const dropAnnouncement = useStore((s) => s.dropAnnouncement);
+  const produceEffect = useStore((s) => s.produceEffect);
+  const clearProduceEffect = useStore((s) => s.clearProduceEffect);
 
   const [mode, setMode] = useState<BuildMode>(null);
   const [robberHex, setRobberHex] = useState<string | null>(null);
@@ -153,6 +159,49 @@ export function Game() {
   const discardChosen = RESOURCES.reduce((n, r) => n + (discard[r] ?? 0), 0);
 
   const ratio = you ? tradeRatio(state, world, you, tradeGive) : 4;
+
+  /*
+   * Welche Felder hat der Wurf getroffen, und was fliegt davon zu mir?
+   *
+   * Beides kommt aus productionSources im Kern - dieselbe Funktion, aus der
+   * auch die Abrechnung entsteht. Die Anzeige kann damit nichts behaupten,
+   * was die Regel nicht deckt.
+   */
+  const quellen = useMemo(
+    () => (produceEffect ? productionSources(state, world, produceEffect.roll) : []),
+    [produceEffect, state, world],
+  );
+
+  const flashHexes = useMemo(() => [...new Set(quellen.map((q) => q.hex))], [quellen]);
+
+  const flights: Flight[] = useMemo(() => {
+    if (!produceEffect || !you) return [];
+    let lauf = 0;
+    return quellen
+      .filter((q) => q.owner === you)
+      .flatMap((q) =>
+        Array.from({ length: q.amount }, () => ({
+          id: `${produceEffect.id}-${q.hex}-${q.resource}-${lauf}`,
+          hex: q.hex,
+          resource: q.resource,
+          // Gestaffelt, damit die Karten nacheinander ankommen.
+          delay: 120 * lauf++,
+        })),
+      );
+  }, [produceEffect, quellen, you]);
+
+  // Ertrag: Klang je ankommender Karte, danach den Effekt wieder loeschen.
+  useEffect(() => {
+    if (!produceEffect) return;
+    flights.forEach((_, i) => playGain(i));
+    const t = window.setTimeout(clearProduceEffect, 1200 + flights.length * 120);
+    return () => window.clearTimeout(t);
+  }, [produceEffect, flights, clearProduceEffect]);
+
+  // Der Raeuber meldet sich auch hoerbar.
+  useEffect(() => {
+    if (phase.t === 'moveRobber') playRobber();
+  }, [phase.t]);
 
   /*
    * Waehrend eine Bauwahl offen ist, muss man Felder vergleichen koennen -
@@ -252,6 +301,8 @@ export function Game() {
           </button>
         </div>
 
+        <Announcements items={announcements} onDone={dropAnnouncement} />
+
         {phase.t === 'finished' && (
           <div className="hud-win">
             {state.players.find((p) => p.id === phase.winner)?.name} gewinnt!
@@ -263,6 +314,8 @@ export function Game() {
           state={state}
           targets={targets}
           showAllNumbers={pinNumbers || waehltGerade}
+          flashHexes={flashHexes}
+          flights={flights}
           onPick={onPick}
         >
           {hand && <HandPanel hand={hand} />}

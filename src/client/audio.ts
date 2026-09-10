@@ -105,9 +105,24 @@ function blip(freq: number, duration: number, gain: number, when = 0, type: Osci
   osc.stop(t + duration + 0.02);
 }
 
-/** Feld unter dem Zeiger. Sehr leise - das passiert staendig. */
+/**
+ * Feld unter dem Zeiger.
+ *
+ * Das passiert bei jeder Mausbewegung dutzendfach, also muss es fast
+ * unhoerbar sein - ein Anstupsen, kein Ton. Ein erster Entwurf war deutlich
+ * lauter und wurde schnell laestig.
+ *
+ * Zusaetzlich eine Sperre: wer schnell ueber die Karte faehrt, loest sonst
+ * ein Maschinengewehr aus.
+ */
+let letzterHover = 0;
+const HOVER_MIN_MS = 90;
+
 export function playHover(): void {
-  blip(880, 0.045, 0.045, 0, 'triangle');
+  const jetzt = Date.now();
+  if (jetzt - letzterHover < HOVER_MIN_MS) return;
+  letzterHover = jetzt;
+  blip(1180, 0.022, 0.012, 0, 'sine');
 }
 
 /** Rasseln, solange die Wuerfel rollen. */
@@ -136,4 +151,25 @@ export function playBuild(): void {
 export function playChime(): void {
   blip(660, 0.12, 0.08, 0, 'sine');
   blip(990, 0.14, 0.06, 0.07, 'sine');
+}
+
+/** Raeuber: tief und unfreundlich. */
+export function playRobber(): void {
+  noise(0.3, 180, 0.35);
+  blip(90, 0.35, 0.14, 0, 'sawtooth');
+  blip(70, 0.4, 0.1, 0.08, 'sawtooth');
+}
+
+/**
+ * Ertrag: ein kleiner aufsteigender Dreiklang.
+ *
+ * Aufsteigend, weil es sich nach Zugewinn anfuehlen soll - dieselben Toene
+ * abwaerts klaengen nach Verlust. Der Versatz laesst mehrere Karten
+ * nacheinander eintreffen statt als Klumpen.
+ */
+export function playGain(index = 0): void {
+  const t = index * 0.09;
+  blip(523, 0.1, 0.09, t, 'sine');
+  blip(659, 0.11, 0.08, t + 0.05, 'sine');
+  blip(784, 0.14, 0.07, t + 0.1, 'sine');
 }

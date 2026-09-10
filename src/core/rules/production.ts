@@ -18,6 +18,55 @@ import type { Hand } from '../state';
 
 export type Payout = Record<PlayerId, Hand>;
 
+/** Ein einzelner Ertrag: dieses Feld gibt diesem Spieler so viel davon. */
+export type ProductionSource = {
+  /** Hexschluessel des liefernden Feldes. */
+  hex: string;
+  owner: PlayerId;
+  resource: Resource;
+  /** 1 fuer eine Siedlung, 2 fuer eine Stadt. */
+  amount: number;
+};
+
+/**
+ * Woher kommt der Ertrag im Einzelnen?
+ *
+ * computeProduction fasst das zu Summen je Spieler zusammen - fuer die Regel
+ * genuegt das. Die Oberflaeche braucht aber die Herkunft: welches Feld
+ * aufleuchten soll und von wo eine Karte zur Hand fliegt.
+ *
+ * Bewusst hier und nicht im Client: sonst gaebe es die Ertragsregel zweimal,
+ * und die Anzeige koennte etwas anderes behaupten als die Abrechnung.
+ * Bankmangel bleibt draussen - das ist eine Frage der Abrechnung, nicht der
+ * Herkunft.
+ */
+export function productionSources(
+  /**
+   * Nur belegte Ecken und die Raeuberstellung werden gelesen - beides
+   * oeffentlich. So passt auch die redigierte Sicht des Clients hinein und
+   * die Ertragsregel bleibt einmalig.
+   */
+  state: Pick<GameState, 'buildings' | 'robber'>,
+  world: World,
+  roll: number,
+): ProductionSource[] {
+  const out: ProductionSource[] = [];
+  for (const tile of world.tiles.values()) {
+    if (tile.number !== roll) continue;
+    const hk = hexKey(tile.q, tile.r);
+    if (hk === state.robber) continue;
+    const resource = TERRAIN_RESOURCE[tile.terrain];
+    if (resource === null) continue;
+
+    for (const v of hexVertices(tile.q, tile.r)) {
+      const b = state.buildings[vertexKey(v)];
+      if (b === undefined) continue;
+      out.push({ hex: hk, owner: b.owner, resource, amount: b.type === 'city' ? 2 : 1 });
+    }
+  }
+  return out;
+}
+
 /**
  * Was der Wurf einbringt, ohne den Zustand zu aendern.
  * Liefert je Spieler die Karten und die Rohstoffe, die wegen Bankmangel
@@ -37,19 +86,9 @@ export function computeProduction(
     ore: new Map(),
   };
 
-  for (const tile of world.tiles.values()) {
-    if (tile.number !== roll) continue;
-    if (hexKey(tile.q, tile.r) === state.robber) continue;
-    const res = TERRAIN_RESOURCE[tile.terrain];
-    if (res === null) continue;
-
-    for (const v of hexVertices(tile.q, tile.r)) {
-      const b = state.buildings[vertexKey(v)];
-      if (b === undefined) continue;
-      const n = b.type === 'city' ? 2 : 1;
-      const m = claims[res];
-      m.set(b.owner, (m.get(b.owner) ?? 0) + n);
-    }
+  for (const q of productionSources(state, world, roll)) {
+    const m = claims[q.resource];
+    m.set(q.owner, (m.get(q.owner) ?? 0) + q.amount);
   }
 
   const payout: Payout = {};

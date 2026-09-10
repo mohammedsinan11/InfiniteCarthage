@@ -16,6 +16,16 @@ import type { PlayerId } from '../../core/state';
 import { createWorld, revealChunks } from '../../core/world';
 import type { World } from '../../core/world';
 import { describeEvent } from '../log';
+import { SEASON_NAME, seasonChangedAt, seasonOf } from '../../core/season';
+
+export type Announcement = {
+  id: number;
+  text: string;
+  /** Bestimmt Farbe und Ton der Meldung. */
+  kind: 'robber' | 'season' | 'gain' | 'info';
+};
+
+let naechsteId = 1;
 
 const TOKEN_KEY = 'infinitecarthage.token';
 const ROOM_KEY = 'infinitecarthage.room';
@@ -51,6 +61,19 @@ export type Store = {
    * kann, statt die Zahl kommentarlos einzublenden.
    */
   pendingRoll: [number, number] | null;
+  /**
+   * Meldungen, die von links hereinfliegen sollen.
+   *
+   * Eine Warteschlange und keine einzelne Meldung: in einem Zug koennen
+   * mehrere Dinge auf einmal passieren - Wurf, Raeuber, Jahreszeitwechsel -,
+   * und sie sollen nacheinander zu sehen sein statt sich zu ueberschreiben.
+   */
+  announcements: Announcement[];
+  /**
+   * Der letzte Ertrag, damit die Felder aufleuchten und die Karten fliegen
+   * koennen. Die Nummer wechselt bei jedem Wurf und stoesst die Animation an.
+   */
+  produceEffect: { id: number; roll: number } | null;
 
   connect: (code: string, name: string, create: boolean) => void;
   /** Nach einem Neuladen zurueck in die laufende Partie, falls moeglich. */
@@ -60,7 +83,29 @@ export type Store = {
   act: (action: Action) => void;
   dismissError: () => void;
   clearPendingRoll: () => void;
+  dropAnnouncement: (id: number) => void;
+  clearProduceEffect: () => void;
 };
+
+/** Welche Ereignisse sind eine Meldung wert? Nicht jedes - sonst rauscht es. */
+function meldungenAus(events: GameEvent[], state: PublicState | null): Announcement[] {
+  const out: Announcement[] = [];
+  const wer = (id: string) => state?.players.find((p) => p.id === id)?.name ?? 'Jemand';
+  for (const e of events) {
+    if (e.t === 'robber') {
+      out.push({ id: naechsteId++, text: 'Der Raeuber zieht um', kind: 'robber' });
+    } else if (e.t === 'steal') {
+      out.push({ id: naechsteId++, text: `${wer(e.to)} bestiehlt ${wer(e.from)}`, kind: 'robber' });
+    } else if (e.t === 'monopoly') {
+      out.push({ id: naechsteId++, text: `Monopol: ${e.taken} Karten`, kind: 'info' });
+    } else if (e.t === 'largestArmy') {
+      out.push({ id: naechsteId++, text: `${wer(e.player)}: Groesste Rittermacht`, kind: 'info' });
+    } else if (e.t === 'win') {
+      out.push({ id: naechsteId++, text: `${wer(e.player)} gewinnt`, kind: 'info' });
+    }
+  }
+  return out;
+}
 
 /** Token je Raum merken, damit ein Neuladen den Platz nicht verliert. */
 const tokenKey = (code: string) => `${TOKEN_KEY}.${code}`;
@@ -107,6 +152,8 @@ export const useStore = create<Store>((set, get) => ({
   log: [],
   ws: null,
   pendingRoll: null,
+  announcements: [],
+  produceEffect: null,
 
   connect: (code, name, create) => {
     get().ws?.close();
@@ -129,16 +176,35 @@ export const useStore = create<Store>((set, get) => ({
             set((s) => ({ room: msg.room, status: msg.room.started ? s.status : 'lobby' }));
             break;
           case 'state':
-            set((s) => ({
-              state: msg.state,
-              world: buildWorld(s.world, msg.state),
-              status: 'playing',
-            }));
+            set((s) => {
+              // Jahreszeitwechsel faellt beim Zustand auf, nicht bei den
+              // Ereignissen - er ist aus der Zugnummer abgeleitet.
+              const vorher = s.state?.turn ?? 0;
+              const jetzt = msg.state.turn;
+              const wechsel =
+                jetzt > vorher && seasonChangedAt(jetzt)
+                  ? [
+                      {
+                        id: naechsteId++,
+                        text: SEASON_NAME[seasonOf(jetzt)],
+                        kind: 'season' as const,
+                      },
+                    ]
+                  : [];
+              return {
+                state: msg.state,
+                world: buildWorld(s.world, msg.state),
+                status: 'playing' as const,
+                announcements: [...s.announcements, ...wechsel].slice(-6),
+              };
+            });
             break;
           case 'events': {
             const wurf = msg.events.find((e: GameEvent) => e.t === 'roll');
+            const neue = meldungenAus(msg.events, get().state);
             set((s) => ({
               log: [...s.log, ...msg.events.map((e: GameEvent) => describeEvent(e, s.state))].slice(-120),
+              announcements: [...s.announcements, ...neue].slice(-6),
               ...(wurf && wurf.t === 'roll' ? { pendingRoll: wurf.dice } : {}),
             }));
             break;
@@ -196,5 +262,20 @@ export const useStore = create<Store>((set, get) => ({
   send: (msg) => sendMsg(get().ws, msg),
   act: (action) => sendMsg(get().ws, { t: 'action', action }),
   dismissError: () => set({ error: null }),
-  clearPendingRoll: () => set({ pendingRoll: null }),
+  clearPendingRoll: () => {
+    // Erst wenn die Wuerfel weg sind, sollen Felder leuchten und Karten
+    // fliegen - sonst passiert beides hinter dem Overlay.
+    const s = get();
+    const roll = s.state?.lastRoll;
+    set({
+      pendingRoll: null,
+      produceEffect:
+        roll && roll[0] + roll[1] !== 7
+          ? { id: naechsteId++, roll: roll[0] + roll[1] }
+          : null,
+    });
+  },
+  dropAnnouncement: (id) =>
+    set((s) => ({ announcements: s.announcements.filter((a) => a.id !== id) })),
+  clearProduceEffect: () => set({ produceEffect: null }),
 }));

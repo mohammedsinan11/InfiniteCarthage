@@ -30,6 +30,9 @@ import type { PublicState } from '../../core/redact';
 import { SEASON_TINT, playerColor } from '../theme';
 import { seasonOf } from '../../core/season';
 import { playHover } from '../audio';
+import type { Resource } from '../../core/types';
+import { ResourceCard } from '../ui/ResourceIcon';
+import { hexCornerPixel } from '../../core/coords';
 import {
   HEX_CX,
   HEX_CY,
@@ -117,6 +120,15 @@ if (typeof console !== 'undefined') {
   );
 }
 
+/** Eine Karte, die von einem Feld zur Hand fliegt. */
+export type Flight = {
+  id: string;
+  hex: string;
+  resource: Resource;
+  /** Versatz in Millisekunden, damit mehrere nacheinander starten. */
+  delay: number;
+};
+
 export type Targets = {
   vertices?: string[];
   edges?: string[];
@@ -129,6 +141,10 @@ type Props = {
   targets: Targets;
   /** Alle Zahlen dauerhaft zeigen - sonst erscheinen sie nur unter dem Zeiger. */
   showAllNumbers: boolean;
+  /** Felder, die kurz aufleuchten - etwa weil der Wurf sie getroffen hat. */
+  flashHexes?: string[];
+  /** Karten, die zur Hand fliegen sollen. */
+  flights?: Flight[];
   onPick: (kind: 'vertex' | 'edge' | 'hex', key: string) => void;
   /**
    * Aufgesetzte Anzeigen - Handblatt, Wuerfelknopf, Overlays.
@@ -147,7 +163,16 @@ type Camera = { cx: number; cy: number; zi: number };
 /** Augenzahl als Punkte: sagt schneller als die Ziffer, wie oft ein Feld trifft. */
 const pips = (n: number): string => '.'.repeat(6 - Math.abs(7 - n));
 
-export function Board({ world, state, targets, showAllNumbers, onPick, children }: Props) {
+export function Board({
+  world,
+  state,
+  targets,
+  showAllNumbers,
+  flashHexes,
+  flights,
+  onPick,
+  children,
+}: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [cam, setCam] = useState<Camera>({ cx: 0, cy: 0, zi: DEFAULT_ZOOM_INDEX });
@@ -405,6 +430,37 @@ export function Board({ world, state, targets, showAllNumbers, onPick, children 
     onPick(kind, key);
   };
 
+  /**
+   * Flugbahnen in Brettkoordinaten.
+   *
+   * Der Start ergibt sich aus der Feldposition, das Ziel wird an der
+   * Handkarte GEMESSEN statt gerechnet: die Leiste faechert auf, ihre Karten
+   * verschieben sich je nach Fensterbreite, und eine gerechnete Position
+   * laege daneben.
+   */
+  const bahnen = useMemo(() => {
+    if (!flights || flights.length === 0) return [];
+    const el = ref.current;
+    if (!el) return [];
+    const brett = el.getBoundingClientRect();
+    return flights.flatMap((f) => {
+      const parts = f.hex.split(':').map(Number);
+      const c = hexToPixel(parts[0]!, parts[1]!, LAYOUT);
+      const karte = el.querySelector(`.hand-card[data-res="${f.resource}"]`);
+      if (!karte) return [];
+      const k = karte.getBoundingClientRect();
+      return [
+        {
+          ...f,
+          x0: (c.x - view.x) * scale,
+          y0: (c.y - view.y) * scale,
+          x1: k.left - brett.left + k.width / 2,
+          y1: k.top - brett.top + k.height / 2,
+        },
+      ];
+    });
+  }, [flights, view, scale, size]);
+
   const vertexTargets = new Set(targets.vertices ?? []);
   const edgeTargets = new Set(targets.edges ?? []);
   const hexTargets = new Set(targets.hexes ?? []);
@@ -489,6 +545,18 @@ export function Board({ world, state, targets, showAllNumbers, onPick, children 
           );
         })}
 
+        {/* Felder, die der Wurf getroffen hat - kurzes Aufleuchten. */}
+        {(flashHexes ?? []).map((hk) => {
+          const parts = hk.split(':').map(Number);
+          const punkte = [0, 1, 2, 3, 4, 5]
+            .map((i) => {
+              const p = hexCornerPixel(parts[0]!, parts[1]!, i, LAYOUT);
+              return `${p.x.toFixed(1)},${p.y.toFixed(1)}`;
+            })
+            .join(' ');
+          return <polygon key={'f' + hk} className="hex-flash" points={punkte} />;
+        })}
+
         {/* Anklickbare Felder - fuer das Versetzen des Raeubers */}
         {[...hexTargets].map((hk) => {
           const parts = hk.split(':').map(Number);
@@ -566,6 +634,28 @@ export function Board({ world, state, targets, showAllNumbers, onPick, children 
 
       <div className="board-hint">Ziehen zum Verschieben, Mausrad zum Zoomen</div>
       {children}
+
+      {/*
+        Fliegende Karten liegen ueber allem: sie sollen den Weg vom Feld zur
+        Hand sichtbar machen, und der fuehrt quer ueber das Brett.
+      */}
+      {bahnen.map((b) => (
+        <div
+          key={b.id}
+          className="flug"
+          style={
+            {
+              '--x0': `${b.x0}px`,
+              '--y0': `${b.y0}px`,
+              '--x1': `${b.x1}px`,
+              '--y1': `${b.y1}px`,
+              animationDelay: `${b.delay}ms`,
+            } as React.CSSProperties
+          }
+        >
+          <ResourceCard r={b.resource} size={1.5} />
+        </div>
+      ))}
     </div>
   );
 }
