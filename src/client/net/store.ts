@@ -156,24 +156,54 @@ export const useStore = create<Store>((set, get) => ({
   produceEffect: null,
 
   connect: (code, name, create) => {
-    get().ws?.close();
-    set({ status: 'connecting', error: null, code, log: [] });
+    const alt = get().ws;
+    if (alt) {
+      /*
+       * Die Handler der alten Verbindung abschalten, BEVOR sie geschlossen
+       * wird.
+       *
+       * Sonst feuert ihr close-Ereignis erst, nachdem die neue Verbindung
+       * schon steht - und setzt den Zustand auf "getrennt" zurueck. Man
+       * landet dann mitten im Beitreten wieder auf der Startseite, ohne dass
+       * irgendetwas schiefgegangen waere.
+       */
+      alt.onopen = null;
+      alt.onclose = null;
+      alt.onmessage = null;
+      alt.close();
+    }
+    set({ status: 'connecting', error: null, code, log: [], state: null, world: null });
 
     const ws = openSocket(code, create, {
       onOpen: () => {
         sendMsg(ws, { t: 'join', name, token: loadToken(code) });
       },
       onClose: () => {
-        set((s) => (s.status === 'connecting' ? { status: 'closed' } : { status: 'closed' }));
+        // Nur die AKTUELLE Verbindung darf den Zustand aendern.
+        if (get().ws !== ws) return;
+        set({ status: 'closed' });
       },
       onMessage: (msg: ServerMsg) => {
+        if (get().ws !== ws) return;
         switch (msg.t) {
           case 'welcome':
             saveToken(code, msg.token);
             set({ you: msg.you, room: msg.room, status: msg.room.started ? 'playing' : 'lobby' });
             break;
           case 'room':
-            set((s) => ({ room: msg.room, status: msg.room.started ? s.status : 'lobby' }));
+            /*
+             * Eine Raumnachricht darf niemanden aus einer laufenden Partie
+             * werfen.
+             *
+             * Sie kommt bei jedem Beitritt und jedem Verbindungsabbruch -
+             * also gerade dann, wenn andere kommen und gehen. Wer bereits
+             * einen Spielzustand hat, ist im Spiel; nur ohne Zustand ist die
+             * Lobby der richtige Ort.
+             */
+            set((s) => ({
+              room: msg.room,
+              status: msg.room.started || s.state !== null ? s.status : 'lobby',
+            }));
             break;
           case 'state':
             set((s) => {

@@ -19,10 +19,8 @@ import { HandPanel } from '../ui/HandPanel';
 import { TradePanel } from '../ui/TradePanel';
 import { DiceOverlay } from '../ui/DiceOverlay';
 import { Announcements } from '../ui/Announcements';
-import { getVolume, initAudio, playBuild, playGain, playRobber, setVolume } from '../audio';
-import { getMusicMode, playFile, setMusicMode } from '../music';
-import type { MusicMode } from '../music';
-import { SEASON_NAME, bigRoundOf, roundOf, seasonOf } from '../../core/season';
+import { SideMenu } from '../ui/SideMenu';
+import { initAudio, playBuild, playGain, playRobber } from '../audio';
 import {
   legalCityVertices,
   legalRoadEdges,
@@ -74,8 +72,6 @@ export function Game() {
   const [discard, setDiscard] = useState<Partial<Record<Resource, number>>>({});
   /** Zahlen festpinnen - fuer alle, die sie lieber dauerhaft sehen. */
   const [pinNumbers, setPinNumbers] = useState(false);
-  const [lautstaerke, setLautstaerke] = useState(getVolume);
-  const [musik, setMusik] = useState<MusicMode>(getMusicMode);
 
   const me = state.players.find((p) => p.id === you);
   const hand = me?.hand;
@@ -234,72 +230,23 @@ export function Game() {
                 : `${state.players.find((p) => p.id === state.currentPlayer)?.name} ist dran`}
             </span>
           )}
-          {/* Zeitrechnung: Runde, grosse Runde, Jahreszeit - alles aus der
-              Zugnummer abgeleitet, siehe core/season.ts. */}
-          <span className="hud-zeit" title="Runde / grosse Runde">
-            R{roundOf(state.turn)}
-            <em>·</em>
-            GR{bigRoundOf(state.turn)}
-          </span>
-          <span className={`hud-saison saison-${seasonOf(state.turn)}`}>
-            {SEASON_NAME[seasonOf(state.turn)]}
-          </span>
           {state.lastRoll && (
             <span className="hud-roll">
               {state.lastRoll[0]} + {state.lastRoll[1]} = {state.lastRoll[0] + state.lastRoll[1]}
             </span>
           )}
-          <button
-            className={lautstaerke === 0 ? 'ghost small' : 'small chosen'}
-            title="Ton an oder aus"
-            onClick={() => {
-              initAudio();
-              const neu = lautstaerke === 0 ? 0.5 : 0;
-              setVolume(neu);
-              setLautstaerke(neu);
-            }}
-          >
-            {lautstaerke === 0 ? 'ton aus' : 'ton an'}
-          </button>
-          <span className="hud-musik">
-            <button
-              className={musik === 'erzeugt' ? 'small chosen' : 'ghost small'}
-              title="Erzeugte Musik an oder aus"
-              onClick={() => {
-                initAudio();
-                const neu: MusicMode = musik === 'erzeugt' ? 'aus' : 'erzeugt';
-                setMusicMode(neu);
-                setMusik(neu);
-              }}
-            >
-              musik
-            </button>
-            <label className="ghost small dateiknopf" title="Eigene Musikdatei waehlen">
-              clip
-              <input
-                type="file"
-                accept="audio/*"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (!f) return;
-                  initAudio();
-                  playFile(f);
-                  setMusik('datei');
-                }}
-              />
-            </label>
-          </span>
-          <button
-            className={pinNumbers ? 'small chosen' : 'ghost small'}
-            title="Zahlen dauerhaft anzeigen"
-            onClick={() => setPinNumbers((v) => !v)}
-          >
-            zahlen
-          </button>
-          <button className="ghost small" onClick={disconnect}>
-            verlassen
-          </button>
         </div>
+
+        {/* Verlassen steht fuer sich, weit weg von allem, was man oft klickt. */}
+        <button className="verlassen" title="Partie verlassen" onClick={disconnect}>
+          verlassen
+        </button>
+
+        <SideMenu
+          turn={state.turn}
+          showNumbers={pinNumbers}
+          onToggleNumbers={() => setPinNumbers((v) => !v)}
+        />
 
         <Announcements items={announcements} onDone={dropAnnouncement} />
 

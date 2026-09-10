@@ -1,5 +1,8 @@
 /**
- * Hintergrundmusik - entweder eine eigene Datei oder im Browser erzeugt.
+ * Hintergrundmusik.
+ *
+ * Zwei Quellen: Stuecke, die im Repo liegen, und eine im Browser erzeugte
+ * Melodie als Rueckfallebene. Der Spieler waehlt im Menue.
  *
  * WARUM KEIN YOUTUBE
  *
@@ -7,26 +10,46 @@
  * YouTubes Bedingungen verlangen einen sichtbaren, unverdeckten Player, die
  * Musik ist urheberrechtlich geschuetzt und wir veroeffentlichen die Seite
  * oeffentlich, und Browser blockieren ohnehin automatisch startenden Ton.
- * Deshalb diese beiden Wege.
  *
- * EIGENE DATEI
+ * EINGEBAUTE STUECKE
  *
- * Der Nutzer waehlt eine Audiodatei; sie wird nur lokal abgespielt und nie
- * hochgeladen. Sie bleibt eine Sitzung lang bestehen - der Browser gibt uns
- * keinen dauerhaften Zugriff auf eine einmal gewaehlte Datei zurueck.
+ * Alles, was in src/assets/music liegt, erscheint automatisch als Auswahl -
+ * siehe das README dort, was lizenzrechtlich geht und was nicht. Solange der
+ * Ordner leer ist, gibt es nur die erzeugte Musik.
  *
  * ERZEUGT
  *
- * Eine langsame Melodie in dorischem Modus ueber einem liegenden Bordunton.
- * Dorisch klingt mittelalterlich, ohne in Kitsch zu kippen; der Bordun ist
- * genau das, was eine Drehleier den ganzen Abend macht. Die Toene werden in
- * kleinen Schritten gewaehlt statt zufaellig gesprungen, sonst klingt es
- * nach Zufallsgenerator statt nach Melodie.
+ * Eine langsame Melodie in dorischem Modus ueber einem liegenden Bordunton,
+ * dazu ein leiser Trommelschlag. Dorisch klingt mittelalterlich, ohne in
+ * Kitsch zu kippen; der Bordun ist genau das, was eine Drehleier den ganzen
+ * Abend macht. Die Toene gehen in kleinen Schritten statt zu springen, sonst
+ * klingt es nach Zufallsgenerator statt nach Melodie.
  */
+
+/**
+ * Stuecke aus dem Repo. Der Glob laeuft beim Bauen; ein leerer Ordner
+ * ergibt eine leere Liste, ohne dass hier etwas anzupassen waere.
+ */
+const DATEIEN = import.meta.glob('../assets/music/*.{mp3,ogg,m4a,wav}', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+}) as Record<string, string>;
+
+export type Track = { id: string; name: string; url: string };
+
+export const TRACKS: Track[] = Object.entries(DATEIEN)
+  .map(([pfad, url]) => {
+    const datei = pfad.slice(pfad.lastIndexOf('/') + 1);
+    const name = datei.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ');
+    return { id: datei, name, url };
+  })
+  .sort((a, b) => a.name.localeCompare(b.name));
 
 const MODE_KEY = 'infinitecarthage.musik';
 
-export type MusicMode = 'aus' | 'erzeugt' | 'datei';
+/** 'aus', 'erzeugt' oder die Kennung eines eingebauten Stuecks. */
+export type MusicMode = string;
 
 let ctx: AudioContext | null = null;
 let bus: GainNode | null = null;
@@ -43,8 +66,11 @@ let objektUrl: string | null = null;
 
 function ladeModus(): MusicMode {
   try {
-    const v = localStorage.getItem(MODE_KEY);
-    return v === 'erzeugt' || v === 'datei' ? (v as MusicMode) : 'aus';
+    const v = localStorage.getItem(MODE_KEY) ?? 'aus';
+    // Ein gemerktes Stueck kann inzwischen fehlen - dann lieber still sein
+    // als ins Leere greifen.
+    if (v !== 'aus' && v !== 'erzeugt' && !TRACKS.some((t) => t.id === v)) return 'aus';
+    return v;
   } catch {
     return 'aus';
   }
@@ -52,9 +78,7 @@ function ladeModus(): MusicMode {
 
 function sichereModus(m: MusicMode): void {
   try {
-    // 'datei' nicht merken: die Datei selbst ueberlebt die Sitzung nicht,
-    // sonst startete das Spiel im Dateimodus ohne Datei.
-    localStorage.setItem(MODE_KEY, m === 'datei' ? 'aus' : m);
+    localStorage.setItem(MODE_KEY, m);
   } catch {
     // Privater Modus - dann gilt die Wahl eben nur jetzt.
   }
@@ -160,18 +184,16 @@ function startErzeugt(): void {
 
 // --- Eigene Datei -----------------------------------------------------------
 
-/** Spielt eine lokal gewaehlte Datei in Schleife. Sie verlaesst das Geraet nie. */
-export function playFile(file: File): void {
+/** Ein eingebautes Stueck in Schleife abspielen. */
+function spieleTrack(track: Track): void {
   stoppeAlles();
-  objektUrl = URL.createObjectURL(file);
-  element = new Audio(objektUrl);
+  element = new Audio(track.url);
   element.loop = true;
   element.volume = lautstaerke;
   void element.play().catch(() => {
-    // Ohne Nutzergeste verweigert der Browser - dann bleibt es eben still.
+    // Ohne Nutzergeste verweigert der Browser - dann bleibt es eben still,
+    // bis der naechste Klick kommt.
   });
-  modus = 'datei';
-  sichereModus(modus);
 }
 
 // --- Steuerung --------------------------------------------------------------
@@ -198,9 +220,17 @@ export function getMusicMode(): MusicMode {
 export function setMusicMode(m: MusicMode): void {
   modus = m;
   sichereModus(m);
-  if (m === 'erzeugt') startErzeugt();
-  else if (m === 'aus') stoppeAlles();
-  // 'datei' wird ueber playFile gestartet - ohne Datei gibt es nichts zu tun.
+  if (m === 'erzeugt') {
+    startErzeugt();
+    return;
+  }
+  if (m === 'aus') {
+    stoppeAlles();
+    return;
+  }
+  const track = TRACKS.find((t) => t.id === m);
+  if (track) spieleTrack(track);
+  else stoppeAlles();
 }
 
 export function getMusicVolume(): number {

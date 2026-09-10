@@ -1000,3 +1000,176 @@ em.off {
   40% { transform: scale(1.6); }
   100% { transform: scale(1); }
 }
+
+/* --- Seitenmenue --- */
+
+.verlassen {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 13;
+  font-size: 9px;
+  padding: 5px 9px;
+  background: transparent;
+  opacity: 0.7;
+}
+.verlassen:hover {
+  opacity: 1;
+  border-color: var(--danger);
+}
+
+.menu-auf,
+.menu-zu {
+  position: absolute;
+  z-index: 13;
+  width: 22px;
+  padding: 10px 0;
+  font-size: 13px;
+  line-height: 1;
+}
+.menu-auf {
+  top: 44px;
+  right: 0;
+}
+.menu-zu {
+  top: 34px;
+  left: -22px;
+  border-right: none;
+}
+
+.menu {
+  position: absolute;
+  top: 34px;
+  right: 10px;
+  bottom: 10px;
+  z-index: 11;
+  width: 210px;
+  display: flex;
+  flex-direction: column;
+  background: rgba(23, 18, 12, 0.94);
+  border: 3px solid var(--line);
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.04), 0 0 0 2px var(--bg);
+}
+
+/*
+ * Der Kopf ist eine Wappentafel, keine Statuszeile: Zierzeichen, Trennlinie,
+ * die Jahreszeit gross. Sie gehoert zum Spielstand und soll sich auch so
+ * anfuehlen.
+ */
+.menu-zeit {
+  padding: 10px 10px 12px;
+  text-align: center;
+  border-bottom: 2px solid var(--line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent);
+}
+.menu-zeit-zier {
+  font-size: 15px;
+  line-height: 1;
+  opacity: 0.6;
+  margin-bottom: 3px;
+}
+.menu-saison {
+  font-family: var(--pixel);
+  font-size: 15px;
+  letter-spacing: 1px;
+}
+.menu-jahr {
+  font-family: var(--pixel);
+  font-size: 9px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.menu-trenner {
+  height: 2px;
+  margin: 7px 14px;
+  background: linear-gradient(90deg, transparent, var(--line-bright), transparent);
+}
+.menu-runde {
+  font-family: var(--pixel);
+  font-size: 10px;
+  color: var(--text);
+}
+.menu-rest {
+  font-family: var(--pixel);
+  font-size: 8px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+/* Die Jahreszeit faerbt ihren eigenen Kopf. */
+.menu-zeit.saison-spring .menu-saison { color: #a8e08a; }
+.menu-zeit.saison-summer .menu-saison { color: #ffe08a; }
+.menu-zeit.saison-autumn .menu-saison { color: #e8a05a; }
+.menu-zeit.saison-winter .menu-saison { color: #bcd6f0; }
+
+.menu-reiter {
+  display: flex;
+  border-bottom: 2px solid var(--line);
+}
+.menu-reiter-knopf {
+  flex: 1;
+  border: none;
+  border-right: 2px solid var(--line);
+  background: var(--panel2);
+  font-size: 9px;
+  padding: 7px 0;
+  box-shadow: none;
+}
+.menu-reiter-knopf:last-child {
+  border-right: none;
+}
+.menu-reiter-knopf.aktiv {
+  background: var(--accent-dark);
+  color: #21170a;
+}
+
+.menu-inhalt {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.menu-inhalt h3 {
+  margin: 4px 0 2px;
+  font-family: var(--pixel);
+  font-size: 10px;
+  color: var(--accent);
+  font-weight: 400;
+}
+.menu-leer {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.menu-zeile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.menu-zeile input[type='range'] {
+  width: 100%;
+  padding: 0;
+}
+.menu-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.menu-liste button {
+  text-align: left;
+  font-size: 9px;
+  padding: 6px 8px;
+}
+.menu-liste button.aktiv {
+  background: var(--accent-dark);
+  border-color: var(--accent);
+  color: #21170a;
+}
+
+@media (max-width: 860px) {
+  .menu {
+    width: 168px;
+  }
+}
