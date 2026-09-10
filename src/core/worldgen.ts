@@ -49,6 +49,9 @@ const SALT_ELEVATION = 41;
 const SALT_WARP_X = 51;
 const SALT_WARP_Y = 52;
 const SALT_RIDGE = 53;
+const SALT_KONT_WARP_X = 54;
+const SALT_KONT_WARP_Y = 55;
+const SALT_KONTINENT = 56;
 const SALT_MOISTURE = 42;
 const SALT_NUMBER = 2;
 const SALT_PORT = 3;
@@ -97,41 +100,57 @@ const RIDGE_STRENGTH = 0.32;
 const RIDGE_FLOOR = 0.55;
 
 /**
- * Schwellen fuer Hoehe und Feuchte.
+ * Kontinente.
  *
- * Nicht geraten, sondern auf gemessene Perzentile der beiden Felder gesetzt.
- * Ein erster Versuch mit runden Zahlen ergab 27 % Berge und 4 % Weide - die
- * Verteilung von fbm ist eben nicht gleichmaessig, und wer Schwellen nach
- * Gefuehl waehlt, trifft danach.
+ * Land und Meer entscheidet ein eigenes, langsames Feld - nicht mehr das
+ * Hoehenfeld, das auch Huegel und Berge verteilt. Vorher lag beides in einem
+ * Feld mit Wellenlaenge 6,5: Land reichte selten weit vom Wasser weg (gemessen
+ * Median 3, Maximum 13 Felder), und fuer grosse Hoehen fehlte der Platz. Ein
+ * einziges langsames Feld haette die Kontinente vergroessert, aber auch die
+ * Huegel- und Berggebiete - der Startbereich waere wieder durchgehend eine
+ * Sorte gewesen.
  *
- * Ziel ist eine Karte, auf der man Catan spielen kann: rund ein Fuenftel
- * Wasser, die Haelfte flaches Land, der Rest Huegel und Berge.
+ * Getrennt geht beides: das Kontinentfeld zieht die Kueste, das Hoehenfeld
+ * gliedert das Land darin. Gemessen ueber sechs Seeds liegt ein Landfeld jetzt
+ * im Median 9 Felder vom Meer entfernt, p90 bei 19, hoechstens 33. Skala 28
+ * gaebe noch groessere Kontinente, aber dann saehe man vom Start aus kaum noch
+ * eine Kueste.
  *
- * Nach dem Einbau von Verzerrung und Kaemmen neu gemessen (66.248 Proben ueber
- * acht Seeds) - die Kaemme heben das Hochland an, also wandern die oberen
- * beiden Schwellen mit. Wer am Feld dreht, muss hier nachmessen, sonst
- * verschiebt sich die Balance unbemerkt.
- *
- *   Hoehe  < p22 (0,291)  Wasser
- *          > p87 (0,955)  Berg
- *          > p72 (0,741)  Huegel
+ * Die Kueste bekommt eine eigene, groessere Verzerrung - mit der kleinen des
+ * Hoehenfeldes saehe ein Kontinent aus wie ein aufgeblasener Kreis.
  */
-export const SEA_LEVEL = 0.291;
-const HILL_LEVEL = 0.7405;
-const MOUNTAIN_LEVEL = 0.9552;
+const KONTINENT_SKALA = 22;
+const KONTINENT_VERZERRUNG = KONTINENT_SKALA * 0.35;
 
 /**
- * Feuchte teilt das flache Land auf - ebenfalls nach Perzentilen:
- *   > p70 (0,686)  Wald
- *   > p40 (0,435)  Weide
- *   > p16 (0,204)  Feld
- *   sonst          Wueste
+ * Schwellen - nicht geraten, sondern auf gemessene Anteile gesetzt.
+ *
+ * Neu vermessen mit Kontinenten (sechs Seeds, je 6.211 Felder). Ziel sind
+ * dieselben Anteile wie vorher, nur anders angeordnet:
+ *
+ *   Kontinent < 0,259            Meer    (~20 %)
+ *   Hoehe     < 0,024  im Land   See     (~3 %)
+ *             > 0,907            Berg
+ *             > 0,669            Huegel
+ *   Feuchte   > 0,678            Wald
+ *             > 0,424            Weide
+ *             > 0,195            Feld
+ *             sonst              Wueste
+ *
+ * Die Hoehenschwellen gelten nur noch fuer Land: Wasser haengt nicht mehr an
+ * der Hoehe, also verteilen sich Huegel und Berge ueber das ganze Land statt nur
+ * ueber seine hoeheren Teile. Wer an einem Feld dreht, muss hier nachmessen,
+ * sonst verschiebt sich die Balance unbemerkt.
  */
-const FOREST_LEVEL = 0.6862;
-const PASTURE_LEVEL = 0.4351;
-const FIELD_LEVEL = 0.2036;
+export const SEA_LEVEL = 0.2593;
+export const LAKE_LEVEL = 0.024;
+const HILL_LEVEL = 0.6691;
+const MOUNTAIN_LEVEL = 0.9065;
+const FOREST_LEVEL = 0.6778;
+const PASTURE_LEVEL = 0.4238;
+const FIELD_LEVEL = 0.1951;
 
-export type Fields = { elevation: number; moisture: number };
+export type Fields = { elevation: number; moisture: number; kontinent: number };
 
 /**
  * Gemerkte Feldwerte.
@@ -182,22 +201,49 @@ function berechneFelder(seed: number, q: number, r: number): Fields {
     elevation = Math.min(1, basis + RIDGE_STRENGTH * kamm * gewicht);
   }
 
+  // Kontinent: eigenes Feld mit eigener, groesserer Verzerrung.
+  const kws = KONTINENT_SKALA * 0.6;
+  const kwx = fbm(seed, p.x / kws, p.y / kws, SALT_KONT_WARP_X, 2) - 0.5;
+  const kwy = fbm(seed, p.x / kws, p.y / kws, SALT_KONT_WARP_Y, 2) - 0.5;
+  const kontinent = expand(
+    fbm(
+      seed,
+      (p.x + kwx * KONTINENT_VERZERRUNG) / KONTINENT_SKALA,
+      (p.y + kwy * KONTINENT_VERZERRUNG) / KONTINENT_SKALA,
+      SALT_KONTINENT,
+      4,
+    ),
+  );
+
   return {
     elevation,
     moisture: expand(fbm(seed, x / MOISTURE_SCALE, y / MOISTURE_SCALE, SALT_MOISTURE, 2)),
+    kontinent,
   };
 }
 
 /** Gelaende ohne Nachbarschaftskorrektur. */
 function rawTerrainAt(seed: number, q: number, r: number): Terrain {
-  const { elevation, moisture } = fieldsAt(seed, q, r);
-  if (elevation < SEA_LEVEL) return 'water';
+  const { elevation, moisture, kontinent } = fieldsAt(seed, q, r);
+  if (kontinent < SEA_LEVEL) return 'water'; // Meer
+  if (elevation < LAKE_LEVEL) return 'water'; // See im Land
   if (elevation > MOUNTAIN_LEVEL) return 'mountain';
   if (elevation > HILL_LEVEL) return 'hill';
   if (moisture > FOREST_LEVEL) return 'forest';
   if (moisture > PASTURE_LEVEL) return 'pasture';
   if (moisture > FIELD_LEVEL) return 'field';
   return 'desert';
+}
+
+/**
+ * Ist dieses Feld Meer - im Unterschied zu einem See im Land?
+ *
+ * Nach dem rohen Kontinentfeld. Eine einzelne Insel, die der Kleckspass zu
+ * Wasser macht, zaehlt damit nicht als Meer - sie liegt ohnehin mitten darin
+ * und bekommt nur keinen Hafen.
+ */
+export function isSeaAt(seed: number, q: number, r: number): boolean {
+  return fieldsAt(seed, q, r).kontinent < SEA_LEVEL;
 }
 
 /**
@@ -355,7 +401,8 @@ export function tileAtCoord(seed: number, q: number, r: number): Tile {
     r,
     terrain,
     number: numberAt(seed, q, r),
-    port: terrain === 'water' ? makePort(seed, q, r) : null,
+    // Haefen nur am Meer - ein Hafen am Bergsee waere eine seltsame Handelsroute.
+    port: terrain === 'water' && isSeaAt(seed, q, r) ? makePort(seed, q, r) : null,
   };
 }
 

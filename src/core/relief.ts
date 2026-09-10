@@ -22,9 +22,8 @@
  * Wassertiefe, die wir nicht treffen koennen.
  */
 
-import { HEX_DIRS, hexesInRange, neighbors } from './coords';
-import { expand, fbm, hexToField } from './noise';
-import { SEA_LEVEL, fieldsAt, terrainAt } from './worldgen';
+import { HEX_DIRS, neighbors } from './coords';
+import { LAKE_LEVEL, SEA_LEVEL, fieldsAt, isSeaAt, terrainAt } from './worldgen';
 
 /**
  * Wie stark hohe Lagen bevorzugt werden.
@@ -103,7 +102,8 @@ export function reliefAt(seed: number, q: number, r: number): number {
 function berechneRelief(seed: number, q: number, r: number): number {
   if (terrainAt(seed, q, r) === 'water') return 0;
   const h = geglaetteteHoehe(seed, q, r);
-  const ueber = (h - SEA_LEVEL) / (1 - SEA_LEVEL);
+  // Land beginnt an der Seegrenze; das Meer entscheidet ein anderes Feld.
+  const ueber = (h - LAKE_LEVEL) / (1 - LAKE_LEVEL);
   if (ueber <= 0) return 0;
   return Math.min(1, ueber) ** GAMMA;
 }
@@ -111,53 +111,23 @@ function berechneRelief(seed: number, q: number, r: number): number {
 // --- Wohin das Relief strebt -------------------------------------------------
 
 /**
- * Breite Grundhebung: eine sehr langsame Welle ueber dem Land.
+ * Grundhebung aus dem Kontinentkern.
  *
- * Das rohe Relief folgt dem Gelaende und wechselt alle paar Felder. Mit
- * begrenzter Steigung reicht das nicht fuer grosse Hoehen: jede Niederung
- * zieht die Umgebung mit herunter. Die Welle hebt ganze Landstriche an, auch
- * ihre Weiden und Felder - so entstehen Hochebenen statt einzelner Kuppen.
- * Weil sie so langsam ist, erzeugt sie selbst keine steilen Stufen.
+ * Das rohe Relief folgt dem Gelaende und wechselt alle paar Felder; mit
+ * begrenzter Steigung zieht jede Niederung die Umgebung herunter. Die Haelfte
+ * der Zielhoehe kommt deshalb aus dem Kontinentfeld: je tiefer im Land, desto
+ * hoeher - so entstehen Hochebenen im Inneren und flache Kuesten, wie bei
+ * hexmap. Eine erste Fassung nahm dafuer ein eigenes, zufaelliges Rauschen;
+ * seit es Kontinente gibt, ist der Kern die ehrlichere Quelle.
  */
-const SALT_BREIT = 97;
-const BREIT_SKALA = 28;
 const BREIT_ANTEIL = 0.5;
 
-/**
- * Meer oder See?
- *
- * hexmap legt nur das MEER auf Hoehe null; Seen im Landesinneren liegen, wo das
- * Land liegt. Hier lag bisher jedes Wasserfeld auf null - und weil ein Viertel
- * der Karte Wasser ist, war nie ein Feld weit genug vom Wasser entfernt, um hoch
- * zu kommen. Gemessen stieg das Hochland mit schwebenden Seen um ein Viertel.
- *
- * Ob Meer oder See, entscheidet ohne Kartenrand der Umkreis: ist dort mindestens
- * die Haelfte Wasser, ist es Meer. Eine enge Bucht kann dadurch als See gelten
- * und etwas angehoben werden - die begrenzte Steigung haelt sie trotzdem dicht
- * am Meer daneben.
+/*
+ * Meer oder See: hexmap legt nur das MEER auf Hoehe null, Seen liegen, wo ihr
+ * Ufer liegt. Die Unterscheidung liefert inzwischen die Weltgenerierung selbst
+ * (isSeaAt) - eine fruehere Fassung schaetzte sie aus dem Wasseranteil im
+ * Umkreis, weil Land und Meer noch am selben Feld hingen.
  */
-const MEER_RADIUS = 3;
-const MEER_ANTEIL = 0.5;
-
-let meerSeed = Number.NaN;
-const meerCache = new Map<string, boolean>();
-
-function istMeer(seed: number, q: number, r: number): boolean {
-  if (seed !== meerSeed) {
-    meerCache.clear();
-    meerSeed = seed;
-  }
-  const k = q + ':' + r;
-  const da = meerCache.get(k);
-  if (da !== undefined) return da;
-  const umkreis = hexesInRange({ q, r }, MEER_RADIUS);
-  let wasser = 0;
-  for (const h of umkreis) if (terrainAt(seed, h.q, h.r) === 'water') wasser++;
-  const v = wasser / umkreis.length >= MEER_ANTEIL;
-  if (meerCache.size >= GEDAECHTNIS_MAX) meerCache.clear();
-  meerCache.set(k, v);
-  return v;
-}
 
 let zielSeed = Number.NaN;
 const zielCache = new Map<string, number>();
@@ -165,7 +135,7 @@ const zielCache = new Map<string, number>();
 /**
  * Die Hoehe, die ein Feld haette, gaebe es keine Steigungsgrenze. 0 bis 1.
  *
- * Land: halb Gelaende, halb breite Welle. Meer: 0. See: unendlich - ein See
+ * Land: halb Gelaende, halb Kontinentkern. Meer: 0. See: unendlich - ein See
  * zieht niemanden herunter, er liegt einfach, wo seine Ufer liegen.
  */
 export function reliefTargetAt(seed: number, q: number, r: number): number {
@@ -179,11 +149,12 @@ export function reliefTargetAt(seed: number, q: number, r: number): number {
 
   let v: number;
   if (terrainAt(seed, q, r) === 'water') {
-    v = istMeer(seed, q, r) ? 0 : Number.POSITIVE_INFINITY;
+    v = isSeaAt(seed, q, r) ? 0 : Number.POSITIVE_INFINITY;
   } else {
-    const p = hexToField(q, r);
-    const breit = expand(fbm(seed, p.x / BREIT_SKALA, p.y / BREIT_SKALA, SALT_BREIT, 2));
-    v = Math.min(1, (1 - BREIT_ANTEIL) * reliefAt(seed, q, r) + BREIT_ANTEIL * breit);
+    // Wie tief im Kontinent: 0 an seiner Kueste, 1 im Kern.
+    const kont = fieldsAt(seed, q, r).kontinent;
+    const kern = Math.min(1, Math.max(0, (kont - SEA_LEVEL) / (1 - SEA_LEVEL)));
+    v = Math.min(1, (1 - BREIT_ANTEIL) * reliefAt(seed, q, r) + BREIT_ANTEIL * kern);
   }
   if (zielCache.size >= GEDAECHTNIS_MAX) zielCache.clear();
   zielCache.set(k, v);

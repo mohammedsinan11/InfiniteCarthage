@@ -36,7 +36,9 @@ import { hexCornerPixel } from '../../core/coords';
 import { nestAt } from '../../core/raiders';
 import { reliefLimitedAt } from '../../core/relief';
 import { edgeAdjacentHexes, vertexAdjacentHexes } from '../../core/coords';
-import { Nest } from './Nest';
+import { guardUnits, nestUnits } from '../../core/units';
+import type { Unit } from '../../core/units';
+import { aufstellung, preloadUnitSprites, zeichneFigur } from '../units';
 import {
   HEX_CX,
   HEX_CY,
@@ -230,7 +232,7 @@ export function Board({
 
   useEffect(() => {
     let lebt = true;
-    void preloadTiles().then(() => {
+    void Promise.all([preloadTiles(), preloadUnitSprites()]).then(() => {
       if (lebt) setTilesReady(true);
     });
     return () => {
@@ -326,6 +328,26 @@ export function Board({
   }, [world, view]);
 
   /**
+   * Wer auf welchem Feld steht - Lagerbewohner und Wachen.
+   *
+   * Aus dem Spielstand abgeleitet (core/units.ts). Nester nur fuer sichtbare
+   * Felder; Wachen stehen an Siedlungen und werden beim Zeichnen ohnehin nur fuer
+   * sichtbare Felder abgefragt.
+   */
+  const besatzung = useMemo(() => {
+    const m = new Map<string, Unit[]>();
+    const dazu = (u: Unit) => {
+      const k = hexKey(u.q, u.r);
+      const liste = m.get(k);
+      if (liste) liste.push(u);
+      else m.set(k, [u]);
+    };
+    nestUnits(state.worldSeed, visible).forEach(dazu);
+    guardUnits(state).forEach(dazu);
+    return m;
+  }, [visible, state]);
+
+  /**
    * Gelaende auf das Canvas zeichnen.
    *
    * Der Speicher hinter dem Canvas ist um devicePixelRatio groesser als die
@@ -362,6 +384,37 @@ export function Board({
       ctx.drawImage(img, x, y, w, h);
     };
 
+    /** Geraetepixel je Kunstpixel - bei jeder Zoomstufe ganzzahlig. */
+    const f = Math.round(SCALE * scale * DPR);
+
+    /**
+     * Was auf dem Feld steht: erst das Lager, dann die Figuren von hinten nach
+     * vorn. Direkt nach der eigenen Kachel gezeichnet, damit die Kacheln davor
+     * die Fuesse verdecken - wer hinter einem Wald steht, steht dahinter.
+     */
+    const zeichneBesatzung = (t: (typeof visible)[number], lift: number) => {
+      const lager = nestAt(state.worldSeed, t.q, t.r);
+      const leute = besatzung.get(hexKey(t.q, t.r));
+      if (!lager && !leute) return;
+      const c = hexToPixel(t.q, t.r, LAYOUT);
+      // Ursprung wie in zeichne, damit Figuren im selben Pixelraster sitzen.
+      const x0 = Math.round((c.x - IMG.dx - view.x) * scale * DPR);
+      const y0 = Math.round((c.y - IMG.dy - lift - view.y) * scale * DPR);
+      const mx = x0 + Math.round(HEX_CX) * f;
+      const my = y0 + Math.round(HEX_CY) * f;
+      if (lager) zeichneFigur(ctx, 'lager', mx, my + f, f);
+      if (!leute) return;
+      const stellen = aufstellung(leute.length, lager);
+      leute.slice(0, stellen.length).forEach((u, i) => {
+        const [ox, oy] = stellen[i]!;
+        const farbe =
+          u.owner === null
+            ? undefined
+            : playerColor(state.players.find((pl) => pl.id === u.owner)?.color ?? 0);
+        zeichneFigur(ctx, u.kind, mx + ox * f, my + oy * f, f, farbe);
+      });
+    };
+
     /*
      * Jede Kachel genau einmal, auf ihrer Hoehe - wie bei hexmap.
      *
@@ -373,7 +426,9 @@ export function Board({
      */
     for (const t of visible) {
       if (hexKey(t.q, t.r) === hover) continue; // kommt zuletzt, angehoben
-      zeichne(t, liftHex(t.q, t.r));
+      const hoch = liftHex(t.q, t.r);
+      zeichne(t, hoch);
+      zeichneBesatzung(t, hoch);
     }
 
     if (hover !== null) {
@@ -396,6 +451,7 @@ export function Board({
         ctx.fill();
         ctx.restore();
         zeichne(t, liftHex(t.q, t.r) + LIFT);
+        zeichneBesatzung(t, liftHex(t.q, t.r) + LIFT);
       }
     }
 
@@ -419,7 +475,7 @@ export function Board({
       ctx.fillRect(0, 0, bw, bh);
       ctx.restore();
     }
-  }, [visible, view, scale, size, hover, world, state.worldSeed, state.turn, tilesReady, liftHex]);
+  }, [visible, view, scale, size, hover, world, state.worldSeed, state.turn, state.players, tilesReady, liftHex, besatzung]);
 
   /** Eine Stufe naeher (+1) oder weiter weg (-1); der Punkt unter x/y bleibt stehen. */
   const zoomUm = useCallback((richtung: number, mausX: number, mausY: number) => {
@@ -721,23 +777,6 @@ export function Board({
         width={size.w}
         height={size.h}
       >
-        {/*
-          Raeubernester. Immer sichtbar, nie unter dem Zeiger versteckt: sie
-          sind der Grund, warum man sich ueberlegt, wo man baut, und diese
-          Ueberlegung faengt beim Hinsehen an.
-        */}
-        {visible.map((t) =>
-          nestAt(state.worldSeed, t.q, t.r) ? (
-            (() => {
-              const c = hexToPixel(t.q, t.r, LAYOUT);
-              const lift = liftHex(t.q, t.r) + (hover === hexKey(t.q, t.r) ? LIFT : 0);
-              return (
-                <Nest key={'nest' + hexKey(t.q, t.r)} x={c.x} y={c.y - lift} size={HEX_H * SCALE * 0.62} />
-              );
-            })()
-          ) : null,
-        )}
-
         {/* Zahlenmarker */}
         {visible.map((t) => {
           const hk = hexKey(t.q, t.r);

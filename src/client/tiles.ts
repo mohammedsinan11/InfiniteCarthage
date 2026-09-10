@@ -75,11 +75,11 @@ export const HEX_CY = 19.5;
 /**
  * Ab welcher Hoehe eine Weide als Huegelland gezeichnet wird.
  *
- * Weiden liegen zwischen Meeresspiegel (0,29) und Huegelgrenze (0,74). Das
+ * Weiden liegen zwischen Seegrenze (0,02) und Huegelgrenze (0,67). Das
  * obere Drittel davon bekommt die gruenen Huegel - so steigt das Gelaende zum
  * Gebirge hin sichtbar an, noch bevor das Relief es anhebt.
  */
-const HANG_WEIDE = 0.6;
+const HANG_WEIDE = 0.45;
 
 /** Grundname der Kachel fuer Gelaende und Klima. */
 function baseName(

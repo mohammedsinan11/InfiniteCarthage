@@ -223,7 +223,10 @@ das Geruest schon.
 7. **Markt und Kosten** — die Runden-Karten, die etwas kosten. Braucht eine
    Kaufentscheidung und damit etwas mehr Oberflaeche.
 8. **Einheiten** — produzieren, ein Hex je Runde ziehen, eine Siedlung halten.
-   Deutlich groesser als alles bisher.
+   Deutlich groesser als alles bisher. *Vorstufe gebaut:* Einheiten stehen
+   sichtbar auf Feldern - Raeuber und Goblins in den Lagern, Ritter als Wachen an
+   den Siedlungen (`core/units.ts`). Noch abgeleitet statt gespeichert; sobald
+   sie sich bewegen, wandern sie in den Spielstand, und das Zeichnen bleibt.
 9. **Belagerung** — Truppen zum Nest schicken und es zerstoeren.
 10. **Held** — erst wenn Karten und Einheiten stehen.
 

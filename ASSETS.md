@@ -71,21 +71,21 @@ Piktogramme, und in sechs Spielerfarben lesbar bleiben.
 *Aufwand:* 3 Formen x 6 Farben, oder 3 Graustufenbilder, die eingefaerbt
 werden.
 
-### Raeubernester — **Platzhalter**
+### Figuren: Lager, Raeuber, Goblins, Ritter — **Platzhalter, sprite-bereit**
 
-`src/client/board/Nest.tsx`: drei Pfaehle als Polygone, ein roter Wimpel, eine
-Schattenellipse. Es liest sich auf einen Blick als Lager, und es sitzt sauber
-auf dem Hex - mehr ist es nicht.
+`src/client/units.ts`: kleine Pixelkarten aus Zeichen, gezeichnet im Kunstpixel
+der Kacheln auf dem Canvas - also im selben Raster wie die Karte und von den
+Kacheln davor richtig verdeckt. Das ersetzt den frueheren Vektor-Marker fuer
+Nester, dessen Stilbruch hier notiert war.
 
-Der eigentliche Mangel ist nicht die Form, sondern der Stil: die Kacheln sind
-Pixelgrafik, das Nest ist eine glatte Vektorform. Neben den Spielsteinen faellt
-das nicht auf, weil die genauso gebaut sind - aber sobald jemand die Steine
-zeichnet, muss das Nest mit.
+Zu sehen: das Lager selbst (Zelt, Palisade, Wimpel), zwei bis drei Bewohner
+davor - Raeuber oder, in etwa jedem dritten Nest, Goblins -, und die Wachen
+eines Spielers als Ritter in seiner Farbe an seinen Siedlungen.
 
-Als Kachel gedacht waere es besser: ein Nest gehoert zum Feld, nicht darauf.
-Dann koennte es auch das Gelaende darunter verdecken, statt daraufzuliegen.
-
-Der alte Raeuber-Spielstein ist ersatzlos entfallen.
+**Sprites ohne Codeaenderung:** `raeuber.png`, `goblin.png`, `ritter.png`,
+`lager.png` nach `src/assets/units/` legen. Format und Anker stehen im README
+dort. Offen: eine Farbmaske fuer Ritter-Sprites, damit sie die Spielerfarbe
+tragen.
 
 ### Zahlenmarker und Haefen — **tragbar**
 
@@ -152,11 +152,11 @@ wuerden.
 | **Gegenstaende** | Symbole | Zahl offen, waechst mit dem Kartensystem. |
 | **Technologien** | Symbole | Fuer den Reiter im Menue. |
 | **Auftraege und Ereignisse** | Symbole, evtl. kleine Bilder | Ereignisse koennten ein Bild vertragen, Auftraege genuegt ein Symbol. |
-| **Raeubernest als Kachel** | 2 bis 3 Varianten | Wuerde den Vektor-Platzhalter ersetzen und ins Gelaende einfuegen statt daraufzulegen. |
-| **Einheiten** | Figur je Seite, zwei Blickrichtungen | Sobald Truppen produziert und bewegt werden (`DESIGN.md`, Schritt 4). |
+| **Lager-Sprite** | 1 bis 3 Varianten (`lager.png`) | Ersetzt das Pixel-Zelt. Raeuber- und Goblinlager duerfen verschieden aussehen - dafuer braeuchte es zwei Dateien. |
+| **Einheiten-Sprites** | `raeuber.png`, `goblin.png`, `ritter.png`, spaeter je Einheit | Werden ohne Codeaenderung gezeichnet (README in `src/assets/units`). Fuer Bewegung spaeter zwei Blickrichtungen. |
 | **Kartenrahmen je Seltenheit** | 5 Rahmen, dazu Glanz als Einzelbildfolge | Ersetzt die CSS-Glut, Funken und Strahlen. Legendaer darf animiert sein, der Rest eher nicht. |
 | **Kartenrueckseite** | 1 Motiv | Fuer das Austeilen - derzeit fliegen die Vorderseiten herein. |
-| **Wache** | Symbol, evtl. Figur neben der Siedlung | Stehende Wachen sieht man nur im Menue. Auf der Karte waeren sie lesbarer. |
+| **Ritter-Farbmaske** | 1 Datei neben `ritter.png` | Wachen stehen inzwischen als Figuren an den Siedlungen; ein Sprite koennte die Spielerfarbe aber noch nicht tragen. |
 | **Abwehr und Pluenderung** | kurze Einzelbildfolgen | Derzeit nur Meldung und Klang. Ein Schwertblitz am Nest, eine Staubwolke an der Siedlung. |
 | **Klaenge** | Aufnahmen oder komponiert | Ertrag, Karte nehmen (je Seltenheit), Wache, Abwehr, Pluenderung zuerst. |
 | **Gegner und Kampf** | offen | Sobald der Held kaempfen soll. |

@@ -67,7 +67,7 @@ const STORAGE_SCHEMA = 'schema';
  *
  * Hochzaehlen, sobald sich GameState aendert.
  */
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 function randomId(bytes = 16): string {
   const a = new Uint8Array(bytes);

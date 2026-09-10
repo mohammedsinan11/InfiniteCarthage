@@ -154,7 +154,8 @@ export function DiceOverlay({ dice, onDone }: Props) {
         <Die value={shown[0]} />
         <Die value={shown[1]} />
       </div>
-      <div className="dice-sum">{settled ? summe : ' '}</div>
+      {/* Die Summe ist das, worauf es ankommt - sie springt heraus und leuchtet. */}
+      <div className={settled ? 'dice-sum steht' : 'dice-sum'}>{settled ? summe : ' '}</div>
       <div className="dice-hint">{settled ? 'Klicken zum Schliessen' : 'Klicken zum Ueberspringen'}</div>
     </div>
   );

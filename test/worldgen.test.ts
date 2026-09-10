@@ -46,7 +46,17 @@ describe('Determinismus', () => {
   });
 
   it('verschiedene Seeds liefern verschiedene Welten', () => {
-    expect(generateChunk(1, 0, 0)).not.toEqual(generateChunk(2, 0, 0));
+    // Ueber eine Flaeche vergleichen, nicht ueber einen einzelnen Chunk: seit es
+    // Kontinente gibt, ist ein Chunk aus sieben Feldern oft reines Meer - bei
+    // zwei Seeds gleichermassen, und dann gleich.
+    const flaeche = (seed: number): string => {
+      const teile: string[] = [];
+      for (let m = -3; m <= 3; m++) {
+        for (let n = -3; n <= 3; n++) teile.push(JSON.stringify(generateChunk(seed, m, n)));
+      }
+      return teile.join('|');
+    };
+    expect(flaeche(1)).not.toEqual(flaeche(2));
   });
 });
 
