@@ -59,6 +59,8 @@ export function Game() {
   const clearPendingRoll = useStore((s) => s.clearPendingRoll);
   const announcements = useStore((s) => s.announcements);
   const dropAnnouncement = useStore((s) => s.dropAnnouncement);
+  const log = useStore((s) => s.log);
+  const welt = useStore((s) => s.welt);
   const produceEffect = useStore((s) => s.produceEffect);
   const clearProduceEffect = useStore((s) => s.clearProduceEffect);
 
@@ -216,6 +218,8 @@ export function Game() {
         <SideMenu
           turn={state.turn}
           cards={me?.cards ?? []}
+          log={log}
+          welt={welt}
           showNumbers={pinNumbers}
           onToggleNumbers={() => setPinNumbers((v) => !v)}
         />
@@ -258,8 +262,9 @@ export function Game() {
 
             Sonst kostet jede Runde zwei Klicks an derselben Stelle: erst Zug
             beenden, dann wuerfeln - obwohl gar niemand anders am Zug ist.
-            Der Knopf erledigt beides. "Zug beenden" bleibt daneben stehen,
-            fuer alle, die vorher noch handeln wollen.
+            Der Knopf erledigt beides. Allein gibt es "Zug beenden" deshalb
+            gar nicht mehr: gehandelt wird vor dem Wurf, und der Wurf beendet
+            den Zug. Zu mehreren bleibt er - dort wuerfelt der Naechste selbst.
           */}
           {isMine &&
             pendingRoll === null &&
@@ -366,7 +371,10 @@ export function Game() {
                 </button>
               </span>
 
-              <button onClick={() => act({ t: 'endTurn' })}>Zug beenden</button>
+              {/* Nur zu mehreren - allein beendet der Wuerfelknopf den Zug. */}
+              {state.order.length > 1 && (
+                <button onClick={() => act({ t: 'endTurn' })}>Zug beenden</button>
+              )}
             </div>
           )}
 

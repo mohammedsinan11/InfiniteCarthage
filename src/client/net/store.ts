@@ -17,7 +17,22 @@ import type { PlayerId } from '../../core/state';
 import { createWorld, revealChunks } from '../../core/world';
 import type { World } from '../../core/world';
 import { describeEvent } from '../log';
-import { SEASON_NAME, seasonChangedAt, seasonOf } from '../../core/season';
+import { bigRoundChangedAt, bigRoundOf, roundOf, SEASON_NAME, seasonChangedAt, seasonOf } from '../../core/season';
+
+/**
+ * Ein Weltereignis - was der Welt geschieht, nicht was ein Spieler tut.
+ *
+ * Getrennt vom Protokoll, weil es eine andere Frage beantwortet. Das
+ * Protokoll sagt, wer was getan hat. Die Weltereignisse sagen, was draussen
+ * los war - und wer nach drei Runden zurueckschaut, sucht meist das und findet
+ * es zwischen dreissig Wuerfen nicht.
+ */
+export type WeltEintrag = {
+  id: number;
+  runde: number;
+  art: 'raid' | 'season' | 'bigRound';
+  text: string;
+};
 
 export type Announcement = {
   id: number;
@@ -53,6 +68,7 @@ export type Store = {
   state: PublicState | null;
   world: World | null;
   log: string[];
+  welt: WeltEintrag[];
   ws: WebSocket | null;
   /**
    * Ein Wurf, der noch gezeigt werden will.
@@ -87,6 +103,35 @@ export type Store = {
   dropAnnouncement: (id: number) => void;
   clearProduceEffect: () => void;
 };
+
+/** Wie viele Weltereignisse das Menue behaelt. */
+const WELT_MAX = 60;
+
+/** Pluenderungen als Weltereignisse. Zeitwechsel kommen aus dem Zustand. */
+function weltAus(
+  events: GameEvent[],
+  state: PublicState | null,
+  you: PlayerId | null,
+): WeltEintrag[] {
+  const out: WeltEintrag[] = [];
+  const wer = (id: string) => state?.players.find((p) => p.id === id)?.name ?? 'Jemand';
+  for (const e of events) {
+    if (e.t !== 'raid') continue;
+    for (const h of e.hits) {
+      const nester = h.nests === 1 ? '1 Nest' : `${h.nests} Nester`;
+      out.push({
+        id: naechsteId++,
+        runde: e.round,
+        art: 'raid',
+        text:
+          h.player === you
+            ? `Raeuber pluendern dich: ${h.count} ${h.count === 1 ? 'Karte' : 'Karten'} (${nester})`
+            : `Raeuber pluendern ${wer(h.player)}: ${h.count} (${nester})`,
+      });
+    }
+  }
+  return out;
+}
 
 /** Welche Ereignisse sind eine Meldung wert? Nicht jedes - sonst rauscht es. */
 function meldungenAus(
@@ -172,7 +217,7 @@ export const useStore = create<Store>((set, get) => ({
   room: null,
   state: null,
   world: null,
-  log: [],
+  log: [], welt: [],
   ws: null,
   pendingRoll: null,
   announcements: [],
@@ -195,7 +240,7 @@ export const useStore = create<Store>((set, get) => ({
       alt.onmessage = null;
       alt.close();
     }
-    set({ status: 'connecting', error: null, code, log: [], state: null, world: null });
+    set({ status: 'connecting', error: null, code, log: [], welt: [], state: null, world: null });
 
     const ws = openSocket(code, create, {
       onOpen: () => {
@@ -244,19 +289,34 @@ export const useStore = create<Store>((set, get) => ({
                       },
                     ]
                   : [];
+              // Fuers Menue: Zeitwechsel als Weltereignis. Nicht beim ersten
+              // Zustand nach dem Verbinden (vorher 0) - sonst meldete ein
+              // Neuladen mitten im Winter "Winter beginnt". Faellt ein
+              // Jahreszeitwechsel auf eine grosse Runde, zaehlt nur er.
+              const zeit: WeltEintrag[] = [];
+              if (vorher > 0 && jetzt > vorher) {
+                if (seasonChangedAt(jetzt)) {
+                  zeit.push({ id: naechsteId++, runde: roundOf(jetzt), art: 'season', text: `${SEASON_NAME[seasonOf(jetzt)]} beginnt` });
+                } else if (bigRoundChangedAt(jetzt)) {
+                  zeit.push({ id: naechsteId++, runde: roundOf(jetzt), art: 'bigRound', text: `Grosse Runde ${bigRoundOf(jetzt)} beginnt` });
+                }
+              }
               return {
                 state: msg.state,
                 world: buildWorld(s.world, msg.state),
                 status: 'playing' as const,
                 announcements: [...s.announcements, ...wechsel].slice(-6),
+                welt: [...s.welt, ...zeit].slice(-WELT_MAX),
               };
             });
             break;
           case 'events': {
             const wurf = msg.events.find((e: GameEvent) => e.t === 'roll');
             const neue = meldungenAus(msg.events, get().state, get().you);
+            const weltNeu = weltAus(msg.events, get().state, get().you);
             set((s) => ({
               log: [...s.log, ...msg.events.map((e: GameEvent) => describeEvent(e, s.state))].slice(-120),
+              welt: [...s.welt, ...weltNeu].slice(-WELT_MAX),
               announcements: [...s.announcements, ...neue].slice(-6),
               ...(wurf && wurf.t === 'roll' ? { pendingRoll: wurf.dice } : {}),
             }));
@@ -286,7 +346,7 @@ export const useStore = create<Store>((set, get) => ({
       state: null,
       world: null,
       you: null,
-      log: [],
+      log: [], welt: [],
       pendingRoll: null,
     });
   },

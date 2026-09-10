@@ -31,6 +31,8 @@ import { cardById } from '../../core/cards/catalog';
 import { modifiersOf } from '../../core/cards/effects';
 import type { Terrain } from '../../core/types';
 import { getVolume, initAudio, setVolume } from '../audio';
+import { LogPanel } from './LogPanel';
+import type { WeltEintrag } from '../net/store';
 import { TRACKS, getMusicMode, setMusicMode } from '../music';
 import type { MusicMode } from '../music';
 
@@ -81,12 +83,18 @@ function NochNicht({ was }: { was: string }) {
 export function SideMenu({
   turn,
   cards,
+  log,
+  welt,
   showNumbers,
   onToggleNumbers,
 }: {
   turn: number;
   /** Die eigenen genommenen Karten, in der Reihenfolge der Wahl. */
   cards: readonly string[];
+  /** Das Protokoll: wer was getan hat. */
+  log: string[];
+  /** Was der Welt geschehen ist - Pluenderungen, Zeitenwechsel. */
+  welt: readonly WeltEintrag[];
   showNumbers: boolean;
   onToggleNumbers: () => void;
 }) {
@@ -147,6 +155,31 @@ export function SideMenu({
           <>
             <h3>Reich</h3>
             <NochNicht was="Bevoelkerung und Beliebtheit" />
+
+            {/*
+              Das Protokoll stand frueher links neben dem Brett und ist beim
+              Umbau auf die Karte gewichen. Vermisst wurde es trotzdem. Hier
+              nimmt es der Karte keinen Platz weg.
+            */}
+            <h3>Protokoll</h3>
+            <div className="menu-log">
+              <LogPanel log={log} />
+            </div>
+
+            {/* Unten, und neueste zuerst: man sucht das Letzte, was geschah. */}
+            <h3 className="menu-welt-kopf">Weltereignisse</h3>
+            {welt.length === 0 ? (
+              <p className="menu-leer">Noch ruhig. Hier landen Pluenderungen und Zeitenwechsel.</p>
+            ) : (
+              <ul className="menu-welt">
+                {[...welt].reverse().map((w) => (
+                  <li key={w.id} className={`welt-${w.art}`}>
+                    <span className="menu-welt-runde">R{w.runde}</span>
+                    {w.text}
+                  </li>
+                ))}
+              </ul>
+            )}
           </>
         )}
 

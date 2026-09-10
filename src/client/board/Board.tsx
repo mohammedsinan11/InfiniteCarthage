@@ -126,6 +126,16 @@ const WHEEL_THRESHOLD = 120;
 /** Mindestabstand zwischen zwei Stufen, damit eine Wischgeste nicht durchrast. */
 const ZOOM_COOLDOWN_MS = 180;
 
+/**
+ * Schwelle fuer die Zwei-Finger-Geste.
+ *
+ * Chrome und Firefox melden das Aufziehen auf dem Trackpad als wheel mit
+ * ctrlKey - aber mit viel kleineren Werten als ein Mausrad, oft nur wenige
+ * Einheiten je Ereignis. Mit der Radschwelle muesste man die Finger quer ueber
+ * das ganze Trackpad ziehen, bevor eine Stufe schaltet.
+ */
+const PINCH_THRESHOLD = 28;
+
 /*
  * Einmal in die Konsole, damit sich Schaerfeprobleme nachvollziehen lassen,
  * ohne raten zu muessen: bei welcher Bildschirmskalierung laeuft das Geraet,
@@ -411,26 +421,8 @@ export function Board({
     }
   }, [visible, view, scale, size, hover, world, state.worldSeed, state.turn, tilesReady, liftHex]);
 
-  const onWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-
-    // Zeilen- und Seitenmodus auf Pixel umrechnen, sonst zaehlt ein
-    // Mausrad-Ereignis viel zu wenig.
-    const einheit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
-    radAcc.current += e.deltaY * einheit;
-
-    const jetzt = Date.now();
-    if (Math.abs(radAcc.current) < WHEEL_THRESHOLD) return;
-    if (jetzt - letzterZoom.current < ZOOM_COOLDOWN_MS) {
-      radAcc.current = 0;
-      return;
-    }
-    const richtung = radAcc.current < 0 ? 1 : -1;
-    radAcc.current = 0;
-    letzterZoom.current = jetzt;
-    const mausX = e.clientX;
-    const mausY = e.clientY;
-
+  /** Eine Stufe naeher (+1) oder weiter weg (-1); der Punkt unter x/y bleibt stehen. */
+  const zoomUm = useCallback((richtung: number, mausX: number, mausY: number) => {
     setCam((c) => {
       const zi = Math.min(ZOOM_STEPS.length - 1, Math.max(0, c.zi + richtung));
       if (zi === c.zi) return c;
@@ -449,6 +441,86 @@ export function Board({
       };
     });
   }, []);
+
+  const onWheel = useCallback((e: WheelEvent) => {
+    e.preventDefault();
+
+    // Zeilen- und Seitenmodus auf Pixel umrechnen, sonst zaehlt ein
+    // Mausrad-Ereignis viel zu wenig.
+    const einheit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
+    radAcc.current += e.deltaY * einheit;
+
+    const jetzt = Date.now();
+    if (Math.abs(radAcc.current) < (e.ctrlKey ? PINCH_THRESHOLD : WHEEL_THRESHOLD)) return;
+    if (jetzt - letzterZoom.current < ZOOM_COOLDOWN_MS) {
+      radAcc.current = 0;
+      return;
+    }
+    const richtung = radAcc.current < 0 ? 1 : -1;
+    radAcc.current = 0;
+    letzterZoom.current = jetzt;
+    zoomUm(richtung, e.clientX, e.clientY);
+  }, [zoomUm]);
+
+  /*
+   * Rad und Trackpad-Geste NATIV abonnieren, nicht ueber Reacts onWheel.
+   *
+   * React meldet wheel als passiven Listener an, und dort wird preventDefault
+   * ignoriert - die Konsole sagte es die ganze Zeit: "Unable to preventDefault
+   * inside passive event listener". Fuers Mausrad fiel das nicht auf. Fuer die
+   * Zwei-Finger-Geste auf dem Mac schon: Chrome und Firefox schicken sie als
+   * wheel mit ctrlKey, und ohne preventDefault zoomt der Browser die Seite.
+   *
+   * Safari schickt eigene gesture-Ereignisse mit einem Massstab. Eine Stufe
+   * je Faktor Wurzel 2 - also etwa, wenn sich der Fingerabstand um 40 % aendert.
+   *
+   * Zusaetzlich wird das Seitenzoomen per Geste auf der ganzen Seite
+   * unterdrueckt, solange das Brett steht - sonst zoomt, wer ueber dem Menue
+   * die Finger spreizt, doch wieder die Seite. Cmd und Plus bleiben frei: wer
+   * die Seite groesser braucht, soll sie weiter groesser stellen koennen.
+   */
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const nurAktiv = { passive: false } as AddEventListenerOptions;
+
+    let letzteStufe = 0;
+    const gesteStart = (e: Event) => {
+      e.preventDefault();
+      letzteStufe = 0;
+    };
+    const gesteAendern = (e: Event) => {
+      e.preventDefault();
+      const g = e as Event & { scale?: number; clientX?: number; clientY?: number };
+      if (typeof g.scale !== 'number' || g.scale <= 0) return;
+      const stufe = Math.round(Math.log2(g.scale) * 2);
+      if (stufe === letzteStufe) return;
+      const rect = el.getBoundingClientRect();
+      const x = g.clientX ?? rect.left + rect.width / 2;
+      const y = g.clientY ?? rect.top + rect.height / 2;
+      zoomUm(stufe > letzteStufe ? 1 : -1, x, y);
+      letzteStufe = stufe;
+    };
+    const seiteSchuetzen = (e: WheelEvent) => {
+      if (e.ctrlKey) e.preventDefault();
+    };
+    const gesteSchlucken = (e: Event) => e.preventDefault();
+
+    el.addEventListener('wheel', onWheel, nurAktiv);
+    el.addEventListener('gesturestart', gesteStart, nurAktiv);
+    el.addEventListener('gesturechange', gesteAendern, nurAktiv);
+    document.addEventListener('wheel', seiteSchuetzen, nurAktiv);
+    document.addEventListener('gesturestart', gesteSchlucken, nurAktiv);
+    document.addEventListener('gesturechange', gesteSchlucken, nurAktiv);
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('gesturestart', gesteStart);
+      el.removeEventListener('gesturechange', gesteAendern);
+      document.removeEventListener('wheel', seiteSchuetzen);
+      document.removeEventListener('gesturestart', gesteSchlucken);
+      document.removeEventListener('gesturechange', gesteSchlucken);
+    };
+  }, [onWheel, zoomUm]);
 
   /**
    * Zoomstufe direkt setzen - fuer den Balken am linken Rand.
@@ -625,7 +697,6 @@ export function Board({
     <div
       ref={ref}
       className="board"
-      onWheel={onWheel}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}

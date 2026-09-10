@@ -14,8 +14,15 @@
 import { useEffect } from 'react';
 import type { Announcement } from '../net/store';
 
-/** Wie lange eine Meldung stehen bleibt, bevor sie verschwindet. */
-const DAUER_MS = 3200;
+/**
+ * Wie lange eine Meldung stehen bleibt, bevor sie verschwindet.
+ *
+ * Erst 3,2 Sekunden - zu kurz: wer gerade auf die Karte schaute, sah nur noch
+ * etwas hinausfliegen. Die Ausblendung in styles.css (meldung-raus) muss mit
+ * dieser Zahl uebereinstimmen, sonst verschwindet sie optisch, bevor sie aus
+ * dem Stapel faellt, oder umgekehrt.
+ */
+const DAUER_MS = 6500;
 
 function Eine({ a, onDone }: { a: Announcement; onDone: (id: number) => void }) {
   useEffect(() => {

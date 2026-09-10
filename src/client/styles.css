@@ -932,7 +932,7 @@ em.off {
   color: var(--text);
   white-space: nowrap;
   animation: meldung-rein 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.2) both,
-    meldung-raus 0.4s ease-in 2.8s both;
+    meldung-raus 0.4s ease-in 6.1s both; /* muss zu DAUER_MS passen */
 }
 .meldung-raid { border-left-color: var(--danger); color: #f0b8a8; }
 .meldung-season { border-left-color: var(--accent); color: var(--accent); }
@@ -1382,4 +1382,54 @@ em.off {
 .zoom-stufe.aktiv {
   background: var(--accent);
   border-color: var(--accent);
+}
+
+/* Protokoll und Weltereignisse im Reich-Reiter. Schmaler gesetzt als frueher
+   neben dem Brett - die Spalte ist nur gut 200 px breit. */
+.menu-log .log {
+  max-height: 200px;
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+.menu-log .log p {
+  margin-bottom: 4px;
+}
+.menu-log .note {
+  font-size: 10.5px;
+}
+/* Nach unten gedrueckt, solange Platz ist - wie im Wunsch: unten im Reich. */
+.menu-welt-kopf {
+  margin-top: auto;
+}
+.menu-welt {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.menu-welt li {
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--fg);
+  padding: 4px 6px;
+  border-left: 2px solid var(--line-bright);
+  background: rgba(0, 0, 0, 0.2);
+}
+.menu-welt li.welt-raid {
+  border-left-color: var(--danger);
+  color: #f0b8a8;
+}
+.menu-welt li.welt-season {
+  border-left-color: var(--accent);
+  color: var(--accent);
+}
+.menu-welt-runde {
+  display: inline-block;
+  min-width: 24px;
+  margin-right: 4px;
+  color: var(--muted);
+  font-family: var(--pixel);
+  font-size: 8px;
 }
