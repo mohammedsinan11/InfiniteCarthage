@@ -28,7 +28,17 @@ import type { Layout } from '../../core/coords';
 import type { World } from '../../core/world';
 import type { PublicState } from '../../core/redact';
 import { playerColor } from '../theme';
-import { HEX_CX, HEX_CY, HEX_H, HEX_W, IMG_H, IMG_W, tileUrl } from '../tiles';
+import {
+  HEX_CX,
+  HEX_CY,
+  HEX_H,
+  HEX_W,
+  IMG_H,
+  IMG_W,
+  preloadTiles,
+  tileImage,
+  tileUrl,
+} from '../tiles';
 
 /** Wie stark die Kacheln vergroessert werden. */
 const SCALE = 2.0;
@@ -88,6 +98,11 @@ const DEFAULT_ZOOM_INDEX = (() => {
 /** Wie weit sich ein Feld unter dem Zeiger hebt. */
 const LIFT = 3 * SCALE;
 
+/** Aufgelaufene Raddrehung, ab der eine Zoomstufe geschaltet wird. */
+const WHEEL_THRESHOLD = 120;
+/** Mindestabstand zwischen zwei Stufen, damit eine Wischgeste nicht durchrast. */
+const ZOOM_COOLDOWN_MS = 180;
+
 /*
  * Einmal in die Konsole, damit sich Schaerfeprobleme nachvollziehen lassen,
  * ohne raten zu muessen: bei welcher Bildschirmskalierung laeuft das Geraet,
@@ -131,6 +146,28 @@ export function Board({ world, state, targets, showAllNumbers, onPick }: Props) 
   const moved = useRef(false);
   /** Feld unter dem Zeiger - nur dessen Zahl wird eingeblendet. */
   const [hover, setHover] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  /**
+   * Aufgelaufene Raddrehung.
+   *
+   * Ein Mausrad meldet je Rastung ein Ereignis, ein Trackpad dagegen
+   * dutzende pro Wischgeste - eine Zoomstufe pro Ereignis rast dort durch
+   * alle Stufen, bevor man den Finger hebt. Deshalb wird die Drehung
+   * aufsummiert und erst ab einer Schwelle eine Stufe geschaltet.
+   */
+  const radAcc = useRef(0);
+  const letzterZoom = useRef(0);
+  const [tilesReady, setTilesReady] = useState(false);
+
+  useEffect(() => {
+    let lebt = true;
+    void preloadTiles().then(() => {
+      if (lebt) setTilesReady(true);
+    });
+    return () => {
+      lebt = false;
+    };
+  }, []);
 
   useEffect(() => {
     const el = ref.current;
@@ -185,14 +222,93 @@ export function Board({ world, state, targets, showAllNumbers, onPick }: Props) 
     return out;
   }, [world, view]);
 
+  /**
+   * Gelaende auf das Canvas zeichnen.
+   *
+   * Der Speicher hinter dem Canvas ist um devicePixelRatio groesser als die
+   * angezeigte Flaeche, sonst waere schon die Aufloesung zu grob. Danach wird
+   * jede Kachel auf ganze Geraetepixel gerundet gezeichnet - Bruchteile
+   * fuehren selbst mit abgeschalteter Glaettung zu weichen Kanten.
+   */
+  useEffect(() => {
+    const cv = canvasRef.current;
+    if (!cv || !tilesReady) return;
+    const ctx = cv.getContext('2d');
+    if (!ctx) return;
+
+    const bw = Math.round(size.w * DPR);
+    const bh = Math.round(size.h * DPR);
+    if (cv.width !== bw) cv.width = bw;
+    if (cv.height !== bh) cv.height = bh;
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, bw, bh);
+    // Das eine, worum es hier geht.
+    ctx.imageSmoothingEnabled = false;
+
+    const zeichne = (t: (typeof visible)[number], lift: number) => {
+      const url = tileUrl(state.worldSeed, t.terrain, t.q, t.r);
+      if (url === null) return;
+      const img = tileImage(url);
+      if (!img) return;
+      const c = hexToPixel(t.q, t.r, LAYOUT);
+      const x = Math.round((c.x - IMG.dx - view.x) * scale * DPR);
+      const y = Math.round((c.y - IMG.dy - lift - view.y) * scale * DPR);
+      const w = Math.round(IMG.w * scale * DPR);
+      const h = Math.round(IMG.h * scale * DPR);
+      ctx.drawImage(img, x, y, w, h);
+    };
+
+    for (const t of visible) {
+      if (hexKey(t.q, t.r) === hover) continue; // kommt zuletzt, angehoben
+      zeichne(t, 0);
+    }
+    if (hover !== null) {
+      const t = world.tiles.get(hover);
+      if (t) {
+        // Schatten zuerst: er gehoert auf den Boden, nicht auf die Kachel.
+        const c = hexToPixel(t.q, t.r, LAYOUT);
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.beginPath();
+        ctx.ellipse(
+          (c.x - view.x) * scale * DPR,
+          (c.y + LAYOUT.h * 0.42 - view.y) * scale * DPR,
+          LAYOUT.w * 0.34 * scale * DPR,
+          LAYOUT.h * 0.09 * scale * DPR,
+          0,
+          0,
+          Math.PI * 2,
+        );
+        ctx.fill();
+        ctx.restore();
+        zeichne(t, LIFT);
+      }
+    }
+  }, [visible, view, scale, size, hover, world, state.worldSeed, tilesReady]);
+
   const onWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
+
+    // Zeilen- und Seitenmodus auf Pixel umrechnen, sonst zaehlt ein
+    // Mausrad-Ereignis viel zu wenig.
+    const einheit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
+    radAcc.current += e.deltaY * einheit;
+
+    const jetzt = Date.now();
+    if (Math.abs(radAcc.current) < WHEEL_THRESHOLD) return;
+    if (jetzt - letzterZoom.current < ZOOM_COOLDOWN_MS) {
+      radAcc.current = 0;
+      return;
+    }
+    const richtung = radAcc.current < 0 ? 1 : -1;
+    radAcc.current = 0;
+    letzterZoom.current = jetzt;
+    const mausX = e.clientX;
+    const mausY = e.clientY;
+
     setCam((c) => {
-      // Eine Stufe pro Raddreh, nicht stufenlos - siehe ZOOM_STEPS.
-      const zi = Math.min(
-        ZOOM_STEPS.length - 1,
-        Math.max(0, c.zi + (e.deltaY < 0 ? 1 : -1)),
-      );
+      const zi = Math.min(ZOOM_STEPS.length - 1, Math.max(0, c.zi + richtung));
       if (zi === c.zi) return c;
 
       const alt = ZOOM_STEPS[c.zi]!;
@@ -200,8 +316,8 @@ export function Board({ world, state, targets, showAllNumbers, onPick }: Props) 
       const rect = ref.current?.getBoundingClientRect();
       if (!rect) return { ...c, zi };
       // Der Punkt unter dem Zeiger soll stehen bleiben.
-      const mx = e.clientX - rect.left - rect.width / 2;
-      const my = e.clientY - rect.top - rect.height / 2;
+      const mx = mausX - rect.left - rect.width / 2;
+      const my = mausY - rect.top - rect.height / 2;
       return {
         zi,
         cx: c.cx + mx / alt - mx / neu,
@@ -269,67 +385,24 @@ export function Board({ world, state, targets, showAllNumbers, onPick }: Props) 
       onPointerCancel={onPointerUp}
       onPointerLeave={onPointerLeave}
     >
+      {/*
+        Das Gelaende liegt auf einem Canvas, alles Interaktive darueber im
+        SVG. Grund ist die Schaerfe: Safari beachtet image-rendering bei
+        SVG-<image> nicht zuverlaessig, auf dem Canvas laesst sich die
+        Glaettung dagegen hart abschalten. Beide teilen sich denselben
+        Ausschnitt, deshalb liegen sie deckungsgleich uebereinander.
+      */}
+      <canvas
+        ref={canvasRef}
+        className="board-canvas"
+        style={{ width: size.w, height: size.h }}
+      />
       <svg
+        className="board-svg"
         viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
         width={size.w}
         height={size.h}
       >
-        {/*
-          Gelaendekacheln.
-
-          Das Feld unter dem Zeiger wird hier UEBERSPRUNGEN und ganz zum
-          Schluss gezeichnet - angehoben und damit ueber allen anderen. Zoege
-          man es in der normalen Reihenfolge hoch, wuerde die Reihe darunter
-          es sofort wieder ueberdecken, denn die Kacheln ueberlappen sich.
-        */}
-        {visible.map((t) => {
-          const hk = hexKey(t.q, t.r);
-          if (hk === hover) return null;
-          const url = tileUrl(state.worldSeed, t.terrain, t.q, t.r);
-          if (url === null) return null;
-          const c = hexToPixel(t.q, t.r, LAYOUT);
-          return (
-            <image
-              key={'t' + hk}
-              href={url}
-              x={c.x - IMG.dx}
-              y={c.y - IMG.dy}
-              width={IMG.w}
-              height={IMG.h}
-              className="tile"
-            />
-          );
-        })}
-
-        {/* Das angehobene Feld, zuletzt und damit obenauf. */}
-        {(() => {
-          if (hover === null) return null;
-          const t = world.tiles.get(hover);
-          if (!t) return null;
-          const url = tileUrl(state.worldSeed, t.terrain, t.q, t.r);
-          if (url === null) return null;
-          const c = hexToPixel(t.q, t.r, LAYOUT);
-          return (
-            <g pointerEvents="none">
-              <ellipse
-                cx={c.x}
-                cy={c.y + LAYOUT.h * 0.42}
-                rx={LAYOUT.w * 0.34}
-                ry={LAYOUT.h * 0.09}
-                className="lift-shadow"
-              />
-              <image
-                href={url}
-                x={c.x - IMG.dx}
-                y={c.y - IMG.dy - LIFT}
-                width={IMG.w}
-                height={IMG.h}
-                className="tile"
-              />
-            </g>
-          );
-        })()}
-
         {/* Zahlenmarker und Raeuber */}
         {visible.map((t) => {
           const hk = hexKey(t.q, t.r);

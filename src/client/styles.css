@@ -231,6 +231,16 @@ em.off {
 
 .game {
   display: grid;
+  /*
+   * Die Zeile muss ausdruecklich 1fr sein.
+   *
+   * Ohne sie richtet sich die implizite Zeile nach dem Inhalt. Solange das
+   * Brett ein SVG im Textfluss enthielt, gab das eine Hoehe - seit Canvas und
+   * SVG absolut liegen, hat es keine mehr, und die Spielflaeche fiel auf null
+   * zusammen. Sichtbar wurde das erst, als das Canvas nur noch zwei Punkte
+   * hoch war.
+   */
+  grid-template-rows: 1fr;
   height: 100vh;
 }
 
@@ -662,21 +672,26 @@ em.off {
   opacity: 0.7;
 }
 
+/*
+ * Schmale Fenster.
+ *
+ * Hier standen noch Regeln aus der Zeit mit Seitenspalte, unter anderem
+ * grid-template-rows: auto 1fr. Seit .main das einzige Kind ist, bekam es
+ * dadurch die auto-Zeile - also nur die Hoehe der Bedienleiste - und die
+ * freie Zeile darunter blieb leer. Das Brett war unter 860 px schlicht
+ * unsichtbar.
+ */
 @media (max-width: 860px) {
-  .game {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
-  }
-  .side {
-    grid-template-rows: auto auto auto;
-    border-right: none;
-    border-bottom: 3px solid var(--line);
-  }
-  .log {
-    display: none;
-  }
   .trade-cols {
     gap: 12px;
+  }
+  /* Die Schilder untereinander statt nebeneinander, sonst ueberlappen sie. */
+  .hud {
+    flex-wrap: wrap;
+    max-width: calc(100% - 20px);
+  }
+  .bar {
+    max-height: 52vh;
   }
 }
 
@@ -724,7 +739,18 @@ em.off {
   color: var(--accent);
 }
 
-/* Schatten unter dem angehobenen Feld - ohne ihn wirkt es verschoben statt gehoben. */
-.lift-shadow {
-  fill: rgba(0, 0, 0, 0.45);
+/*
+ * Canvas und SVG liegen deckungsgleich uebereinander: unten das Gelaende,
+ * darueber alles Anklickbare. Das Canvas nimmt keine Zeigerereignisse an,
+ * sonst wuerde es die Trefferflaechen des SVG abfangen.
+ */
+.board-canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+.board-svg {
+  position: absolute;
+  inset: 0;
 }

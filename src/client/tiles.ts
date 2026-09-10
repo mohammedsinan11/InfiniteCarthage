@@ -105,3 +105,41 @@ export function tileUrl(seed: number, terrain: Terrain, q: number, r: number): s
 
 /** Nur fuer die Diagnose: welche Kachelsorten stehen zur Verfuegung. */
 export const availableGroups = (): string[] => Object.keys(GROUPS).sort();
+
+// --- Bilder fuer das Canvas -------------------------------------------------
+
+/**
+ * Vorgeladene Bildobjekte je URL.
+ *
+ * Das Brett zeichnet die Kacheln auf ein Canvas statt als SVG-Elemente, weil
+ * Safari image-rendering: pixelated bei SVG-<image> nicht zuverlaessig
+ * beachtet - dort sah die Karte verwaschen aus, waehrend sie in Chromium
+ * scharf war. Auf dem Canvas laesst sich die Glaettung mit
+ * imageSmoothingEnabled = false hart abschalten, das gilt in jedem Browser.
+ */
+const IMAGES = new Map<string, HTMLImageElement>();
+
+/** Alle Kacheln laden. Aufloesung erst, wenn wirklich alle bereit sind. */
+export function preloadTiles(): Promise<void> {
+  const urls = [...new Set(Object.values(GROUPS).flat())];
+  return Promise.all(
+    urls.map(
+      (url) =>
+        new Promise<void>((resolve) => {
+          const img = new Image();
+          // Auch bei Fehlern aufloesen: eine fehlende Kachel darf das Brett
+          // nicht dauerhaft leer lassen.
+          img.onload = () => {
+            IMAGES.set(url, img);
+            resolve();
+          };
+          img.onerror = () => resolve();
+          img.src = url;
+        }),
+    ),
+  ).then(() => undefined);
+}
+
+export function tileImage(url: string): HTMLImageElement | undefined {
+  return IMAGES.get(url);
+}
