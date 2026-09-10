@@ -20,6 +20,7 @@
 
 import { useState } from 'react';
 import {
+  ROUNDS_PER_BIG_ROUND,
   SEASON_NAME,
   bigRoundOf,
   roundOf,
@@ -85,6 +86,8 @@ export function SideMenu({
   cards,
   log,
   welt,
+  wachen,
+  bedroht,
   showNumbers,
   onToggleNumbers,
 }: {
@@ -95,6 +98,10 @@ export function SideMenu({
   log: string[];
   /** Was der Welt geschehen ist - Pluenderungen, Zeitenwechsel. */
   welt: readonly WeltEintrag[];
+  /** Stehende Wachen des Betrachters. */
+  wachen: number;
+  /** Nester, die ihn bei der naechsten Pluenderung erreichen. */
+  bedroht: number;
   showNumbers: boolean;
   onToggleNumbers: () => void;
 }) {
@@ -104,6 +111,8 @@ export function SideMenu({
   const [musik, setMusik] = useState<MusicMode>(getMusicMode);
 
   const saison = seasonOf(turn);
+  // Gepluendert wird zum Beginn jeder grossen Runde (bigRoundChangedAt).
+  const bisPluenderung = ROUNDS_PER_BIG_ROUND - ((Math.max(1, turn) - 1) % ROUNDS_PER_BIG_ROUND);
 
   if (!offen) {
     return (
@@ -155,6 +164,28 @@ export function SideMenu({
           <>
             <h3>Reich</h3>
             <NochNicht was="Bevoelkerung und Beliebtheit" />
+
+            {/*
+              Die Lage vor der naechsten Pluenderung - genau das braucht man,
+              um zu entscheiden, ob sich ein Ritter lohnt: wie viele Nester
+              reichen heran, wie viele Wachen stehen, wann ist es so weit.
+            */}
+            <h3>Wache</h3>
+            <div className="menu-wache">
+              <span>Nester in Reichweite</span>
+              <b className={bedroht > wachen ? 'gefahr' : undefined}>{bedroht}</b>
+              <span>Stehende Wachen</span>
+              <b>{wachen}</b>
+              <span>Naechste Pluenderung</span>
+              <b>{bisPluenderung === 1 ? 'naechste Runde' : `in ${bisPluenderung} Runden`}</b>
+              <span className="menu-wache-hinweis">
+                {bedroht === 0
+                  ? 'Kein Nest erreicht dich.'
+                  : bedroht <= wachen
+                    ? 'Deine Wachen halten alle Nester ab.'
+                    : `${bedroht - wachen} ${bedroht - wachen === 1 ? 'Nest kommt' : 'Nester kommen'} durch. Ein Ritter stellt eine Wache auf.`}
+              </span>
+            </div>
 
             {/*
               Das Protokoll stand frueher links neben dem Brett und ist beim

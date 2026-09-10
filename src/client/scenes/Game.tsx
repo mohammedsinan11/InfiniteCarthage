@@ -21,6 +21,7 @@ import { DiceOverlay } from '../ui/DiceOverlay';
 import { Announcements } from '../ui/Announcements';
 import { CardDraft } from '../ui/CardDraft';
 import { SideMenu } from '../ui/SideMenu';
+import { threateningNests } from '../../core/rules/raid';
 import { initAudio, playBuild, playGain } from '../audio';
 import {
   legalCityVertices,
@@ -73,6 +74,12 @@ export function Game() {
   const [pinNumbers, setPinNumbers] = useState(false);
 
   const me = state.players.find((p) => p.id === you);
+  /**
+   * Wie viele Nester mich bei der naechsten Pluenderung erreichen. Dieselbe
+   * Rechnung wie auf dem Server, auf der redigierten Sicht - die eigene Hand
+   * steht darin, und nur sie entscheidet, ob man hortet.
+   */
+  const bedroht = useMemo(() => (you ? threateningNests(state, you).length : 0), [state, you]);
   const hand = me?.hand;
   const phase = state.phase;
   const isMine = state.currentPlayer === you && phase.t !== 'finished';
@@ -220,6 +227,8 @@ export function Game() {
           cards={me?.cards ?? []}
           log={log}
           welt={welt}
+          wachen={me?.guards ?? 0}
+          bedroht={bedroht}
           showNumbers={pinNumbers}
           onToggleNumbers={() => setPinNumbers((v) => !v)}
         />
@@ -302,7 +311,7 @@ export function Game() {
 
           {isMine && phase.t === 'roll' && canPlay('knight') && (
             <div className="actions">
-              <button onClick={() => act({ t: 'playKnight' })}>Ritter vorab spielen</button>
+              <button onClick={() => act({ t: 'playKnight' })}>Ritter vorab: Wache aufstellen</button>
             </div>
           )}
 
@@ -341,7 +350,12 @@ export function Game() {
               </button>
 
               {canPlay('knight') && (
-                <button onClick={() => act({ t: 'playKnight' })}>Ritter</button>
+                <button
+                  title="Stellt eine Wache auf. Bei der naechsten Pluenderung haelt sie ein Nest ab."
+                  onClick={() => act({ t: 'playKnight' })}
+                >
+                  Ritter: Wache
+                </button>
               )}
               {canPlay('roadBuilding') && (
                 <button onClick={() => act({ t: 'playRoadBuilding' })}>Strassenbau</button>

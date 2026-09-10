@@ -159,8 +159,9 @@ locken) und erhoeht den Verlust auf die Haelfte.
   gegen Wachstum. Ob er richtig steht, zeigt erst das Spielen.
 - **Nester tun nichts ausser nehmen.** Keine Truppen, keine Bewegung, keine
   Belagerung - das sind die Schritte 4 und 5.
-- **Der Ritter wehrt noch nichts ab.** Das ist der naechstliegende Schritt und
-  gaebe ihm seine Aufgabe zurueck.
+- ~~**Der Ritter wehrt noch nichts ab.**~~ Inzwischen doch: Wachen, eine je
+  Nest. Offen bleibt, ob sie auch ohne Ritterkarte zu haben sein sollen - etwa
+  als Bauteil. Derzeit haengt die ganze Verteidigung am Kartendeck.
 
 ---
 
@@ -216,8 +217,8 @@ das Geruest schon.
 3. ~~**Dauerwirkungen**~~ — gebaut: Ertrag, Bankhandel und Handkartengrenze
    fragen die Karten.
 4. ~~**Raeubernester und Pluenderungen**~~ — gebaut, siehe oben.
-5. **Verteidigung** — der Ritter wehrt die naechste Pluenderung ab. Klein, und
-   er braucht dringend eine Aufgabe.
+5. ~~**Verteidigung**~~ — gebaut: ein gespielter Ritter stellt eine Wache auf,
+   jede Wache haelt bei der Pluenderung ein Nest ab und ist danach verbraucht.
 6. **Belohnung nach grosser Runde** — dieselbe Mechanik, andere Quelle. Klein.
 7. **Markt und Kosten** — die Runden-Karten, die etwas kosten. Braucht eine
    Kaufentscheidung und damit etwas mehr Oberflaeche.
@@ -228,9 +229,9 @@ das Geruest schon.
 
 ### Was beim Bauen aufgefallen ist
 
-- **Der Ritter hat seine Aufgabe verloren.** Ohne Raeuber zaehlt er nur noch
-  fuer die Groesste Rittermacht. Das ist ehrlich, aber duenn - er waere ein
-  Kandidat, ganz durch Karten ersetzt zu werden.
+- **Der Ritter hatte seine Aufgabe verloren.** Ohne Raeuber zaehlte er nur noch
+  fuer die Groesste Rittermacht. Mit den Nestern hat er sie zurueck: er stellt
+  Wachen.
 - **"Nimm beliebige Rohstoffe" verteilt derzeit gleichmaessig**, statt zu
   fragen. Eine echte Wahl waere eine eigene Phase; das lohnt erst, wenn es
   mehr solcher Karten gibt.

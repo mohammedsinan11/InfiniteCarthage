@@ -57,6 +57,11 @@ export type Player = {
    * abweichen.
    */
   cards: string[];
+  /**
+   * Stehende Wachen. Jeder gespielte Ritter stellt eine auf; bei einer
+   * Pluenderung haelt jede ein Nest ab und ist danach verbraucht.
+   */
+  guards: number;
   connected: boolean;
 };
 

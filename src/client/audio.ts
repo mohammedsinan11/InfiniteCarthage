@@ -13,6 +13,16 @@
 
 const VOLUME_KEY = 'infinitecarthage.volume';
 
+/**
+ * Grundpegel ueber dem Regler.
+ *
+ * Die Klaenge waren insgesamt zu leise - besonders Ertrag und Karten, also
+ * genau die Momente, die sich lohnen sollen. Statt jeden Klang einzeln
+ * aufzudrehen, hebt dieser Faktor alles an; der Kompressor dahinter faengt die
+ * Spitzen ab, wenn mehreres gleichzeitig klingt.
+ */
+const PEGEL = 1.8;
+
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 
@@ -43,8 +53,16 @@ export function initAudio(): void {
   if (!Ctor) return;
   ctx = new Ctor();
   master = ctx.createGain();
-  master.gain.value = volume;
-  master.connect(ctx.destination);
+  master.gain.value = volume * PEGEL;
+  // Lauter heisst sonst schnell uebersteuert, sobald Ertrag, Karte und Wuerfel
+  // zusammenfallen.
+  const kompressor = ctx.createDynamicsCompressor();
+  kompressor.threshold.value = -14;
+  kompressor.knee.value = 10;
+  kompressor.ratio.value = 4;
+  kompressor.attack.value = 0.004;
+  kompressor.release.value = 0.18;
+  master.connect(kompressor).connect(ctx.destination);
 }
 
 export function getVolume(): number {
@@ -53,7 +71,7 @@ export function getVolume(): number {
 
 export function setVolume(v: number): void {
   volume = Math.min(1, Math.max(0, v));
-  if (master && ctx) master.gain.setTargetAtTime(volume, ctx.currentTime, 0.01);
+  if (master && ctx) master.gain.setTargetAtTime(volume * PEGEL, ctx.currentTime, 0.01);
   try {
     localStorage.setItem(VOLUME_KEY, String(volume));
   } catch {
@@ -162,9 +180,14 @@ export function playChime(): void {
  */
 export function playGain(index = 0): void {
   const t = index * 0.09;
-  blip(523, 0.1, 0.09, t, 'sine');
-  blip(659, 0.11, 0.08, t + 0.05, 'sine');
-  blip(784, 0.14, 0.07, t + 0.1, 'sine');
+  // Leicht verstimmt je Karte, damit eine Serie nicht mechanisch klingt.
+  const f = 1 + ((index % 3) - 1) * 0.02;
+  blip(523 * f, 0.12, 0.16, t, 'sine');
+  blip(659 * f, 0.13, 0.14, t + 0.05, 'sine');
+  blip(784 * f, 0.18, 0.13, t + 0.1, 'sine');
+  // Heller Glanz obendrauf - das Klimpern einer Muenze.
+  blip(1568 * f, 0.09, 0.05, t + 0.12, 'triangle');
+  noise(0.05, 5200, 0.06, t + 0.1);
 }
 
 /**
@@ -179,4 +202,109 @@ export function playRaid(): void {
   blip(392, 0.14, 0.09, 0, 'triangle');
   blip(311, 0.16, 0.08, 0.09, 'triangle');
   blip(233, 0.24, 0.08, 0.18, 'triangle');
+}
+
+
+/** Ton mit Tonhoehenverlauf - fuer Wischer, Glanz und Zerfall. */
+function glide(
+  from: number,
+  to: number,
+  duration: number,
+  gain: number,
+  when = 0,
+  type: OscillatorType = 'sine',
+): void {
+  if (!ctx || !master || volume === 0) return;
+  const t = ctx.currentTime + when;
+  const osc = ctx.createOscillator();
+  osc.type = type;
+  osc.frequency.setValueAtTime(from, t);
+  osc.frequency.exponentialRampToValueAtTime(to, t + duration);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(gain, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+  osc.connect(g).connect(master);
+  osc.start(t);
+  osc.stop(t + duration + 0.02);
+}
+
+// --- Karten -----------------------------------------------------------------
+//
+// PLATZHALTER wie die Karteneffekte: sie tragen die Wahl, solange es keine
+// gezeichneten Karten und keinen richtigen Klang dafuer gibt.
+
+/** Kartenwahl oeffnet: drei Karten werden ausgeteilt - drei Wischer. */
+export function playCardDeal(): void {
+  for (let i = 0; i < 3; i++) {
+    const t = 0.08 + i * 0.13;
+    noise(0.09, 2600, 0.22, t);
+    glide(900, 1400, 0.08, 0.05, t, 'triangle');
+  }
+}
+
+/** Zeiger ueber einer Karte: leise, aber hoerbar. */
+let letzteKarte = 0;
+export function playCardHover(): void {
+  const jetzt = performance.now();
+  if (jetzt - letzteKarte < 60) return;
+  letzteKarte = jetzt;
+  blip(1320, 0.05, 0.035, 0, 'triangle');
+}
+
+/**
+ * Karte genommen - je seltener, desto groesser.
+ *
+ * Gewoehnlich ein Anschlag, dann mit jeder Stufe eine Note mehr; ab episch ein
+ * Schimmern darueber, legendaer dazu Pauke und Grundton. Die Stufe soll man
+ * hoeren, bevor man den Rahmen gesehen hat.
+ */
+export function playCardPick(stufe: number): void {
+  const st = Math.max(0, Math.min(4, stufe));
+  const grund = [392, 440, 523, 587, 659][st]!;
+  const leiter = [1, 1.25, 1.5, 2, 2.5, 3];
+  const noten = 2 + st;
+  noise(0.06, 1800, 0.18, 0);
+  for (let i = 0; i < noten; i++) {
+    blip(grund * leiter[i]!, 0.22 + st * 0.04, 0.12, i * 0.07, i % 2 ? 'triangle' : 'sine');
+  }
+  if (st >= 3) {
+    glide(1800, 3600, 0.5, 0.045, noten * 0.07, 'sine');
+    for (let i = 0; i < 5; i++) blip(2400 + i * 300, 0.06, 0.03, noten * 0.07 + 0.1 + i * 0.06, 'triangle');
+  }
+  if (st === 4) {
+    noise(0.35, 140, 0.4, 0);
+    blip(grund / 2, 0.7, 0.14, 0.02, 'triangle');
+  }
+}
+
+/** Die nicht gewaehlten Karten zerfallen. */
+export function playCardVanish(): void {
+  glide(700, 180, 0.35, 0.05, 0.05, 'sawtooth');
+  noise(0.3, 900, 0.1, 0.05);
+}
+
+// --- Verteidigung -----------------------------------------------------------
+
+/** Ein Ritter bezieht Wache: Metall auf Metall, dann ein tiefer Schritt. */
+export function playGuard(): void {
+  blip(1046, 0.25, 0.1, 0, 'square');
+  blip(1397, 0.3, 0.07, 0.01, 'triangle');
+  noise(0.08, 3800, 0.2, 0);
+  blip(262, 0.18, 0.12, 0.08, 'triangle');
+}
+
+/**
+ * Pluenderung abgewehrt: Schwertklang, dann ein aufsteigender Ruf.
+ *
+ * Aufsteigend, wo die Pluenderung absteigt - dieselbe Sprache wie Ertrag gegen
+ * Verlust.
+ */
+export function playDefend(): void {
+  noise(0.12, 4200, 0.28, 0);
+  blip(880, 0.3, 0.09, 0, 'square');
+  blip(1175, 0.35, 0.06, 0.02, 'triangle');
+  blip(392, 0.14, 0.12, 0.2, 'triangle');
+  blip(523, 0.14, 0.12, 0.3, 'triangle');
+  blip(784, 0.3, 0.12, 0.4, 'triangle');
 }

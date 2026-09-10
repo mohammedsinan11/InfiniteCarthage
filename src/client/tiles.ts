@@ -225,33 +225,3 @@ export function tileImage(url: string): HTMLImageElement | undefined {
   return IMAGES.get(url);
 }
 
-/**
- * Abgedunkelte Kacheln fuer die Felswand unter angehobenem Gelaende.
- *
- * Einmal je Bild erzeugt und gemerkt, nicht bei jedem Zeichnen gefiltert: ein
- * Canvas-Filter pro drawImage waere teuer und in aelteren Safari-Versionen gar
- * nicht vorhanden. 'source-atop' faerbt nur, wo das Bild deckt - die
- * durchsichtigen Ecken bleiben durchsichtig.
- */
-const DUNKEL = new Map<string, HTMLCanvasElement>();
-const FELS = 'rgba(30, 22, 17, 0.6)';
-
-export function tileImageDark(url: string): CanvasImageSource | undefined {
-  const da = DUNKEL.get(url);
-  if (da) return da;
-  const img = IMAGES.get(url);
-  if (!img) return undefined;
-
-  const c = document.createElement('canvas');
-  c.width = img.naturalWidth || IMG_W;
-  c.height = img.naturalHeight || IMG_H;
-  const ctx = c.getContext('2d');
-  if (!ctx) return img;
-  ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(img, 0, 0);
-  ctx.globalCompositeOperation = 'source-atop';
-  ctx.fillStyle = FELS;
-  ctx.fillRect(0, 0, c.width, c.height);
-  DUNKEL.set(url, c);
-  return c;
-}

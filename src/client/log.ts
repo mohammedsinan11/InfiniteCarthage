@@ -62,11 +62,14 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
     case 'build':
       return `${who(state, e.player)} baut ${BUILD_NAME[e.kind]}.`;
     case 'raid': {
-      const teile = e.hits.map(
-        (h) => `${who(state, h.player)}: ${h.count} (${h.nests} Nester)`,
-      );
+      const teile = e.hits.map((h) => {
+        const abgewehrt = h.blocked > 0 ? `${h.blocked} abgewehrt, ` : '';
+        return `${who(state, h.player)}: ${abgewehrt}${h.count} verloren (${h.nests} Nester)`;
+      });
       return `Raeuber pluendern - ${teile.join(' | ')}`;
     }
+    case 'guard':
+      return `${who(state, e.player)} stellt eine Wache auf (${e.guards} ${e.guards === 1 ? 'steht' : 'stehen'}).`;
     case 'buyDev':
       return `${who(state, e.player)} kauft eine Entwicklungskarte.`;
     case 'playDev':

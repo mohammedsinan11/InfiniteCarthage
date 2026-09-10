@@ -1226,17 +1226,18 @@ em.off {
   text-align: center;
   background: linear-gradient(180deg, #2e2418 0%, #221a11 100%);
   border-width: 3px;
-  transition: transform 0.12s;
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  /* Hub, Neigung und Groesse als Variablen: Zeiger, Wahl und Effekte greifen
+     auf dieselbe Transformation zu, statt sich gegenseitig zu ueberschreiben. */
+  transform: translateY(var(--hub, 0px)) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))
+    scale(var(--gr, 1));
+  transition: transform 0.14s ease-out, box-shadow 0.2s;
+  will-change: transform;
 }
 .draft-karte:hover:not(:disabled) {
-  transform: translateY(-8px);
-}
-.draft-karte.gewaehlt {
-  transform: translateY(-14px) scale(1.04);
-}
-.draft-karte.verworfen {
-  opacity: 0.3;
-  transform: translateY(10px);
+  --hub: -10px;
 }
 
 .selt-gewoehnlich { border-color: #7d6141; }
@@ -1432,4 +1433,328 @@ em.off {
   color: var(--muted);
   font-family: var(--pixel);
   font-size: 8px;
+}
+
+/* === Karteneffekte ============================================================
+   PLATZHALTER, bis es gezeichnete Karten gibt (siehe ASSETS.md). Alles hier
+   soll spaeter durch echte Grafik ersetzt oder stark reduziert werden.
+   Reihenfolge ist wichtig: die Wahl (.gewaehlt) steht hinter den Seltenheiten,
+   damit ihre Animation die Glut der Seltenheit ablöst. */
+
+.draft-karten {
+  perspective: 900px;
+}
+
+/* Austeilen: von unten, leicht gefaechert, nacheinander. */
+.draft-platz {
+  position: relative;
+  animation: karte-austeilen 0.55s cubic-bezier(0.2, 0.9, 0.25, 1.15) both;
+  animation-delay: calc(var(--i, 0) * 0.13s + 0.08s);
+}
+@keyframes karte-austeilen {
+  from {
+    opacity: 0;
+    transform: translateY(140px) rotate(calc((var(--i, 0) - 1) * 14deg)) scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Glanz: ein Lichtfleck folgt dem Zeiger, ab selten zieht ein Streifen durch. */
+.draft-glanz {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at var(--gx, 50%) var(--gy, 30%),
+    rgba(255, 240, 200, 0.16),
+    transparent 55%
+  );
+}
+.draft-glanz::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  bottom: -50%;
+  left: -60%;
+  width: 40%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+  transform: skewX(-12deg);
+  opacity: 0;
+  animation: glanz-lauf 2.8s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 0.3s + 0.9s);
+}
+.selt-selten .draft-glanz::before,
+.selt-episch .draft-glanz::before,
+.selt-legendaer .draft-glanz::before {
+  opacity: 1;
+}
+@keyframes glanz-lauf {
+  0%,
+  55% {
+    left: -60%;
+  }
+  100% {
+    left: 130%;
+  }
+}
+
+/* Glut je Seltenheit. */
+.draft-karte.selt-selten {
+  box-shadow: 0 0 10px rgba(58, 122, 194, 0.45);
+}
+.draft-karte.selt-episch {
+  animation: puls-episch 2.2s ease-in-out infinite;
+}
+@keyframes puls-episch {
+  0%,
+  100% {
+    box-shadow: 0 0 12px rgba(143, 91, 176, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 28px rgba(175, 115, 225, 0.9);
+  }
+}
+.draft-karte.selt-legendaer {
+  animation: puls-legendaer 1.8s ease-in-out infinite;
+}
+@keyframes puls-legendaer {
+  0%,
+  100% {
+    box-shadow: 0 0 16px rgba(217, 164, 65, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 36px rgba(255, 205, 90, 0.95);
+  }
+}
+
+/* Legendaer: Strahlenkranz hinter der Karte. */
+.draft-strahlen {
+  position: absolute;
+  inset: -50px;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgba(255, 210, 110, 0.24) 0deg 8deg,
+    transparent 8deg 24deg
+  );
+  -webkit-mask: radial-gradient(circle, #000 22%, transparent 68%);
+  mask: radial-gradient(circle, #000 22%, transparent 68%);
+  animation: strahlen-drehen 14s linear infinite;
+}
+@keyframes strahlen-drehen {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Funken ab episch: eckige Pixel, die aufsteigen - rund passte nicht zur Grafik. */
+.draft-funken {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.draft-funken i {
+  position: absolute;
+  bottom: 6%;
+  left: calc(6% + var(--k, 0) * 9.5%);
+  width: 4px;
+  height: 4px;
+  background: #ffe7a8;
+  box-shadow: 0 0 6px #ffcf6a;
+  opacity: 0;
+  animation: funke 2.4s ease-out infinite;
+  animation-delay: calc(var(--k, 0) * 0.23s + var(--i, 0) * 0.1s);
+}
+.draft-funken.episch i {
+  background: #e6ccff;
+  box-shadow: 0 0 6px #b77cf0;
+}
+@keyframes funke {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(1);
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc((var(--k, 0) - 4.5) * 3px), -200px) scale(0.4);
+  }
+}
+
+/* Die Wahl: aufleuchten, anheben, Lichtblitz. */
+.draft-karte.gewaehlt {
+  --hub: -22px;
+  --gr: 1.1;
+  animation: karte-genommen 0.9s ease-out both;
+}
+@keyframes karte-genommen {
+  0% {
+    filter: brightness(1);
+    box-shadow: 0 0 0 rgba(255, 220, 140, 0);
+  }
+  18% {
+    filter: brightness(1.9);
+    box-shadow: 0 0 60px rgba(255, 220, 140, 1);
+  }
+  100% {
+    filter: brightness(1.05);
+    box-shadow: 0 0 22px rgba(255, 220, 140, 0.5);
+  }
+}
+.draft-blitz {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 20px;
+  height: 20px;
+  z-index: 3;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 250, 220, 0.95),
+    rgba(255, 210, 120, 0.5) 40%,
+    transparent 70%
+  );
+  animation: blitz 0.7s ease-out both;
+}
+@keyframes blitz {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 1;
+  }
+  60% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(22);
+    opacity: 0;
+  }
+}
+
+/* Die anderen: fallen, verblassen, zerfallen. */
+.draft-platz.verworfen {
+  animation: karte-zerfallen 0.7s ease-in both;
+}
+@keyframes karte-zerfallen {
+  from {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(70px) rotate(calc((var(--i, 0) - 1) * 10deg)) scale(0.85);
+    filter: blur(3px) grayscale(1);
+  }
+}
+
+/* Wer Bewegung abgeschaltet hat, bekommt die Wahl ohne Theater. */
+@media (prefers-reduced-motion: reduce) {
+  .draft-platz,
+  .draft-karte,
+  .draft-glanz::before,
+  .draft-strahlen,
+  .draft-funken i,
+  .draft-blitz {
+    animation: none !important;
+  }
+  .draft-funken,
+  .draft-strahlen {
+    display: none;
+  }
+}
+
+/* Wache und Bedrohung im Reich-Reiter. */
+.menu-wache {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 8px;
+  font-size: 10.5px;
+  padding: 6px 7px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid var(--line);
+}
+.menu-wache b {
+  font-family: var(--pixel);
+  font-size: 10px;
+  color: var(--accent);
+  text-align: right;
+  font-weight: 400;
+}
+.menu-wache b.gefahr {
+  color: #f0b8a8;
+}
+.menu-wache-hinweis {
+  grid-column: 1 / -1;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+.menu-welt li.welt-defense {
+  border-left-color: #4f9e5c;
+  color: #b8e0b0;
+}
+
+/* Zugewinn auf der Handkarte: die Karte huepft, blitzt auf, ein Lichtfleck
+   platzt. PLATZHALTER bis zu gezeichneten Karten (ASSETS.md). Die Klasse
+   .zugewinn steht 450 ms - die Animationen sind darauf abgestimmt. */
+.hand-card.zugewinn .res-card {
+  animation: karte-hueft 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+}
+@keyframes karte-hueft {
+  0% {
+    transform: none;
+    filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.5)) brightness(1);
+  }
+  35% {
+    transform: translateY(-14px) scale(1.12) rotate(-3deg);
+    filter: drop-shadow(2px 7px 0 rgba(0, 0, 0, 0.4)) brightness(1.5);
+  }
+  100% {
+    transform: none;
+    filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.5)) brightness(1);
+  }
+}
+.hand-card.zugewinn::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+  background: radial-gradient(
+    circle,
+    rgba(255, 245, 200, 0.95),
+    rgba(255, 210, 120, 0.4) 45%,
+    transparent 70%
+  );
+  transform: translate(-50%, -50%) scale(0);
+  animation: hand-blitz 0.45s ease-out;
+}
+@keyframes hand-blitz {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(7);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hand-card.zugewinn .res-card,
+  .hand-card.zugewinn::after {
+    animation: none;
+  }
 }

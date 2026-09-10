@@ -12,7 +12,7 @@ import { openSocket, sendMsg } from './socket';
 import type { ClientMsg, RoomInfo, ServerMsg } from '../../core/protocol';
 import type { PublicState } from '../../core/redact';
 import type { Action, GameEvent } from '../../core/rules/reducer';
-import { playRaid } from '../audio';
+import { playDefend, playGuard, playRaid } from '../audio';
 import type { PlayerId } from '../../core/state';
 import { createWorld, revealChunks } from '../../core/world';
 import type { World } from '../../core/world';
@@ -30,7 +30,7 @@ import { bigRoundChangedAt, bigRoundOf, roundOf, SEASON_NAME, seasonChangedAt, s
 export type WeltEintrag = {
   id: number;
   runde: number;
-  art: 'raid' | 'season' | 'bigRound';
+  art: 'raid' | 'defense' | 'season' | 'bigRound';
   text: string;
 };
 
@@ -119,14 +119,18 @@ function weltAus(
     if (e.t !== 'raid') continue;
     for (const h of e.hits) {
       const nester = h.nests === 1 ? '1 Nest' : `${h.nests} Nester`;
+      const wen = h.player === you ? 'dich' : wer(h.player);
+      const text =
+        h.count === 0
+          ? `Wachen halten ${nester} ab${h.player === you ? '' : ` (${wer(h.player)})`}`
+          : h.blocked > 0
+            ? `Raeuber pluendern ${wen}: ${h.count} (${h.blocked} von ${nester} abgehalten)`
+            : `Raeuber pluendern ${wen}: ${h.count} (${nester})`;
       out.push({
         id: naechsteId++,
         runde: e.round,
-        art: 'raid',
-        text:
-          h.player === you
-            ? `Raeuber pluendern dich: ${h.count} ${h.count === 1 ? 'Karte' : 'Karten'} (${nester})`
-            : `Raeuber pluendern ${wer(h.player)}: ${h.count} (${nester})`,
+        art: h.count === 0 ? 'defense' : 'raid',
+        text,
       });
     }
   }
@@ -144,24 +148,52 @@ function meldungenAus(
   for (const e of events) {
     if (e.t === 'raid') {
       // Der eigene Verlust zuerst und deutlich - fremde Verluste sind
-      // Nachricht, der eigene ist eine Ohrfeige.
+      // Nachricht, der eigene ist eine Ohrfeige. Eine Abwehr genauso deutlich,
+      // nur mit dem umgekehrten Gefuehl.
       const meins = e.hits.find((h) => h.player === you);
       if (meins) {
-        playRaid();
-        out.push({
-          id: naechsteId++,
-          text: `Raeuber pluendern dich: ${meins.count} ${meins.count === 1 ? 'Karte' : 'Karten'}`,
-          kind: 'raid',
-        });
+        if (meins.count === 0) {
+          playDefend();
+          out.push({
+            id: naechsteId++,
+            text: `Deine Wachen halten ${meins.blocked === 1 ? 'das Nest' : `${meins.blocked} Nester`} ab`,
+            kind: 'gain',
+          });
+        } else {
+          if (meins.blocked > 0) playDefend();
+          playRaid();
+          const karten = `${meins.count} ${meins.count === 1 ? 'Karte' : 'Karten'}`;
+          out.push({
+            id: naechsteId++,
+            text:
+              meins.blocked > 0
+                ? `${meins.blocked} abgehalten - trotzdem gepluendert: ${karten}`
+                : `Raeuber pluendern dich: ${karten}`,
+            kind: 'raid',
+          });
+        }
       }
       for (const h of e.hits) {
         if (h.player === you) continue;
         out.push({
           id: naechsteId++,
-          text: `${wer(h.player)} wird gepluendert: ${h.count}`,
-          kind: 'raid',
+          text:
+            h.count === 0
+              ? `${wer(h.player)} haelt die Raeuber ab`
+              : `${wer(h.player)} wird gepluendert: ${h.count}`,
+          kind: h.count === 0 ? 'info' : 'raid',
         });
       }
+    } else if (e.t === 'guard') {
+      if (e.player === you) playGuard();
+      out.push({
+        id: naechsteId++,
+        text:
+          e.player === you
+            ? `Ritter bezieht Wache (${e.guards} ${e.guards === 1 ? 'Wache steht' : 'Wachen stehen'})`
+            : `${wer(e.player)} stellt eine Wache auf`,
+        kind: 'info',
+      });
     } else if (e.t === 'draftOffered') {
       out.push({ id: naechsteId++, text: 'Ein Fund! Waehle eine Karte', kind: 'gain' });
     } else if (e.t === 'monopoly') {

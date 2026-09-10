@@ -34,8 +34,7 @@ import type { Resource } from '../../core/types';
 import { ResourceCard } from '../ui/ResourceIcon';
 import { hexCornerPixel } from '../../core/coords';
 import { nestAt } from '../../core/raiders';
-import { reliefAt } from '../../core/relief';
-import { tileImageDark } from '../tiles';
+import { reliefLimitedAt } from '../../core/relief';
 import { edgeAdjacentHexes, vertexAdjacentHexes } from '../../core/coords';
 import { Nest } from './Nest';
 import {
@@ -109,17 +108,22 @@ const DEFAULT_ZOOM_INDEX = (() => {
 const LIFT = 3 * SCALE;
 
 /**
- * Wie hoch der hoechste Gipfel gezeichnet wird, in Welteinheiten.
+ * Wie hoch das Gelaende hoechstens gezeichnet wird, in Welteinheiten.
  *
- * Ein Hex ist LAYOUT.h = 50 hoch, eine Zeile 37,5. Bei 44 hebt sich das
- * Hochland um mehr als eine Zeile. Ein erster Versuch mit 30 war zu
- * zurueckhaltend: man sah, dass etwas anders war, aber nicht, was.
- *
- * Das Vorbild geht viel weiter (60 px bei 17 px Zeilenschritt), kann sich das
- * aber leisten: seine Karte ist 200 Zeilen hoch, also hat ein Hang Platz, sich
- * ueber dreissig Felder zu entwickeln. Bei uns sind fuenfzehn Zeilen im Bild.
+ * Seit die Steigung begrenzt ist (RELIEF_SLOPE), erreicht kaum ein Feld diesen
+ * Wert - dafuer muesste es weit genug im Landesinneren liegen, um bei zwei
+ * Kunstpixeln je Feld so hoch zu kommen. Die Grenze deckelt nur noch, sie formt
+ * nicht mehr; deshalb ist sie grosszuegiger als vorher.
  */
-const RELIEF_MAX = 44;
+const RELIEF_MAX = 64;
+
+/**
+ * Wie weit ein Feld hoechstens ueber oder unter seinem Nachbarn stehen darf.
+ *
+ * Zwei Kunstpixel, genau wie hexmap (height_max_neighbor_delta = 2). So viel
+ * verdeckt die gemalte Unterkante der Kachel - mehr, und es klaffen Fugen.
+ */
+const RELIEF_SLOPE = 2 * SCALE;
 
 /** Aufgelaufene Raddrehung, ab der eine Zoomstufe geschaltet wird. */
 const WHEEL_THRESHOLD = 120;
@@ -246,11 +250,12 @@ export function Board({
   /**
    * Zeichenhoehe eines Feldes.
    *
-   * reliefAt merkt sich seine Werte selbst; hier geht es nur um die
+   * reliefLimitedAt merkt sich seine Werte selbst; hier geht es nur um die
    * Umrechnung in Welteinheiten.
    */
   const liftHex = useCallback(
-    (q: number, r: number) => reliefAt(state.worldSeed, q, r) * RELIEF_MAX,
+    (q: number, r: number) =>
+      reliefLimitedAt(state.worldSeed, q, r, RELIEF_SLOPE / RELIEF_MAX) * RELIEF_MAX,
     [state.worldSeed],
   );
 
@@ -338,13 +343,10 @@ export function Board({
     // Das eine, worum es hier geht.
     ctx.imageSmoothingEnabled = false;
 
-    const zeichne = (t: (typeof visible)[number], lift: number, fels = false) => {
+    const zeichne = (t: (typeof visible)[number], lift: number) => {
       const url = tileUrl(state.worldSeed, t.terrain, t.q, t.r);
       if (url === null) return;
-      // Der Sockel unter einer angehobenen Kachel ist ihre Felswand: dieselbe
-      // Kachel, abgedunkelt. Nur so liest sich der Streifen darunter als Hang
-      // statt als zweites, verrutschtes Feld.
-      const img = fels ? tileImageDark(url) : tileImage(url);
+      const img = tileImage(url);
       if (!img) return;
       const c = hexToPixel(t.q, t.r, LAYOUT);
       const x = Math.round((c.x - IMG.dx - view.x) * scale * DPR);
@@ -355,25 +357,17 @@ export function Board({
     };
 
     /*
-     * Zwei Durchgaenge je Kachel: erst am Boden, dann angehoben.
+     * Jede Kachel genau einmal, auf ihrer Hoehe - wie bei hexmap.
      *
-     * Der Sockel ist der Grund, warum nirgends ein Loch aufreisst. Hebt man
-     * eine Kachel an, gibt sie den Streifen frei, den sie vorher unten
-     * bedeckt hat - und die Nachbarn davor koennen ihn nur schliessen, wenn
-     * sie genauso hoch stehen. An einer Steilkueste stehen sie das nie.
-     *
-     * Die flache Karte bleibt deshalb liegen. Was zwischen Sockel und
-     * angehobener Kachel sichtbar wird, liest sich als Felswand.
+     * Eine erste Fassung legte die flache Karte als abgedunkelten Sockel
+     * darunter, weil angehobene Kacheln Loecher aufrissen. Das lag an der
+     * Steigung: benachbarte Felder durften beliebig weit auseinanderliegen.
+     * Seit sie auf zwei Kunstpixel begrenzt ist (reliefLimitedAt), verdeckt
+     * die gemalte Unterkante jeder Kachel die Stufe selbst.
      */
     for (const t of visible) {
-      const hoch = liftHex(t.q, t.r);
-      const istHover = hexKey(t.q, t.r) === hover;
-      // Auch der Sockel des Feldes unter dem Zeiger bleibt an seinem Platz in
-      // der Zeichenfolge - zuletzt gezeichnet wuerde er die Felder davor
-      // uebermalen. Nur die angehobene Kachel kommt ans Ende.
-      zeichne(t, 0, hoch >= 1 || istHover);
-      if (istHover) continue;
-      if (hoch >= 1) zeichne(t, hoch);
+      if (hexKey(t.q, t.r) === hover) continue; // kommt zuletzt, angehoben
+      zeichne(t, liftHex(t.q, t.r));
     }
 
     if (hover !== null) {

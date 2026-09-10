@@ -19,6 +19,17 @@
  * Punkt: Horten zieht Raeuber an (siehe rangeFor). Damit ist die
  * Handkartengrenze wieder an etwas gebunden, das im Spiel steht, statt an
  * einen Wurf.
+ *
+ * VERTEIDIGUNG. Ein gespielter Ritter bezieht Wache. Greift ein Nest zu, stellt
+ * sich ihm eine Wache entgegen und ist danach verbraucht - eine Wache je Nest.
+ * Wer von zwei Nestern erreicht wird, braucht zwei Ritter, um ganz verschont zu
+ * bleiben; mit einem kommt eines durch. Auch der Horterverlust greift nur, wenn
+ * mindestens ein Nest durchkommt: wer alle abwehrt, verliert nichts, egal wie
+ * voll das Lager ist.
+ *
+ * Die Wache kaempft, sobald ein Nest angreift - auch wenn gerade nichts zu holen
+ * waere. Sie weiss nicht, was im Lager liegt; sie steht einfach da. Wachen, die
+ * nicht gebraucht werden, bleiben stehen.
  */
 
 import { hexDistance } from '../coords';
@@ -30,6 +41,14 @@ import { vertexAdjacentHexes, parseVertexKey } from '../coords';
 import type { Hex } from '../coords';
 import type { Resource } from '../types';
 import type { GameState, Hand, PlayerId } from '../state';
+import type { HandView } from './handlimit';
+
+/**
+ * Was die Bedrohungsrechnung vom Spielstand braucht. Schmal genug fuer die
+ * redigierte Sicht des Clients - das Menue zeigt damit, wie viele Nester
+ * heranreichen, und rechnet dabei nach denselben Regeln wie der Server.
+ */
+export type RaidView = HandView & Pick<GameState, 'worldSeed' | 'buildings'>;
 
 /**
  * Wie weit ein Nest greift.
@@ -41,12 +60,12 @@ import type { GameState, Hand, PlayerId } from '../state';
 export const RAID_RANGE = 3;
 
 /** Die Reichweite gegenueber diesem Spieler. Horten zieht sie weiter. */
-export function rangeFor(state: GameState, id: PlayerId): number {
+export function rangeFor(state: RaidView, id: PlayerId): number {
   return isHoarding(state, id) ? RAID_RANGE + 1 : RAID_RANGE;
 }
 
 /** Die Felder, auf denen dieser Spieler etwas stehen hat. */
-function occupiedHexes(state: GameState, id: PlayerId): Hex[] {
+function occupiedHexes(state: RaidView, id: PlayerId): Hex[] {
   const seen = new Set<string>();
   const out: Hex[] = [];
   for (const [key, b] of Object.entries(state.buildings)) {
@@ -68,7 +87,7 @@ function occupiedHexes(state: GameState, id: PlayerId): Hex[] {
  * stehen - sonst waere eine dichte Stadt naeher am Nest schlimmer als eine
  * weit verteilte, und das ist genau verkehrt herum.
  */
-export function threateningNests(state: GameState, id: PlayerId): Hex[] {
+export function threateningNests(state: RaidView, id: PlayerId): Hex[] {
   const reichweite = rangeFor(state, id);
   const felder = occupiedHexes(state, id);
   if (felder.length === 0) return [];
@@ -125,6 +144,8 @@ export type RaidHit = {
   player: PlayerId;
   /** Wie viele Nester zugegriffen haben. */
   nests: number;
+  /** Wie viele davon Wachen abgehalten haben. */
+  blocked: number;
   /** Was genommen wurde. Fuer Fremde redigiert (redact.ts). */
   taken: Hand;
   /** Wie viele Karten insgesamt - bleibt auch fuer Fremde sichtbar. */
@@ -146,15 +167,28 @@ export function runRaid(state: GameState): RaidHit[] {
     const p = state.players.find((x) => x.id === id);
     if (!p) continue;
 
-    const menge = raidLoss(state, id, nester.length);
-    if (menge === 0) continue;
+    // Wachen zuerst: jede haelt ein Nest ab und ist danach verbraucht.
+    const abgewehrt = Math.min(p.guards, nester.length);
+    p.guards -= abgewehrt;
+    const durch = nester.length - abgewehrt;
+
+    const menge = raidLoss(state, id, durch);
+    // Auch eine reine Abwehr ist ein Ereignis - man soll sehen, dass die
+    // Wache etwas getan hat.
+    if (menge === 0 && abgewehrt === 0) continue;
 
     const genommen = takeFromLargest(p.hand, menge);
     for (const r of RESOURCES) {
       p.hand[r] -= genommen[r];
       state.bank[r] += genommen[r];
     }
-    treffer.push({ player: id, nests: nester.length, taken: genommen, count: menge });
+    treffer.push({
+      player: id,
+      nests: nester.length,
+      blocked: abgewehrt,
+      taken: genommen,
+      count: menge,
+    });
   }
   return treffer;
 }

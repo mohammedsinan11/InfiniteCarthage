@@ -13,10 +13,10 @@ import { hexDistance, hexesInRange, vertexKey } from '../src/core/coords';
 import { terrainAt } from '../src/core/worldgen';
 import { applyAction, createGame } from '../src/core/rules/reducer';
 import type { Game } from '../src/core/rules/reducer';
-import { RAID_RANGE, raidLoss, takeFromLargest, threateningNests } from '../src/core/rules/raid';
+import { RAID_RANGE, raidLoss, runRaid, takeFromLargest, threateningNests } from '../src/core/rules/raid';
 import { HAND_LIMIT, limitFor } from '../src/core/rules/handlimit';
 import { bigRoundChangedAt, ROUNDS_PER_BIG_ROUND } from '../src/core/season';
-import { redactEventsFor } from '../src/core/redact';
+import { redactEventsFor, redactStateFor } from '../src/core/redact';
 import { emptyHand, handSize } from '../src/core/state';
 import { RESOURCES } from '../src/core/types';
 
@@ -246,8 +246,8 @@ describe('Die Redaktion der Pluenderung', () => {
       t: 'raid' as const,
       round: 6,
       hits: [
-        { player: 'p0', nests: 1, taken: { ...emptyHand(), ore: 2 }, count: 2 },
-        { player: 'p1', nests: 2, taken: { ...emptyHand(), lumber: 3 }, count: 3 },
+        { player: 'p0', nests: 1, blocked: 0, taken: { ...emptyHand(), ore: 2 }, count: 2 },
+        { player: 'p1', nests: 2, blocked: 0, taken: { ...emptyHand(), lumber: 3 }, count: 3 },
       ],
     };
 
@@ -265,7 +265,7 @@ describe('Die Redaktion der Pluenderung', () => {
     const ereignis = {
       t: 'raid' as const,
       round: 6,
-      hits: [{ player: 'p1', nests: 1, taken: { ...emptyHand(), wool: 1 }, count: 1 }],
+      hits: [{ player: 'p1', nests: 1, blocked: 0, taken: { ...emptyHand(), wool: 1 }, count: 1 }],
     };
     redactEventsFor([ereignis], 'p0');
     expect(ereignis.hits[0]!.taken.wool, 'Redaktion darf nicht am Zustand schnitzen').toBe(1);
@@ -341,5 +341,92 @@ describe('Die Pluenderung im Spielverlauf', () => {
       game.state.phase = { t: 'main' };
     }
     expect(handSize(game.state.players[0]!.hand)).toBe(vorher);
+  });
+});
+
+describe('Ritter halten Wache', () => {
+  /** Eine Siedlung direkt an ein Nest stellen; liefert die Zahl bedrohender Nester. */
+  function nestNah(game: Game): number {
+    const s = game.state;
+    const nest = hexesInRange(ORIGIN, 20).find((h) => nestAt(s.worldSeed, h.q, h.r))!;
+    s.buildings[vertexKey({ q: nest.q, r: nest.r, d: 'N' })] = { owner: 'p0', type: 'settlement' };
+    return threateningNests(s, 'p0').length;
+  }
+
+  it('eine Wache je Nest haelt die Pluenderung ganz ab und ist danach verbraucht', () => {
+    const game = solo();
+    const nester = nestNah(game);
+    expect(nester).toBeGreaterThan(0);
+    const p = game.state.players[0]!;
+    for (const r of RESOURCES) p.hand[r] = 1;
+    p.guards = nester;
+    const hits = runRaid(game.state);
+    expect(hits[0]!.blocked).toBe(nester);
+    expect(hits[0]!.count).toBe(0);
+    expect(handSize(p.hand)).toBe(5);
+    expect(p.guards).toBe(0);
+  });
+
+  it('eine Wache zu wenig laesst ein Nest durch', () => {
+    const game = solo();
+    const nester = nestNah(game);
+    const p = game.state.players[0]!;
+    for (const r of RESOURCES) p.hand[r] = 1;
+    p.guards = nester - 1;
+    const hits = runRaid(game.state);
+    expect(hits[0]!.blocked).toBe(nester - 1);
+    expect(hits[0]!.count).toBe(1);
+  });
+
+  it('schuetzt auch Horter, wenn alle Nester abgehalten werden', () => {
+    const game = solo();
+    nestNah(game);
+    const p = game.state.players[0]!;
+    for (const r of RESOURCES) p.hand[r] = 4; // 20 Karten, weit ueber der Grenze
+    // Horten weitet die Reichweite - also nach dem Aufstocken neu zaehlen.
+    p.guards = threateningNests(game.state, 'p0').length;
+    const hits = runRaid(game.state);
+    expect(hits[0]!.count).toBe(0);
+    expect(handSize(p.hand)).toBe(20);
+  });
+
+  it('laesst ueberzaehlige Wachen stehen', () => {
+    const game = solo();
+    const nester = nestNah(game);
+    const p = game.state.players[0]!;
+    for (const r of RESOURCES) p.hand[r] = 1;
+    p.guards = nester + 2;
+    runRaid(game.state);
+    expect(p.guards).toBe(2);
+  });
+
+  it('meldet auch eine reine Abwehr, bei der nichts genommen wurde', () => {
+    const game = solo();
+    const nester = nestNah(game);
+    const p = game.state.players[0]!;
+    for (const r of RESOURCES) p.hand[r] = 0;
+    p.guards = nester;
+    const hits = runRaid(game.state);
+    expect(hits).toHaveLength(1);
+    expect(hits[0]!.blocked).toBe(nester);
+  });
+
+  it('ein gespielter Ritter stellt eine Wache auf', () => {
+    const game = solo();
+    game.state.phase = { t: 'main' };
+    game.state.turn = 6;
+    game.state.players[0]!.dev.push({ type: 'knight', boughtTurn: 0, played: false });
+    const res = applyAction(game, { t: 'playKnight' }, 'p0');
+    if (!res.ok) throw new Error(res.error);
+    // Frisch lesen: applyAction haengt einen neuen Zustand ein.
+    expect(game.state.players[0]!.guards).toBe(1);
+    expect(game.state.players[0]!.playedKnights).toBe(1);
+    expect(res.events).toContainEqual({ t: 'guard', player: 'p0', guards: 1 });
+  });
+
+  it('zeigt Wachen allen - sie stehen sichtbar auf Posten', () => {
+    const game = solo();
+    game.state.players[0]!.guards = 3;
+    expect(redactStateFor(game.state, 'jemand-anders').players[0]!.guards).toBe(3);
   });
 });

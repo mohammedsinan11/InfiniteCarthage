@@ -12,21 +12,30 @@
 
 import { handSize } from '../state';
 import { modifiersOf } from '../cards/effects';
-import type { GameState, PlayerId } from '../state';
+import type { Hand, PlayerId } from '../state';
+
+/**
+ * Was die Grenze vom Spielstand braucht. Bewusst schmal, damit auch der Client
+ * damit rechnen kann: er haelt nur die redigierte Sicht, und darin steht die
+ * eigene Hand, fremde nicht.
+ */
+export type HandView = {
+  players: ReadonlyArray<{ id: PlayerId; cards: readonly string[]; hand?: Hand }>;
+};
 
 /** Ab dieser Handgrosse gilt man als hortend - vor Kartenboni. */
 export const HAND_LIMIT = 7;
 
 /** Die Grenze dieses Spielers, einschliesslich seiner Karten. */
-export function limitFor(state: GameState, id: PlayerId): number {
+export function limitFor(state: HandView, id: PlayerId): number {
   const p = state.players.find((x) => x.id === id);
   if (!p) return HAND_LIMIT;
   return HAND_LIMIT + modifiersOf(p.cards).handLimitBonus;
 }
 
 /** Haelt dieser Spieler mehr, als ihm zusteht? */
-export function isHoarding(state: GameState, id: PlayerId): boolean {
+export function isHoarding(state: HandView, id: PlayerId): boolean {
   const p = state.players.find((x) => x.id === id);
-  if (!p) return false;
+  if (!p || !p.hand) return false;
   return handSize(p.hand) > limitFor(state, id);
 }

@@ -34,6 +34,8 @@ export type PublicPlayer = {
    * sondern Verwirrung.
    */
   cards: string[];
+  /** Stehende Wachen - oeffentlich wie die Karten: Ritter auf Posten sieht man. */
+  guards: number;
   connected: boolean;
   /** Sichtbare Punkte, ohne verdeckte Siegpunktkarten. */
   points: number;
@@ -83,6 +85,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
       devCount: p.dev.filter((d) => !d.played).length,
       playedKnights: p.playedKnights,
       cards: [...p.cards],
+      guards: p.guards,
       connected: p.connected,
       points: publicPoints(state, p.id),
     };

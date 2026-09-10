@@ -117,6 +117,30 @@ Feld, hereinfliegende Meldungen. Alles per CSS und Canvas.
 *Was fehlt:* Einzelbildfolgen statt reiner Bewegung. Eine fliegende Karte, die
 sich dreht, ein Feld, das aufblitzt statt nur heller zu werden.
 
+### Karteneffekte — **Platzhalter, bewusst**
+
+Auf Wunsch eingebaut, damit sich die Kartenwahl nach etwas anfuehlt, solange es
+keine gezeichneten Karten gibt - und ausdruecklich zum Ersetzen gedacht:
+
+- Austeilen (Karten fliegen gefaechert von unten herein)
+- Neigen unter dem Zeiger mit mitlaufendem Lichtfleck
+- Glanzstreifen ab selten, pulsierende Glut ab episch
+- aufsteigende Pixelfunken ab episch, Strahlenkranz bei legendaer
+- Lichtblitz beim Nehmen, Zerfallen der nicht gewaehlten Karten
+- auf der Handkarte: Huepfen und Lichtfleck bei Zugewinn
+
+Alles CSS in `styles.css` (Abschnitt "Karteneffekte") und `CardDraft.tsx`. Wenn
+echte Karten kommen, sollten die meisten davon wegfallen; ein gezeichneter
+Rahmen je Seltenheit traegt mehr als jeder Glanz.
+
+### Klaenge — **Platzhalter**
+
+Alles im Browser erzeugt (`audio.ts`): Wuerfel, Bauen, Ertrag, Pluenderung,
+Kartenwahl (Austeilen, Zeiger, Nehmen je Seltenheit, Zerfallen), Wache,
+Abwehr. Zweckmaessig und lizenzfrei, aber erkennbar synthetisch. Ertrag und
+Karten sind die Momente, die am meisten von echten Aufnahmen profitieren
+wuerden.
+
 ---
 
 ## Noch nicht vorhanden
@@ -130,6 +154,11 @@ sich dreht, ein Feld, das aufblitzt statt nur heller zu werden.
 | **Auftraege und Ereignisse** | Symbole, evtl. kleine Bilder | Ereignisse koennten ein Bild vertragen, Auftraege genuegt ein Symbol. |
 | **Raeubernest als Kachel** | 2 bis 3 Varianten | Wuerde den Vektor-Platzhalter ersetzen und ins Gelaende einfuegen statt daraufzulegen. |
 | **Einheiten** | Figur je Seite, zwei Blickrichtungen | Sobald Truppen produziert und bewegt werden (`DESIGN.md`, Schritt 4). |
+| **Kartenrahmen je Seltenheit** | 5 Rahmen, dazu Glanz als Einzelbildfolge | Ersetzt die CSS-Glut, Funken und Strahlen. Legendaer darf animiert sein, der Rest eher nicht. |
+| **Kartenrueckseite** | 1 Motiv | Fuer das Austeilen - derzeit fliegen die Vorderseiten herein. |
+| **Wache** | Symbol, evtl. Figur neben der Siedlung | Stehende Wachen sieht man nur im Menue. Auf der Karte waeren sie lesbarer. |
+| **Abwehr und Pluenderung** | kurze Einzelbildfolgen | Derzeit nur Meldung und Klang. Ein Schwertblitz am Nest, eine Staubwolke an der Siedlung. |
+| **Klaenge** | Aufnahmen oder komponiert | Ertrag, Karte nehmen (je Seltenheit), Wache, Abwehr, Pluenderung zuerst. |
 | **Gegner und Kampf** | offen | Sobald der Held kaempfen soll. |
 | **Menuereiter** | 4 bis 8 Symbole | Derzeit stehen dort Kuerzel wie "RE" und "TE". Das ist offensichtlich vorlaeufig. |
 

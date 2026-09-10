@@ -117,6 +117,8 @@ export type GameEvent =
   | { t: 'tradeSettled'; from: PlayerId; to: PlayerId; give: Bundle; want: Bundle }
   | { t: 'tradeCancelled'; player: PlayerId }
   | { t: 'largestArmy'; player: PlayerId }
+  /** Ein Ritter bezieht Wache; guards ist der neue Stand. */
+  | { t: 'guard'; player: PlayerId; guards: number }
   | { t: 'draftOffered'; player: PlayerId; source: DraftSource; options: string[] }
   | { t: 'cardTaken'; player: PlayerId; card: string }
   | { t: 'chunks'; coords: ChunkCoord[] }
@@ -182,6 +184,7 @@ export function createGame(
       dev: [],
       playedKnights: 0,
       cards: [],
+      guards: 0,
       connected: true,
     })),
     order: players.map((p) => p.id),
@@ -549,8 +552,10 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
 
       actorPlayer.dev[findPlayableDev(s, actorPlayer, 'knight')]!.played = true;
       actorPlayer.playedKnights += 1;
+      actorPlayer.guards += 1;
       s.devPlayedThisTurn = true;
       events.push({ t: 'playDev', player: actor, card: 'knight' });
+      events.push({ t: 'guard', player: actor, guards: actorPlayer.guards });
 
       const holder = largestArmyHolder(s);
       if (holder !== s.largestArmy && holder !== null) {
@@ -558,9 +563,9 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         events.push({ t: 'largestArmy', player: holder });
       }
       /*
-       * Ohne Raeuber hat der Ritter keine Zielrichtung mehr. Er zaehlt nur
-       * noch fuer die Groesste Rittermacht - eine schwaechere Karte als
-       * frueher, aber eine ehrliche: sie tut genau das, was dasteht.
+       * Der Ritter bezieht Wache und haelt bei der naechsten Pluenderung ein
+       * Nest ab (rules/raid.ts). Fuer die Groesste Rittermacht zaehlt er
+       * weiter - die Wache verbraucht sich, der Ruhm nicht.
        */
       checkWin(s, events);
       break;
