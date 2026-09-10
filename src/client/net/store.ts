@@ -12,6 +12,7 @@ import { openSocket, sendMsg } from './socket';
 import type { ClientMsg, RoomInfo, ServerMsg } from '../../core/protocol';
 import type { PublicState } from '../../core/redact';
 import type { Action, GameEvent } from '../../core/rules/reducer';
+import { playRaid } from '../audio';
 import type { PlayerId } from '../../core/state';
 import { createWorld, revealChunks } from '../../core/world';
 import type { World } from '../../core/world';
@@ -22,7 +23,7 @@ export type Announcement = {
   id: number;
   text: string;
   /** Bestimmt Farbe und Ton der Meldung. */
-  kind: 'robber' | 'season' | 'gain' | 'info';
+  kind: 'raid' | 'season' | 'gain' | 'info';
 };
 
 let naechsteId = 1;
@@ -88,11 +89,35 @@ export type Store = {
 };
 
 /** Welche Ereignisse sind eine Meldung wert? Nicht jedes - sonst rauscht es. */
-function meldungenAus(events: GameEvent[], state: PublicState | null): Announcement[] {
+function meldungenAus(
+  events: GameEvent[],
+  state: PublicState | null,
+  you: PlayerId | null,
+): Announcement[] {
   const out: Announcement[] = [];
   const wer = (id: string) => state?.players.find((p) => p.id === id)?.name ?? 'Jemand';
   for (const e of events) {
-    if (e.t === 'draftOffered') {
+    if (e.t === 'raid') {
+      // Der eigene Verlust zuerst und deutlich - fremde Verluste sind
+      // Nachricht, der eigene ist eine Ohrfeige.
+      const meins = e.hits.find((h) => h.player === you);
+      if (meins) {
+        playRaid();
+        out.push({
+          id: naechsteId++,
+          text: `Raeuber pluendern dich: ${meins.count} ${meins.count === 1 ? 'Karte' : 'Karten'}`,
+          kind: 'raid',
+        });
+      }
+      for (const h of e.hits) {
+        if (h.player === you) continue;
+        out.push({
+          id: naechsteId++,
+          text: `${wer(h.player)} wird gepluendert: ${h.count}`,
+          kind: 'raid',
+        });
+      }
+    } else if (e.t === 'draftOffered') {
       out.push({ id: naechsteId++, text: 'Ein Fund! Waehle eine Karte', kind: 'gain' });
     } else if (e.t === 'monopoly') {
       out.push({ id: naechsteId++, text: `Monopol: ${e.taken} Karten`, kind: 'info' });
@@ -229,7 +254,7 @@ export const useStore = create<Store>((set, get) => ({
             break;
           case 'events': {
             const wurf = msg.events.find((e: GameEvent) => e.t === 'roll');
-            const neue = meldungenAus(msg.events, get().state);
+            const neue = meldungenAus(msg.events, get().state, get().you);
             set((s) => ({
               log: [...s.log, ...msg.events.map((e: GameEvent) => describeEvent(e, s.state))].slice(-120),
               announcements: [...s.announcements, ...neue].slice(-6),

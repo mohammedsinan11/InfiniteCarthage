@@ -67,7 +67,6 @@ export function Game() {
   const [tradeGet, setTradeGet] = useState<Resource>('ore');
   const [yopA, setYopA] = useState<Resource>('lumber');
   const [yopB, setYopB] = useState<Resource>('brick');
-  const [discard, setDiscard] = useState<Partial<Record<Resource, number>>>({});
   /** Zahlen festpinnen - fuer alle, die sie lieber dauerhaft sehen. */
   const [pinNumbers, setPinNumbers] = useState(false);
 
@@ -129,13 +128,6 @@ export function Game() {
   }
   const canPlay = (t: DevCardType): boolean =>
     !state.devPlayedThisTurn && playableDev.some((d) => d.type === t);
-
-  const mustDiscard =
-    phase.t === 'discard' && you !== null && phase.pending.includes(you);
-  const discardNeed = mustDiscard && hand
-    ? Math.floor(RESOURCES.reduce((n, r) => n + hand[r], 0) / 2)
-    : 0;
-  const discardChosen = RESOURCES.reduce((n, r) => n + (discard[r] ?? 0), 0);
 
   const ratio = you ? tradeRatio(state, world, you, tradeGive) : 4;
 
@@ -398,41 +390,6 @@ export function Game() {
       </main>
 
       {/* Abwerfen nach einer 7 */}
-      {mustDiscard && hand && (
-        <Dialog title={`${discardNeed} Karten abwerfen`}>
-          <div className="discard">
-            {RESOURCES.map((r) => (
-              <div key={r} className="drow">
-                <span>{resourceName(r)}</span>
-                <button
-                  disabled={(discard[r] ?? 0) <= 0}
-                  onClick={() => setDiscard({ ...discard, [r]: (discard[r] ?? 0) - 1 })}
-                >
-                  -
-                </button>
-                <b>{discard[r] ?? 0}</b>
-                <button
-                  disabled={(discard[r] ?? 0) >= hand[r] || discardChosen >= discardNeed}
-                  onClick={() => setDiscard({ ...discard, [r]: (discard[r] ?? 0) + 1 })}
-                >
-                  +
-                </button>
-                <span className="have">von {hand[r]}</span>
-              </div>
-            ))}
-          </div>
-          <button
-            className="primary"
-            disabled={discardChosen !== discardNeed}
-            onClick={() => {
-              act({ t: 'discard', cards: discard });
-              setDiscard({});
-            }}
-          >
-            {discardChosen} von {discardNeed} abwerfen
-          </button>
-        </Dialog>
-      )}
     </div>
   );
 }
@@ -479,13 +436,3 @@ function MonopolyButton({ onPick }: { onPick: (r: Resource) => void }) {
   );
 }
 
-function Dialog({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="overlay">
-      <div className="dialog">
-        <h2>{title}</h2>
-        {children}
-      </div>
-    </div>
-  );
-}

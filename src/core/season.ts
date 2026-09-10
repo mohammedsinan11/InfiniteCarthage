@@ -60,6 +60,17 @@ export function roundsLeftInSeason(turn: number): number {
   return ROUNDS_PER_SEASON - ((asRound(turn) - 1) % ROUNDS_PER_SEASON);
 }
 
+/**
+ * Beginnt mit diesem Zug eine neue grosse Runde?
+ *
+ * Der Takt, in dem die Raeuber pluendern. Bewusst am Zug abgelesen statt
+ * mitgezaehlt: ein zweiter Zaehler koennte vom Zug abweichen, diese Frage
+ * kann es nicht.
+ */
+export function bigRoundChangedAt(turn: number): boolean {
+  return asRound(turn) > 1 && (asRound(turn) - 1) % ROUNDS_PER_BIG_ROUND === 0;
+}
+
 /** Wechselt mit diesem Zug die Jahreszeit? Fuer Meldungen und spaeter Effekte. */
 export function seasonChangedAt(turn: number): boolean {
   return asRound(turn) > 1 && (asRound(turn) - 1) % ROUNDS_PER_SEASON === 0;

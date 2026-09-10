@@ -76,7 +76,6 @@ export type Building = { owner: PlayerId; type: 'settlement' | 'city' };
 export type Phase =
   | { t: 'setup'; step: number; awaiting: 'settlement' | 'road'; lastVertex: string | null }
   | { t: 'roll' }
-  | { t: 'discard'; pending: PlayerId[] }
   /**
    * Kartenwahl. Loest die Raeuberphase ab: bei einer Sieben gibt es jetzt
    * einen Fund statt einer Strafe.

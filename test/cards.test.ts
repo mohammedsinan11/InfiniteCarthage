@@ -12,7 +12,7 @@ import {
 import { currentPlayerId, playerById } from '../src/core/state';
 import { redactStateFor } from '../src/core/redact';
 import type { PlayerId } from '../src/core/state';
-import { discardCount, limitFor } from '../src/core/rules/discard';
+import { limitFor } from '../src/core/rules/handlimit';
 import { DRAFT_SIZE, draftOptions } from '../src/core/cards/draft';
 import { CARDS, cardById } from '../src/core/cards/catalog';
 import { modifiersOf, terrainBonusFor } from '../src/core/cards/effects';
@@ -21,7 +21,6 @@ import type { DraftSource } from '../src/core/cards/types';
 import { productionSources } from '../src/core/rules/production';
 import { tradeRatio } from '../src/core/rules/trade';
 import { RESOURCES } from '../src/core/types';
-import type { Resource } from '../src/core/types';
 
 const QUELLEN: DraftSource[] = ['fund', 'belohnung', 'markt'];
 
@@ -57,22 +56,6 @@ function wuerfelBisSieben(game: Game): boolean {
     const pid = currentPlayerId(game.state);
     if (phaseOf(game) !== 'roll') return false;
     must(game, { t: 'roll' }, pid);
-
-    // Abwerfen, falls faellig.
-    let guard = 0;
-    while (phaseOf(game) === 'discard' && guard++ < 10) {
-      const ph = game.state.phase;
-      if (ph.t !== 'discard') break;
-      const p = playerById(game.state, ph.pending[0]!)!;
-      let need = discardCount(game.state, ph.pending[0]!);
-      const cards: Partial<Record<Resource, number>> = {};
-      for (const r of RESOURCES) {
-        const n = Math.min(need, p.hand[r]);
-        if (n > 0) cards[r] = n;
-        need -= n;
-      }
-      must(game, { t: 'discard', cards }, ph.pending[0]!);
-    }
 
     if (phaseOf(game) === 'draft') return true;
     if (phaseOf(game) === 'main') must(game, { t: 'endTurn' }, pid);

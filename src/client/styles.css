@@ -934,7 +934,7 @@ em.off {
   animation: meldung-rein 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.2) both,
     meldung-raus 0.4s ease-in 2.8s both;
 }
-.meldung-robber { border-left-color: var(--danger); color: #f0b8a8; }
+.meldung-raid { border-left-color: var(--danger); color: #f0b8a8; }
 .meldung-season { border-left-color: var(--accent); color: var(--accent); }
 .meldung-gain { border-left-color: #4f9e5c; }
 .meldung-info { border-left-color: var(--line-bright); }
@@ -1315,4 +1315,20 @@ em.off {
   position: absolute;
   left: 0;
   color: var(--accent);
+}
+
+/* Raeubernester. Platzhalter aus Polygonen - siehe board/Nest.tsx. */
+.nest-schatten {
+  fill: rgba(0, 0, 0, 0.38);
+}
+.nest-pfahl {
+  fill: #2b2119;
+  stroke: #150f0a;
+  stroke-width: 0.5;
+}
+.nest-pfahl.hoch {
+  fill: #35281d;
+}
+.nest-wimpel {
+  fill: #9c3226;
 }

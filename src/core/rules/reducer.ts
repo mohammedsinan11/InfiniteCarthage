@@ -57,7 +57,9 @@ import {
   legalRoadEdges,
 } from './placement';
 import { computeProduction } from './production';
-import { discardCount, playersMustDiscard } from './discard';
+import { runRaid } from './raid';
+import type { RaidHit } from './raid';
+import { bigRoundChangedAt, roundOf } from '../season';
 import { draftOptions } from '../cards/draft';
 import { cardById } from '../cards/catalog';
 import type { DraftSource } from '../cards/types';
@@ -75,7 +77,6 @@ export type Action =
   | { t: 'placeSettlement'; vertex: string }
   | { t: 'placeRoad'; edge: string }
   | { t: 'roll' }
-  | { t: 'discard'; cards: Partial<Record<Resource, number>> }
   | { t: 'buildRoad'; edge: string }
   | { t: 'buildSettlement'; vertex: string }
   | { t: 'buildCity'; vertex: string }
@@ -101,7 +102,12 @@ export type GameEvent =
   | { t: 'roll'; player: PlayerId; dice: [number, number] }
   | { t: 'production'; payout: Record<PlayerId, Hand>; shortfall: Resource[] }
   | { t: 'build'; player: PlayerId; kind: 'road' | 'settlement' | 'city'; at: string }
-  | { t: 'discard'; player: PlayerId; count: number }
+  | {
+      t: 'raid';
+      round: number;
+      /** Je Spieler ein Eintrag. `taken` ist fuer Fremde redigiert. */
+      hits: RaidHit[];
+    }
   | { t: 'buyDev'; player: PlayerId }
   | { t: 'playDev'; player: PlayerId; card: DevCardType }
   | { t: 'yearOfPlenty'; player: PlayerId; a: Resource; b: Resource }
@@ -292,11 +298,14 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
   if (s.phase.t === 'finished') return fail('Die Partie ist beendet.');
 
   /**
-   * Zwei Aktionen kommen bewusst NICHT vom Spieler am Zug: das Abwerfen nach
-   * einer Sieben und die Antwort auf ein Handelsangebot. Alles andere darf
-   * nur, wer dran ist.
+   * Eine Aktion kommt bewusst NICHT vom Spieler am Zug: die Antwort auf ein
+   * Handelsangebot. Alles andere darf nur, wer dran ist.
+   *
+   * Frueher stand hier auch das Abwerfen. Dass es fort ist, ist kein Verlust
+   * an Mitsprache - die Pluenderung nimmt selbst, und zwar ohne Phase, damit
+   * ein abwesender Spieler die Runde nicht anhalten kann.
    */
-  const fromOthers = action.t === 'discard' || action.t === 'respondTrade';
+  const fromOthers = action.t === 'respondTrade';
   if (!fromOthers && actor !== currentPlayerId(s)) return fail('Du bist nicht am Zug.');
 
   const phase = s.phase;
@@ -380,11 +389,10 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       events.push({ t: 'roll', player: actor, dice });
 
       if (sum === 7) {
-        const pending = playersMustDiscard(s);
-        // Erst abwerfen, dann der Fund - sonst waehlt man Karten aus, die
-        // man gleich darauf wieder abgibt.
-        if (pending.length > 0) s.phase = { t: 'discard', pending };
-        else enterDraft(s, 'fund', events);
+        // Nur noch der Fund. Das Abwerfen sass frueher auch hier und machte
+        // dieselbe Zahl zu Geschenk und Strafe zugleich; es haengt jetzt an
+        // den Pluenderungen.
+        enterDraft(s, 'fund', events);
       } else {
         const { payout, shortfall } = computeProduction(s, world, sum);
         for (const [pid, gain] of Object.entries(payout)) {
@@ -398,32 +406,6 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         events.push({ t: 'production', payout, shortfall });
         s.phase = { t: 'main' };
       }
-      break;
-    }
-
-    case 'discard': {
-      if (phase.t !== 'discard') return fail('Jetzt wird nicht abgeworfen.');
-      if (!phase.pending.includes(actor)) return fail('Du musst nichts abwerfen.');
-      const need = discardCount(s, actor);
-      let given = 0;
-      for (const r of RESOURCES) {
-        const n = action.cards[r] ?? 0;
-        if (n < 0) return fail('Negative Anzahl.');
-        if (n > actorPlayer.hand[r]) return fail('So viele Karten hast du nicht.');
-        given += n;
-      }
-      if (given !== need) return fail(`Du musst genau ${need} Karten abwerfen.`);
-
-      for (const r of RESOURCES) {
-        const n = action.cards[r] ?? 0;
-        actorPlayer.hand[r] -= n;
-        s.bank[r] += n;
-      }
-      events.push({ t: 'discard', player: actor, count: need });
-
-      const rest = phase.pending.filter((id) => id !== actor);
-      if (rest.length > 0) s.phase = { t: 'discard', pending: rest };
-      else enterDraft(s, 'fund', events);
       break;
     }
 
@@ -722,6 +704,15 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
     case 'endTurn': {
       if (phase.t !== 'main') return fail('Der Zug laesst sich jetzt nicht beenden.');
       nextTurn(s);
+
+      // Der Takt der Raeuber: zum Beginn jeder grossen Runde. Vor der Meldung
+      // des neuen Zuges, damit die Pluenderung zur alten Runde gehoert und
+      // nicht zum ersten Spieler der neuen.
+      if (bigRoundChangedAt(s.turn)) {
+        const hits = runRaid(s);
+        if (hits.length > 0) events.push({ t: 'raid', round: roundOf(s.turn), hits });
+      }
+
       events.push({ t: 'turn', player: s.order[s.current]! });
       break;
     }

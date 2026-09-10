@@ -61,8 +61,12 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
     }
     case 'build':
       return `${who(state, e.player)} baut ${BUILD_NAME[e.kind]}.`;
-    case 'discard':
-      return `${who(state, e.player)} wirft ${e.count} Karten ab.`;
+    case 'raid': {
+      const teile = e.hits.map(
+        (h) => `${who(state, h.player)}: ${h.count} (${h.nests} Nester)`,
+      );
+      return `Raeuber pluendern - ${teile.join(' | ')}`;
+    }
     case 'buyDev':
       return `${who(state, e.player)} kauft eine Entwicklungskarte.`;
     case 'playDev':

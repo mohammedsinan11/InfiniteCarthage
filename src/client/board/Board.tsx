@@ -33,6 +33,8 @@ import { playHover } from '../audio';
 import type { Resource } from '../../core/types';
 import { ResourceCard } from '../ui/ResourceIcon';
 import { hexCornerPixel } from '../../core/coords';
+import { nestAt } from '../../core/raiders';
+import { Nest } from './Nest';
 import {
   HEX_CX,
   HEX_CY,
@@ -496,7 +498,24 @@ export function Board({
         width={size.w}
         height={size.h}
       >
-        {/* Zahlenmarker und Raeuber */}
+        {/*
+          Raeubernester. Immer sichtbar, nie unter dem Zeiger versteckt: sie
+          sind der Grund, warum man sich ueberlegt, wo man baut, und diese
+          Ueberlegung faengt beim Hinsehen an.
+        */}
+        {visible.map((t) =>
+          nestAt(state.worldSeed, t.q, t.r) ? (
+            (() => {
+              const c = hexToPixel(t.q, t.r, LAYOUT);
+              const lift = hover === hexKey(t.q, t.r) ? LIFT : 0;
+              return (
+                <Nest key={'nest' + hexKey(t.q, t.r)} x={c.x} y={c.y - lift} size={HEX_H * SCALE * 0.62} />
+              );
+            })()
+          ) : null,
+        )}
+
+        {/* Zahlenmarker */}
         {visible.map((t) => {
           const hk = hexKey(t.q, t.r);
           const c = hexToPixel(t.q, t.r, LAYOUT);

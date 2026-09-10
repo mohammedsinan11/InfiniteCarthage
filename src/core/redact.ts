@@ -12,7 +12,7 @@
  *   fremde Haende und Karten - nur die Anzahl geht raus
  */
 
-import { handSize, publicPoints } from './state';
+import { emptyHand, handSize, publicPoints } from './state';
 import type { DevCard, GameState, Hand, Phase, PlayerId, TradeOffer } from './state';
 import type { ChunkCoord } from './chunks';
 import type { GameEvent } from './rules/reducer';
@@ -131,11 +131,22 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
 /**
  * Ereignisse fuer einen Empfaenger saeubern.
  *
- * Derzeit ist nichts zu verbergen: seit der Raeuber fort ist, gibt es keinen
- * Diebstahl mehr, und alle uebrigen Ereignisse sind oeffentlich. Die Stelle
- * bleibt trotzdem bestehen - die naechste Karte mit verdeckter Wirkung
- * braucht sie wieder, und dann soll man sie nicht erst suchen muessen.
+ * Eine Pluenderung nennt, WELCHE Rohstoffe genommen wurden. Beim Bestohlenen
+ * gehoert das hin - er sieht seine Hand ohnehin. Bei allen anderen waere es
+ * ein Blick in fremde Karten: wer mitschreibt, was jemandem genommen wurde,
+ * rekonstruiert mit der Zeit dessen Vorrat.
+ *
+ * Die ANZAHL bleibt oeffentlich. Dass jemand geplündert wurde und wie hart,
+ * ist Teil des Spielgeschehens - nur das Was nicht.
  */
-export function redactEventsFor(events: GameEvent[], _viewer: PlayerId): GameEvent[] {
-  return events;
+export function redactEventsFor(events: GameEvent[], viewer: PlayerId): GameEvent[] {
+  return events.map((e) => {
+    if (e.t !== 'raid') return e;
+    return {
+      ...e,
+      hits: e.hits.map((h) =>
+        h.player === viewer ? h : { ...h, taken: emptyHand() },
+      ),
+    };
+  });
 }

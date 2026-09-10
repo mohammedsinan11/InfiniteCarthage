@@ -166,3 +166,17 @@ export function playGain(index = 0): void {
   blip(659, 0.11, 0.08, t + 0.05, 'sine');
   blip(784, 0.14, 0.07, t + 0.1, 'sine');
 }
+
+/**
+ * Pluenderung: ein absteigender Dreiklang mit Trommel darunter.
+ *
+ * Bewusst das Spiegelbild von playGain - dieselbe Figur abwaerts statt
+ * aufwaerts. Wer den Ertrag kennt, hoert sofort, dass hier das Gegenteil
+ * passiert, ohne dass es jemand erklaeren muss.
+ */
+export function playRaid(): void {
+  noise(0.22, 220, 0.32);
+  blip(392, 0.14, 0.09, 0, 'triangle');
+  blip(311, 0.16, 0.08, 0.09, 'triangle');
+  blip(233, 0.24, 0.08, 0.18, 'triangle');
+}

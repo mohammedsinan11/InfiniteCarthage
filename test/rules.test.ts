@@ -11,9 +11,7 @@ import { currentPlayerId, playerById, totalPoints, handSize } from '../src/core/
 import type { Hand, PlayerId } from '../src/core/state';
 import { redactStateFor, redactEventsFor } from '../src/core/redact';
 import { tradeRatio } from '../src/core/rules/trade';
-import { discardCount } from '../src/core/rules/discard';
 import { RESOURCES } from '../src/core/types';
-import type { Resource } from '../src/core/types';
 import { vertexNeighborVertices, parseVertexKey, vertexKey, hexEdges, edgeKey } from '../src/core/coords';
 
 const NAMES = ['Anna', 'Bert', 'Cem', 'Dana'];
@@ -204,25 +202,11 @@ describe('Zugablauf', () => {
 /** Nach dem Wurf eine eventuelle Sieben abarbeiten: abwerfen, dann waehlen. */
 function resolveSeven(game: Game): void {
   let guard = 0;
-  while (phaseOf(game) === 'discard' || phaseOf(game) === 'draft') {
-    if (guard++ > 20) throw new Error('Siebener-Phase endet nicht');
-    const ph = game.state.phase;
-    if (ph.t === 'discard') {
-      const pid = ph.pending[0]!;
-      const p = playerById(game.state, pid)!;
-      let need = discardCount(game.state, pid);
-      const cards: Partial<Record<Resource, number>> = {};
-      for (const r of RESOURCES) {
-        const n = Math.min(need, p.hand[r]);
-        if (n > 0) cards[r] = n;
-        need -= n;
-      }
-      must(game, { t: 'discard', cards }, pid);
-    } else {
-      // Der Fund: die erste angebotene Karte nehmen.
-      const cur = currentPlayerId(game.state);
-      must(game, { t: 'chooseCard', card: game.state.draft!.options[0]! }, cur);
-    }
+  while (phaseOf(game) === 'draft') {
+    if (guard++ > 20) throw new Error('Fund-Phase endet nicht');
+    // Der Fund: die erste angebotene Karte nehmen.
+    const cur = currentPlayerId(game.state);
+    must(game, { t: 'chooseCard', card: game.state.draft!.options[0]! }, cur);
   }
 }
 

@@ -1,8 +1,8 @@
 # Entwurf: Karten, Wuerfel, Held
 
-Vorschlag zum Widersprechen. **Schritt 1 und 2 sind inzwischen gebaut** -
-Raeuber raus, Sieben wird Fund, Kartengeruest samt Dauerwirkungen. Der Rest
-steht noch aus; siehe die Liste am Ende.
+Vorschlag zum Widersprechen. Gebaut sind: Fund statt Raeuber, das
+Kartengeruest samt Dauerwirkungen - und inzwischen die Raeubernester mit
+ihren Pluenderungen. Der Rest steht noch aus; siehe die Listen am Ende.
 
 ## Wohin das Spiel geht
 
@@ -121,6 +121,49 @@ ohne Raeuber, und eine Karte kann die Grenze anheben.
 
 ---
 
+## Raeuber, zweiter Anlauf
+
+Der alte Raeuber ist gefallen, weil er einen zweiten Spieler zum Schaedigen
+brauchte. Was zurueckkommt, ist etwas anderes: **Nester**, die auf der Karte
+liegen wie das Gelaende, aus demselben Seed abgeleitet, und die alle fuenf
+Runden zugreifen.
+
+### Warum das mehr ist als eine Rueckkehr
+
+**Die Karte ohne Rand bekommt eine Richtung.** Bisher war Hinausbauen reine
+Aufwaertsbewegung - mehr Land, mehr Ertrag, es kostete nur Strassen. Jetzt ist
+Entfernung eine Abwaegung: weit weg ist unerschlossen und ertragreich, aber
+ungeschuetzt.
+
+**Der Einzelspieler bekommt einen Gegner**, der nicht mitspielen muss.
+
+**Die Handkartengrenze bekommt einen Anker.** Sie hing an der Sieben und war
+damit an einen Wurf gebunden, der inzwischen ein Geschenk ist. Jetzt beisst
+sie bei den Pluenderungen: Horten weitet die Reichweite der Nester (Vorraete
+locken) und erhoeht den Verlust auf die Haelfte.
+
+### Was gebaut ist
+
+| Teil | Wo |
+| --- | --- |
+| Nester aus dem worldSeed, ein Nest je rund 70 Landfelder, Mindestabstand 3 | `core/raiders.ts` |
+| Ruhe im Umkreis 3 um den Ursprung | `core/raiders.ts` |
+| Pluenderung zum Beginn jeder grossen Runde | `core/rules/raid.ts` |
+| Handkartengrenze, jetzt ohne Sieben | `core/rules/handlimit.ts` |
+| Marker auf dem Brett, Meldung und Klang | `client/board/Nest.tsx`, `client/net/store.ts` |
+
+### Was dabei bewusst offen blieb
+
+- **Wer eng am Ursprung baut, kann ungestraft horten.** Die Reichweitenregel
+  federt das ab, aber nicht ganz. Das ist ein Regler, kein Fehler: Sicherheit
+  gegen Wachstum. Ob er richtig steht, zeigt erst das Spielen.
+- **Nester tun nichts ausser nehmen.** Keine Truppen, keine Bewegung, keine
+  Belagerung - das sind die Schritte 4 und 5.
+- **Der Ritter wehrt noch nichts ab.** Das ist der naechstliegende Schritt und
+  gaebe ihm seine Aufgabe zurueck.
+
+---
+
 ## Der Held
 
 Deine Idee einer zweiten, parallel laufenden Ebene. Sie passt gut zur
@@ -172,10 +215,16 @@ das Geruest schon.
    Auswahlfunktion, Draft-Phase.
 3. ~~**Dauerwirkungen**~~ — gebaut: Ertrag, Bankhandel und Handkartengrenze
    fragen die Karten.
-4. **Belohnung nach grosser Runde** — dieselbe Mechanik, andere Quelle. Klein.
-5. **Markt und Kosten** — die Runden-Karten, die etwas kosten. Braucht eine
+4. ~~**Raeubernester und Pluenderungen**~~ — gebaut, siehe oben.
+5. **Verteidigung** — der Ritter wehrt die naechste Pluenderung ab. Klein, und
+   er braucht dringend eine Aufgabe.
+6. **Belohnung nach grosser Runde** — dieselbe Mechanik, andere Quelle. Klein.
+7. **Markt und Kosten** — die Runden-Karten, die etwas kosten. Braucht eine
    Kaufentscheidung und damit etwas mehr Oberflaeche.
-6. **Held** — erst wenn Karten stehen.
+8. **Einheiten** — produzieren, ein Hex je Runde ziehen, eine Siedlung halten.
+   Deutlich groesser als alles bisher.
+9. **Belagerung** — Truppen zum Nest schicken und es zerstoeren.
+10. **Held** — erst wenn Karten und Einheiten stehen.
 
 ### Was beim Bauen aufgefallen ist
 

@@ -71,11 +71,21 @@ Piktogramme, und in sechs Spielerfarben lesbar bleiben.
 *Aufwand:* 3 Formen x 6 Farben, oder 3 Graustufenbilder, die eingefaerbt
 werden.
 
-### Raeuber — **Platzhalter**
+### Raeubernester — **Platzhalter**
 
-Kreis plus Trapez plus Schattenellipse. Erkennbar als "Figur", mehr nicht.
-Wenn er ohnehin durch etwas anderes ersetzt wird (siehe `DESIGN.md`),
-erledigt sich der Posten vielleicht von selbst.
+`src/client/board/Nest.tsx`: drei Pfaehle als Polygone, ein roter Wimpel, eine
+Schattenellipse. Es liest sich auf einen Blick als Lager, und es sitzt sauber
+auf dem Hex - mehr ist es nicht.
+
+Der eigentliche Mangel ist nicht die Form, sondern der Stil: die Kacheln sind
+Pixelgrafik, das Nest ist eine glatte Vektorform. Neben den Spielsteinen faellt
+das nicht auf, weil die genauso gebaut sind - aber sobald jemand die Steine
+zeichnet, muss das Nest mit.
+
+Als Kachel gedacht waere es besser: ein Nest gehoert zum Feld, nicht darauf.
+Dann koennte es auch das Gelaende darunter verdecken, statt daraufzuliegen.
+
+Der alte Raeuber-Spielstein ist ersatzlos entfallen.
 
 ### Zahlenmarker und Haefen — **tragbar**
 
@@ -118,6 +128,8 @@ sich dreht, ein Feld, das aufblitzt statt nur heller zu werden.
 | **Gegenstaende** | Symbole | Zahl offen, waechst mit dem Kartensystem. |
 | **Technologien** | Symbole | Fuer den Reiter im Menue. |
 | **Auftraege und Ereignisse** | Symbole, evtl. kleine Bilder | Ereignisse koennten ein Bild vertragen, Auftraege genuegt ein Symbol. |
+| **Raeubernest als Kachel** | 2 bis 3 Varianten | Wuerde den Vektor-Platzhalter ersetzen und ins Gelaende einfuegen statt daraufzulegen. |
+| **Einheiten** | Figur je Seite, zwei Blickrichtungen | Sobald Truppen produziert und bewegt werden (`DESIGN.md`, Schritt 4). |
 | **Gegner und Kampf** | offen | Sobald der Held kaempfen soll. |
 | **Menuereiter** | 4 bis 8 Symbole | Derzeit stehen dort Kuerzel wie "RE" und "TE". Das ist offensichtlich vorlaeufig. |
 
