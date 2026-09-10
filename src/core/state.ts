@@ -49,8 +49,6 @@ export type Player = {
   hand: Hand;
   dev: DevCard[];
   playedKnights: number;
-  /** Noch nicht verbaute Spielsteine. */
-  pieces: { roads: number; settlements: number; cities: number };
   /**
    * Genommene Karten, als Kennungen.
    *
@@ -61,8 +59,6 @@ export type Player = {
   cards: string[];
   connected: boolean;
 };
-
-export const STARTING_PIECES = { roads: 15, settlements: 5, cities: 4 };
 
 export type Building = { owner: PlayerId; type: 'settlement' | 'city' };
 

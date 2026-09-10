@@ -26,7 +26,6 @@ export type PublicPlayer = {
   /** Anzahl noch nicht gespielter Entwicklungskarten. */
   devCount: number;
   playedKnights: number;
-  pieces: { roads: number; settlements: number; cities: number };
   /**
    * Genommene Karten - oeffentlich, im Gegensatz zur Hand.
    *
@@ -83,7 +82,6 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
       handCount: handSize(p.hand),
       devCount: p.dev.filter((d) => !d.played).length,
       playedKnights: p.playedKnights,
-      pieces: { ...p.pieces },
       cards: [...p.cards],
       connected: p.connected,
       points: publicPoints(state, p.id),

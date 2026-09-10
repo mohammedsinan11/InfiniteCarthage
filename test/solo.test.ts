@@ -121,8 +121,8 @@ describe('Allein spielen', () => {
       game.state.bank.lumber -= 2;
       game.state.bank.brick -= 2;
       const es = legalRoadEdges(game.state, game.world, 'p0');
-      // Der Vorrat ist endlich - nach 15 Strassen ist Schluss, und das ist richtig so.
-      if (es.length > 0 && p.pieces.roads > 0) {
+      // Strassen gibt es beliebig viele - gebaut wird, solange Platz ist.
+      if (es.length > 0) {
         must(game, { t: 'buildRoad', edge: es[es.length - 1]! }, 'p0');
       }
       must(game, { t: 'endTurn' }, 'p0');

@@ -24,7 +24,7 @@ import {
   vertexToPixel,
   hexKey,
 } from '../../core/coords';
-import type { Layout } from '../../core/coords';
+import type { Edge, Hex, Layout, Vertex } from '../../core/coords';
 import type { World } from '../../core/world';
 import type { PublicState } from '../../core/redact';
 import { SEASON_TINT, playerColor } from '../theme';
@@ -34,6 +34,9 @@ import type { Resource } from '../../core/types';
 import { ResourceCard } from '../ui/ResourceIcon';
 import { hexCornerPixel } from '../../core/coords';
 import { nestAt } from '../../core/raiders';
+import { reliefAt } from '../../core/relief';
+import { tileImageDark } from '../tiles';
+import { edgeAdjacentHexes, vertexAdjacentHexes } from '../../core/coords';
 import { Nest } from './Nest';
 import {
   HEX_CX,
@@ -104,6 +107,19 @@ const DEFAULT_ZOOM_INDEX = (() => {
 
 /** Wie weit sich ein Feld unter dem Zeiger hebt. */
 const LIFT = 3 * SCALE;
+
+/**
+ * Wie hoch der hoechste Gipfel gezeichnet wird, in Welteinheiten.
+ *
+ * Ein Hex ist LAYOUT.h = 50 hoch, eine Zeile 37,5. Bei 44 hebt sich das
+ * Hochland um mehr als eine Zeile. Ein erster Versuch mit 30 war zu
+ * zurueckhaltend: man sah, dass etwas anders war, aber nicht, was.
+ *
+ * Das Vorbild geht viel weiter (60 px bei 17 px Zeilenschritt), kann sich das
+ * aber leisten: seine Karte ist 200 Zeilen hoch, also hat ein Hang Platz, sich
+ * ueber dreissig Felder zu entwickeln. Bei uns sind fuenfzehn Zeilen im Bild.
+ */
+const RELIEF_MAX = 44;
 
 /** Aufgelaufene Raddrehung, ab der eine Zoomstufe geschaltet wird. */
 const WHEEL_THRESHOLD = 120;
@@ -217,6 +233,33 @@ export function Board({
     return () => ro.disconnect();
   }, []);
 
+  /**
+   * Zeichenhoehe eines Feldes.
+   *
+   * reliefAt merkt sich seine Werte selbst; hier geht es nur um die
+   * Umrechnung in Welteinheiten.
+   */
+  const liftHex = useCallback(
+    (q: number, r: number) => reliefAt(state.worldSeed, q, r) * RELIEF_MAX,
+    [state.worldSeed],
+  );
+
+  /** Ecken und Kanten liegen zwischen Feldern - also der Mittelwert. */
+  const liftVertex = useCallback(
+    (v: Vertex) => {
+      const hs = vertexAdjacentHexes(v);
+      return hs.reduce((n, h) => n + liftHex(h.q, h.r), 0) / hs.length;
+    },
+    [liftHex],
+  );
+  const liftEdge = useCallback(
+    (e: Edge) => {
+      const hs = edgeAdjacentHexes(e);
+      return hs.reduce((n, h) => n + liftHex(h.q, h.r), 0) / hs.length;
+    },
+    [liftHex],
+  );
+
   const view = useMemo(() => {
     /*
      * Der Ausschnitt wird auf das Geraetepixel-Raster gerastet.
@@ -248,7 +291,9 @@ export function Board({
         p.x < view.x - LAYOUT.w ||
         p.x > view.x + view.w + LAYOUT.w ||
         p.y < view.y - IMG.h ||
-        p.y > view.y + view.h + IMG.h
+        // Nach unten grosszuegiger: eine angehobene Kachel weit unten kann
+        // noch ins Bild ragen, obwohl ihr Fuss darunter liegt.
+        p.y > view.y + view.h + IMG.h + RELIEF_MAX
       ) {
         continue;
       }
@@ -283,10 +328,13 @@ export function Board({
     // Das eine, worum es hier geht.
     ctx.imageSmoothingEnabled = false;
 
-    const zeichne = (t: (typeof visible)[number], lift: number) => {
+    const zeichne = (t: (typeof visible)[number], lift: number, fels = false) => {
       const url = tileUrl(state.worldSeed, t.terrain, t.q, t.r);
       if (url === null) return;
-      const img = tileImage(url);
+      // Der Sockel unter einer angehobenen Kachel ist ihre Felswand: dieselbe
+      // Kachel, abgedunkelt. Nur so liest sich der Streifen darunter als Hang
+      // statt als zweites, verrutschtes Feld.
+      const img = fels ? tileImageDark(url) : tileImage(url);
       if (!img) return;
       const c = hexToPixel(t.q, t.r, LAYOUT);
       const x = Math.round((c.x - IMG.dx - view.x) * scale * DPR);
@@ -296,9 +344,26 @@ export function Board({
       ctx.drawImage(img, x, y, w, h);
     };
 
+    /*
+     * Zwei Durchgaenge je Kachel: erst am Boden, dann angehoben.
+     *
+     * Der Sockel ist der Grund, warum nirgends ein Loch aufreisst. Hebt man
+     * eine Kachel an, gibt sie den Streifen frei, den sie vorher unten
+     * bedeckt hat - und die Nachbarn davor koennen ihn nur schliessen, wenn
+     * sie genauso hoch stehen. An einer Steilkueste stehen sie das nie.
+     *
+     * Die flache Karte bleibt deshalb liegen. Was zwischen Sockel und
+     * angehobener Kachel sichtbar wird, liest sich als Felswand.
+     */
     for (const t of visible) {
-      if (hexKey(t.q, t.r) === hover) continue; // kommt zuletzt, angehoben
-      zeichne(t, 0);
+      const hoch = liftHex(t.q, t.r);
+      const istHover = hexKey(t.q, t.r) === hover;
+      // Auch der Sockel des Feldes unter dem Zeiger bleibt an seinem Platz in
+      // der Zeichenfolge - zuletzt gezeichnet wuerde er die Felder davor
+      // uebermalen. Nur die angehobene Kachel kommt ans Ende.
+      zeichne(t, 0, hoch >= 1 || istHover);
+      if (istHover) continue;
+      if (hoch >= 1) zeichne(t, hoch);
     }
 
     if (hover !== null) {
@@ -311,7 +376,7 @@ export function Board({
         ctx.beginPath();
         ctx.ellipse(
           (c.x - view.x) * scale * DPR,
-          (c.y + LAYOUT.h * 0.42 - view.y) * scale * DPR,
+          (c.y + LAYOUT.h * 0.42 - liftHex(t.q, t.r) - view.y) * scale * DPR,
           LAYOUT.w * 0.34 * scale * DPR,
           LAYOUT.h * 0.09 * scale * DPR,
           0,
@@ -320,7 +385,7 @@ export function Board({
         );
         ctx.fill();
         ctx.restore();
-        zeichne(t, LIFT);
+        zeichne(t, liftHex(t.q, t.r) + LIFT);
       }
     }
 
@@ -344,7 +409,7 @@ export function Board({
       ctx.fillRect(0, 0, bw, bh);
       ctx.restore();
     }
-  }, [visible, view, scale, size, hover, world, state.worldSeed, state.turn, tilesReady]);
+  }, [visible, view, scale, size, hover, world, state.worldSeed, state.turn, tilesReady, liftHex]);
 
   const onWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -385,14 +450,69 @@ export function Board({
     });
   }, []);
 
+  /**
+   * Zoomstufe direkt setzen - fuer den Balken am linken Rand.
+   *
+   * Anders als das Mausrad zoomt der Balken um die Bildmitte: es gibt keinen
+   * Zeiger ueber der Karte, dessen Punkt stehen bleiben koennte. cx/cy sind
+   * bereits die Bildmitte in Weltkoordinaten, also genuegt es, zi zu tauschen.
+   */
+  const setZoom = useCallback((zi: number) => {
+    setCam((c) => {
+      const z = Math.min(ZOOM_STEPS.length - 1, Math.max(0, zi));
+      return z === c.zi ? c : { ...c, zi: z };
+    });
+  }, []);
+
+  /** Wird der Balken gerade gezogen? */
+  const balkenZug = useRef(false);
+
+  /** Zeigerhoehe auf dem Balken in eine Stufe umrechnen: oben nah, unten fern. */
+  const zoomAusBalken = (e: React.PointerEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const t = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+    setZoom(Math.round((1 - t) * (ZOOM_STEPS.length - 1)));
+  };
+
+  /**
+   * Liegt der Druckpunkt auf einem Bedienelement statt auf der Karte?
+   *
+   * Die Aktionsleiste, die Handkarten und der Wuerfelknopf liegen als Kinder
+   * IM Brett - sonst koennten sie nicht darueber schweben. Ihre Pressen
+   * blubbern damit bis hierher.
+   */
+  const aufBedienelement = (ziel: EventTarget | null): boolean =>
+    ziel instanceof Element && ziel.closest('button, input, select, textarea, a, label, .zoom') !== null;
+
   const onPointerDown = (e: React.PointerEvent) => {
+    /*
+     * Presst jemand einen Knopf, gehoert der Zeiger dem Knopf.
+     *
+     * Vorher hat das Brett hier bedingungslos setPointerCapture gerufen - und
+     * zwar auf e.target, also auf den Knopf selbst. Damit lief jede weitere
+     * Zeigermeldung ueber den Knopf, waehrend das Brett gleichzeitig einen
+     * Kartenzug begann: die kleinste Handbewegung zwischen Druecken und
+     * Loslassen verschob die Karte, statt den Knopf auszuloesen. Der Knopf sah
+     * gedrueckt aus und tat nichts - man musste "fester" druecken, also
+     * ruhiger halten.
+     */
+    if (aufBedienelement(e.target)) return;
+
     moved.current = false;
     drag.current = { x: e.clientX, y: e.clientY, cx: cam.cx, cy: cam.cy };
-    (e.target as Element).setPointerCapture?.(e.pointerId);
+    // Auf dem Brett fangen, nicht auf der getroffenen Kachel: der Zug soll
+    // weiterlaufen, auch wenn der Zeiger die Kachel verlaesst.
+    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
     const d = drag.current;
+    if (!d && aufBedienelement(e.target)) {
+      // Ueber der Bedienung gibt es kein Feld unter dem Zeiger - und schon gar
+      // keinen Klang dafuer.
+      setHover(null);
+      return;
+    }
     if (d) {
       const dx = e.clientX - d.x;
       const dy = e.clientY - d.y;
@@ -407,7 +527,7 @@ export function Board({
     if (!rect) return;
     const wx = view.x + (e.clientX - rect.left) / scale;
     const wy = view.y + (e.clientY - rect.top) / scale;
-    const h = pixelToHex(wx, wy, LAYOUT);
+    const h = hexUnter(wx, wy);
     const key = hexKey(h.q, h.r);
     setHover((prev) => {
       if (prev === key) return prev;
@@ -415,6 +535,38 @@ export function Board({
       playHover();
       return key;
     });
+  };
+
+  /**
+   * Welches Feld liegt an dieser Stelle wirklich?
+   *
+   * Solange alles flach lag, genuegte pixelToHex. Angehobene Kacheln stehen
+   * aber ueber ihrem eigenen Platz: ein Berg deckt einen Streifen ab, der
+   * rechnerisch schon zum Feld davor gehoert. Wer dorthin zeigt, meint den
+   * Berg, den er sieht - nicht das Feld darunter.
+   *
+   * Ein Feld (q,r) deckt den Punkt p, wenn pixelToHex(p.x, p.y + hoehe(q,r))
+   * wieder (q,r) ergibt: die Anhebung rueckgaengig gemacht landet man im
+   * eigenen Sechseck. Es gewinnt das vorderste Feld, weil es zuletzt
+   * gezeichnet wurde und alles dahinter verdeckt.
+   */
+  const hexUnter = (wx: number, wy: number): Hex => {
+    let beste = pixelToHex(wx, wy, LAYOUT); // der Sockel deckt immer
+
+    // Kandidaten einsammeln, indem die moegliche Anhebung abgetastet wird.
+    const schritt = LAYOUT.h / 4;
+    const gesehen = new Set<string>();
+    for (let dy = schritt; dy <= RELIEF_MAX; dy += schritt) {
+      const k = pixelToHex(wx, wy + dy, LAYOUT);
+      const key = hexKey(k.q, k.r);
+      if (gesehen.has(key)) continue;
+      gesehen.add(key);
+
+      const zurueck = pixelToHex(wx, wy + liftHex(k.q, k.r), LAYOUT);
+      if (zurueck.q !== k.q || zurueck.r !== k.r) continue;
+      if (k.r > beste.r || (k.r === beste.r && k.q > beste.q)) beste = k;
+    }
+    return beste;
   };
 
   const onPointerUp = () => {
@@ -507,7 +659,7 @@ export function Board({
           nestAt(state.worldSeed, t.q, t.r) ? (
             (() => {
               const c = hexToPixel(t.q, t.r, LAYOUT);
-              const lift = hover === hexKey(t.q, t.r) ? LIFT : 0;
+              const lift = liftHex(t.q, t.r) + (hover === hexKey(t.q, t.r) ? LIFT : 0);
               return (
                 <Nest key={'nest' + hexKey(t.q, t.r)} x={c.x} y={c.y - lift} size={HEX_H * SCALE * 0.62} />
               );
@@ -530,8 +682,8 @@ export function Board({
            * werden alle gezeigt. Und der Nutzer kann sie festpinnen.
            */
           const showNumber = t.number !== null && (showAllNumbers || hover === hk);
-          // Liegt das Feld oben, wandern Zahl und Raeuber mit.
-          const lift = hover === hk ? LIFT : 0;
+          // Was auf dem Feld steht, steht auf seiner Hoehe - sonst schwebt es.
+          const lift = liftHex(t.q, t.r) + (hover === hk ? LIFT : 0);
           return (
             <g key={'n' + hk} pointerEvents="none" transform={`translate(0 ${-lift})`}>
               {showNumber && (
@@ -557,10 +709,11 @@ export function Board({
         {/* Felder, die der Wurf getroffen hat - kurzes Aufleuchten. */}
         {(flashHexes ?? []).map((hk) => {
           const parts = hk.split(':').map(Number);
+          const hoch = liftHex(parts[0]!, parts[1]!);
           const punkte = [0, 1, 2, 3, 4, 5]
             .map((i) => {
               const p = hexCornerPixel(parts[0]!, parts[1]!, i, LAYOUT);
-              return `${p.x.toFixed(1)},${p.y.toFixed(1)}`;
+              return `${p.x.toFixed(1)},${(p.y - hoch).toFixed(1)}`;
             })
             .join(' ');
           return <polygon key={'f' + hk} className="hex-flash" points={punkte} />;
@@ -575,7 +728,7 @@ export function Board({
               key={'ht' + hk}
               className="hex-target"
               cx={c.x}
-              cy={c.y}
+              cy={c.y - liftHex(parts[0]!, parts[1]!)}
               r={LAYOUT.w * 0.38}
               onClick={pick('hex', hk)}
             />
@@ -584,12 +737,22 @@ export function Board({
 
         {/* Haefen */}
         {visible.map((t) =>
-          t.port === null ? null : <PortMark key={'p' + hexKey(t.q, t.r)} port={t.port} />,
+          t.port === null ? null : (
+            // Haefen sitzen an Wasserfeldern, und Wasser liegt immer auf Null.
+            // Die Ecken des Hafens beruehren aber Land, das sich hebt - also
+            // wandert er mit dem Mittel seiner beiden Ecken.
+            <PortMark key={'p' + hexKey(t.q, t.r)} port={t.port} liftVertex={liftVertex} />
+          ),
         )}
 
         {/* Strassen */}
         {Object.entries(state.roads).map(([ek, owner]) => {
-          const [a, b] = edgeEndpoints(parseEdgeKey(ek)).map((v) => vertexToPixel(v, LAYOUT));
+          const kante = parseEdgeKey(ek);
+          const hoch = liftEdge(kante);
+          const [a, b] = edgeEndpoints(kante).map((v) => {
+            const p = vertexToPixel(v, LAYOUT);
+            return { x: p.x, y: p.y - hoch };
+          });
           return (
             <g key={'r' + ek} pointerEvents="none">
               <line x1={a!.x} y1={a!.y} x2={b!.x} y2={b!.y} className="road-base" />
@@ -600,7 +763,12 @@ export function Board({
 
         {/* Anklickbare Kanten */}
         {[...edgeTargets].map((ek) => {
-          const [a, b] = edgeEndpoints(parseEdgeKey(ek)).map((v) => vertexToPixel(v, LAYOUT));
+          const kante = parseEdgeKey(ek);
+          const hoch = liftEdge(kante);
+          const [a, b] = edgeEndpoints(kante).map((v) => {
+            const p = vertexToPixel(v, LAYOUT);
+            return { x: p.x, y: p.y - hoch };
+          });
           return (
             <line
               key={'et' + ek}
@@ -616,7 +784,9 @@ export function Board({
 
         {/* Gebaeude: Haus mit Giebel, Stadt mit Anbau */}
         {Object.entries(state.buildings).map(([vk, b]) => {
-          const p = vertexToPixel(parseVertexKey(vk), LAYOUT);
+          const ecke = parseVertexKey(vk);
+          const roh = vertexToPixel(ecke, LAYOUT);
+          const p = { x: roh.x, y: roh.y - liftVertex(ecke) };
           const fill = colorOf(b.owner);
           const d =
             b.type === 'city'
@@ -627,13 +797,14 @@ export function Board({
 
         {/* Anklickbare Ecken */}
         {[...vertexTargets].map((vk) => {
-          const p = vertexToPixel(parseVertexKey(vk), LAYOUT);
+          const ecke = parseVertexKey(vk);
+          const p = vertexToPixel(ecke, LAYOUT);
           return (
             <circle
               key={'vt' + vk}
               className="vertex-target"
               cx={p.x}
-              cy={p.y}
+              cy={p.y - liftVertex(ecke)}
               r={8}
               onClick={pick('vertex', vk)}
             />
@@ -641,8 +812,70 @@ export function Board({
         })}
       </svg>
 
-      <div className="board-hint">Ziehen zum Verschieben, Mausrad zum Zoomen</div>
+      <div className="board-hint">Ziehen zum Verschieben · Mausrad oder Balken links zum Zoomen</div>
       {children}
+
+      {/*
+        Zoom als Balken. Stufen statt stufenloser Regler, weil der Zoom nur
+        ganzzahlige Vergroesserungen kennt - alles dazwischen waere wieder
+        unscharf. Oben ist nah, unten fern.
+      */}
+      <div className="zoom">
+        <button
+          className="zoom-knopf"
+          title="Naeher heran"
+          disabled={cam.zi >= ZOOM_STEPS.length - 1}
+          onClick={() => setZoom(cam.zi + 1)}
+        >
+          +
+        </button>
+        <div
+          className="zoom-balken"
+          role="slider"
+          tabIndex={0}
+          aria-label="Zoom"
+          aria-orientation="vertical"
+          aria-valuemin={0}
+          aria-valuemax={ZOOM_STEPS.length - 1}
+          aria-valuenow={cam.zi}
+          onPointerDown={(e) => {
+            balkenZug.current = true;
+            e.currentTarget.setPointerCapture(e.pointerId);
+            zoomAusBalken(e);
+          }}
+          onPointerMove={(e) => {
+            if (balkenZug.current) zoomAusBalken(e);
+          }}
+          onPointerUp={() => {
+            balkenZug.current = false;
+          }}
+          onPointerCancel={() => {
+            balkenZug.current = false;
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowUp' || e.key === 'ArrowRight') setZoom(cam.zi + 1);
+            else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') setZoom(cam.zi - 1);
+            else return;
+            e.preventDefault();
+          }}
+        >
+          {ZOOM_STEPS.map((_, i) => {
+            // Von oben nach unten: hoechste Stufe zuerst.
+            const stufe = ZOOM_STEPS.length - 1 - i;
+            const cls =
+              stufe === cam.zi ? 'zoom-stufe aktiv' : stufe < cam.zi ? 'zoom-stufe voll' : 'zoom-stufe';
+            return <span key={stufe} className={cls} />;
+          })}
+        </div>
+        <button
+          className="zoom-knopf"
+          title="Weiter weg"
+          disabled={cam.zi <= 0}
+          onClick={() => setZoom(cam.zi - 1)}
+        >
+          −
+        </button>
+      </div>
 
       {/*
         Fliegende Karten liegen ueber allem: sie sollen den Weg vom Feld zur
@@ -669,10 +902,18 @@ export function Board({
   );
 }
 
-function PortMark({ port }: { port: NonNullable<import('../../core/types').Tile['port']> }) {
-  const [a, b] = port.vertices.map((v) => vertexToPixel(parseVertexKey(v), LAYOUT));
+function PortMark({
+  port,
+  liftVertex,
+}: {
+  port: NonNullable<import('../../core/types').Tile['port']>;
+  liftVertex: (v: Vertex) => number;
+}) {
+  const ecken = port.vertices.map((v) => parseVertexKey(v));
+  const [a, b] = ecken.map((v) => vertexToPixel(v, LAYOUT));
+  const hoch = ecken.reduce((n, v) => n + liftVertex(v), 0) / ecken.length;
   const mx = (a!.x + b!.x) / 2;
-  const my = (a!.y + b!.y) / 2;
+  const my = (a!.y + b!.y) / 2 - hoch;
   return (
     <g pointerEvents="none">
       <rect x={mx - 17} y={my - 10} width={34} height={20} className="port" />

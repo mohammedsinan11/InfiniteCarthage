@@ -80,6 +80,17 @@ export function expand(v: number, k = 1.9): number {
 }
 
 /**
+ * Rauschen zu Kammlinien falten.
+ *
+ * 1 - |2v-1| macht aus einem weichen Feld eines mit scharfem Grat dort, wo das
+ * Original die Mitte kreuzt. Aus runden Bergklumpen werden dadurch Ketten -
+ * genau der Unterschied, den man auf hexmaps Karten als Gebirgszug sieht.
+ */
+export function ridged(v: number): number {
+  return 1 - Math.abs(2 * v - 1);
+}
+
+/**
  * Axiale Hexkoordinaten in ein gleichmaessiges Feld umrechnen.
  *
  * Ohne das waeren alle Zonen schraege Rauten: in einem Pointy-Top-Gitter

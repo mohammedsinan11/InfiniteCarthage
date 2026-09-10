@@ -1332,3 +1332,54 @@ em.off {
 .nest-wimpel {
   fill: #9c3226;
 }
+
+/* Zoombalken am linken Rand. Stufen statt Regler - der Zoom kennt nur
+   ganzzahlige Vergroesserungen. Oben nah, unten fern. */
+.zoom {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 5px;
+  background: rgba(28, 22, 17, 0.9);
+  border: 1px solid var(--line);
+  z-index: 5;
+  touch-action: none;
+}
+.zoom-knopf {
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+}
+.zoom-balken {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0;
+  cursor: ns-resize;
+  outline: none;
+}
+.zoom-balken:focus-visible {
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.zoom-stufe {
+  display: block;
+  width: 18px;
+  height: 14px;
+  border: 1px solid var(--line-bright);
+  background: rgba(0, 0, 0, 0.35);
+}
+.zoom-stufe.voll {
+  background: var(--accent-dark);
+  border-color: var(--accent-dark);
+}
+.zoom-stufe.aktiv {
+  background: var(--accent);
+  border-color: var(--accent);
+}

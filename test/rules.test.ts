@@ -88,8 +88,8 @@ describe('Aufbauphase', () => {
     expect(game.state.phase.t).toBe('roll');
     expect(currentPlayerId(game.state)).toBe('p0');
     for (const p of game.state.players) {
-      expect(p.pieces.settlements).toBe(3); // 5 - 2
-      expect(p.pieces.roads).toBe(13); // 15 - 2
+      const eigene = Object.values(game.state.buildings).filter((b) => b.owner === p.id);
+      expect(eigene).toHaveLength(2);
     }
     expect(Object.keys(game.state.buildings)).toHaveLength(6);
     expect(Object.keys(game.state.roads)).toHaveLength(6);
@@ -122,13 +122,29 @@ describe('Aufbauphase', () => {
     const game = newGame(3);
     const p = currentPlayerId(game.state);
     const vs = legalSettlementVertices(game.state, game.world, p, { setup: true });
-    must(game, { t: 'placeSettlement', vertex: vs[0]! }, p);
+    // Eine Ecke waehlen, neben der ueberhaupt gebaut werden koennte. An einer
+    // Landzunge liegen alle Nachbarecken am Wasser - dort gaebe es keine
+    // Abstandsregel zu pruefen, nur Unbebaubarkeit.
+    const wahl = vs.find((v) =>
+      vertexNeighborVertices(parseVertexKey(v)).some(
+        (n) => canPlaceSettlement(game.state, game.world, p, vertexKey(n), { setup: true }) === null,
+      ),
+    )!;
+    expect(wahl).toBeDefined();
+    must(game, { t: 'placeSettlement', vertex: wahl }, p);
 
-    // Direkt daneben darf nichts stehen.
-    for (const n of vertexNeighborVertices(parseVertexKey(vs[0]!))) {
+    // Direkt daneben darf nichts stehen. Nachbarecken am Wasser melden zuerst
+    // ihre Unbebaubarkeit (die Pruefung steht in canPlaceSettlement vor dem
+    // Abstand) - sie zaehlen nicht. Mindestens eine echte Pruefung muss aber
+    // stattfinden, sonst beweist der Test nichts.
+    let geprueft = 0;
+    for (const n of vertexNeighborVertices(parseVertexKey(wahl))) {
       const why = canPlaceSettlement(game.state, game.world, p, vertexKey(n), { setup: true });
+      if (why === 'Dort laesst sich nicht bauen.') continue;
       expect(why).toBe('Zu nah an einer anderen Siedlung.');
+      geprueft++;
     }
+    expect(geprueft).toBeGreaterThan(0);
   });
 
   it('verlangt, dass die Aufbaustrasse an der neuen Siedlung liegt', () => {
@@ -243,7 +259,7 @@ describe('Bauen und Kosten', () => {
     expect(after.hand.lumber).toBe(before.lumber - 1);
     expect(after.hand.brick).toBe(before.brick - 1);
     expect(game.state.bank.lumber).toBe(bankBefore.lumber + 1);
-    expect(after.pieces.roads).toBe(12);
+    expect(Object.values(game.state.roads).filter((o) => o === 'p0')).toHaveLength(3);
   });
 
   it('verweigert Bauen ohne Rohstoffe', () => {
@@ -272,9 +288,24 @@ describe('Bauen und Kosten', () => {
     must(game, { t: 'buildCity', vertex: mine[0] }, 'p0');
 
     expect(game.state.buildings[mine[0]]!.type).toBe('city');
-    const p = playerById(game.state, 'p0')!;
-    expect(p.pieces.cities).toBe(3);
-    expect(p.pieces.settlements).toBe(4); // die Siedlung kehrt in den Vorrat zurueck
+  });
+
+  it('kennt keine Obergrenze fuer Strassen', () => {
+    const game = newGame(3);
+    runSetup(game);
+    must(game, { t: 'roll' }, 'p0');
+    resolveSeven(game);
+    expect(game.state.phase.t).toBe('main');
+    // Frisch lesen: applyAction tauscht den Zustand bei jedem Zug aus.
+    const p = () => playerById(game.state, 'p0')!;
+    // Frueher war nach 15 Strassen Schluss - also deutlich darueber hinaus.
+    for (let i = 0; i < 18; i++) {
+      p().hand.lumber = 1;
+      p().hand.brick = 1;
+      const es = legalRoadEdges(game.state, game.world, 'p0');
+      must(game, { t: 'buildRoad', edge: es[0]! }, 'p0');
+    }
+    expect(Object.values(game.state.roads).filter((o) => o === 'p0')).toHaveLength(20);
   });
 });
 
@@ -405,7 +436,7 @@ describe('Entwicklungskarten', () => {
     for (const r of RESOURCES) p.hand[r] = 0;
     toMain(game, 'p0');
 
-    const roadsBefore = playerById(game.state, 'p0')!.pieces.roads;
+    const roadsBefore = Object.values(game.state.roads).filter((o) => o === 'p0').length;
     const handBefore = handSize(playerById(game.state, 'p0')!.hand);
     must(game, { t: 'playRoadBuilding' }, 'p0');
     expect(game.state.phase).toMatchObject({ t: 'roadBuilding', remaining: 2 });
@@ -416,7 +447,7 @@ describe('Entwicklungskarten', () => {
       must(game, { t: 'buildRoad', edge: es[0]! }, 'p0');
     }
     expect(game.state.phase.t).toBe('main');
-    expect(playerById(game.state, 'p0')!.pieces.roads).toBe(roadsBefore - 2);
+    expect(Object.values(game.state.roads).filter((o) => o === 'p0').length).toBe(roadsBefore + 2);
     // Nichts bezahlt - gegen den Stand VOR dem Kartenspiel geprueft, nicht
     // gegen null: der Wurf davor kann Ertrag gebracht haben.
     expect(handSize(playerById(game.state, 'p0')!.hand)).toBe(handBefore);
@@ -521,7 +552,7 @@ describe('Dauerlauf', () => {
       // Bauen, wann immer es geht - sonst passiert nie etwas.
       const p = playerById(game.state, pid)!;
       const es = legalRoadEdges(game.state, game.world, pid);
-      if (p.hand.lumber >= 1 && p.hand.brick >= 1 && es.length > 0 && p.pieces.roads > 0) {
+      if (p.hand.lumber >= 1 && p.hand.brick >= 1 && es.length > 0) {
         must(game, { t: 'buildRoad', edge: es[0]! }, pid);
       }
       if (phaseOf(game) === 'main') must(game, { t: 'endTurn' }, pid);
@@ -530,7 +561,6 @@ describe('Dauerlauf', () => {
     // Buchhaltung: keine negativen Beststaende, Bank plus Haende bleiben im Rahmen.
     for (const p of game.state.players) {
       for (const r of RESOURCES) expect(p.hand[r]).toBeGreaterThanOrEqual(0);
-      expect(p.pieces.roads).toBeGreaterThanOrEqual(0);
     }
     for (const r of RESOURCES) {
       expect(game.state.bank[r]).toBeGreaterThanOrEqual(0);

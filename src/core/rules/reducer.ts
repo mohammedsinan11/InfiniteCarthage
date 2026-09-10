@@ -31,7 +31,6 @@ import { RESOURCES, TERRAIN_RESOURCE } from '../types';
 import type { Resource } from '../types';
 import {
   BANK_PER_RESOURCE,
-  STARTING_PIECES,
   currentPlayerId,
   emptyHand,
   handSize,
@@ -134,6 +133,21 @@ const fail = (error: string): Result => ({ ok: false, error });
 
 // --- Aufbau -----------------------------------------------------------------
 
+/**
+ * Wie weit die Karte zu Beginn aufgedeckt ist.
+ *
+ * Frueher reichte der Wachstumspuffer (Radius 3, gut 50 Felder): genug zum
+ * Siedeln, aber zu wenig, um Landschaft zu lesen. Seit Relief, Kaemme und
+ * Nester die Karte gliedern, will man beim Start sehen, wie sie aussieht -
+ * wo das Gebirge laeuft, wo die Kueste, wo das naechste Nest.
+ *
+ * Radius 9 sind 271 Felder, auf ganze Chunks aufgerundet etwas mehr. Die
+ * Regel dahinter aendert sich nicht: danach waechst die Welt wie gehabt um
+ * jedes Bauteil.
+ */
+const START_REVEAL_RADIUS = 9;
+
+
 export type NewPlayer = { id: PlayerId; name: string };
 
 export function createGame(
@@ -154,7 +168,7 @@ export function createGame(
   // Nicht jede Gegend taugt als Startplatz - siehe findPlayableSeed.
   const seed = findPlayableSeed(worldSeed);
   const world = createWorld(seed);
-  const added = ensureGenerated(world, { q: 0, r: 0 });
+  const added = ensureGenerated(world, { q: 0, r: 0 }, START_REVEAL_RADIUS);
 
   const state: GameState = {
     worldSeed: seed,
@@ -167,7 +181,6 @@ export function createGame(
       hand: emptyHand(),
       dev: [],
       playedKnights: 0,
-      pieces: { ...STARTING_PIECES },
       cards: [],
       connected: true,
     })),
@@ -318,10 +331,8 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       }
       const why = canPlaceSettlement(s, world, actor, action.vertex, { setup: true });
       if (why) return fail(why);
-      if (actorPlayer.pieces.settlements <= 0) return fail('Keine Siedlungen mehr.');
 
       s.buildings[action.vertex] = { owner: actor, type: 'settlement' };
-      actorPlayer.pieces.settlements -= 1;
       events.push({ t: 'build', player: actor, kind: 'settlement', at: action.vertex });
 
       const v = parseVertexKey(action.vertex);
@@ -354,10 +365,8 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       }
       const why = canPlaceRoad(s, world, actor, action.edge, phase.lastVertex ?? undefined);
       if (why) return fail(why);
-      if (actorPlayer.pieces.roads <= 0) return fail('Keine Strassen mehr.');
 
       s.roads[action.edge] = actor;
-      actorPlayer.pieces.roads -= 1;
       events.push({ t: 'build', player: actor, kind: 'road', at: action.edge });
 
       const e = parseEdgeKey(action.edge);
@@ -459,14 +468,12 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (phase.t !== 'main' && !inRoadBuilding) return fail('Jetzt kann nicht gebaut werden.');
       const why = canPlaceRoad(s, world, actor, action.edge);
       if (why) return fail(why);
-      if (actorPlayer.pieces.roads <= 0) return fail('Keine Strassen mehr.');
       if (!inRoadBuilding && !canAfford(actorPlayer.hand, COST_ROAD)) {
         return fail('Zu wenig Rohstoffe fuer eine Strasse.');
       }
 
       if (!inRoadBuilding) pay(actorPlayer.hand, s.bank, COST_ROAD);
       s.roads[action.edge] = actor;
-      actorPlayer.pieces.roads -= 1;
       events.push({ t: 'build', player: actor, kind: 'road', at: action.edge });
 
       const added = grow(
@@ -480,7 +487,6 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         const remaining = phase.remaining - 1;
         const canStillBuild =
           remaining > 0 &&
-          actorPlayer.pieces.roads > 0 &&
           legalRoadEdges(s, world, actor).length > 0;
         s.phase = canStillBuild ? { t: 'roadBuilding', remaining } : { t: 'main' };
       }
@@ -491,14 +497,12 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (phase.t !== 'main') return fail('Jetzt kann nicht gebaut werden.');
       const why = canPlaceSettlement(s, world, actor, action.vertex, { setup: false });
       if (why) return fail(why);
-      if (actorPlayer.pieces.settlements <= 0) return fail('Keine Siedlungen mehr.');
       if (!canAfford(actorPlayer.hand, COST_SETTLEMENT)) {
         return fail('Zu wenig Rohstoffe fuer eine Siedlung.');
       }
 
       pay(actorPlayer.hand, s.bank, COST_SETTLEMENT);
       s.buildings[action.vertex] = { owner: actor, type: 'settlement' };
-      actorPlayer.pieces.settlements -= 1;
       events.push({ t: 'build', player: actor, kind: 'settlement', at: action.vertex });
 
       const added = grow(s, world, vertexAdjacentHexes(parseVertexKey(action.vertex)));
@@ -511,15 +515,12 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (phase.t !== 'main') return fail('Jetzt kann nicht gebaut werden.');
       const why = canPlaceCity(s, actor, action.vertex);
       if (why) return fail(why);
-      if (actorPlayer.pieces.cities <= 0) return fail('Keine Staedte mehr.');
       if (!canAfford(actorPlayer.hand, COST_CITY)) {
         return fail('Zu wenig Rohstoffe fuer eine Stadt.');
       }
 
       pay(actorPlayer.hand, s.bank, COST_CITY);
       s.buildings[action.vertex] = { owner: actor, type: 'city' };
-      actorPlayer.pieces.cities -= 1;
-      actorPlayer.pieces.settlements += 1; // die Siedlung kommt zurueck in den Vorrat
       events.push({ t: 'build', player: actor, kind: 'city', at: action.vertex });
       checkWin(s, events);
       break;
@@ -574,7 +575,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       s.devPlayedThisTurn = true;
       events.push({ t: 'playDev', player: actor, card: 'roadBuilding' });
 
-      const possible = Math.min(2, actorPlayer.pieces.roads);
+      const possible = 2;
       s.phase =
         possible > 0 && legalRoadEdges(s, world, actor).length > 0
           ? { t: 'roadBuilding', remaining: possible }

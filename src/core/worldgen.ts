@@ -29,7 +29,7 @@
 
 import { Rng } from './rng';
 import { hash3i } from './hash';
-import { expand, fbm, hexToField } from './noise';
+import { expand, fbm, hexToField, ridged } from './noise';
 import { chunkHexes, chunkOf, chunkKey } from './chunks';
 import {
   hexKey,
@@ -46,6 +46,9 @@ import type { Chunk, Port, PortType, Terrain, Tile } from './types';
 // Getrennte Zufallsstroeme, damit eine Aenderung an den Haefen nicht das
 // gesamte Gelaende verschiebt.
 const SALT_ELEVATION = 41;
+const SALT_WARP_X = 51;
+const SALT_WARP_Y = 52;
+const SALT_RIDGE = 53;
 const SALT_MOISTURE = 42;
 const SALT_NUMBER = 2;
 const SALT_PORT = 3;
@@ -69,6 +72,31 @@ const ELEVATION_SCALE = 6.5;
 const MOISTURE_SCALE = 5;
 
 /**
+ * Verzerrung des Abtastpunktes (Domain Warping).
+ *
+ * Rauschen allein liefert weiche, blasige Kuesten - Formen, die nach Wolke
+ * aussehen und nicht nach Land. Wird der Punkt, an dem man abtastet, selbst
+ * durch ein zweites Rauschen verschoben, bekommen dieselben Formen Buchten,
+ * Landzungen und Ausfransungen, ohne dass ein einziger Nachbar befragt wird.
+ *
+ * Die Verteilung aendert sich dadurch NICHT: es wird dasselbe Feld gelesen,
+ * nur anderswo. Die Schwellen unten bleiben also gueltig.
+ */
+const WARP_SCALE = 11;
+const WARP_STRENGTH = 2.2;
+
+/**
+ * Kammlinien im Hochland.
+ *
+ * Wirken nur oberhalb von RIDGE_FLOOR und dort mit wachsendem Gewicht. Im
+ * Flachland und im Meer waeren sie schaedlich - sie wuerden Kuesten
+ * zerschneiden und aus Seen Streifen machen.
+ */
+const RIDGE_SCALE = 3.6;
+const RIDGE_STRENGTH = 0.32;
+const RIDGE_FLOOR = 0.55;
+
+/**
  * Schwellen fuer Hoehe und Feuchte.
  *
  * Nicht geraten, sondern auf gemessene Perzentile der beiden Felder gesetzt.
@@ -79,38 +107,89 @@ const MOISTURE_SCALE = 5;
  * Ziel ist eine Karte, auf der man Catan spielen kann: rund ein Fuenftel
  * Wasser, die Haelfte flaches Land, der Rest Huegel und Berge.
  *
- *   Hoehe  < p22 (0,310)  Wasser
- *          > p87 (0,831)  Berg
- *          > p72 (0,694)  Huegel
+ * Nach dem Einbau von Verzerrung und Kaemmen neu gemessen (66.248 Proben ueber
+ * acht Seeds) - die Kaemme heben das Hochland an, also wandern die oberen
+ * beiden Schwellen mit. Wer am Feld dreht, muss hier nachmessen, sonst
+ * verschiebt sich die Balance unbemerkt.
+ *
+ *   Hoehe  < p22 (0,291)  Wasser
+ *          > p87 (0,955)  Berg
+ *          > p72 (0,741)  Huegel
  */
-const SEA_LEVEL = 0.31;
-const HILL_LEVEL = 0.694;
-const MOUNTAIN_LEVEL = 0.831;
+export const SEA_LEVEL = 0.291;
+const HILL_LEVEL = 0.7405;
+const MOUNTAIN_LEVEL = 0.9552;
 
 /**
  * Feuchte teilt das flache Land auf - ebenfalls nach Perzentilen:
- *   > p70 (0,697)  Wald
- *   > p40 (0,438)  Weide
- *   > p16 (0,184)  Feld
+ *   > p70 (0,686)  Wald
+ *   > p40 (0,435)  Weide
+ *   > p16 (0,204)  Feld
  *   sonst          Wueste
  */
-const FOREST_LEVEL = 0.697;
-const PASTURE_LEVEL = 0.438;
-const FIELD_LEVEL = 0.184;
+const FOREST_LEVEL = 0.6862;
+const PASTURE_LEVEL = 0.4351;
+const FIELD_LEVEL = 0.2036;
 
 export type Fields = { elevation: number; moisture: number };
 
+/**
+ * Gemerkte Feldwerte.
+ *
+ * Seit Kleckse entfernt werden und das Relief glaettet, wird jedes Feld nicht
+ * mehr einmal gebraucht, sondern gut ein Dutzend Mal - einmal fuer sich und
+ * immer wieder als Nachbar. Jede Auswertung sind mehrere Rauschlagen; ohne
+ * dieses Gedaechtnis rechnet der Bildaufbau dieselben Werte staendig neu.
+ *
+ * Die Funktion bleibt rein: gleiche Eingabe, gleiches Ergebnis. Gemerkt wird
+ * nur, was ohnehin herauskaeme.
+ */
+const FELD_MAX = 80000;
+let feldSeed = Number.NaN;
+const feldCache = new Map<string, Fields>();
+
 /** Die beiden Felder an einem Hex. Rein. */
 export function fieldsAt(seed: number, q: number, r: number): Fields {
+  if (seed !== feldSeed) {
+    feldCache.clear();
+    feldSeed = seed;
+  }
+  const k = q + ':' + r;
+  const da = feldCache.get(k);
+  if (da !== undefined) return da;
+  const v = berechneFelder(seed, q, r);
+  if (feldCache.size >= FELD_MAX) feldCache.clear();
+  feldCache.set(k, v);
+  return v;
+}
+
+function berechneFelder(seed: number, q: number, r: number): Fields {
   const p = hexToField(q, r);
+
+  // Abtastpunkt verzerren - dieselben Formen, aber mit Buchten statt Blasen.
+  const wx = fbm(seed, p.x / WARP_SCALE, p.y / WARP_SCALE, SALT_WARP_X, 2) - 0.5;
+  const wy = fbm(seed, p.x / WARP_SCALE, p.y / WARP_SCALE, SALT_WARP_Y, 2) - 0.5;
+  const x = p.x + wx * WARP_STRENGTH;
+  const y = p.y + wy * WARP_STRENGTH;
+
+  const basis = expand(fbm(seed, x / ELEVATION_SCALE, y / ELEVATION_SCALE, SALT_ELEVATION, 3));
+
+  // Kaemme erst ueber RIDGE_FLOOR, und dann allmaehlich staerker.
+  let elevation = basis;
+  if (basis > RIDGE_FLOOR) {
+    const gewicht = (basis - RIDGE_FLOOR) / (1 - RIDGE_FLOOR);
+    const kamm = ridged(fbm(seed, x / RIDGE_SCALE, y / RIDGE_SCALE, SALT_RIDGE, 2));
+    elevation = Math.min(1, basis + RIDGE_STRENGTH * kamm * gewicht);
+  }
+
   return {
-    elevation: expand(fbm(seed, p.x / ELEVATION_SCALE, p.y / ELEVATION_SCALE, SALT_ELEVATION, 3)),
-    moisture: expand(fbm(seed, p.x / MOISTURE_SCALE, p.y / MOISTURE_SCALE, SALT_MOISTURE, 2)),
+    elevation,
+    moisture: expand(fbm(seed, x / MOISTURE_SCALE, y / MOISTURE_SCALE, SALT_MOISTURE, 2)),
   };
 }
 
-/** Gelaende an einem Hex. Rein - haengt nur von Seed und Koordinate ab. */
-export function terrainAt(seed: number, q: number, r: number): Terrain {
+/** Gelaende ohne Nachbarschaftskorrektur. */
+function rawTerrainAt(seed: number, q: number, r: number): Terrain {
   const { elevation, moisture } = fieldsAt(seed, q, r);
   if (elevation < SEA_LEVEL) return 'water';
   if (elevation > MOUNTAIN_LEVEL) return 'mountain';
@@ -120,6 +199,60 @@ export function terrainAt(seed: number, q: number, r: number): Terrain {
   if (moisture > FIELD_LEVEL) return 'field';
   return 'desert';
 }
+
+/**
+ * Gelaende an einem Hex, nach Entfernung der Kleckse.
+ *
+ * WAS EIN KLECKS IST: ein Feld, dessen Sorte bei keinem einzigen der sechs
+ * Nachbarn vorkommt. Ein einzelner Berg mitten in der Steppe, eine Wueste von
+ * genau einem Feld. Rauschen erzeugt so etwas staendig, und es sieht aus wie
+ * verschuettetes Konfetti - man liest keine Landschaft mehr, sondern
+ * Bildpunkte. Das Vorbild raeumt sie mit prune_specks weg; dort ist es ein
+ * Durchgang ueber die ganze Karte, hier genuegt der Blick auf die Nachbarn.
+ *
+ * Der Klecks wird zur haeufigsten Sorte ringsum. Damit waechst er der Umgebung
+ * zu, statt ein neues Loch zu reissen.
+ *
+ * WASSER BLEIBT. Ein einzelnes Wasserfeld im Land ist kein Fehler, sondern ein
+ * Teich - und Seen sind sonst nichts, was wir haetten, weil echte Seen eine
+ * Karte mit Rand brauchen. Umgekehrt darf eine einzelne Insel verschwinden.
+ *
+ * EIN DURCHGANG, nicht mehr. Er entscheidet anhand der ROHEN Nachbarn, nie
+ * anhand bereits bereinigter - sonst haenge das Ergebnis davon ab, in welcher
+ * Reihenfolge gefragt wird, und die Karte waere nicht mehr reproduzierbar.
+ * Deshalb kann in seltenen Faellen ein neuer Klecks entstehen; gemessen sind
+ * es zu wenige, um dafuer die Reinheit aufzugeben.
+ */
+export function terrainAt(seed: number, q: number, r: number): Terrain {
+  const eigen = rawTerrainAt(seed, q, r);
+  if (eigen === 'water') return eigen;
+
+  const zaehl = new Map<Terrain, number>();
+  let gleiche = 0;
+  for (const n of neighbors(q, r)) {
+    const t = rawTerrainAt(seed, n.q, n.r);
+    if (t === eigen) gleiche++;
+    zaehl.set(t, (zaehl.get(t) ?? 0) + 1);
+  }
+  if (gleiche > 0) return eigen;
+
+  let beste: Terrain = eigen;
+  let bestN = -1;
+  // Feste Reihenfolge bei Gleichstand - eine Map allein waere Einfuegereihenfolge.
+  for (const t of TERRAIN_ORDER) {
+    const n = zaehl.get(t) ?? 0;
+    if (n > bestN) {
+      bestN = n;
+      beste = t;
+    }
+  }
+  return beste;
+}
+
+/** Feste Reihenfolge fuer Gleichstaende beim Kleckse-Entfernen. */
+const TERRAIN_ORDER: readonly Terrain[] = [
+  'water', 'mountain', 'hill', 'forest', 'pasture', 'field', 'desert',
+];
 
 const produces = (t: Terrain): boolean => TERRAIN_RESOURCE[t] !== null;
 
