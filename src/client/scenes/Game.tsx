@@ -272,18 +272,30 @@ export function Game() {
             kleiner Knopf in eine Leiste. Solange gewuerfelt werden muss,
             steht er mitten im Bild - er ist ohnehin der einzige moegliche Zug.
           */}
-          {isMine && phase.t === 'roll' && pendingRoll === null && (
-            <button
-              className="roll-button"
-              onClick={() => {
-                initAudio();
-                act({ t: 'roll' });
-              }}
-            >
-              <DieIcon />
-              <span>Wuerfeln</span>
-            </button>
-          )}
+          {/*
+            Der Wuerfelknopf steht auch schon in der Bauphase bereit, wenn
+            man allein spielt.
+
+            Sonst kostet jede Runde zwei Klicks an derselben Stelle: erst Zug
+            beenden, dann wuerfeln - obwohl gar niemand anders am Zug ist.
+            Der Knopf erledigt beides. "Zug beenden" bleibt daneben stehen,
+            fuer alle, die vorher noch handeln wollen.
+          */}
+          {isMine &&
+            pendingRoll === null &&
+            (phase.t === 'roll' || (phase.t === 'main' && state.order.length === 1)) && (
+              <button
+                className="roll-button"
+                onClick={() => {
+                  initAudio();
+                  if (phase.t === 'main') act({ t: 'endTurn' });
+                  act({ t: 'roll' });
+                }}
+              >
+                <DieIcon />
+                <span>Wuerfeln</span>
+              </button>
+            )}
 
           {pendingRoll !== null && (
             <DiceOverlay dice={pendingRoll} onDone={clearPendingRoll} />
@@ -374,9 +386,7 @@ export function Game() {
                 </button>
               </span>
 
-              <button className="primary" onClick={() => act({ t: 'endTurn' })}>
-                Zug beenden
-              </button>
+              <button onClick={() => act({ t: 'endTurn' })}>Zug beenden</button>
             </div>
           )}
 
