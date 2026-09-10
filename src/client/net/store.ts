@@ -43,6 +43,14 @@ export type Store = {
   world: World | null;
   log: string[];
   ws: WebSocket | null;
+  /**
+   * Ein Wurf, der noch gezeigt werden will.
+   *
+   * Das Ergebnis steht laengst fest - es kommt aus dem Durable Object. Diese
+   * Zwischenablage sorgt nur dafuer, dass die Oberflaeche es inszenieren
+   * kann, statt die Zahl kommentarlos einzublenden.
+   */
+  pendingRoll: [number, number] | null;
 
   connect: (code: string, name: string, create: boolean) => void;
   /** Nach einem Neuladen zurueck in die laufende Partie, falls moeglich. */
@@ -51,6 +59,7 @@ export type Store = {
   send: (msg: ClientMsg) => void;
   act: (action: Action) => void;
   dismissError: () => void;
+  clearPendingRoll: () => void;
 };
 
 /** Token je Raum merken, damit ein Neuladen den Platz nicht verliert. */
@@ -97,6 +106,7 @@ export const useStore = create<Store>((set, get) => ({
   world: null,
   log: [],
   ws: null,
+  pendingRoll: null,
 
   connect: (code, name, create) => {
     get().ws?.close();
@@ -125,11 +135,14 @@ export const useStore = create<Store>((set, get) => ({
               status: 'playing',
             }));
             break;
-          case 'events':
+          case 'events': {
+            const wurf = msg.events.find((e: GameEvent) => e.t === 'roll');
             set((s) => ({
               log: [...s.log, ...msg.events.map((e: GameEvent) => describeEvent(e, s.state))].slice(-120),
+              ...(wurf && wurf.t === 'roll' ? { pendingRoll: wurf.dice } : {}),
             }));
             break;
+          }
           case 'error':
             set({ error: msg.message });
             break;
@@ -147,7 +160,16 @@ export const useStore = create<Store>((set, get) => ({
       // nichts zu tun
     }
     get().ws?.close();
-    set({ ws: null, status: 'idle', room: null, state: null, world: null, you: null, log: [] });
+    set({
+      ws: null,
+      status: 'idle',
+      room: null,
+      state: null,
+      world: null,
+      you: null,
+      log: [],
+      pendingRoll: null,
+    });
   },
 
   /**
@@ -174,4 +196,5 @@ export const useStore = create<Store>((set, get) => ({
   send: (msg) => sendMsg(get().ws, msg),
   act: (action) => sendMsg(get().ws, { t: 'action', action }),
   dismissError: () => set({ error: null }),
+  clearPendingRoll: () => set({ pendingRoll: null }),
 }));

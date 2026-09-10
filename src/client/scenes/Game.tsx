@@ -17,6 +17,8 @@ import { Board } from '../board/Board';
 import type { Targets } from '../board/Board';
 import { HandPanel } from '../ui/HandPanel';
 import { TradePanel } from '../ui/TradePanel';
+import { DiceOverlay } from '../ui/DiceOverlay';
+import { getVolume, initAudio, playBuild, setVolume } from '../audio';
 import {
   legalCityVertices,
   legalRoadEdges,
@@ -51,6 +53,8 @@ export function Game() {
   const you = useStore((s) => s.you);
   const act = useStore((s) => s.act);
   const disconnect = useStore((s) => s.disconnect);
+  const pendingRoll = useStore((s) => s.pendingRoll);
+  const clearPendingRoll = useStore((s) => s.clearPendingRoll);
 
   const [mode, setMode] = useState<BuildMode>(null);
   const [robberHex, setRobberHex] = useState<string | null>(null);
@@ -61,6 +65,7 @@ export function Game() {
   const [discard, setDiscard] = useState<Partial<Record<Resource, number>>>({});
   /** Zahlen festpinnen - fuer alle, die sie lieber dauerhaft sehen. */
   const [pinNumbers, setPinNumbers] = useState(false);
+  const [lautstaerke, setLautstaerke] = useState(getVolume);
 
   const me = state.players.find((p) => p.id === you);
   const hand = me?.hand;
@@ -103,6 +108,7 @@ export function Game() {
     if (phase.t === 'setup') {
       if (kind === 'vertex') act({ t: 'placeSettlement', vertex: key });
       else act({ t: 'placeRoad', edge: key });
+      playBuild();
       return;
     }
     if (phase.t === 'moveRobber' && kind === 'hex') {
@@ -119,6 +125,7 @@ export function Game() {
       if (mode === 'road' && kind === 'edge') act({ t: 'buildRoad', edge: key });
       if (mode === 'settlement' && kind === 'vertex') act({ t: 'buildSettlement', vertex: key });
       if (mode === 'city' && kind === 'vertex') act({ t: 'buildCity', vertex: key });
+      if (mode !== null) playBuild();
       setMode(null);
     }
   };
@@ -180,6 +187,18 @@ export function Game() {
             </span>
           )}
           <button
+            className={lautstaerke === 0 ? 'ghost small' : 'small chosen'}
+            title="Ton an oder aus"
+            onClick={() => {
+              initAudio();
+              const neu = lautstaerke === 0 ? 0.5 : 0;
+              setVolume(neu);
+              setLautstaerke(neu);
+            }}
+          >
+            {lautstaerke === 0 ? 'ton aus' : 'ton an'}
+          </button>
+          <button
             className={pinNumbers ? 'small chosen' : 'ghost small'}
             title="Zahlen dauerhaft anzeigen"
             onClick={() => setPinNumbers((v) => !v)}
@@ -203,10 +222,33 @@ export function Game() {
           targets={targets}
           showAllNumbers={pinNumbers || waehltGerade}
           onPick={onPick}
-        />
+        >
+          {hand && <HandPanel hand={hand} />}
+
+          {/*
+            Wuerfeln ist der Taktgeber der Partie und gehoert nicht als
+            kleiner Knopf in eine Leiste. Solange gewuerfelt werden muss,
+            steht er mitten im Bild - er ist ohnehin der einzige moegliche Zug.
+          */}
+          {isMine && phase.t === 'roll' && pendingRoll === null && (
+            <button
+              className="roll-button"
+              onClick={() => {
+                initAudio();
+                act({ t: 'roll' });
+              }}
+            >
+              <DieIcon />
+              <span>Wuerfeln</span>
+            </button>
+          )}
+
+          {pendingRoll !== null && (
+            <DiceOverlay dice={pendingRoll} onDone={clearPendingRoll} />
+          )}
+        </Board>
 
         <div className="bar">
-          {hand && <HandPanel hand={hand} />}
 
           {/*
             Der Handel steht bewusst ausserhalb des isMine-Blocks: ein Angebot
@@ -219,16 +261,9 @@ export function Game() {
               <TradePanel state={state} you={you} hand={hand} act={act} />
             )}
 
-          {isMine && phase.t === 'roll' && (
+          {isMine && phase.t === 'roll' && canPlay('knight') && (
             <div className="actions">
-              <button className="primary" onClick={() => act({ t: 'roll' })}>
-                Wuerfeln
-              </button>
-              {canPlay('knight') && (
-                <button onClick={() => act({ t: 'playKnight' })}>
-                  Ritter vorab spielen
-                </button>
-              )}
+              <button onClick={() => act({ t: 'playKnight' })}>Ritter vorab spielen</button>
             </div>
           )}
 
@@ -384,6 +419,20 @@ export function Game() {
         </Dialog>
       )}
     </div>
+  );
+}
+
+/** Kleines Wuerfelsymbol fuer den Knopf. */
+function DieIcon() {
+  return (
+    <svg width={22} height={22} viewBox="0 0 22 22" aria-hidden="true">
+      <rect x={2} y={2} width={18} height={18} rx={3} className="die-body" />
+      <circle cx={7} cy={7} r={1.8} className="die-pip" />
+      <circle cx={15} cy={7} r={1.8} className="die-pip" />
+      <circle cx={11} cy={11} r={1.8} className="die-pip" />
+      <circle cx={7} cy={15} r={1.8} className="die-pip" />
+      <circle cx={15} cy={15} r={1.8} className="die-pip" />
+    </svg>
   );
 }
 

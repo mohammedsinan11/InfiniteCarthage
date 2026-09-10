@@ -28,6 +28,7 @@ import type { Layout } from '../../core/coords';
 import type { World } from '../../core/world';
 import type { PublicState } from '../../core/redact';
 import { playerColor } from '../theme';
+import { playHover } from '../audio';
 import {
   HEX_CX,
   HEX_CY,
@@ -128,6 +129,14 @@ type Props = {
   /** Alle Zahlen dauerhaft zeigen - sonst erscheinen sie nur unter dem Zeiger. */
   showAllNumbers: boolean;
   onPick: (kind: 'vertex' | 'edge' | 'hex', key: string) => void;
+  /**
+   * Aufgesetzte Anzeigen - Handblatt, Wuerfelknopf, Overlays.
+   *
+   * Sie gehoeren INS Brett, nicht daneben: nur so beziehen sich ihre
+   * absoluten Positionen auf die Spielflaeche und nicht auf den Bereich
+   * samt Bedienleiste. Sonst legt sich das Handblatt ueber die Knoepfe.
+   */
+  children?: React.ReactNode;
 };
 
 /** zi ist der Index in ZOOM_STEPS - nicht der Faktor selbst, weil sich
@@ -137,7 +146,7 @@ type Camera = { cx: number; cy: number; zi: number };
 /** Augenzahl als Punkte: sagt schneller als die Ziffer, wie oft ein Feld trifft. */
 const pips = (n: number): string => '.'.repeat(6 - Math.abs(7 - n));
 
-export function Board({ world, state, targets, showAllNumbers, onPick }: Props) {
+export function Board({ world, state, targets, showAllNumbers, onPick, children }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [cam, setCam] = useState<Camera>({ cx: 0, cy: 0, zi: DEFAULT_ZOOM_INDEX });
@@ -350,7 +359,12 @@ export function Board({ world, state, targets, showAllNumbers, onPick }: Props) 
     const wy = view.y + (e.clientY - rect.top) / scale;
     const h = pixelToHex(wx, wy, LAYOUT);
     const key = hexKey(h.q, h.r);
-    setHover((prev) => (prev === key ? prev : key));
+    setHover((prev) => {
+      if (prev === key) return prev;
+      // Nur beim Wechsel, nicht bei jeder Zeigerbewegung.
+      playHover();
+      return key;
+    });
   };
 
   const onPointerUp = () => {
@@ -528,6 +542,7 @@ export function Board({ world, state, targets, showAllNumbers, onPick }: Props) 
       </svg>
 
       <div className="board-hint">Ziehen zum Verschieben, Mausrad zum Zoomen</div>
+      {children}
     </div>
   );
 }
