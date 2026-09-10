@@ -14,7 +14,6 @@
 import { Rng } from '../rng';
 import {
   edgeEndpoints,
-  hexKey,
   parseEdgeKey,
   parseVertexKey,
   vertexAdjacentHexes,
@@ -22,7 +21,6 @@ import {
 import {
   createWorld,
   ensureGenerated,
-  robberStart,
   revealChunks,
   tileAt,
 } from '../world';
@@ -59,12 +57,10 @@ import {
   legalRoadEdges,
 } from './placement';
 import { computeProduction } from './production';
-import {
-  canMoveRobber,
-  discardCount,
-  playersMustDiscard,
-  stealCandidatesServer,
-} from './robber';
+import { discardCount, playersMustDiscard } from './discard';
+import { draftOptions } from '../cards/draft';
+import { cardById } from '../cards/catalog';
+import type { DraftSource } from '../cards/types';
 import {
   canAcceptTrade,
   canBankTrade,
@@ -80,7 +76,6 @@ export type Action =
   | { t: 'placeRoad'; edge: string }
   | { t: 'roll' }
   | { t: 'discard'; cards: Partial<Record<Resource, number>> }
-  | { t: 'moveRobber'; hex: string; victim?: PlayerId }
   | { t: 'buildRoad'; edge: string }
   | { t: 'buildSettlement'; vertex: string }
   | { t: 'buildCity'; vertex: string }
@@ -98,15 +93,14 @@ export type Action =
   | { t: 'settleTrade'; partner: PlayerId }
   /** Anbieter zieht sein Angebot zurueck. */
   | { t: 'cancelTrade' }
+  /** Eine der drei angebotenen Karten nehmen. */
+  | { t: 'chooseCard'; card: string }
   | { t: 'endTurn' };
 
 export type GameEvent =
   | { t: 'roll'; player: PlayerId; dice: [number, number] }
   | { t: 'production'; payout: Record<PlayerId, Hand>; shortfall: Resource[] }
   | { t: 'build'; player: PlayerId; kind: 'road' | 'settlement' | 'city'; at: string }
-  | { t: 'robber'; player: PlayerId; hex: string }
-  /** resource ist null, wenn der Empfaenger weder Dieb noch Bestohlener ist. */
-  | { t: 'steal'; from: PlayerId; to: PlayerId; resource: Resource | null }
   | { t: 'discard'; player: PlayerId; count: number }
   | { t: 'buyDev'; player: PlayerId }
   | { t: 'playDev'; player: PlayerId; card: DevCardType }
@@ -118,6 +112,8 @@ export type GameEvent =
   | { t: 'tradeSettled'; from: PlayerId; to: PlayerId; give: Bundle; want: Bundle }
   | { t: 'tradeCancelled'; player: PlayerId }
   | { t: 'largestArmy'; player: PlayerId }
+  | { t: 'draftOffered'; player: PlayerId; source: DraftSource; options: string[] }
+  | { t: 'cardTaken'; player: PlayerId; card: string }
   | { t: 'chunks'; coords: ChunkCoord[] }
   | { t: 'turn'; player: PlayerId }
   | { t: 'win'; player: PlayerId };
@@ -153,7 +149,6 @@ export function createGame(
   const seed = findPlayableSeed(worldSeed);
   const world = createWorld(seed);
   const added = ensureGenerated(world, { q: 0, r: 0 });
-  const robber = robberStart(world);
 
   const state: GameState = {
     worldSeed: seed,
@@ -167,6 +162,7 @@ export function createGame(
       dev: [],
       playedKnights: 0,
       pieces: { ...STARTING_PIECES },
+      cards: [],
       connected: true,
     })),
     order: players.map((p) => p.id),
@@ -174,7 +170,6 @@ export function createGame(
     phase: { t: 'setup', step: 0, awaiting: 'settlement', lastVertex: null },
     buildings: {},
     roads: {},
-    robber: hexKey(robber.q, robber.r),
     bank: {
       lumber: BANK_PER_RESOURCE,
       wool: BANK_PER_RESOURCE,
@@ -190,6 +185,7 @@ export function createGame(
     targetPoints,
     largestArmy: null,
     trade: null,
+    draft: null,
     chunks: added,
   };
 
@@ -242,14 +238,6 @@ function checkWin(state: GameState, events: GameEvent[]): void {
   }
 }
 
-function takeRandomCard(rng: Rng, hand: Hand): Resource | null {
-  const pool: Resource[] = [];
-  for (const r of RESOURCES) for (let i = 0; i < hand[r]; i++) pool.push(r);
-  if (pool.length === 0) return null;
-  const picked = pool[rng.int(pool.length)]!;
-  hand[picked] -= 1;
-  return picked;
-}
 
 /** Eine spielbare Entwicklungskarte dieses Typs suchen. */
 function findPlayableDev(
@@ -274,14 +262,22 @@ function devPlayGuard(state: GameState, p: Player, type: DevCardType): string | 
 }
 
 /**
- * In die Raeuberphase wechseln.
+ * Kartenwahl eroeffnen.
  *
- * returnTo ist kein Beiwerk: ein Ritter darf auch VOR dem Wuerfeln gespielt
- * werden. Ohne die Ruecksprungmarke wuerde der Wurf danach uebersprungen und
- * der Spieler bekaeme in dieser Runde keinen Ertrag.
+ * Loest die Raeuberphase ab. Die drei Karten stehen zwar schon durch Seed und
+ * Runde fest, werden aber in den Spielstand geschrieben - so sehen die
+ * Clients dieselben drei, ohne den geheimen Seed zu kennen.
  */
-function enterRobber(state: GameState, by: 'dice' | 'knight', returnTo: 'roll' | 'main'): void {
-  state.phase = { t: 'moveRobber', by, returnTo };
+function enterDraft(state: GameState, source: DraftSource, events: GameEvent[]): void {
+  const options = draftOptions(state.secretSeed, state.turn, source);
+  state.draft = { source, options };
+  state.phase = { t: 'draft' };
+  events.push({
+    t: 'draftOffered',
+    player: state.order[state.current]!,
+    source,
+    options,
+  });
 }
 
 // --- Hauptfunktion ----------------------------------------------------------
@@ -385,8 +381,10 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
 
       if (sum === 7) {
         const pending = playersMustDiscard(s);
+        // Erst abwerfen, dann der Fund - sonst waehlt man Karten aus, die
+        // man gleich darauf wieder abgibt.
         if (pending.length > 0) s.phase = { t: 'discard', pending };
-        else enterRobber(s, 'dice', 'main');
+        else enterDraft(s, 'fund', events);
       } else {
         const { payout, shortfall } = computeProduction(s, world, sum);
         for (const [pid, gain] of Object.entries(payout)) {
@@ -425,34 +423,51 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
 
       const rest = phase.pending.filter((id) => id !== actor);
       if (rest.length > 0) s.phase = { t: 'discard', pending: rest };
-      else enterRobber(s, 'dice', 'main');
+      else enterDraft(s, 'fund', events);
       break;
     }
 
-    case 'moveRobber': {
-      if (phase.t !== 'moveRobber') return fail('Der Raeuber ist gerade nicht dran.');
-      const why = canMoveRobber(s, world, action.hex);
-      if (why) return fail(why);
+    case 'chooseCard': {
+      if (phase.t !== 'draft') return fail('Jetzt ist keine Karte zu waehlen.');
+      const angebot = s.draft;
+      if (angebot === null) return fail('Es liegt keine Auswahl vor.');
+      if (!angebot.options.includes(action.card)) {
+        return fail('Diese Karte steht nicht zur Wahl.');
+      }
+      const karte = cardById(action.card);
+      if (!karte) return fail('Unbekannte Karte.');
 
-      s.robber = action.hex;
-      events.push({ t: 'robber', player: actor, hex: action.hex });
+      actorPlayer.cards.push(karte.id);
 
-      const candidates = stealCandidatesServer(s, action.hex, actor);
-      if (action.victim !== undefined) {
-        if (!candidates.includes(action.victim)) return fail('Dort ist nichts zu holen.');
-        const victim = playerById(s, action.victim)!;
-        const rng = new Rng(s.rngState);
-        const stolen = takeRandomCard(rng, victim.hand);
-        s.rngState = rng.getState();
-        if (stolen) {
-          actorPlayer.hand[stolen] += 1;
-          events.push({ t: 'steal', from: action.victim, to: actor, resource: stolen });
+      // Sofortwirkung, soweit die Bank sie decken kann.
+      if (karte.instant) {
+        if (karte.instant.t === 'gain') {
+          for (const r of RESOURCES) {
+            const n = Math.min(karte.instant.resources[r] ?? 0, s.bank[r]);
+            s.bank[r] -= n;
+            actorPlayer.hand[r] += n;
+          }
+        } else {
+          // "Beliebige" Rohstoffe: gleichmaessig verteilt, damit die Regel
+          // ohne Rueckfrage auskommt. Eine echte Wahl waere eine eigene
+          // Phase - das lohnt erst, wenn es mehr solcher Karten gibt.
+          let offen = karte.instant.count;
+          for (let runde = 0; runde < karte.instant.count && offen > 0; runde++) {
+            for (const r of RESOURCES) {
+              if (offen <= 0) break;
+              if (s.bank[r] <= 0) continue;
+              s.bank[r] -= 1;
+              actorPlayer.hand[r] += 1;
+              offen -= 1;
+            }
+          }
         }
-      } else if (candidates.length > 0) {
-        return fail('Du musst einen Spieler zum Bestehlen waehlen.');
       }
 
-      s.phase = phase.returnTo === 'roll' ? { t: 'roll' } : { t: 'main' };
+      s.draft = null;
+      s.phase = { t: 'main' };
+      events.push({ t: 'cardTaken', player: actor, card: karte.id });
+      checkWin(s, events);
       break;
     }
 
@@ -559,7 +574,11 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         s.largestArmy = holder;
         events.push({ t: 'largestArmy', player: holder });
       }
-      enterRobber(s, 'knight', phase.t === 'roll' ? 'roll' : 'main');
+      /*
+       * Ohne Raeuber hat der Ritter keine Zielrichtung mehr. Er zaehlt nur
+       * noch fuer die Groesste Rittermacht - eine schwaechere Karte als
+       * frueher, aber eine ehrliche: sie tut genau das, was dasteht.
+       */
       checkWin(s, events);
       break;
     }

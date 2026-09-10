@@ -1173,3 +1173,93 @@ em.off {
     width: 168px;
   }
 }
+
+/* --- Kartenwahl --- */
+
+.draft-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 22;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: rgba(12, 9, 6, 0.9);
+  animation: draft-auf 0.25s ease-out;
+}
+@keyframes draft-auf {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.draft-titel {
+  margin: 0;
+  font-family: var(--pixel);
+  font-size: 20px;
+  color: var(--accent);
+}
+.draft-sub {
+  margin: 0 0 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.draft-karten {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 0 12px;
+}
+
+/*
+ * Eine Karte zur Wahl. Die Seltenheit faerbt den Rahmen - man sieht schon am
+ * Rand, was man vor sich hat, bevor man den Text gelesen hat.
+ */
+.draft-karte {
+  width: 168px;
+  min-height: 200px;
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  background: linear-gradient(180deg, #2e2418 0%, #221a11 100%);
+  border-width: 3px;
+  transition: transform 0.12s;
+}
+.draft-karte:hover:not(:disabled) {
+  transform: translateY(-8px);
+}
+.draft-karte.gewaehlt {
+  transform: translateY(-14px) scale(1.04);
+}
+.draft-karte.verworfen {
+  opacity: 0.3;
+  transform: translateY(10px);
+}
+
+.selt-gewoehnlich { border-color: #7d6141; }
+.selt-ungewoehnlich { border-color: #4f9e5c; }
+.selt-selten { border-color: #3a7ac2; }
+.selt-episch { border-color: #8f5bb0; }
+.selt-legendaer { border-color: var(--accent); box-shadow: 0 0 12px rgba(217, 164, 65, 0.5); }
+
+.draft-selt {
+  font-family: var(--pixel);
+  font-size: 8px;
+  color: var(--muted);
+  letter-spacing: 1px;
+}
+.draft-name {
+  font-family: var(--pixel);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text);
+}
+.draft-text {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--muted);
+  white-space: normal;
+}

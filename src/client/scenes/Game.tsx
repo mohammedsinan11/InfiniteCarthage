@@ -19,14 +19,14 @@ import { HandPanel } from '../ui/HandPanel';
 import { TradePanel } from '../ui/TradePanel';
 import { DiceOverlay } from '../ui/DiceOverlay';
 import { Announcements } from '../ui/Announcements';
+import { CardDraft } from '../ui/CardDraft';
 import { SideMenu } from '../ui/SideMenu';
-import { initAudio, playBuild, playGain, playRobber } from '../audio';
+import { initAudio, playBuild, playGain } from '../audio';
 import {
   legalCityVertices,
   legalRoadEdges,
   legalSettlementVertices,
 } from '../../core/rules/placement';
-import { stealCandidates } from '../../core/rules/robber';
 import { productionSources } from '../../core/rules/production';
 import { tradeRatio } from '../../core/rules/trade';
 import {
@@ -39,7 +39,6 @@ import {
 import type { Cost } from '../../core/rules/costs';
 import { RESOURCES } from '../../core/types';
 import type { Resource } from '../../core/types';
-import { hexKey } from '../../core/coords';
 import { devName, resourceName } from '../log';
 import type { DevCardType } from '../../core/state';
 
@@ -64,7 +63,6 @@ export function Game() {
   const clearProduceEffect = useStore((s) => s.clearProduceEffect);
 
   const [mode, setMode] = useState<BuildMode>(null);
-  const [robberHex, setRobberHex] = useState<string | null>(null);
   const [tradeGive, setTradeGive] = useState<Resource>('lumber');
   const [tradeGet, setTradeGet] = useState<Resource>('ore');
   const [yopA, setYopA] = useState<Resource>('lumber');
@@ -78,9 +76,6 @@ export function Game() {
   const phase = state.phase;
   const isMine = state.currentPlayer === you && phase.t !== 'finished';
 
-  const hasCards = (id: string): boolean =>
-    (state.players.find((p) => p.id === id)?.handCount ?? 0) > 0;
-
   /** Welche Stellen darf ich gerade anklicken? */
   const targets: Targets = useMemo(() => {
     if (!you || !isMine) return {};
@@ -89,12 +84,6 @@ export function Game() {
         return phase.awaiting === 'settlement'
           ? { vertices: legalSettlementVertices(state, world, you, { setup: true }) }
           : { edges: legalRoadEdges(state, world, you, phase.lastVertex ?? undefined) };
-      case 'moveRobber':
-        return {
-          hexes: [...world.tiles.values()]
-            .map((t) => hexKey(t.q, t.r))
-            .filter((k) => k !== state.robber),
-        };
       case 'roadBuilding':
         return { edges: legalRoadEdges(state, world, you) };
       case 'main':
@@ -115,12 +104,6 @@ export function Game() {
       if (kind === 'vertex') act({ t: 'placeSettlement', vertex: key });
       else act({ t: 'placeRoad', edge: key });
       playBuild();
-      return;
-    }
-    if (phase.t === 'moveRobber' && kind === 'hex') {
-      const victims = stealCandidates(state, key, you, hasCards);
-      if (victims.length === 0) act({ t: 'moveRobber', hex: key });
-      else setRobberHex(key); // erst das Opfer waehlen lassen
       return;
     }
     if (phase.t === 'roadBuilding' && kind === 'edge') {
@@ -194,10 +177,6 @@ export function Game() {
     return () => window.clearTimeout(t);
   }, [produceEffect, flights, clearProduceEffect]);
 
-  // Der Raeuber meldet sich auch hoerbar.
-  useEffect(() => {
-    if (phase.t === 'moveRobber') playRobber();
-  }, [phase.t]);
 
   /*
    * Waehrend eine Bauwahl offen ist, muss man Felder vergleichen koennen -
@@ -247,6 +226,14 @@ export function Game() {
           showNumbers={pinNumbers}
           onToggleNumbers={() => setPinNumbers((v) => !v)}
         />
+
+        {state.draft !== null && phase.t === 'draft' && (
+          <CardDraft
+            options={state.draft.options}
+            darfWaehlen={isMine}
+            onChoose={(card) => act({ t: 'chooseCard', card })}
+          />
+        )}
 
         <Announcements items={announcements} onDone={dropAnnouncement} />
 
@@ -396,11 +383,6 @@ export function Game() {
             </div>
           )}
 
-          {isMine && phase.t === 'moveRobber' && !robberHex && (
-            <div className="actions">
-              <strong>Raeuber auf ein Feld setzen</strong>
-            </div>
-          )}
 
           {(me?.dev?.length ?? 0) > 0 && (
             <div className="devlist">
@@ -413,26 +395,6 @@ export function Game() {
           )}
         </div>
       </main>
-
-      {/* Opfer waehlen */}
-      {robberHex !== null && you && (
-        <Dialog title="Wen bestehlen?">
-          {stealCandidates(state, robberHex, you, hasCards).map((vid) => (
-            <button
-              key={vid}
-              onClick={() => {
-                act({ t: 'moveRobber', hex: robberHex, victim: vid });
-                setRobberHex(null);
-              }}
-            >
-              {state.players.find((p) => p.id === vid)?.name}
-            </button>
-          ))}
-          <button className="ghost" onClick={() => setRobberHex(null)}>
-            anderes Feld waehlen
-          </button>
-        </Dialog>
-      )}
 
       {/* Abwerfen nach einer 7 */}
       {mustDiscard && hand && (

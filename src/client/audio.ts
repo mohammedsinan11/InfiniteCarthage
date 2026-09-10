@@ -153,13 +153,6 @@ export function playChime(): void {
   blip(990, 0.14, 0.06, 0.07, 'sine');
 }
 
-/** Raeuber: tief und unfreundlich. */
-export function playRobber(): void {
-  noise(0.3, 180, 0.35);
-  blip(90, 0.35, 0.14, 0, 'sawtooth');
-  blip(70, 0.4, 0.1, 0.08, 'sawtooth');
-}
-
 /**
  * Ertrag: ein kleiner aufsteigender Dreiklang.
  *

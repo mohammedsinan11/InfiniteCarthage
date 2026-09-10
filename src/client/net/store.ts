@@ -92,10 +92,8 @@ function meldungenAus(events: GameEvent[], state: PublicState | null): Announcem
   const out: Announcement[] = [];
   const wer = (id: string) => state?.players.find((p) => p.id === id)?.name ?? 'Jemand';
   for (const e of events) {
-    if (e.t === 'robber') {
-      out.push({ id: naechsteId++, text: 'Der Raeuber zieht um', kind: 'robber' });
-    } else if (e.t === 'steal') {
-      out.push({ id: naechsteId++, text: `${wer(e.to)} bestiehlt ${wer(e.from)}`, kind: 'robber' });
+    if (e.t === 'draftOffered') {
+      out.push({ id: naechsteId++, text: 'Ein Fund! Waehle eine Karte', kind: 'gain' });
     } else if (e.t === 'monopoly') {
       out.push({ id: naechsteId++, text: `Monopol: ${e.taken} Karten`, kind: 'info' });
     } else if (e.t === 'largestArmy') {

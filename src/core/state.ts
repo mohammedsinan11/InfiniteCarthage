@@ -10,6 +10,7 @@
 
 import type { Bundle, Resource } from './types';
 import type { ChunkCoord } from './chunks';
+import type { DraftSource } from './cards/types';
 
 export type PlayerId = string;
 
@@ -50,6 +51,14 @@ export type Player = {
   playedKnights: number;
   /** Noch nicht verbaute Spielsteine. */
   pieces: { roads: number; settlements: number; cities: number };
+  /**
+   * Genommene Karten, als Kennungen.
+   *
+   * Die Dauerwirkungen werden bei Bedarf daraus abgeleitet (cards/effects.ts)
+   * statt getrennt gespeichert - so kann der Bonus nicht von den Karten
+   * abweichen.
+   */
+  cards: string[];
   connected: boolean;
 };
 
@@ -68,9 +77,11 @@ export type Phase =
   | { t: 'setup'; step: number; awaiting: 'settlement' | 'road'; lastVertex: string | null }
   | { t: 'roll' }
   | { t: 'discard'; pending: PlayerId[] }
-  /** returnTo: ein Ritter darf vor dem Wuerfeln kommen - dann geht es danach
-   *  zurueck zum Wurf, nicht in die Bauphase. */
-  | { t: 'moveRobber'; by: 'dice' | 'knight'; returnTo: 'roll' | 'main' }
+  /**
+   * Kartenwahl. Loest die Raeuberphase ab: bei einer Sieben gibt es jetzt
+   * einen Fund statt einer Strafe.
+   */
+  | { t: 'draft' }
   | { t: 'main' }
   | { t: 'roadBuilding'; remaining: number }
   | { t: 'finished'; winner: PlayerId };
@@ -113,7 +124,6 @@ export type GameState = {
 
   buildings: Record<string, Building>;
   roads: Record<string, PlayerId>;
-  robber: string;
 
   bank: Hand;
   deck: DevCardType[];
@@ -129,6 +139,12 @@ export type GameState = {
   chunks: ChunkCoord[];
   /** Offenes Angebot, oder null. Hoechstens eines gleichzeitig. */
   trade: TradeOffer | null;
+  /**
+   * Die offene Kartenwahl. Die Karten stehen hier, obwohl sie sich aus Seed
+   * und Runde ableiten liessen - so sieht der Client dieselben drei, ohne den
+   * geheimen Seed zu kennen.
+   */
+  draft: { source: DraftSource; options: string[] } | null;
 };
 
 /** Die Bank haelt 19 Karten je Rohstoff - auch auf unendlicher Karte. */

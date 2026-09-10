@@ -11,7 +11,7 @@ import { currentPlayerId, playerById, totalPoints, handSize } from '../src/core/
 import type { Hand, PlayerId } from '../src/core/state';
 import { redactStateFor, redactEventsFor } from '../src/core/redact';
 import { tradeRatio } from '../src/core/rules/trade';
-import { discardCount, stealCandidatesServer } from '../src/core/rules/robber';
+import { discardCount } from '../src/core/rules/discard';
 import { RESOURCES } from '../src/core/types';
 import type { Resource } from '../src/core/types';
 import { vertexNeighborVertices, parseVertexKey, vertexKey, hexEdges, edgeKey } from '../src/core/coords';
@@ -201,9 +201,10 @@ describe('Zugablauf', () => {
 });
 
 /** Nach einem Wurf ggf. Abwerfen und Raeuber abarbeiten. */
+/** Nach dem Wurf eine eventuelle Sieben abarbeiten: abwerfen, dann waehlen. */
 function resolveSeven(game: Game): void {
   let guard = 0;
-  while (game.state.phase.t === 'discard' || game.state.phase.t === 'moveRobber') {
+  while (phaseOf(game) === 'discard' || phaseOf(game) === 'draft') {
     if (guard++ > 20) throw new Error('Siebener-Phase endet nicht');
     const ph = game.state.phase;
     if (ph.t === 'discard') {
@@ -218,14 +219,9 @@ function resolveSeven(game: Game): void {
       }
       must(game, { t: 'discard', cards }, pid);
     } else {
-      // Auf ein Feld ohne fremde Gebaeude ziehen, damit kein Opfer noetig ist.
+      // Der Fund: die erste angebotene Karte nehmen.
       const cur = currentPlayerId(game.state);
-      const target = [...game.world.tiles.values()].find((t) => {
-        const k = t.q + ':' + t.r;
-        if (k === game.state.robber) return false;
-        return stealFree(game, k, cur);
-      });
-      must(game, { t: 'moveRobber', hex: target!.q + ':' + target!.r }, cur);
+      must(game, { t: 'chooseCard', card: game.state.draft!.options[0]! }, cur);
     }
   }
 }
@@ -242,9 +238,6 @@ function phaseOf(game: Game): string {
   return game.state.phase.t;
 }
 
-function stealFree(game: Game, hk: string, thief: PlayerId): boolean {
-  return stealCandidatesServer(game.state, hk, thief).length === 0;
-}
 
 describe('Bauen und Kosten', () => {
   it('zieht Kosten ab und gibt sie der Bank', () => {
@@ -368,7 +361,7 @@ describe('Entwicklungskarten', () => {
     toMain(game, 'p0');
     must(game, { t: 'playKnight' }, 'p0');
     // Raeuber setzen, danach zweiter Ritter -> muss scheitern.
-    resolveRobberOnly(game);
+    resolveDraft(game);
     const r = applyAction(game, { t: 'playKnight' }, 'p0');
     expect(r).toEqual({ ok: false, error: 'In diesem Zug wurde schon eine Karte gespielt.' });
   });
@@ -446,14 +439,12 @@ describe('Entwicklungskarten', () => {
   });
 });
 
-function resolveRobberOnly(game: Game): void {
-  if (game.state.phase.t !== 'moveRobber') return;
+/** Eine offene Kartenwahl abschliessen - nach dem Ritter gibt es keine mehr,
+ *  aber nach einer Sieben schon. */
+function resolveDraft(game: Game): void {
+  if (game.state.phase.t !== 'draft') return;
   const cur = currentPlayerId(game.state);
-  const target = [...game.world.tiles.values()].find((t) => {
-    const k = t.q + ':' + t.r;
-    return k !== game.state.robber && stealFree(game, k, cur);
-  })!;
-  must(game, { t: 'moveRobber', hex: target.q + ':' + target.r }, cur);
+  must(game, { t: 'chooseCard', card: game.state.draft!.options[0]! }, cur);
 }
 
 describe('Sieg', () => {
@@ -512,13 +503,11 @@ describe('Redaktion', () => {
     expect(me.dev).toBeDefined();
   });
 
-  it('zeigt die geklaute Karte nur Dieb und Bestohlenem', () => {
-    const events = [
-      { t: 'steal' as const, from: 'p1', to: 'p0', resource: 'ore' as Resource | null },
-    ];
-    expect(redactEventsFor(events, 'p0')[0]).toMatchObject({ resource: 'ore' });
-    expect(redactEventsFor(events, 'p1')[0]).toMatchObject({ resource: 'ore' });
-    expect(redactEventsFor(events, 'p2')[0]).toMatchObject({ resource: null });
+  it('laesst Ereignisse unveraendert, solange nichts zu verbergen ist', () => {
+    // Seit der Raeuber fort ist, gibt es keinen Diebstahl mehr - und damit
+    // derzeit kein Ereignis mit verdeckter Wirkung.
+    const events = [{ t: 'turn' as const, player: 'p0' }];
+    expect(redactEventsFor(events, 'p1')).toEqual(events);
   });
 });
 

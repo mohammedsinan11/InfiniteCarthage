@@ -531,16 +531,6 @@ export function Board({
                   </text>
                 </>
               )}
-              {state.robber === hk && (
-                <>
-                  <ellipse cx={c.x} cy={c.y + 20} rx={11} ry={4} className="robber-shadow" />
-                  <circle cx={c.x} cy={c.y - 6} r={7} className="robber" />
-                  <path
-                    d={`M ${c.x - 9} ${c.y + 17} L ${c.x - 6} ${c.y - 3} L ${c.x + 6} ${c.y - 3} L ${c.x + 9} ${c.y + 17} Z`}
-                    className="robber"
-                  />
-                </>
-              )}
             </g>
           );
         })}

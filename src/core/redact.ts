@@ -27,6 +27,14 @@ export type PublicPlayer = {
   devCount: number;
   playedKnights: number;
   pieces: { roads: number; settlements: number; cities: number };
+  /**
+   * Genommene Karten - oeffentlich, im Gegensatz zur Hand.
+   *
+   * Sie aendern sichtbare Regeln: wer weiss, dass jemand doppelten Ertrag aus
+   * Bergen zieht, kann das einordnen. Sie zu verbergen waere kein Geheimnis,
+   * sondern Verwirrung.
+   */
+  cards: string[];
   connected: boolean;
   /** Sichtbare Punkte, ohne verdeckte Siegpunktkarten. */
   points: number;
@@ -45,7 +53,6 @@ export type PublicState = {
   phase: Phase;
   buildings: GameState['buildings'];
   roads: GameState['roads'];
-  robber: string;
   bank: Hand;
   /** Wie viele Entwicklungskarten im laufenden Pack noch liegen. */
   deckLeft: number;
@@ -54,6 +61,8 @@ export type PublicState = {
   lastRoll: [number, number] | null;
   targetPoints: number;
   largestArmy: PlayerId | null;
+  /** Die offene Kartenwahl - fuer alle sichtbar, gewaehlt wird vom Spieler am Zug. */
+  draft: GameState['draft'];
   /**
    * Das offene Handelsangebot. Bewusst unredigiert: alle muessen sehen,
    * was geboten wird, sonst laesst sich nicht darauf antworten. Auch die
@@ -75,6 +84,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
       devCount: p.dev.filter((d) => !d.played).length,
       playedKnights: p.playedKnights,
       pieces: { ...p.pieces },
+      cards: [...p.cards],
       connected: p.connected,
       points: publicPoints(state, p.id),
     };
@@ -105,7 +115,6 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     phase: state.phase,
     buildings: state.buildings,
     roads: state.roads,
-    robber: state.robber,
     bank: { ...state.bank },
     deckLeft: state.deck.length,
     turn: state.turn,
@@ -113,6 +122,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     lastRoll: state.lastRoll,
     targetPoints: state.targetPoints,
     largestArmy: state.largestArmy,
+    draft: state.draft,
     trade: state.trade,
     myPoints: (me ? publicPoints(state, viewer) : 0) + hidden,
   };
@@ -121,13 +131,11 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
 /**
  * Ereignisse fuer einen Empfaenger saeubern.
  *
- * Betrifft praktisch nur das Klauen: Bestohlener und Dieb duerfen wissen,
- * welche Karte gewandert ist, alle anderen nur, DASS etwas gewandert ist.
+ * Derzeit ist nichts zu verbergen: seit der Raeuber fort ist, gibt es keinen
+ * Diebstahl mehr, und alle uebrigen Ereignisse sind oeffentlich. Die Stelle
+ * bleibt trotzdem bestehen - die naechste Karte mit verdeckter Wirkung
+ * braucht sie wieder, und dann soll man sie nicht erst suchen muessen.
  */
-export function redactEventsFor(events: GameEvent[], viewer: PlayerId): GameEvent[] {
-  return events.map((e) => {
-    if (e.t !== 'steal') return e;
-    if (e.from === viewer || e.to === viewer) return e;
-    return { ...e, resource: null };
-  });
+export function redactEventsFor(events: GameEvent[], _viewer: PlayerId): GameEvent[] {
+  return events;
 }

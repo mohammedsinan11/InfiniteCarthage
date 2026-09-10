@@ -6,6 +6,7 @@
 import type { GameEvent } from '../core/rules/reducer';
 import type { PublicState } from '../core/redact';
 import type { Bundle, Resource } from '../core/types';
+import { cardById } from '../core/cards/catalog';
 
 const RES_NAME: Record<Resource, string> = {
   lumber: 'Holz',
@@ -60,12 +61,6 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
     }
     case 'build':
       return `${who(state, e.player)} baut ${BUILD_NAME[e.kind]}.`;
-    case 'robber':
-      return `${who(state, e.player)} versetzt den Raeuber.`;
-    case 'steal':
-      return e.resource === null
-        ? `${who(state, e.to)} nimmt ${who(state, e.from)} eine Karte ab.`
-        : `${who(state, e.to)} nimmt ${who(state, e.from)} ${RES_NAME[e.resource]} ab.`;
     case 'discard':
       return `${who(state, e.player)} wirft ${e.count} Karten ab.`;
     case 'buyDev':
@@ -96,6 +91,10 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
         : `Die Karte waechst um ${e.coords.length} Gebiete.`;
     case 'turn':
       return `${who(state, e.player)} ist am Zug.`;
+    case 'draftOffered':
+      return `${who(state, e.player)} darf eine von drei Karten waehlen.`;
+    case 'cardTaken':
+      return `${who(state, e.player)} nimmt ${cardById(e.card)?.name ?? 'eine Karte'}.`;
     case 'win':
       return `${who(state, e.player)} gewinnt!`;
   }

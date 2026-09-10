@@ -13,6 +13,7 @@ import type { World } from '../world';
 import { RESOURCES, TERRAIN_RESOURCE } from '../types';
 import type { Resource } from '../types';
 import type { GameState, PlayerId } from '../state';
+import { modifiersOf, terrainBonusFor } from '../cards/effects';
 import { emptyHand } from '../state';
 import type { Hand } from '../state';
 
@@ -42,26 +43,31 @@ export type ProductionSource = {
  */
 export function productionSources(
   /**
-   * Nur belegte Ecken und die Raeuberstellung werden gelesen - beides
+   * Gelesen werden nur belegte Ecken und die Karten der Spieler - beides
    * oeffentlich. So passt auch die redigierte Sicht des Clients hinein und
    * die Ertragsregel bleibt einmalig.
    */
-  state: Pick<GameState, 'buildings' | 'robber'>,
+  state: Pick<GameState, 'buildings'> & { players: ReadonlyArray<{ id: PlayerId; cards: string[] }> },
   world: World,
   roll: number,
 ): ProductionSource[] {
   const out: ProductionSource[] = [];
+  const cardsOf = (id: PlayerId): string[] =>
+    state.players.find((p) => p.id === id)?.cards ?? [];
   for (const tile of world.tiles.values()) {
     if (tile.number !== roll) continue;
     const hk = hexKey(tile.q, tile.r);
-    if (hk === state.robber) continue;
     const resource = TERRAIN_RESOURCE[tile.terrain];
     if (resource === null) continue;
 
     for (const v of hexVertices(tile.q, tile.r)) {
       const b = state.buildings[vertexKey(v)];
       if (b === undefined) continue;
-      out.push({ hex: hk, owner: b.owner, resource, amount: b.type === 'city' ? 2 : 1 });
+      const grund = b.type === 'city' ? 2 : 1;
+      // Karten koennen den Ertrag heben oder senken, aber nie unter null.
+      const mods = modifiersOf(cardsOf(b.owner));
+      const amount = terrainBonusFor(mods, tile.terrain, grund);
+      if (amount > 0) out.push({ hex: hk, owner: b.owner, resource, amount });
     }
   }
   return out;

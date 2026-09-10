@@ -7,7 +7,7 @@ import {
 } from '../src/core/rules/placement';
 import { currentPlayerId, playerById } from '../src/core/state';
 import type { Hand, PlayerId } from '../src/core/state';
-import { stealCandidatesServer, discardCount } from '../src/core/rules/robber';
+import { discardCount } from '../src/core/rules/discard';
 import { redactStateFor } from '../src/core/redact';
 import { bundleSize, hasBundle } from '../src/core/rules/trade';
 import { RESOURCES } from '../src/core/types';
@@ -44,9 +44,10 @@ function runSetup(game: Game): void {
 }
 
 /** Nach dem Wurf eine eventuelle Sieben abarbeiten, bis gebaut werden darf. */
+/** Nach dem Wurf eine eventuelle Sieben abarbeiten: abwerfen, dann waehlen. */
 function resolveSeven(game: Game): void {
   let guard = 0;
-  while (phaseOf(game) === 'discard' || phaseOf(game) === 'moveRobber') {
+  while (phaseOf(game) === 'discard' || phaseOf(game) === 'draft') {
     if (guard++ > 20) throw new Error('Siebener-Phase endet nicht');
     const ph = game.state.phase;
     if (ph.t === 'discard') {
@@ -61,12 +62,9 @@ function resolveSeven(game: Game): void {
       }
       must(game, { t: 'discard', cards }, pid);
     } else {
+      // Der Fund: die erste angebotene Karte nehmen.
       const cur = currentPlayerId(game.state);
-      const target = [...game.world.tiles.values()].find((t) => {
-        const k = t.q + ':' + t.r;
-        return k !== game.state.robber && stealCandidatesServer(game.state, k, cur).length === 0;
-      })!;
-      must(game, { t: 'moveRobber', hex: target.q + ':' + target.r }, cur);
+      must(game, { t: 'chooseCard', card: game.state.draft!.options[0]! }, cur);
     }
   }
 }

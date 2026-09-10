@@ -13,6 +13,7 @@ import type { Bundle, Resource } from '../types';
 import { handSize, playerById } from '../state';
 import type { GameState, Hand, PlayerId } from '../state';
 import type { BoardView } from './placement';
+import { modifiersOf } from '../cards/effects';
 
 export const DEFAULT_RATIO = 4;
 
@@ -21,7 +22,7 @@ export const DEFAULT_RATIO = 4;
  * hinlegen muss: 2 mit passendem 2:1-Hafen, 3 mit 3:1-Hafen, sonst 4.
  */
 export function tradeRatio(
-  state: BoardView,
+  state: BoardView & { players?: ReadonlyArray<{ id: PlayerId; cards: string[] }> },
   world: World,
   player: PlayerId,
   give: Resource,
@@ -31,10 +32,16 @@ export function tradeRatio(
     if (b.owner !== player) continue;
     const port = portAt(world, vk);
     if (port === undefined) continue;
-    if (port === give) return 2; // besser geht es nicht
+    if (port === give) {
+      ratio = 2;
+      break; // besser geht es ueber Haefen nicht
+    }
     if (port === 'any') ratio = Math.min(ratio, 3);
   }
-  return ratio;
+  // Karten koennen den Handel guenstiger machen - aber nie unter zwei, sonst
+  // waere Tauschen kein Handel mehr, sondern eine Umbenennung.
+  const karten = state.players?.find((p) => p.id === player)?.cards ?? [];
+  return Math.max(2, ratio - modifiersOf(karten).tradeDiscount);
 }
 
 /** Alle Haefen, an denen dieser Spieler sitzt - fuer die Anzeige. */

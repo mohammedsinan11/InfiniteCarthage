@@ -1,7 +1,8 @@
 # Entwurf: Karten, Wuerfel, Held
 
-Kein fertiger Plan, sondern ein Vorschlag zum Widersprechen. Was hier steht,
-ist noch nicht gebaut.
+Vorschlag zum Widersprechen. **Schritt 1 und 2 sind inzwischen gebaut** -
+Raeuber raus, Sieben wird Fund, Kartengeruest samt Dauerwirkungen. Der Rest
+steht noch aus; siehe die Liste am Ende.
 
 ## Wohin das Spiel geht
 
@@ -166,10 +167,24 @@ das Geruest schon.
 
 ## Vorschlag zum Vorgehen
 
-1. **Raeuber raus, Sieben wird Fund** — klein, sofort spuerbar, macht das
-   Alleinspiel stimmiger.
-2. **Kartengeruest** — Typen, Katalog, Auswahlfunktion, Draft-Phase, zehn
-   Karten zum Ausprobieren.
-3. **Dauerwirkungen** — der Eingriff in Ertrag und Kosten.
-4. **Markt und Kosten** — die Runden-Karten, die etwas kosten.
-5. **Held** — erst wenn Karten stehen.
+1. ~~**Raeuber raus, Sieben wird Fund**~~ — gebaut.
+2. ~~**Kartengeruest**~~ — gebaut: Typen, Katalog mit 15 Karten,
+   Auswahlfunktion, Draft-Phase.
+3. ~~**Dauerwirkungen**~~ — gebaut: Ertrag, Bankhandel und Handkartengrenze
+   fragen die Karten.
+4. **Belohnung nach grosser Runde** — dieselbe Mechanik, andere Quelle. Klein.
+5. **Markt und Kosten** — die Runden-Karten, die etwas kosten. Braucht eine
+   Kaufentscheidung und damit etwas mehr Oberflaeche.
+6. **Held** — erst wenn Karten stehen.
+
+### Was beim Bauen aufgefallen ist
+
+- **Der Ritter hat seine Aufgabe verloren.** Ohne Raeuber zaehlt er nur noch
+  fuer die Groesste Rittermacht. Das ist ehrlich, aber duenn - er waere ein
+  Kandidat, ganz durch Karten ersetzt zu werden.
+- **"Nimm beliebige Rohstoffe" verteilt derzeit gleichmaessig**, statt zu
+  fragen. Eine echte Wahl waere eine eigene Phase; das lohnt erst, wenn es
+  mehr solcher Karten gibt.
+- **Das Abwerfen bei ueber sieben Handkarten ist geblieben.** Es ist die
+  einzige Bremse gegen das Horten, und zwei Karten heben die Grenze an -
+  damit ist es Teil des Kartenspiels statt einer reinen Strafe.
