@@ -164,9 +164,9 @@ wuerden.
 | **Einheiten-Sprites** | `raeuber.png`, `goblin.png`, `ritter.png`, spaeter je Einheit | Werden ohne Codeaenderung gezeichnet (README in `src/assets/units`). Fuer Bewegung spaeter zwei Blickrichtungen. |
 | **Kartenrahmen je Seltenheit** | 5 Rahmen, dazu Glanz als Einzelbildfolge | Ersetzt die CSS-Glut, Funken und Strahlen. Legendaer darf animiert sein, der Rest eher nicht. |
 | **Kartenrueckseite** | 1 Motiv | Fuer das Austeilen - derzeit fliegen die Vorderseiten herein. |
-| **Ritter-Farbmaske** | 1 Datei neben `ritter.png` | Wachen stehen inzwischen als Figuren an den Siedlungen; ein Sprite koennte die Spielerfarbe aber noch nicht tragen. |
-| **Abwehr und Pluenderung** | kurze Einzelbildfolgen | Derzeit nur Meldung und Klang. Ein Schwertblitz am Nest, eine Staubwolke an der Siedlung. |
-| **Klaenge** | Aufnahmen oder komponiert | Ertrag, Karte nehmen (je Seltenheit), Wache, Abwehr, Pluenderung zuerst. |
+| **Ritter-Farbmaske** | 1 Datei neben `ritter.png` | Ritter ziehen in Spielerfarbe ueber die Karte; ein Sprite koennte die Farbe aber noch nicht tragen. |
+| **Pluenderung** | kurze Einzelbildfolge | Derzeit nur Meldung und Klang. Eine Staubwolke an der Siedlung, wenn ein Raubzug ankommt. |
+| **Klaenge** | Aufnahmen oder komponiert | Ertrag, Karte nehmen (je Seltenheit), Marsch, Gefecht, Pluenderung, Ruine zuerst. |
 | **Ruinen-Sprite** | `ruine.png`, besser 2-3 Varianten | Ersetzt die Pixelsaeulen. Eine erkundete Ruine verschwindet derzeit - eine "leere" Variante waere schoener. |
 | **Nebel** | weiche Kante, evtl. ziehende Schwaden | Derzeit harte Tönung je Feld. Ein Uebergang am Sichtrand wuerde das meiste bringen. |
 | **Befehlsanzeige** | Fahne, Wegmarken, Auswahlring | Derzeit SVG-Formen. Eine gezeichnete Fahne und Fussspuren statt Strichlinie. |
