@@ -123,6 +123,11 @@ ohne Raeuber, und eine Karte kann die Grenze anheben.
 
 ## Raeuber, zweiter Anlauf
 
+> **Inzwischen abgeloest** vom Heer (`core/rules/army.ts`): Raeuber ziehen als
+> Einheiten ueber die Karte und pluendern erst bei Ankunft, Ritter stehen als
+> Figuren auf Feldern und stellen sie. Der Abschnitt bleibt als Weg dorthin
+> stehen.
+
 Der alte Raeuber ist gefallen, weil er einen zweiten Spieler zum Schaedigen
 brauchte. Was zurueckkommt, ist etwas anderes: **Nester**, die auf der Karte
 liegen wie das Gelaende, aus demselben Seed abgeleitet, und die alle fuenf
@@ -222,12 +227,16 @@ das Geruest schon.
 6. **Belohnung nach grosser Runde** — dieselbe Mechanik, andere Quelle. Klein.
 7. **Markt und Kosten** — die Runden-Karten, die etwas kosten. Braucht eine
    Kaufentscheidung und damit etwas mehr Oberflaeche.
-8. **Einheiten** — produzieren, ein Hex je Runde ziehen, eine Siedlung halten.
-   Deutlich groesser als alles bisher. *Vorstufe gebaut:* Einheiten stehen
-   sichtbar auf Feldern - Raeuber und Goblins in den Lagern, Ritter als Wachen an
-   den Siedlungen (`core/units.ts`). Noch abgeleitet statt gespeichert; sobald
-   sie sich bewegen, wandern sie in den Spielstand, und das Zeichnen bleibt.
-9. **Belagerung** — Truppen zum Nest schicken und es zerstoeren.
+8. ~~**Einheiten**~~ — gebaut: Ritter (angeworben oder per Karte), Raeuber und
+   Goblins stehen im Spielstand und ziehen ein Feld je Runde. Raubzuege brechen
+   zum Beginn jeder grossen Runde aus Lagern bis 10 Felder vor einer Siedlung auf
+   und pluendern erst bei Ankunft. Ritter stellen, wer ihnen nahe kommt
+   (Wurf ab 3).
+9. ~~**Belagerung**~~ — gebaut: Ritter auf einem Lager treffen ab 4, die
+   Besatzung ab 6. Faellt das Lager, gibt es Beute - eine Kartenwahl.
+   *Erkundung:* Nebel ausserhalb der Sicht, Ruinen mit Schatz, Beute, alter
+   Karte oder Hinterhalt. Offen: der Held selbst, und ob Einheiten zu mehreren
+   langsamer ziehen sollen - die Runde ist der Spielerzug.
 10. **Held** — erst wenn Karten und Einheiten stehen.
 
 ### Was beim Bauen aufgefallen ist

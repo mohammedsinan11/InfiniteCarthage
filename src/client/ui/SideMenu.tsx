@@ -31,6 +31,8 @@ import {
 import { cardById } from '../../core/cards/catalog';
 import { modifiersOf } from '../../core/cards/effects';
 import type { Terrain } from '../../core/types';
+import type { UnitState } from '../../core/state';
+import { hexDistance } from '../../core/coords';
 import { getVolume, initAudio, setVolume } from '../audio';
 import { LogPanel } from './LogPanel';
 import type { WeltEintrag } from '../net/store';
@@ -43,7 +45,7 @@ const REITER: ReadonlyArray<{ id: Reiter; kurz: string; titel: string }> = [
   { id: 'reich', kurz: 'RE', titel: 'Reich' },
   { id: 'karten', kurz: 'KA', titel: 'Karten' },
   { id: 'technik', kurz: 'TE', titel: 'Technik' },
-  { id: 'auftraege', kurz: 'AU', titel: 'Auftraege' },
+  { id: 'auftraege', kurz: 'HA', titel: 'Helden & Auftraege' },
   { id: 'ton', kurz: 'TO', titel: 'Ton' },
 ];
 
@@ -86,8 +88,16 @@ export function SideMenu({
   cards,
   log,
   welt,
-  wachen,
-  bedroht,
+  ritter,
+  lage,
+  befehl,
+  beute,
+  befehleMoeglich,
+  beuteMoeglich,
+  onBefehl,
+  onHalt,
+  onZeigen,
+  onBeute,
   showNumbers,
   onToggleNumbers,
 }: {
@@ -98,10 +108,22 @@ export function SideMenu({
   log: string[];
   /** Was der Welt geschehen ist - Pluenderungen, Zeitenwechsel. */
   welt: readonly WeltEintrag[];
-  /** Stehende Wachen des Betrachters. */
-  wachen: number;
-  /** Nester, die ihn bei der naechsten Pluenderung erreichen. */
-  bedroht: number;
+  /** Die eigenen Ritter. */
+  ritter: readonly UnitState[];
+  /** Raubzuege unterwegs und wie nah der naechste den eigenen Siedlungen ist. */
+  lage: { unterwegs: number; naechster: number | null };
+  /** Ritter, der gerade auf sein Ziel wartet. */
+  befehl: number | null;
+  /** Uneingeloeste Beute. */
+  beute: number;
+  /** Duerfen gerade Befehle gegeben werden (eigener Zug)? */
+  befehleMoeglich: boolean;
+  /** Darf gerade Beute eingeloest werden (eigene Bauphase)? */
+  beuteMoeglich: boolean;
+  onBefehl: (id: number) => void;
+  onHalt: (id: number) => void;
+  onZeigen: (id: number) => void;
+  onBeute: () => void;
   showNumbers: boolean;
   onToggleNumbers: () => void;
 }) {
@@ -111,7 +133,7 @@ export function SideMenu({
   const [musik, setMusik] = useState<MusicMode>(getMusicMode);
 
   const saison = seasonOf(turn);
-  // Gepluendert wird zum Beginn jeder grossen Runde (bigRoundChangedAt).
+  // Raubzuege brechen zum Beginn jeder grossen Runde auf (rules/army.ts, sendRaiders).
   const bisPluenderung = ROUNDS_PER_BIG_ROUND - ((Math.max(1, turn) - 1) % ROUNDS_PER_BIG_ROUND);
 
   if (!offen) {
@@ -166,24 +188,26 @@ export function SideMenu({
             <NochNicht was="Bevoelkerung und Beliebtheit" />
 
             {/*
-              Die Lage vor der naechsten Pluenderung - genau das braucht man,
-              um zu entscheiden, ob sich ein Ritter lohnt: wie viele Nester
-              reichen heran, wie viele Wachen stehen, wann ist es so weit.
+              Die Lage draussen: wie viele Raubzuege unterwegs sind, wie nah der
+              naechste schon ist, und wann die naechsten aufbrechen - genau das
+              braucht man, um zu entscheiden, wohin die Ritter sollen.
             */}
-            <h3>Wache</h3>
+            <h3>Lage</h3>
             <div className="menu-wache">
-              <span>Nester in Reichweite</span>
-              <b className={bedroht > wachen ? 'gefahr' : undefined}>{bedroht}</b>
-              <span>Stehende Wachen</span>
-              <b>{wachen}</b>
-              <span>Naechste Pluenderung</span>
+              <span>Raubzuege unterwegs</span>
+              <b className={lage.unterwegs > 0 ? 'gefahr' : undefined}>{lage.unterwegs}</b>
+              <span>Naechster bis zu dir</span>
+              <b className={lage.naechster !== null && lage.naechster <= 3 ? 'gefahr' : undefined}>
+                {lage.naechster === null ? '-' : `${lage.naechster} Felder`}
+              </b>
+              <span>Deine Ritter</span>
+              <b>{ritter.length}</b>
+              <span>Naechster Aufbruch</span>
               <b>{bisPluenderung === 1 ? 'naechste Runde' : `in ${bisPluenderung} Runden`}</b>
               <span className="menu-wache-hinweis">
-                {bedroht === 0
-                  ? 'Kein Nest erreicht dich.'
-                  : bedroht <= wachen
-                    ? 'Deine Wachen halten alle Nester ab.'
-                    : `${bedroht - wachen} ${bedroht - wachen === 1 ? 'Nest kommt' : 'Nester kommen'} durch. Ein Ritter stellt eine Wache auf.`}
+                {lage.unterwegs === 0
+                  ? 'Ruhig. Zum Beginn jeder grossen Runde brechen Raubzuege aus nahen Lagern auf.'
+                  : 'Raeuber pluendern erst, wenn sie eine Siedlung erreichen. Ein Ritter in ihrem Weg stellt sie.'}
               </span>
             </div>
 
@@ -262,8 +286,63 @@ export function SideMenu({
 
         {reiter === 'auftraege' && (
           <>
+            {/*
+              Die Ritter: wo sie stehen, wohin sie ziehen. Von hier bekommen sie
+              ihre Befehle. Auf der Karte waehlt ein Klick auf den eigenen Ritter
+              ihn ebenso aus.
+            */}
+            <h3>Ritter</h3>
+            {ritter.length === 0 ? (
+              <p className="menu-leer">
+                Noch keine. Anwerben in der Leiste unten oder eine Ritterkarte ausspielen.
+              </p>
+            ) : (
+              <ul className="menu-ritter">
+                {ritter.map((u, i) => {
+                  const weit = u.ziel ? hexDistance(u, u.ziel) : 0;
+                  return (
+                    <li key={u.id} className={befehl === u.id ? 'aktiv' : undefined}>
+                      <div className="menu-ritter-kopf">
+                        <span className="menu-ritter-name">Ritter {i + 1}</span>
+                        <span className="menu-ritter-ort">
+                          {u.ziel ? `zieht, noch ${weit} ${weit === 1 ? 'Feld' : 'Felder'}` : 'steht'}
+                        </span>
+                      </div>
+                      <div className="menu-ritter-knoepfe">
+                        <button onClick={() => onZeigen(u.id)}>Zeigen</button>
+                        <button
+                          disabled={!befehleMoeglich}
+                          className={befehl === u.id ? 'aktiv' : ''}
+                          onClick={() => onBefehl(u.id)}
+                        >
+                          {befehl === u.id ? 'Waehle Ziel' : 'Ziel'}
+                        </button>
+                        <button disabled={!befehleMoeglich || !u.ziel} onClick={() => onHalt(u.id)}>
+                          Halt
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+
+            <h3>Beute</h3>
+            {beute === 0 ? (
+              <p className="menu-leer">Zerstoerte Lager und erkundete Ruinen bringen Beute.</p>
+            ) : (
+              <div className="menu-liste">
+                <button className="aktiv" disabled={!beuteMoeglich} onClick={onBeute}>
+                  {beute} {beute === 1 ? 'Kartenwahl' : 'Kartenwahlen'} einloesen
+                </button>
+              </div>
+            )}
+
+            <h3>Helden</h3>
+            <NochNicht was="Der Held" />
+
             <h3>Auftraege</h3>
-            <NochNicht was="Auftraege, Ereignisse und Helden" />
+            <NochNicht was="Auftraege" />
           </>
         )}
 

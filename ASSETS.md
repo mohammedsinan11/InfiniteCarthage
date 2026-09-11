@@ -71,21 +71,29 @@ Piktogramme, und in sechs Spielerfarben lesbar bleiben.
 *Aufwand:* 3 Formen x 6 Farben, oder 3 Graustufenbilder, die eingefaerbt
 werden.
 
-### Figuren: Lager, Raeuber, Goblins, Ritter — **Platzhalter, sprite-bereit**
+### Figuren: Lager, Ruinen, Raeuber, Goblins, Ritter — **Platzhalter, sprite-bereit**
 
 `src/client/units.ts`: kleine Pixelkarten aus Zeichen, gezeichnet im Kunstpixel
 der Kacheln auf dem Canvas - also im selben Raster wie die Karte und von den
-Kacheln davor richtig verdeckt. Das ersetzt den frueheren Vektor-Marker fuer
-Nester, dessen Stilbruch hier notiert war.
+Kacheln davor richtig verdeckt.
 
-Zu sehen: das Lager selbst (Zelt, Palisade, Wimpel), zwei bis drei Bewohner
-davor - Raeuber oder, in etwa jedem dritten Nest, Goblins -, und die Wachen
-eines Spielers als Ritter in seiner Farbe an seinen Siedlungen.
+Zu sehen: Lager (Zelt, Palisade, Wimpel) mit ihrer Besatzung davor, noch nicht
+erkundete Ruinen (zwei Saeulen auf einem Sockel), Raubzuege, die ueber die Karte
+ziehen, und die Ritter der Spieler in ihrer Farbe. Alle Figuren blicken nach
+vorn und haben keine Laufanimation - sie springen je Runde ein Feld weiter.
 
 **Sprites ohne Codeaenderung:** `raeuber.png`, `goblin.png`, `ritter.png`,
-`lager.png` nach `src/assets/units/` legen. Format und Anker stehen im README
-dort. Offen: eine Farbmaske fuer Ritter-Sprites, damit sie die Spielerfarbe
-tragen.
+`lager.png`, `ruine.png` nach `src/assets/units/` legen. Format und Anker stehen
+im README dort. Offen: eine Farbmaske fuer Ritter-Sprites, damit sie die
+Spielerfarbe tragen.
+
+### Nebel und Befehle — **Platzhalter**
+
+- **Nebel:** Kacheln ausserhalb der Sicht werden blaeulich eingetruebt
+  (`tiles.ts`, `tileImageFog`). Harte Kanten je Feld, keine Bewegung.
+- **Befehle:** gestrichelte Linie vom Ritter zum Ziel, eine Dreiecksfahne in
+  Spielerfarbe, ein kreisender Ring um den ausgewaehlten Ritter, ein gelb
+  umrandetes Feld unter dem Zeiger (SVG in `Board.tsx`).
 
 ### Zahlenmarker und Haefen — **tragbar**
 
@@ -159,6 +167,11 @@ wuerden.
 | **Ritter-Farbmaske** | 1 Datei neben `ritter.png` | Wachen stehen inzwischen als Figuren an den Siedlungen; ein Sprite koennte die Spielerfarbe aber noch nicht tragen. |
 | **Abwehr und Pluenderung** | kurze Einzelbildfolgen | Derzeit nur Meldung und Klang. Ein Schwertblitz am Nest, eine Staubwolke an der Siedlung. |
 | **Klaenge** | Aufnahmen oder komponiert | Ertrag, Karte nehmen (je Seltenheit), Wache, Abwehr, Pluenderung zuerst. |
+| **Ruinen-Sprite** | `ruine.png`, besser 2-3 Varianten | Ersetzt die Pixelsaeulen. Eine erkundete Ruine verschwindet derzeit - eine "leere" Variante waere schoener. |
+| **Nebel** | weiche Kante, evtl. ziehende Schwaden | Derzeit harte Tönung je Feld. Ein Uebergang am Sichtrand wuerde das meiste bringen. |
+| **Befehlsanzeige** | Fahne, Wegmarken, Auswahlring | Derzeit SVG-Formen. Eine gezeichnete Fahne und Fussspuren statt Strichlinie. |
+| **Laufanimation** | 2-4 Einzelbilder je Einheit | Einheiten springen je Runde ein Feld. Ein kurzes Gleiten mit Schrittbildern wuerde Bewegung lesbar machen. |
+| **Gefecht und Belagerung** | kurze Einzelbildfolgen | Derzeit nur Meldung und Klang. Ein Schwertblitz, eine Rauchwolke ueber einem fallenden Lager. |
 | **Gegner und Kampf** | offen | Sobald der Held kaempfen soll. |
 | **Menuereiter** | 4 bis 8 Symbole | Derzeit stehen dort Kuerzel wie "RE" und "TE". Das ist offensichtlich vorlaeufig. |
 

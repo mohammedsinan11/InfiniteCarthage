@@ -10,6 +10,7 @@ bzw. den Dev-Server neu laden.
 | `goblin.png` | Bewohner eines Goblinlagers (etwa jedes dritte Nest) |
 | `ritter.png` | Wache eines Spielers, steht an seinen Siedlungen |
 | `lager.png` | Das Nest selbst - Zelt, Palisade |
+| `ruine.png` | Eine noch nicht erkundete Ruine |
 
 ## Format
 

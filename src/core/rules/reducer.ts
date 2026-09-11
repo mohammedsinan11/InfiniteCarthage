@@ -14,6 +14,7 @@
 import { Rng } from '../rng';
 import {
   edgeEndpoints,
+  hexKey,
   parseEdgeKey,
   parseVertexKey,
   vertexAdjacentHexes,
@@ -44,6 +45,7 @@ import type { Bundle } from '../types';
 import {
   COST_CITY,
   COST_DEV,
+  COST_KNIGHT,
   COST_ROAD,
   COST_SETTLEMENT,
   canAfford,
@@ -56,9 +58,10 @@ import {
   legalRoadEdges,
 } from './placement';
 import { computeProduction } from './production';
-import { runRaid } from './raid';
-import type { RaidHit } from './raid';
-import { bigRoundChangedAt, roundOf } from '../season';
+import { sendRaiders, spawnKnight, tickArmy } from './army';
+import type { ArmyEvent } from './army';
+import { nextStep } from '../units';
+import { bigRoundChangedAt } from '../season';
 import { draftOptions } from '../cards/draft';
 import { cardById } from '../cards/catalog';
 import type { DraftSource } from '../cards/types';
@@ -95,18 +98,18 @@ export type Action =
   | { t: 'cancelTrade' }
   /** Eine der drei angebotenen Karten nehmen. */
   | { t: 'chooseCard'; card: string }
+  /** Einen Ritter anwerben - er tritt an einer eigenen Siedlung an. */
+  | { t: 'recruitKnight' }
+  /** Einem eigenen Ritter ein Ziel geben. Sein eigenes Feld als Ziel heisst: halt. */
+  | { t: 'orderUnit'; unit: number; q: number; r: number }
+  /** Eine Beute einloesen: eine Kartenwahl. */
+  | { t: 'claimLoot' }
   | { t: 'endTurn' };
 
 export type GameEvent =
   | { t: 'roll'; player: PlayerId; dice: [number, number] }
   | { t: 'production'; payout: Record<PlayerId, Hand>; shortfall: Resource[] }
   | { t: 'build'; player: PlayerId; kind: 'road' | 'settlement' | 'city'; at: string }
-  | {
-      t: 'raid';
-      round: number;
-      /** Je Spieler ein Eintrag. `taken` ist fuer Fremde redigiert. */
-      hits: RaidHit[];
-    }
   | { t: 'buyDev'; player: PlayerId }
   | { t: 'playDev'; player: PlayerId; card: DevCardType }
   | { t: 'yearOfPlenty'; player: PlayerId; a: Resource; b: Resource }
@@ -117,13 +120,13 @@ export type GameEvent =
   | { t: 'tradeSettled'; from: PlayerId; to: PlayerId; give: Bundle; want: Bundle }
   | { t: 'tradeCancelled'; player: PlayerId }
   | { t: 'largestArmy'; player: PlayerId }
-  /** Ein Ritter bezieht Wache; guards ist der neue Stand. */
-  | { t: 'guard'; player: PlayerId; guards: number }
   | { t: 'draftOffered'; player: PlayerId; source: DraftSource; options: string[] }
   | { t: 'cardTaken'; player: PlayerId; card: string }
   | { t: 'chunks'; coords: ChunkCoord[] }
   | { t: 'turn'; player: PlayerId }
-  | { t: 'win'; player: PlayerId };
+  | { t: 'win'; player: PlayerId }
+  /** Heer, Raubzuege, Gefechte, Lager und Ruinen - siehe rules/army.ts. */
+  | ArmyEvent;
 
 export type Game = { state: GameState; world: World };
 
@@ -184,7 +187,7 @@ export function createGame(
       dev: [],
       playedKnights: 0,
       cards: [],
-      guards: 0,
+      loot: 0,
       connected: true,
     })),
     order: players.map((p) => p.id),
@@ -209,6 +212,11 @@ export function createGame(
     trade: null,
     draft: null,
     chunks: added,
+    units: [],
+    nextUnitId: 1,
+    destroyedNests: [],
+    nestGarrison: {},
+    exploredRuins: [],
   };
 
   return { state, world };
@@ -290,8 +298,16 @@ function devPlayGuard(state: GameState, p: Player, type: DevCardType): string | 
  * Runde fest, werden aber in den Spielstand geschrieben - so sehen die
  * Clients dieselben drei, ohne den geheimen Seed zu kennen.
  */
-function enterDraft(state: GameState, source: DraftSource, events: GameEvent[]): void {
-  const options = draftOptions(state.secretSeed, state.turn, source);
+function enterDraft(
+  state: GameState,
+  source: DraftSource,
+  events: GameEvent[],
+  salt = 0,
+): void {
+  // Mit salt zeigen mehrere Wahlen derselben Runde verschiedene Karten - etwa
+  // zwei eingeloeste Beuten hintereinander. Ohne salt bleibt alles wie gehabt.
+  const runde = salt === 0 ? state.turn : state.turn * 64 + salt;
+  const options = draftOptions(state.secretSeed, runde, source);
   state.draft = { source, options };
   state.phase = { t: 'draft' };
   events.push({
@@ -552,10 +568,9 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
 
       actorPlayer.dev[findPlayableDev(s, actorPlayer, 'knight')]!.played = true;
       actorPlayer.playedKnights += 1;
-      actorPlayer.guards += 1;
       s.devPlayedThisTurn = true;
       events.push({ t: 'playDev', player: actor, card: 'knight' });
-      events.push({ t: 'guard', player: actor, guards: actorPlayer.guards });
+      spawnKnight(s, actor, events);
 
       const holder = largestArmyHolder(s);
       if (holder !== s.largestArmy && holder !== null) {
@@ -563,9 +578,9 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         events.push({ t: 'largestArmy', player: holder });
       }
       /*
-       * Der Ritter bezieht Wache und haelt bei der naechsten Pluenderung ein
-       * Nest ab (rules/raid.ts). Fuer die Groesste Rittermacht zaehlt er
-       * weiter - die Wache verbraucht sich, der Ruhm nicht.
+       * Der Ritter tritt als Einheit an einer eigenen Siedlung an (rules/army.ts)
+       * und zieht von dort, wohin man ihn schickt. Fuer die Groesste Rittermacht
+       * zaehlt er weiter - auch wenn er spaeter faellt.
        */
       checkWin(s, events);
       break;
@@ -707,17 +722,61 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       break;
     }
 
+    // --- Heer ---
+    case 'recruitKnight': {
+      if (phase.t !== 'main') return fail('Jetzt kann niemand angeworben werden.');
+      if (!canAfford(actorPlayer.hand, COST_KNIGHT)) {
+        return fail('Zu wenig Rohstoffe fuer einen Ritter.');
+      }
+      pay(actorPlayer.hand, s.bank, COST_KNIGHT);
+      if (!spawnKnight(s, actor, events)) {
+        return fail('Keine Siedlung, an der ein Ritter antreten koennte.');
+      }
+      break;
+    }
+
+    case 'orderUnit': {
+      if (phase.t !== 'main' && phase.t !== 'roll') {
+        return fail('Jetzt koennen keine Befehle gegeben werden.');
+      }
+      const einheit = s.units.find((u) => u.id === action.unit);
+      if (!einheit) return fail('Diese Einheit gibt es nicht.');
+      if (einheit.owner !== actor || einheit.kind !== 'ritter') {
+        return fail('Das ist nicht dein Ritter.');
+      }
+      if (action.q === einheit.q && action.r === einheit.r) {
+        einheit.ziel = null;
+        break;
+      }
+      const feld = tileAt(world, action.q, action.r);
+      if (!feld) return fail('Dieses Feld ist noch nicht erkundet.');
+      if (feld.terrain === 'water') return fail('Ritter gehen nicht uebers Wasser.');
+      if (!nextStep(s.worldSeed, einheit, new Set([hexKey(action.q, action.r)]))) {
+        return fail('Dorthin fuehrt kein Landweg.');
+      }
+      einheit.ziel = { q: action.q, r: action.r };
+      break;
+    }
+
+    case 'claimLoot': {
+      if (phase.t !== 'main') return fail('Beute wird in der Bauphase eingeloest.');
+      if (actorPlayer.loot <= 0) return fail('Keine Beute vorhanden.');
+      actorPlayer.loot -= 1;
+      enterDraft(s, 'belohnung', events, 1 + actorPlayer.cards.length);
+      break;
+    }
+
     case 'endTurn': {
       if (phase.t !== 'main') return fail('Der Zug laesst sich jetzt nicht beenden.');
       nextTurn(s);
 
-      // Der Takt der Raeuber: zum Beginn jeder grossen Runde. Vor der Meldung
-      // des neuen Zuges, damit die Pluenderung zur alten Runde gehoert und
-      // nicht zum ersten Spieler der neuen.
-      if (bigRoundChangedAt(s.turn)) {
-        const hits = runRaid(s);
-        if (hits.length > 0) events.push({ t: 'raid', round: roundOf(s.turn), hits });
-      }
+      // Jede Runde zieht das Heer ein Feld: Ritter, Raeuber, Gefechte,
+      // Pluenderungen, Belagerungen (rules/army.ts).
+      tickArmy(s, world, events);
+
+      // Zum Beginn jeder grossen Runde brechen neue Raubzuege auf - nach dem
+      // Ziehen, damit ein frischer Raubzug nicht im selben Moment schon pluendert.
+      if (bigRoundChangedAt(s.turn)) sendRaiders(s, events);
 
       events.push({ t: 'turn', player: s.order[s.current]! });
       break;

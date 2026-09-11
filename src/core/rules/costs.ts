@@ -19,6 +19,13 @@ export const COST_SETTLEMENT: Cost = { lumber: 1, brick: 1, wool: 1, grain: 1 };
 export const COST_CITY: Cost = { ore: 3, grain: 2 };
 export const COST_DEV: Cost = { ore: 1, wool: 1, grain: 1 };
 
+/**
+ * Ein Ritter. Erz, weil es Waffen und Ruestung sind; Getreide, weil er essen
+ * muss. Bewusst anders als die Entwicklungskarte: wer gezielt einen Ritter will,
+ * soll nicht auf das Kartendeck hoffen muessen.
+ */
+export const COST_KNIGHT: Cost = { ore: 2, grain: 1 };
+
 export function canAfford(hand: Hand, cost: Cost): boolean {
   for (const r of RESOURCES) {
     const need = cost[r] ?? 0;

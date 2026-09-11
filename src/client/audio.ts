@@ -308,3 +308,20 @@ export function playDefend(): void {
   blip(523, 0.14, 0.12, 0.3, 'triangle');
   blip(784, 0.3, 0.12, 0.4, 'triangle');
 }
+
+// --- Heer -------------------------------------------------------------------
+
+/** Ein Raubzug bricht auf: dumpfe Trommel, drei Schlaege. */
+export function playMarch(): void {
+  for (let i = 0; i < 3; i++) {
+    noise(0.18, 110, 0.45, i * 0.22);
+    blip(82, 0.2, 0.14, i * 0.22, 'sine');
+  }
+}
+
+/** Eine Ruine wird erkundet: ein fallender, hallender Ton, dann ein Schimmer. */
+export function playRuin(): void {
+  glide(660, 330, 0.6, 0.06, 0, 'triangle');
+  blip(988, 0.4, 0.04, 0.35, 'sine');
+  blip(1318, 0.5, 0.03, 0.45, 'sine');
+}

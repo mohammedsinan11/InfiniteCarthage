@@ -7,13 +7,13 @@
  * ASSETS.md beim alten Nest-Marker notiert hatte.
  *
  * SPRITES FOLGEN. Liegt in src/assets/units eine Datei mit dem Namen der Art
- * (raeuber.png, goblin.png, ritter.png, lager.png), wird sie statt des
+ * (raeuber.png, goblin.png, ritter.png, lager.png, ruine.png), wird sie statt des
  * Platzhalters gezeichnet - ohne Codeaenderung. Format: README dort.
  */
 
 import type { UnitKind } from '../core/units';
 
-export type FigurArt = UnitKind | 'lager';
+export type FigurArt = UnitKind | 'lager' | 'ruine';
 
 const PALETTE: Record<string, string> = {
   k: '#1b130d', // Umriss
@@ -73,6 +73,17 @@ const ART: Record<FigurArt, readonly string[]> = {
     '.kMkMk..',
     '.kMkMk..',
     '.kk.kk..',
+  ],
+  ruine: [
+    '..k.....k..',
+    '.kmk...kmk.',
+    '.kmk...kMk.',
+    '.kmk.k.kmk.',
+    '.kmkkmkkmk.',
+    '.kMkkmkkMk.',
+    'kkkkkkkkkkk',
+    'kMMMmMMMmMk',
+    '.kkkkkkkkk.',
   ],
   lager: [
     '......k........',

@@ -17,7 +17,7 @@
 import { useEffect, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import { cardById } from '../../core/cards/catalog';
-import type { Rarity } from '../../core/cards/types';
+import type { DraftSource, Rarity } from '../../core/cards/types';
 import { playCardDeal, playCardHover, playCardPick, playCardVanish } from '../audio';
 
 const RARITY_NAME: Record<Rarity, string> = {
@@ -27,6 +27,9 @@ const RARITY_NAME: Record<Rarity, string> = {
   episch: 'episch',
   legendaer: 'legendaer',
 };
+
+/** Ueberschrift je Herkunft - ein Fund faellt vom Himmel, Beute ist verdient. */
+const TITEL: Record<DraftSource, string> = { fund: 'Ein Fund', belohnung: 'Beute', markt: 'Markt' };
 
 const STUFEN: readonly Rarity[] = ['gewoehnlich', 'ungewoehnlich', 'selten', 'episch', 'legendaer'];
 
@@ -54,10 +57,13 @@ function aufrichten(e: ReactPointerEvent<HTMLButtonElement>): void {
 
 export function CardDraft({
   options,
+  source,
   darfWaehlen,
   onChoose,
 }: {
   options: string[];
+  /** Woher die Wahl kommt - bestimmt die Ueberschrift. */
+  source?: DraftSource;
   /** Nur der Spieler am Zug waehlt - die anderen sehen zu. */
   darfWaehlen: boolean;
   onChoose: (card: string) => void;
@@ -70,7 +76,7 @@ export function CardDraft({
 
   return (
     <div className="draft-overlay">
-      <h2 className="draft-titel">Ein Fund</h2>
+      <h2 className="draft-titel">{TITEL[source ?? 'fund']}</h2>
       <p className="draft-sub">
         {darfWaehlen
           ? 'Waehle eine Karte. Die anderen beiden verfallen.'

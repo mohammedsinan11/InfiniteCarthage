@@ -26,6 +26,8 @@ const DEV_NAME = {
 
 const BUILD_NAME = { road: 'Strasse', settlement: 'Siedlung', city: 'Stadt' } as const;
 
+const FEIND = { raeuber: 'Raeuber', goblin: 'Goblin' } as const;
+
 export const resourceName = (r: Resource): string => RES_NAME[r];
 export const devName = (d: keyof typeof DEV_NAME): string => DEV_NAME[d];
 
@@ -61,15 +63,36 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
     }
     case 'build':
       return `${who(state, e.player)} baut ${BUILD_NAME[e.kind]}.`;
-    case 'raid': {
-      const teile = e.hits.map((h) => {
-        const abgewehrt = h.blocked > 0 ? `${h.blocked} abgewehrt, ` : '';
-        return `${who(state, h.player)}: ${abgewehrt}${h.count} verloren (${h.nests} Nester)`;
-      });
-      return `Raeuber pluendern - ${teile.join(' | ')}`;
-    }
-    case 'guard':
-      return `${who(state, e.player)} stellt eine Wache auf (${e.guards} ${e.guards === 1 ? 'steht' : 'stehen'}).`;
+    case 'knightReady':
+      return `${who(state, e.player)} stellt einen Ritter auf.`;
+    case 'march':
+      return e.parties.length === 1
+        ? `Ein Raubzug bricht auf (${FEIND[e.parties[0]!.kind]}).`
+        : `${e.parties.length} Raubzuege brechen auf.`;
+    case 'fight':
+      return e.knightWon
+        ? `Ein Ritter von ${e.owner ? who(state, e.owner) : 'niemandem'} schlaegt einen ${FEIND[e.foe]} (Wurf ${e.roll}).`
+        : `Ein ${FEIND[e.foe]} bezwingt einen Ritter von ${e.owner ? who(state, e.owner) : 'niemandem'} (Wurf ${e.roll}).`;
+    case 'plunder':
+      return `Ein ${FEIND[e.kind]} pluendert ${who(state, e.player)}: ${e.count} ${e.count === 1 ? 'Karte' : 'Karten'}.`;
+    case 'siege':
+      return `Belagerung: ${e.hits} Treffer, ${e.knightsLost} Ritter gefallen, noch ${e.left} Verteidiger.`;
+    case 'nestDestroyed':
+      return `Ein ${e.kind === 'goblin' ? 'Goblinlager' : 'Raeuberlager'} faellt. Beute fuer ${e.players.map((p) => who(state, p)).join(', ') || 'niemanden'}.`;
+    case 'ruin':
+      switch (e.result) {
+        case 'schatz':
+          return `${who(state, e.player)} findet in einer Ruine ${bundleText(e.gained)}.`;
+        case 'beute':
+          return `${who(state, e.player)} findet in einer Ruine Beute.`;
+        case 'karte':
+          return `${who(state, e.player)} findet in einer Ruine eine alte Karte.`;
+        case 'hinterhalt':
+          return e.knightLost
+            ? `Hinterhalt in einer Ruine - ein Ritter von ${who(state, e.player)} faellt.`
+            : `Hinterhalt in einer Ruine - ${who(state, e.player)} wehrt ihn ab.`;
+      }
+      return '';
     case 'buyDev':
       return `${who(state, e.player)} kauft eine Entwicklungskarte.`;
     case 'playDev':

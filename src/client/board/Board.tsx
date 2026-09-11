@@ -33,11 +33,11 @@ import { playHover } from '../audio';
 import type { Resource } from '../../core/types';
 import { ResourceCard } from '../ui/ResourceIcon';
 import { hexCornerPixel } from '../../core/coords';
-import { nestAt } from '../../core/raiders';
 import { reliefLimitedAt } from '../../core/relief';
 import { edgeAdjacentHexes, vertexAdjacentHexes } from '../../core/coords';
-import { guardUnits, nestUnits } from '../../core/units';
+import { garrisonUnits, isNestActive } from '../../core/units';
 import type { Unit } from '../../core/units';
+import { ruinAt } from '../../core/ruins';
 import { aufstellung, preloadUnitSprites, zeichneFigur } from '../units';
 import {
   HEX_CX,
@@ -48,6 +48,7 @@ import {
   IMG_W,
   preloadTiles,
   tileImage,
+  tileImageFog,
   tileUrl,
 } from '../tiles';
 
@@ -183,6 +184,21 @@ type Props = {
   flights?: Flight[];
   onPick: (kind: 'vertex' | 'edge' | 'hex', key: string) => void;
   /**
+   * Felder, die der Betrachter gerade sieht. Alles andere liegt im Nebel.
+   * null heisst: kein Nebel.
+   */
+  sicht?: Set<string> | null;
+  /** Wer zuschaut - seine Einheiten stehen nie im Nebel. */
+  du?: string | null;
+  /** Klick auf ein Feld melden - fuer Befehle an Ritter. */
+  onHex?: (key: string) => void;
+  /** Ein Befehl wartet auf sein Ziel: das Feld unter dem Zeiger wird markiert. */
+  zielWahl?: boolean;
+  /** Ausgewaehlte Einheit - bekommt einen Ring. */
+  auswahl?: number | null;
+  /** Kamera auf dieses Feld fahren. n wechselt bei jedem neuen Wunsch. */
+  fokus?: { q: number; r: number; n: number } | null;
+  /**
    * Aufgesetzte Anzeigen - Handblatt, Wuerfelknopf, Overlays.
    *
    * Sie gehoeren INS Brett, nicht daneben: nur so beziehen sich ihre
@@ -207,6 +223,12 @@ export function Board({
   flashHexes,
   flights,
   onPick,
+  sicht = null,
+  du = null,
+  onHex,
+  zielWahl = false,
+  auswahl = null,
+  fokus = null,
   children,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
@@ -283,6 +305,15 @@ export function Board({
     [liftHex],
   );
 
+  /** Auf Wunsch zu einem Feld fahren - etwa wenn im Menue ein Ritter gezeigt wird. */
+  useEffect(() => {
+    if (!fokus) return;
+    const p = hexToPixel(fokus.q, fokus.r, LAYOUT);
+    setCam((c) => ({ ...c, cx: p.x, cy: p.y - liftHex(fokus.q, fokus.r) }));
+    // Nur bei einem neuen Wunsch - nicht, wenn sich die Hoehenfunktion aendert.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fokus?.n]);
+
   const view = useMemo(() => {
     /*
      * Der Ausschnitt wird auf das Geraetepixel-Raster gerastet.
@@ -328,11 +359,10 @@ export function Board({
   }, [world, view]);
 
   /**
-   * Wer auf welchem Feld steht - Lagerbewohner und Wachen.
+   * Wer auf welchem Feld steht - Lagerbesatzungen und das Heer.
    *
-   * Aus dem Spielstand abgeleitet (core/units.ts). Nester nur fuer sichtbare
-   * Felder; Wachen stehen an Siedlungen und werden beim Zeichnen ohnehin nur fuer
-   * sichtbare Felder abgefragt.
+   * Das Heer steht im Spielstand (state.units); die Besatzung der Lager wird nur
+   * fuer sichtbare Felder abgeleitet (core/units.ts).
    */
   const besatzung = useMemo(() => {
     const m = new Map<string, Unit[]>();
@@ -342,8 +372,8 @@ export function Board({
       if (liste) liste.push(u);
       else m.set(k, [u]);
     };
-    nestUnits(state.worldSeed, visible).forEach(dazu);
-    guardUnits(state).forEach(dazu);
+    garrisonUnits(state, visible).forEach(dazu);
+    state.units.forEach(dazu);
     return m;
   }, [visible, state]);
 
@@ -371,10 +401,13 @@ export function Board({
     // Das eine, worum es hier geht.
     ctx.imageSmoothingEnabled = false;
 
+    /** Liegt ein Feld im Nebel? Ohne Sichtangabe nie. */
+    const imNebel = (q: number, r: number) => sicht !== null && !sicht.has(hexKey(q, r));
+
     const zeichne = (t: (typeof visible)[number], lift: number) => {
       const url = tileUrl(state.worldSeed, t.terrain, t.q, t.r);
       if (url === null) return;
-      const img = tileImage(url);
+      const img = imNebel(t.q, t.r) ? tileImageFog(url) : tileImage(url);
       if (!img) return;
       const c = hexToPixel(t.q, t.r, LAYOUT);
       const x = Math.round((c.x - IMG.dx - view.x) * scale * DPR);
@@ -393,18 +426,30 @@ export function Board({
      * die Fuesse verdecken - wer hinter einem Wald steht, steht dahinter.
      */
     const zeichneBesatzung = (t: (typeof visible)[number], lift: number) => {
-      const lager = nestAt(state.worldSeed, t.q, t.r);
-      const leute = besatzung.get(hexKey(t.q, t.r));
-      if (!lager && !leute) return;
+      const lager = isNestActive(state, t.q, t.r);
+      const ruine =
+        ruinAt(state.worldSeed, t.q, t.r) && !state.exploredRuins.includes(hexKey(t.q, t.r));
+      const nebel = imNebel(t.q, t.r);
+      // Im Nebel sieht man nur, was man ohnehin kennt - Lager, ihre Besatzung,
+      // Ruinen - und die eigenen Leute. Fremde Einheiten verschwinden darin.
+      const leute = besatzung
+        .get(hexKey(t.q, t.r))
+        ?.filter((u) => !nebel || u.id < 0 || (du !== null && u.owner === du));
+      if (!lager && !ruine && (!leute || leute.length === 0)) return;
       const c = hexToPixel(t.q, t.r, LAYOUT);
       // Ursprung wie in zeichne, damit Figuren im selben Pixelraster sitzen.
       const x0 = Math.round((c.x - IMG.dx - view.x) * scale * DPR);
       const y0 = Math.round((c.y - IMG.dy - lift - view.y) * scale * DPR);
       const mx = x0 + Math.round(HEX_CX) * f;
       const my = y0 + Math.round(HEX_CY) * f;
+      if (nebel) ctx.globalAlpha = 0.6;
       if (lager) zeichneFigur(ctx, 'lager', mx, my + f, f);
-      if (!leute) return;
-      const stellen = aufstellung(leute.length, lager);
+      if (ruine) zeichneFigur(ctx, 'ruine', mx, my + 2 * f, f);
+      if (!leute || leute.length === 0) {
+        ctx.globalAlpha = 1;
+        return;
+      }
+      const stellen = aufstellung(leute.length, lager || ruine);
       leute.slice(0, stellen.length).forEach((u, i) => {
         const [ox, oy] = stellen[i]!;
         const farbe =
@@ -413,6 +458,7 @@ export function Board({
             : playerColor(state.players.find((pl) => pl.id === u.owner)?.color ?? 0);
         zeichneFigur(ctx, u.kind, mx + ox * f, my + oy * f, f, farbe);
       });
+      ctx.globalAlpha = 1;
     };
 
     /*
@@ -475,7 +521,7 @@ export function Board({
       ctx.fillRect(0, 0, bw, bh);
       ctx.restore();
     }
-  }, [visible, view, scale, size, hover, world, state.worldSeed, state.turn, state.players, tilesReady, liftHex, besatzung]);
+  }, [visible, view, scale, size, hover, world, state, tilesReady, liftHex, besatzung, sicht, du]);
 
   /** Eine Stufe naeher (+1) oder weiter weg (-1); der Punkt unter x/y bleibt stehen. */
   const zoomUm = useCallback((richtung: number, mausX: number, mausY: number) => {
@@ -697,8 +743,22 @@ export function Board({
     return beste;
   };
 
-  const onPointerUp = () => {
+  const onPointerUp = (e: React.PointerEvent) => {
+    /*
+     * Ein Klick ohne Ziehen meldet das Feld darunter - fuer Befehle an Ritter.
+     * Ueber pointerup statt click: das Brett faengt den Zeiger ein, ein click
+     * landete dann auf dem Brett statt auf dem Feld.
+     */
+    const warGedrueckt = drag.current !== null;
     drag.current = null;
+    if (!onHex || !warGedrueckt || moved.current || aufBedienelement(e.target)) return;
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+    const h = hexUnter(
+      view.x + (e.clientX - rect.left) / scale,
+      view.y + (e.clientY - rect.top) / scale,
+    );
+    onHex(hexKey(h.q, h.r));
   };
 
   const onPointerLeave = () => {
@@ -752,7 +812,7 @@ export function Board({
   return (
     <div
       ref={ref}
-      className="board"
+      className={zielWahl ? 'board ziel-wahl' : 'board'}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -920,9 +980,62 @@ export function Board({
             />
           );
         })}
+
+        {/* Befehle: Weg und Ziel eigener Ritter. */}
+        {state.units
+          .filter((u) => u.kind === 'ritter' && du !== null && u.owner === du && u.ziel !== null)
+          .map((u) => {
+            const a = hexToPixel(u.q, u.r, LAYOUT);
+            const b = hexToPixel(u.ziel!.q, u.ziel!.r, LAYOUT);
+            const ya = a.y - liftHex(u.q, u.r);
+            const yb = b.y - liftHex(u.ziel!.q, u.ziel!.r);
+            const farbe = colorOf(u.owner!);
+            return (
+              <g key={'ziel' + u.id} pointerEvents="none">
+                <line x1={a.x} y1={ya} x2={b.x} y2={yb} className="ziel-linie" stroke={farbe} />
+                <path
+                  d={`M ${b.x} ${yb + 6} L ${b.x} ${yb - 16} L ${b.x + 12} ${yb - 11} L ${b.x} ${yb - 6}`}
+                  className="ziel-fahne"
+                  fill={farbe}
+                />
+              </g>
+            );
+          })}
+
+        {/* Der ausgewaehlte Ritter bekommt einen Ring. */}
+        {auswahl !== null &&
+          (() => {
+            const u = state.units.find((x) => x.id === auswahl);
+            if (!u) return null;
+            const c = hexToPixel(u.q, u.r, LAYOUT);
+            return (
+              <circle
+                cx={c.x}
+                cy={c.y - liftHex(u.q, u.r) + 8}
+                r={LAYOUT.w * 0.36}
+                className="auswahl-ring"
+                pointerEvents="none"
+              />
+            );
+          })()}
+
+        {/* Waehrend ein Befehl sein Ziel sucht: das Feld unter dem Zeiger. */}
+        {zielWahl &&
+          hover !== null &&
+          (() => {
+            const [hq, hr] = hover.split(':').map(Number);
+            const hoch = liftHex(hq!, hr!);
+            const punkte = [0, 1, 2, 3, 4, 5]
+              .map((i) => {
+                const p = hexCornerPixel(hq!, hr!, i, LAYOUT);
+                return `${p.x.toFixed(1)},${(p.y - hoch).toFixed(1)}`;
+              })
+              .join(' ');
+            return <polygon className="hex-ziel" points={punkte} pointerEvents="none" />;
+          })()}
       </svg>
 
-      <div className="board-hint">Ziehen zum Verschieben · Mausrad oder Balken links zum Zoomen</div>
+      <div className="board-hint">Ziehen zum Verschieben · Mausrad oder Balken zum Zoomen · Klick auf deinen Ritter: Befehl</div>
       {children}
 
       {/*

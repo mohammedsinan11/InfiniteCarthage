@@ -58,14 +58,36 @@ export type Player = {
    */
   cards: string[];
   /**
-   * Stehende Wachen. Jeder gespielte Ritter stellt eine auf; bei einer
-   * Pluenderung haelt jede ein Nest ab und ist danach verbraucht.
+   * Beute aus zerstoerten Lagern und Ruinen, die noch nicht eingeloest ist.
+   * Jede ist eine Kartenwahl; eingeloest wird in der eigenen Bauphase.
    */
-  guards: number;
+  loot: number;
   connected: boolean;
 };
 
 export type Building = { owner: PlayerId; type: 'settlement' | 'city' };
+
+/** Was auf der Karte laufen kann. */
+export type UnitKind = 'ritter' | 'raeuber' | 'goblin';
+
+/**
+ * Eine Einheit im Spielstand.
+ *
+ * Ritter gehoeren einem Spieler und ziehen, wohin er sie schickt. Raeuber und
+ * Goblins gehoeren niemandem, kommen aus einem Lager (heimat) und ziehen zur
+ * naechsten Siedlung. Alle ziehen ein Feld je Runde (rules/army.ts).
+ */
+export type UnitState = {
+  id: number;
+  kind: UnitKind;
+  owner: PlayerId | null;
+  q: number;
+  r: number;
+  /** Wohin sie zieht. Bei Raeubern das Feld an ihrer Beute - fuer die Anzeige. */
+  ziel: { q: number; r: number } | null;
+  /** Aus welchem Lager ein Raubzug kommt; je Lager ist hoechstens einer unterwegs. */
+  heimat: string | null;
+};
 
 /**
  * Spielphasen.
@@ -145,6 +167,19 @@ export type GameState = {
    * geheimen Seed zu kennen.
    */
   draft: { source: DraftSource; options: string[] } | null;
+  /** Alle Einheiten auf der Karte. */
+  units: UnitState[];
+  /** Naechste freie Einheitennummer - Nummern werden nie wiederverwendet. */
+  nextUnitId: number;
+  /** Zerstoerte Lager, als Feldschluessel "q:r". */
+  destroyedNests: string[];
+  /**
+   * Verbliebene Besatzung angegriffener Lager. Fehlt ein Lager hier, ist es
+   * unberuehrt und hat seine volle Besatzung (units.ts, nestOccupants).
+   */
+  nestGarrison: Record<string, number>;
+  /** Erkundete Ruinen - jede gibt ihr Ereignis nur einmal her. */
+  exploredRuins: string[];
 };
 
 /** Die Bank haelt 19 Karten je Rohstoff - auch auf unendlicher Karte. */

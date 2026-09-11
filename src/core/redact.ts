@@ -34,8 +34,8 @@ export type PublicPlayer = {
    * sondern Verwirrung.
    */
   cards: string[];
-  /** Stehende Wachen - oeffentlich wie die Karten: Ritter auf Posten sieht man. */
-  guards: number;
+  /** Uneingeloeste Beute - oeffentlich: wer ein Lager zerstoert, tut das vor aller Augen. */
+  loot: number;
   connected: boolean;
   /** Sichtbare Punkte, ohne verdeckte Siegpunktkarten. */
   points: number;
@@ -73,6 +73,15 @@ export type PublicState = {
   trade: TradeOffer | null;
   /** Eigene Punkte inklusive verdeckter Karten - nur fuer den Empfaenger. */
   myPoints: number;
+  /**
+   * Heer, zerstoerte Lager, erkundete Ruinen - alles oeffentlich. Einheiten
+   * stehen sichtbar auf der Karte; der Nebel im Client ist Anschauung, keine
+   * Geheimhaltung, denn Gelaende und Lager folgen ohnehin aus dem Seed.
+   */
+  units: GameState['units'];
+  destroyedNests: string[];
+  nestGarrison: Record<string, number>;
+  exploredRuins: string[];
 };
 
 export function redactStateFor(state: GameState, viewer: PlayerId): PublicState {
@@ -85,7 +94,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
       devCount: p.dev.filter((d) => !d.played).length,
       playedKnights: p.playedKnights,
       cards: [...p.cards],
-      guards: p.guards,
+      loot: p.loot,
       connected: p.connected,
       points: publicPoints(state, p.id),
     };
@@ -126,6 +135,10 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     draft: state.draft,
     trade: state.trade,
     myPoints: (me ? publicPoints(state, viewer) : 0) + hidden,
+    units: state.units,
+    destroyedNests: state.destroyedNests,
+    nestGarrison: state.nestGarrison,
+    exploredRuins: state.exploredRuins,
   };
 }
 
@@ -141,13 +154,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
  * ist Teil des Spielgeschehens - nur das Was nicht.
  */
 export function redactEventsFor(events: GameEvent[], viewer: PlayerId): GameEvent[] {
-  return events.map((e) => {
-    if (e.t !== 'raid') return e;
-    return {
-      ...e,
-      hits: e.hits.map((h) =>
-        h.player === viewer ? h : { ...h, taken: emptyHand() },
-      ),
-    };
-  });
+  return events.map((e) =>
+    e.t === 'plunder' && e.player !== viewer ? { ...e, taken: emptyHand() } : e,
+  );
 }

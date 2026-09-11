@@ -21,7 +21,8 @@ import { DiceOverlay } from '../ui/DiceOverlay';
 import { Announcements } from '../ui/Announcements';
 import { CardDraft } from '../ui/CardDraft';
 import { SideMenu } from '../ui/SideMenu';
-import { threateningNests } from '../../core/rules/raid';
+import { sightOf } from '../../core/units';
+import { hexDistance, parseVertexKey, vertexAdjacentHexes } from '../../core/coords';
 import { initAudio, playBuild, playGain } from '../audio';
 import {
   legalCityVertices,
@@ -33,6 +34,7 @@ import { tradeRatio } from '../../core/rules/trade';
 import {
   COST_CITY,
   COST_DEV,
+  COST_KNIGHT,
   COST_ROAD,
   COST_SETTLEMENT,
   canAfford,
@@ -95,12 +97,45 @@ export function Game() {
   }, [wurfUnterwegs]);
 
   const me = state.players.find((p) => p.id === you);
-  /**
-   * Wie viele Nester mich bei der naechsten Pluenderung erreichen. Dieselbe
-   * Rechnung wie auf dem Server, auf der redigierten Sicht - die eigene Hand
-   * steht darin, und nur sie entscheidet, ob man hortet.
-   */
-  const bedroht = useMemo(() => (you ? threateningNests(state, you).length : 0), [state, you]);
+  /** Was ich sehe - alles andere liegt im Nebel. */
+  const sicht = useMemo(() => (you ? sightOf(state, you) : null), [state, you]);
+
+  /** Meine Ritter - und welcher gerade auf sein Ziel wartet. */
+  const meineRitter = useMemo(
+    () => state.units.filter((u) => u.kind === 'ritter' && u.owner === you),
+    [state.units, you],
+  );
+  const [befehl, setBefehl] = useState<number | null>(null);
+  const [fokus, setFokus] = useState<{ q: number; r: number; n: number } | null>(null);
+  // Faellt der Ritter, verfaellt auch der Befehl.
+  useEffect(() => {
+    if (befehl !== null && !meineRitter.some((u) => u.id === befehl)) setBefehl(null);
+  }, [befehl, meineRitter]);
+  // Esc bricht die Zielwahl ab.
+  useEffect(() => {
+    if (befehl === null) return;
+    const taste = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setBefehl(null);
+    };
+    window.addEventListener('keydown', taste);
+    return () => window.removeEventListener('keydown', taste);
+  }, [befehl]);
+
+  /** Raubzuege unterwegs und wie nah der naechste meinen Siedlungen ist. */
+  const lage = useMemo(() => {
+    const feinde = state.units.filter((u) => u.kind !== 'ritter');
+    const meineFelder = Object.entries(state.buildings)
+      .filter(([, b]) => b.owner === you)
+      .flatMap(([vk]) => vertexAdjacentHexes(parseVertexKey(vk)));
+    let naechster: number | null = null;
+    for (const f of feinde) {
+      for (const h of meineFelder) {
+        const d = hexDistance(f, h);
+        if (naechster === null || d < naechster) naechster = d;
+      }
+    }
+    return { unterwegs: feinde.length, naechster };
+  }, [state.units, state.buildings, you]);
   const hand = me?.hand;
   const phase = state.phase;
   const isMine = state.currentPlayer === you && phase.t !== 'finished';
@@ -147,6 +182,22 @@ export function Game() {
       setMode(null);
     }
   };
+
+  /**
+   * Klick auf ein Feld: wartet ein Ritter auf sein Ziel, geht der Befehl raus.
+   * Sonst waehlt ein Klick auf einen eigenen Ritter ihn aus.
+   */
+  const onHex = (key: string) => {
+    const [q, r] = key.split(':').map(Number);
+    if (befehl !== null) {
+      act({ t: 'orderUnit', unit: befehl, q: q!, r: r! });
+      setBefehl(null);
+      return;
+    }
+    const ritter = meineRitter.find((u) => u.q === q && u.r === r);
+    if (ritter) setBefehl(ritter.id);
+  };
+  const befehleMoeglich = isMine && (phase.t === 'main' || phase.t === 'roll') && mode === null;
 
   const playableDev = (me?.dev ?? []).filter(
     (d) => !d.played && d.type !== 'victoryPoint' && d.boughtTurn < state.turn,
@@ -248,8 +299,22 @@ export function Game() {
           cards={me?.cards ?? []}
           log={log}
           welt={welt}
-          wachen={me?.guards ?? 0}
-          bedroht={bedroht}
+          ritter={meineRitter}
+          lage={lage}
+          befehl={befehl}
+          beute={me?.loot ?? 0}
+          befehleMoeglich={befehleMoeglich}
+          beuteMoeglich={isMine && phase.t === 'main'}
+          onBefehl={(id) => setBefehl((alt) => (alt === id ? null : id))}
+          onHalt={(id) => {
+            const u = meineRitter.find((x) => x.id === id);
+            if (u) act({ t: 'orderUnit', unit: id, q: u.q, r: u.r });
+          }}
+          onZeigen={(id) => {
+            const u = meineRitter.find((x) => x.id === id);
+            if (u) setFokus((alt) => ({ q: u.q, r: u.r, n: (alt?.n ?? 0) + 1 }));
+          }}
+          onBeute={() => act({ t: 'claimLoot' })}
           showNumbers={pinNumbers}
           onToggleNumbers={() => setPinNumbers((v) => !v)}
         />
@@ -257,6 +322,7 @@ export function Game() {
         {state.draft !== null && phase.t === 'draft' && (
           <CardDraft
             options={state.draft.options}
+            source={state.draft.source}
             darfWaehlen={isMine}
             onChoose={(card) => act({ t: 'chooseCard', card })}
           />
@@ -278,8 +344,18 @@ export function Game() {
           flashHexes={flashHexes}
           flights={flights}
           onPick={onPick}
+          sicht={sicht}
+          du={you}
+          onHex={befehleMoeglich && meineRitter.length > 0 ? onHex : undefined}
+          zielWahl={befehl !== null}
+          auswahl={befehl}
+          fokus={fokus}
         >
           {hand && <HandPanel hand={hand} />}
+
+          {befehl !== null && (
+            <div className="befehl-hinweis">Ziel fuer den Ritter waehlen · Esc bricht ab</div>
+          )}
 
           {/*
             Wuerfeln ist der Taktgeber der Partie und gehoert nicht als
@@ -335,7 +411,7 @@ export function Game() {
 
           {isMine && phase.t === 'roll' && canPlay('knight') && (
             <div className="actions">
-              <button onClick={() => act({ t: 'playKnight' })}>Ritter vorab: Wache aufstellen</button>
+              <button onClick={() => act({ t: 'playKnight' })}>Ritterkarte vorab ausspielen</button>
             </div>
           )}
 
@@ -372,13 +448,25 @@ export function Game() {
               >
                 Karte kaufen ({state.deckLeft})
               </button>
+              <button
+                disabled={!canAfford(hand, COST_KNIGHT)}
+                title={`Ein Ritter tritt an einer deiner Siedlungen an. ${COST_LABEL(COST_KNIGHT)}`}
+                onClick={() => act({ t: 'recruitKnight' })}
+              >
+                Ritter anwerben
+              </button>
+              {(me?.loot ?? 0) > 0 && (
+                <button className="chosen" onClick={() => act({ t: 'claimLoot' })}>
+                  Beute einloesen ({me?.loot})
+                </button>
+              )}
 
               {canPlay('knight') && (
                 <button
-                  title="Stellt eine Wache auf. Bei der naechsten Pluenderung haelt sie ein Nest ab."
+                  title="Ein Ritter tritt an einer deiner Siedlungen an."
                   onClick={() => act({ t: 'playKnight' })}
                 >
-                  Ritter: Wache
+                  Ritterkarte ausspielen
                 </button>
               )}
               {canPlay('roadBuilding') && (

@@ -12,11 +12,11 @@ import { openSocket, sendMsg } from './socket';
 import type { ClientMsg, RoomInfo, ServerMsg } from '../../core/protocol';
 import type { PublicState } from '../../core/redact';
 import type { Action, GameEvent } from '../../core/rules/reducer';
-import { playDefend, playGuard, playRaid } from '../audio';
+import { playCardPick, playDefend, playGuard, playMarch, playRaid, playRuin } from '../audio';
 import type { PlayerId } from '../../core/state';
 import { createWorld, revealChunks } from '../../core/world';
 import type { World } from '../../core/world';
-import { describeEvent } from '../log';
+import { bundleText, describeEvent } from '../log';
 import { bigRoundChangedAt, bigRoundOf, roundOf, SEASON_NAME, seasonChangedAt, seasonOf } from '../../core/season';
 
 /**
@@ -30,7 +30,7 @@ import { bigRoundChangedAt, bigRoundOf, roundOf, SEASON_NAME, seasonChangedAt, s
 export type WeltEintrag = {
   id: number;
   runde: number;
-  art: 'raid' | 'defense' | 'season' | 'bigRound';
+  art: 'march' | 'plunder' | 'fight' | 'nest' | 'ruin' | 'season' | 'bigRound';
   text: string;
 };
 
@@ -107,34 +107,70 @@ export type Store = {
 /** Wie viele Weltereignisse das Menue behaelt. */
 const WELT_MAX = 60;
 
-/** Pluenderungen als Weltereignisse. Zeitwechsel kommen aus dem Zustand. */
+/** Was draussen geschieht, als Weltereignisse. Zeitwechsel kommen aus dem Zustand. */
 function weltAus(
   events: GameEvent[],
   state: PublicState | null,
   you: PlayerId | null,
 ): WeltEintrag[] {
   const out: WeltEintrag[] = [];
-  const wer = (id: string) => state?.players.find((p) => p.id === id)?.name ?? 'Jemand';
+  const runde = state?.turn ?? 0;
+  const wen = (id: string) =>
+    id === you ? 'dich' : (state?.players.find((p) => p.id === id)?.name ?? 'jemanden');
+  const leute = (k: 'raeuber' | 'goblin') => (k === 'goblin' ? 'Goblins' : 'Raeuber');
   for (const e of events) {
-    if (e.t !== 'raid') continue;
-    for (const h of e.hits) {
-      const nester = h.nests === 1 ? '1 Nest' : `${h.nests} Nester`;
-      const wen = h.player === you ? 'dich' : wer(h.player);
-      const text =
-        h.count === 0
-          ? `Wachen halten ${nester} ab${h.player === you ? '' : ` (${wer(h.player)})`}`
-          : h.blocked > 0
-            ? `Raeuber pluendern ${wen}: ${h.count} (${h.blocked} von ${nester} abgehalten)`
-            : `Raeuber pluendern ${wen}: ${h.count} (${nester})`;
-      out.push({
-        id: naechsteId++,
-        runde: e.round,
-        art: h.count === 0 ? 'defense' : 'raid',
-        text,
-      });
+    switch (e.t) {
+      case 'march':
+        out.push({
+          id: naechsteId++,
+          runde: e.round,
+          art: 'march',
+          text:
+            e.parties.length === 1
+              ? `Ein Raubzug bricht auf (${leute(e.parties[0]!.kind)})`
+              : `${e.parties.length} Raubzuege brechen auf`,
+        });
+        break;
+      case 'plunder':
+        out.push({ id: naechsteId++, runde: e.round, art: 'plunder', text: `${leute(e.kind)} pluendern ${wen(e.player)}: ${e.count}` });
+        break;
+      case 'fight':
+        out.push({
+          id: naechsteId++,
+          runde,
+          art: 'fight',
+          text: e.knightWon
+            ? `Ritter schlaegt ${e.foe === 'goblin' ? 'einen Goblin' : 'einen Raeuber'}`
+            : `Ritter faellt gegen ${e.foe === 'goblin' ? 'einen Goblin' : 'einen Raeuber'}`,
+        });
+        break;
+      case 'nestDestroyed':
+        out.push({ id: naechsteId++, runde, art: 'nest', text: `${e.kind === 'goblin' ? 'Goblinlager' : 'Raeuberlager'} zerstoert` });
+        break;
+      case 'ruin':
+        out.push({ id: naechsteId++, runde, art: 'ruin', text: `Ruine erkundet: ${RUINE_KURZ[e.result]}` });
+        break;
+      default:
+        break;
     }
   }
   return out;
+}
+
+const RUINE_KURZ = { schatz: 'ein Schatz', beute: 'Beute', karte: 'eine alte Karte', hinterhalt: 'ein Hinterhalt' } as const;
+
+/** Die Meldung zu einer eigenen Ruine. */
+function ruinenMeldung(e: Extract<GameEvent, { t: 'ruin' }>): string {
+  switch (e.result) {
+    case 'schatz':
+      return `Schatz in der Ruine: ${bundleText(e.gained)}`;
+    case 'beute':
+      return 'Beute in der Ruine - einloesen unter Helden & Auftraege';
+    case 'karte':
+      return 'Eine alte Karte - die Umgebung ist aufgedeckt';
+    case 'hinterhalt':
+      return e.knightLost ? 'Hinterhalt! Dein Ritter faellt' : 'Hinterhalt in der Ruine - abgewehrt';
+  }
 }
 
 /** Welche Ereignisse sind eine Meldung wert? Nicht jedes - sonst rauscht es. */
@@ -146,56 +182,72 @@ function meldungenAus(
   const out: Announcement[] = [];
   const wer = (id: string) => state?.players.find((p) => p.id === id)?.name ?? 'Jemand';
   for (const e of events) {
-    if (e.t === 'raid') {
-      // Der eigene Verlust zuerst und deutlich - fremde Verluste sind
-      // Nachricht, der eigene ist eine Ohrfeige. Eine Abwehr genauso deutlich,
-      // nur mit dem umgekehrten Gefuehl.
-      const meins = e.hits.find((h) => h.player === you);
-      if (meins) {
-        if (meins.count === 0) {
-          playDefend();
-          out.push({
-            id: naechsteId++,
-            text: `Deine Wachen halten ${meins.blocked === 1 ? 'das Nest' : `${meins.blocked} Nester`} ab`,
-            kind: 'gain',
-          });
-        } else {
-          if (meins.blocked > 0) playDefend();
-          playRaid();
-          const karten = `${meins.count} ${meins.count === 1 ? 'Karte' : 'Karten'}`;
-          out.push({
-            id: naechsteId++,
-            text:
-              meins.blocked > 0
-                ? `${meins.blocked} abgehalten - trotzdem gepluendert: ${karten}`
-                : `Raeuber pluendern dich: ${karten}`,
-            kind: 'raid',
-          });
-        }
+    if (e.t === 'plunder') {
+      const karten = `${e.count} ${e.count === 1 ? 'Karte' : 'Karten'}`;
+      if (e.player === you) {
+        playRaid();
+        out.push({ id: naechsteId++, text: `${e.kind === 'goblin' ? 'Goblins' : 'Raeuber'} pluendern dich: ${karten}`, kind: 'raid' });
+      } else {
+        out.push({ id: naechsteId++, text: `${wer(e.player)} wird gepluendert: ${e.count}`, kind: 'raid' });
       }
-      for (const h of e.hits) {
-        if (h.player === you) continue;
-        out.push({
-          id: naechsteId++,
-          text:
-            h.count === 0
-              ? `${wer(h.player)} haelt die Raeuber ab`
-              : `${wer(h.player)} wird gepluendert: ${h.count}`,
-          kind: h.count === 0 ? 'info' : 'raid',
-        });
-      }
-    } else if (e.t === 'guard') {
-      if (e.player === you) playGuard();
+    } else if (e.t === 'march') {
+      playMarch();
       out.push({
         id: naechsteId++,
-        text:
-          e.player === you
-            ? `Ritter bezieht Wache (${e.guards} ${e.guards === 1 ? 'Wache steht' : 'Wachen stehen'})`
-            : `${wer(e.player)} stellt eine Wache auf`,
-        kind: 'info',
+        text: e.parties.length === 1 ? 'Ein Raubzug bricht auf' : `${e.parties.length} Raubzuege brechen auf`,
+        kind: 'raid',
       });
+    } else if (e.t === 'fight') {
+      const meiner = e.owner !== null && e.owner === you;
+      if (meiner) {
+        if (e.knightWon) playDefend();
+        else playRaid();
+      }
+      const gegner = e.foe === 'goblin' ? 'Goblin' : 'Raeuber';
+      const wessen = meiner ? 'Dein' : 'Ein';
+      out.push({
+        id: naechsteId++,
+        text: e.knightWon
+          ? `${wessen} Ritter schlaegt einen ${gegner} (Wurf ${e.roll})`
+          : `${wessen} Ritter faellt gegen einen ${gegner} (Wurf ${e.roll})`,
+        kind: e.knightWon ? 'gain' : 'raid',
+      });
+    } else if (e.t === 'siege') {
+      if (you !== null && e.owners.includes(you) && e.left > 0) {
+        out.push({
+          id: naechsteId++,
+          text: `Belagerung: ${e.hits} Treffer, noch ${e.left} Verteidiger${e.knightsLost > 0 ? `, ${e.knightsLost} Ritter gefallen` : ''}`,
+          kind: 'info',
+        });
+      }
+    } else if (e.t === 'nestDestroyed') {
+      const meins = you !== null && e.players.includes(you);
+      if (meins) playCardPick(3);
+      out.push({
+        id: naechsteId++,
+        text: meins ? 'Lager zerstoert! Beute: eine Kartenwahl' : `${e.kind === 'goblin' ? 'Goblinlager' : 'Raeuberlager'} zerstoert`,
+        kind: 'gain',
+      });
+    } else if (e.t === 'ruin') {
+      if (e.player === you) {
+        playRuin();
+        out.push({
+          id: naechsteId++,
+          text: ruinenMeldung(e),
+          kind: e.result === 'hinterhalt' && e.knightLost ? 'raid' : 'gain',
+        });
+      }
+    } else if (e.t === 'knightReady') {
+      if (e.player === you) {
+        playGuard();
+        out.push({ id: naechsteId++, text: 'Ein Ritter tritt an', kind: 'info' });
+      }
     } else if (e.t === 'draftOffered') {
-      out.push({ id: naechsteId++, text: 'Ein Fund! Waehle eine Karte', kind: 'gain' });
+      out.push({
+        id: naechsteId++,
+        text: e.source === 'belohnung' ? 'Beute! Waehle eine Karte' : 'Ein Fund! Waehle eine Karte',
+        kind: 'gain',
+      });
     } else if (e.t === 'monopoly') {
       out.push({ id: naechsteId++, text: `Monopol: ${e.taken} Karten`, kind: 'info' });
     } else if (e.t === 'largestArmy') {

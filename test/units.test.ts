@@ -1,18 +1,35 @@
 /**
- * Einheiten auf der Karte: wer in Nestern haust und wo Wachen stehen.
+ * Einheiten: Bewohner der Lager, Wege, Sicht und wo neue Ritter antreten.
  */
 
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../src/core/rules/reducer';
 import { nestAt } from '../src/core/raiders';
-import { hexDistance, hexesInRange, vertexKey } from '../src/core/coords';
-import { terrainAt } from '../src/core/worldgen';
-import { MAX_JE_FELD, guardUnits, nestOccupants, nestUnits } from '../src/core/units';
+import { hexDistance, hexKey, hexesInRange, vertexKey } from '../src/core/coords';
+import {
+  SICHT_SIEDLUNG,
+  garrisonUnits,
+  isLandAt,
+  knightMusterHex,
+  nestOccupants,
+  nextStep,
+  settlementApproaches,
+  sightOf,
+} from '../src/core/units';
 
 const ORIGIN = { q: 0, r: 0 };
 const solo = () => createGame([{ id: 'p0', name: 'Solo' }], 2024, 4711, 15);
 
-describe('Bewohner der Nester', () => {
+/** Ein Feld, um das im Radius alles Land ist und kein Lager steht. */
+function landFlaeche(seed: number, radius: number, ab = ORIGIN, suche = 20) {
+  const h = hexesInRange(ab, suche).find((c) =>
+    hexesInRange(c, radius).every((x) => isLandAt(seed, x.q, x.r) && !nestAt(seed, x.q, x.r)),
+  );
+  if (!h) throw new Error(`keine freie Landflaeche mit Radius ${radius}`);
+  return h;
+}
+
+describe('Bewohner der Lager', () => {
   it('sind rein und zwei bis drei Koepfe stark', () => {
     for (const h of hexesInRange(ORIGIN, 30)) {
       if (!nestAt(2024, h.q, h.r)) continue;
@@ -33,67 +50,89 @@ describe('Bewohner der Nester', () => {
     expect([...arten].sort()).toEqual(['goblin', 'raeuber']);
   });
 
-  it('stehen nur auf Nestern', () => {
-    const einheiten = nestUnits(2024, hexesInRange(ORIGIN, 25));
-    expect(einheiten.length).toBeGreaterThan(0);
-    for (const u of einheiten) expect(nestAt(2024, u.q, u.r)).toBe(true);
+  it('schrumpfen mit der Belagerung und verschwinden mit dem Lager', () => {
+    const s = solo().state;
+    const nest = hexesInRange(ORIGIN, 30).find((h) => nestAt(s.worldSeed, h.q, h.r))!;
+    expect(garrisonUnits(s, [nest])).toHaveLength(nestOccupants(s.worldSeed, nest.q, nest.r).count);
+    s.nestGarrison[hexKey(nest.q, nest.r)] = 1;
+    expect(garrisonUnits(s, [nest])).toHaveLength(1);
+    s.destroyedNests.push(hexKey(nest.q, nest.r));
+    expect(garrisonUnits(s, [nest])).toHaveLength(0);
   });
 });
 
-describe('Wachen auf der Karte', () => {
-  const landOhneNest = (seed: number, ab: { q: number; r: number }, radius: number) =>
-    hexesInRange(ab, radius).find(
-      (h) => terrainAt(seed, h.q, h.r) !== 'water' && !nestAt(seed, h.q, h.r),
-    );
-
-  it('stellt so viele Figuren auf, wie Wachen stehen', () => {
-    const s = solo().state;
-    const land = landOhneNest(s.worldSeed, ORIGIN, 12)!;
-    s.buildings[vertexKey({ q: land.q, r: land.r, d: 'N' })] = { owner: 'p0', type: 'settlement' };
-    s.players[0]!.guards = 5;
-    const einheiten = guardUnits(s);
-    expect(einheiten).toHaveLength(5);
-    expect(einheiten.every((u) => u.kind === 'ritter' && u.owner === 'p0')).toBe(true);
+describe('Wege', () => {
+  it('gehen je Schritt auf ein benachbartes Landfeld', () => {
+    const seed = solo().state.worldSeed;
+    const mitte = landFlaeche(seed, 3);
+    const ziel = { q: mitte.q + 3, r: mitte.r };
+    const weg = nextStep(seed, mitte, new Set([hexKey(ziel.q, ziel.r)]))!;
+    expect(weg).not.toBeNull();
+    expect(hexDistance(weg.step, mitte)).toBe(1);
+    // Alles Land dazwischen: der kuerzeste Weg kommt dem Ziel mit jedem Schritt naeher.
+    expect(hexDistance(weg.step, ziel)).toBe(2);
+    expect(weg.ziel).toEqual(ziel);
   });
 
-  it('steht an der eigenen Siedlung, an Land, hoechstens drei je Feld', () => {
-    const s = solo().state;
-    const land = landOhneNest(s.worldSeed, ORIGIN, 12)!;
-    s.buildings[vertexKey({ q: land.q, r: land.r, d: 'N' })] = { owner: 'p0', type: 'settlement' };
-    s.players[0]!.guards = MAX_JE_FELD;
-    const je = new Map<string, number>();
-    for (const u of guardUnits(s)) {
-      expect(terrainAt(s.worldSeed, u.q, u.r)).not.toBe('water');
-      expect(hexDistance(u, land)).toBeLessThanOrEqual(1);
-      je.set(u.q + ':' + u.r, (je.get(u.q + ':' + u.r) ?? 0) + 1);
-    }
-    for (const n of je.values()) expect(n).toBeLessThanOrEqual(MAX_JE_FELD);
+  it('enden am Ziel', () => {
+    const seed = solo().state.worldSeed;
+    const mitte = landFlaeche(seed, 1);
+    expect(nextStep(seed, mitte, new Set([hexKey(mitte.q, mitte.r)]))).toBeNull();
   });
 
-  it('stellt sich zuerst dorthin, woher die Gefahr kommt', () => {
+  it('fuehren nicht uebers Wasser', () => {
+    const seed = solo().state.worldSeed;
+    const wasser = hexesInRange(ORIGIN, 25).find((h) => !isLandAt(seed, h.q, h.r))!;
+    const land = landFlaeche(seed, 1);
+    expect(nextStep(seed, land, new Set([hexKey(wasser.q, wasser.r)]), 800)).toBeNull();
+  });
+});
+
+describe('Sicht', () => {
+  it('reicht um Siedlungen drei Felder weit und um Ritter zwei', () => {
+    const s = solo().state;
+    const land = landFlaeche(s.worldSeed, 1);
+    s.buildings[vertexKey({ q: land.q, r: land.r, d: 'N' })] = { owner: 'p0', type: 'settlement' };
+    const sicht = sightOf(s, 'p0');
+    expect(sicht.has(hexKey(land.q, land.r))).toBe(true);
+    expect(sicht.has(hexKey(land.q + SICHT_SIEDLUNG, land.r))).toBe(true);
+    expect(sicht.has(hexKey(land.q + SICHT_SIEDLUNG + 3, land.r))).toBe(false);
+
+    s.units.push({ id: 1, kind: 'ritter', owner: 'p0', q: land.q + 12, r: land.r, ziel: null, heimat: null });
+    const mitRitter = sightOf(s, 'p0');
+    expect(mitRitter.has(hexKey(land.q + 14, land.r))).toBe(true);
+    expect(mitRitter.has(hexKey(land.q + 15, land.r))).toBe(false);
+  });
+
+  it('gilt nur fuer die eigenen Siedlungen und Einheiten', () => {
+    const s = solo().state;
+    const land = landFlaeche(s.worldSeed, 1);
+    s.buildings[vertexKey({ q: land.q, r: land.r, d: 'N' })] = { owner: 'p1', type: 'settlement' };
+    expect(sightOf(s, 'p0').size).toBe(0);
+  });
+});
+
+describe('Musterung', () => {
+  it('stellt neue Ritter an eine eigene Siedlung, auf die Seite der Gefahr', () => {
     const s = solo().state;
     const seed = s.worldSeed;
     const nest = hexesInRange(ORIGIN, 30).find((h) => nestAt(seed, h.q, h.r))!;
     const nah = hexesInRange(nest, 2).find(
-      (h) => hexDistance(h, nest) === 2 && terrainAt(seed, h.q, h.r) !== 'water' && !nestAt(seed, h.q, h.r),
+      (h) => hexDistance(h, nest) === 2 && isLandAt(seed, h.q, h.r) && !nestAt(seed, h.q, h.r),
     );
     const fern = hexesInRange(ORIGIN, 40).find(
-      (h) =>
-        terrainAt(seed, h.q, h.r) !== 'water' &&
-        hexesInRange(h, 5).every((c) => !nestAt(seed, c.q, c.r)),
+      (h) => isLandAt(seed, h.q, h.r) && hexesInRange(h, 5).every((c) => !nestAt(seed, c.q, c.r)),
     );
     expect(nah).toBeDefined();
     expect(fern).toBeDefined();
     s.buildings[vertexKey({ q: fern!.q, r: fern!.r, d: 'N' })] = { owner: 'p0', type: 'settlement' };
     s.buildings[vertexKey({ q: nah!.q, r: nah!.r, d: 'N' })] = { owner: 'p0', type: 'settlement' };
-    s.players[0]!.guards = 1;
-    const [posten] = guardUnits(s);
-    expect(hexDistance(posten!, nest)).toBeLessThanOrEqual(3);
+    const feld = knightMusterHex(s, 'p0')!;
+    expect(settlementApproaches(s, 'p0').has(hexKey(feld.q, feld.r))).toBe(true);
+    expect(hexDistance(feld, nest)).toBeLessThanOrEqual(3);
   });
 
-  it('ohne Siedlung keine Wachfigur', () => {
-    const s = solo().state;
-    s.players[0]!.guards = 2;
-    expect(guardUnits(s)).toEqual([]);
+  it('braucht eine Siedlung', () => {
+    expect(knightMusterHex(solo().state, 'p0')).toBeNull();
   });
 });

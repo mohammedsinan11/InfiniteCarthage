@@ -225,3 +225,35 @@ export function tileImage(url: string): HTMLImageElement | undefined {
   return IMAGES.get(url);
 }
 
+/**
+ * Kacheln im Nebel.
+ *
+ * Einmal je Bild eingetruebt erzeugt und gemerkt, nicht bei jedem Zeichnen
+ * gefiltert - ein Canvas-Filter je drawImage waere teuer und in aelteren
+ * Safari-Versionen gar nicht vorhanden. Blaeulich statt schwarz, damit Nebel
+ * nach Nebel aussieht und nicht nach Nacht. 'source-atop' faerbt nur, wo das
+ * Bild deckt; die durchsichtigen Ecken bleiben durchsichtig.
+ *
+ * PLATZHALTER: ein echter Nebel haette weiche Raender und Bewegung (ASSETS.md).
+ */
+const NEBEL = new Map<string, HTMLCanvasElement>();
+const NEBEL_FARBE = 'rgba(24, 30, 44, 0.58)';
+
+export function tileImageFog(url: string): CanvasImageSource | undefined {
+  const da = NEBEL.get(url);
+  if (da) return da;
+  const img = IMAGES.get(url);
+  if (!img) return undefined;
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth || IMG_W;
+  c.height = img.naturalHeight || IMG_H;
+  const ctx = c.getContext('2d');
+  if (!ctx) return img;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(img, 0, 0);
+  ctx.globalCompositeOperation = 'source-atop';
+  ctx.fillStyle = NEBEL_FARBE;
+  ctx.fillRect(0, 0, c.width, c.height);
+  NEBEL.set(url, c);
+  return c;
+}
