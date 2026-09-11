@@ -27,7 +27,7 @@ import {
 import type { Edge, Hex, Layout, Vertex } from '../../core/coords';
 import type { World } from '../../core/world';
 import type { PublicState } from '../../core/redact';
-import { SEASON_TINT, playerColor } from '../theme';
+import { SEASON_TINT, fraktionColor, playerColor } from '../theme';
 import { seasonOf } from '../../core/season';
 import { playHover } from '../audio';
 import type { Resource } from '../../core/types';
@@ -35,10 +35,14 @@ import { ResourceCard } from '../ui/ResourceIcon';
 import { hexCornerPixel } from '../../core/coords';
 import { reliefLimitedAt } from '../../core/relief';
 import { edgeAdjacentHexes, vertexAdjacentHexes } from '../../core/coords';
-import { garrisonUnits, isNestActive } from '../../core/units';
+import { WERTE, garrisonOf, garrisonUnits, isNestActive, nestFraktionOf } from '../../core/units';
 import type { Unit } from '../../core/units';
+import { istSpielerSeite, istKampf, kampfFelder, seiteVon, spielerAus } from '../../core/combat';
+import type { Seite } from '../../core/combat';
+import { fraktionById, istFraktion } from '../../core/factions';
 import { ruinAt } from '../../core/ruins';
-import { aufstellung, preloadUnitSprites, zeichneFigur } from '../units';
+import { aufstellung, preloadUnitSprites, zeichneFigur, zeichneLeben } from '../units';
+import { Schwerter } from './Schwerter';
 import {
   HEX_CX,
   HEX_CY,
@@ -212,6 +216,47 @@ type Props = {
  *  Fliesskommawerte schlecht wiederfinden lassen. */
 type Camera = { cx: number; cy: number; zi: number };
 
+const ART_NAME = {
+  ritter: ['Ritter', 'Ritter'],
+  raeuber: ['Raeuber', 'Raeuber'],
+  goblin: ['Goblin', 'Goblins'],
+  wanderer: ['Wanderer', 'Wanderer'],
+} as const;
+
+const VORHABEN = {
+  befehl: '',
+  raub: 'auf Raubzug',
+  heimkehr: 'auf dem Heimweg',
+  fehde: 'in einer Fehde',
+  wandern: 'auf Wanderschaft',
+} as const;
+
+/** Eine Gruppe gleicher Einheiten auf einem Feld, in Worten. */
+function einheitenText(state: PublicState, du: string | null, gruppe: readonly Unit[]): string {
+  const u = gruppe[0]!;
+  const n = gruppe.length;
+  const teile: string[] = [`${n > 1 ? `${n} ` : ''}${ART_NAME[u.kind][n > 1 ? 1 : 0]}`];
+  if (u.owner !== null) {
+    teile.push(
+      u.owner === du
+        ? n === 1
+          ? 'dein'
+          : 'deine'
+        : `von ${state.players.find((p) => p.id === u.owner)?.name ?? 'jemandem'}`,
+    );
+  } else if (u.fraktion !== null) {
+    teile.push(fraktionById(state.worldSeed, u.fraktion).name);
+  }
+  if (VORHABEN[u.auftrag]) teile.push(VORHABEN[u.auftrag]);
+  const beute = gruppe.reduce((s, x) => s + x.traegt, 0);
+  if (beute > 0) teile.push(`traegt ${beute} ${beute === 1 ? 'Karte' : 'Karten'}`);
+  const max = WERTE[u.kind].leben;
+  if (u.kind !== 'wanderer') {
+    teile.push(n === 1 ? `Leben ${u.leben}/${max}` : `Leben ${gruppe.map((x) => x.leben).join(', ')} von ${max}`);
+  }
+  return teile.join(' · ');
+}
+
 /** Augenzahl als Punkte: sagt schneller als die Ziffer, wie oft ein Feld trifft. */
 const pips = (n: number): string => '.'.repeat(6 - Math.abs(7 - n));
 
@@ -377,6 +422,58 @@ export function Board({
     return m;
   }, [visible, state]);
 
+  /** Die Farbe einer Seite: Spielerfarbe, Fraktionsfarbe oder Grau fuer Neutrale. */
+  const farbeSeite = useCallback(
+    (seite: Seite | undefined): string => {
+      if (seite === undefined) return '#8d8a7e';
+      if (istSpielerSeite(seite)) {
+        const id = spielerAus(seite);
+        return playerColor(state.players.find((pl) => pl.id === id)?.color ?? 0);
+      }
+      if (istFraktion(seite)) return fraktionColor(fraktionById(state.worldSeed, seite).farbe);
+      return '#8d8a7e';
+    },
+    [state.players, state.worldSeed],
+  );
+
+  /** Wo gekaempft wird - dieselbe Frage, nach der die Regel kaempfen laesst. */
+  const kampf = useMemo(() => kampfFelder(state), [state]);
+
+  /**
+   * Was auf dem Feld unter dem Zeiger steht, in Worten: Lager, Ruine, Einheiten
+   * mit Fraktion und Vorhaben, ein Kampf. Im Nebel nur, was man ohnehin kennt.
+   */
+  const feldInfo = useMemo(() => {
+    if (hover === null) return null;
+    const [q, r] = hover.split(':').map(Number) as [number, number];
+    const nebel = sicht !== null && !sicht.has(hover);
+    const zeilen: { farbe?: string; text: string; kampf?: boolean }[] = [];
+    if (isNestActive(state, q, r)) {
+      const f = fraktionById(state.worldSeed, nestFraktionOf(state, q, r));
+      const n = garrisonOf(state, q, r);
+      zeilen.push({
+        farbe: fraktionColor(f.farbe),
+        text: `Lager von ${f.name} · ${n} ${f.art === 'goblin' ? (n === 1 ? 'Goblin' : 'Goblins') : 'Raeuber'}`,
+      });
+    }
+    if (ruinAt(state.worldSeed, q, r) && !state.exploredRuins.includes(hover)) {
+      zeilen.push({ text: 'Ruine, unerkundet' });
+    }
+    if (!nebel) {
+      const gruppen = new Map<string, Unit[]>();
+      for (const u of state.units) {
+        if (u.q !== q || u.r !== r) continue;
+        const key = `${seiteVon(u)}|${u.kind}|${u.auftrag}`;
+        gruppen.set(key, [...(gruppen.get(key) ?? []), u]);
+      }
+      for (const gruppe of gruppen.values()) {
+        zeilen.push({ farbe: farbeSeite(seiteVon(gruppe[0]!)), text: einheitenText(state, du, gruppe) });
+      }
+      if (istKampf(kampf.get(hover) ?? [])) zeilen.push({ text: 'Hier wird gekaempft', kampf: true });
+    }
+    return zeilen.length > 0 ? zeilen : null;
+  }, [hover, state, sicht, du, kampf, farbeSeite]);
+
   /**
    * Gelaende auf das Canvas zeichnen.
    *
@@ -443,20 +540,29 @@ export function Board({
       const mx = x0 + Math.round(HEX_CX) * f;
       const my = y0 + Math.round(HEX_CY) * f;
       if (nebel) ctx.globalAlpha = 0.6;
-      if (lager) zeichneFigur(ctx, 'lager', mx, my + f, f);
+      if (lager) {
+        zeichneFigur(ctx, 'lager', mx, my + f, f, farbeSeite(nestFraktionOf(state, t.q, t.r)));
+      }
       if (ruine) zeichneFigur(ctx, 'ruine', mx, my + 2 * f, f);
       if (!leute || leute.length === 0) {
         ctx.globalAlpha = 1;
         return;
       }
-      const stellen = aufstellung(leute.length, lager || ruine);
-      leute.slice(0, stellen.length).forEach((u, i) => {
+      // Nach Seite sortiert: wer zusammengehoert, steht beieinander - im Kampf
+      // stehen die Seiten einander gegenueber (aufstellung).
+      const reihe = [...leute].sort((a, b) => {
+        const sa = seiteVon(a);
+        const sb = seiteVon(b);
+        return sa < sb ? -1 : sa > sb ? 1 : a.id - b.id;
+      });
+      const stellen = aufstellung(reihe.length, lager || ruine);
+      reihe.slice(0, stellen.length).forEach((u, i) => {
         const [ox, oy] = stellen[i]!;
-        const farbe =
-          u.owner === null
-            ? undefined
-            : playerColor(state.players.find((pl) => pl.id === u.owner)?.color ?? 0);
-        zeichneFigur(ctx, u.kind, mx + ox * f, my + oy * f, f, farbe);
+        const fx = mx + ox * f;
+        const fy = my + oy * f;
+        zeichneFigur(ctx, u.kind, fx, fy, f, farbeSeite(seiteVon(u)));
+        const max = WERTE[u.kind].leben;
+        if (u.id >= 0 && u.leben < max) zeichneLeben(ctx, u.kind, fx, fy, f, u.leben, max);
       });
       ctx.globalAlpha = 1;
     };
@@ -521,7 +627,7 @@ export function Board({
       ctx.fillRect(0, 0, bw, bh);
       ctx.restore();
     }
-  }, [visible, view, scale, size, hover, world, state, tilesReady, liftHex, besatzung, sicht, du]);
+  }, [visible, view, scale, size, hover, world, state, tilesReady, liftHex, besatzung, sicht, du, farbeSeite]);
 
   /** Eine Stufe naeher (+1) oder weiter weg (-1); der Punkt unter x/y bleibt stehen. */
   const zoomUm = useCallback((richtung: number, mausX: number, mausY: number) => {
@@ -1002,6 +1108,24 @@ export function Board({
             );
           })}
 
+        {/* Kaempfe: zwei Schwerter ueber dem Feld, in den Farben der Seiten. Im Nebel nicht. */}
+        {[...kampf].map(([k, seiten]) => {
+          if (sicht !== null && !sicht.has(k)) return null;
+          const [q, r] = k.split(':').map(Number) as [number, number];
+          const c = hexToPixel(q, r, LAYOUT);
+          const y = c.y - liftHex(q, r) - LAYOUT.h * 0.62;
+          return (
+            <Schwerter
+              key={'kampf' + k}
+              x={c.x}
+              y={y}
+              k={SCALE}
+              links={farbeSeite(seiten[0])}
+              rechts={farbeSeite(seiten[seiten.length - 1])}
+            />
+          );
+        })}
+
         {/* Der ausgewaehlte Ritter bekommt einen Ring. */}
         {auswahl !== null &&
           (() => {
@@ -1036,6 +1160,17 @@ export function Board({
       </svg>
 
       <div className="board-hint">Ziehen zum Verschieben · Mausrad oder Balken zum Zoomen · Klick auf deinen Ritter: Befehl</div>
+      {/* Was auf dem Feld unter dem Zeiger steht. PLATZHALTER-Tafel (ASSETS.md). */}
+      {feldInfo && (
+        <div className="feld-info">
+          {feldInfo.map((z, i) => (
+            <div key={i} className={z.kampf ? 'feld-info-zeile kampf' : 'feld-info-zeile'}>
+              {z.farbe && <span className="feld-info-farbe" style={{ background: z.farbe }} />}
+              <span>{z.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
       {children}
 
       {/*

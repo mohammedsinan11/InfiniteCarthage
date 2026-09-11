@@ -8,7 +8,9 @@ import { nestAt } from '../src/core/raiders';
 import { hexDistance, hexKey, hexesInRange, vertexKey } from '../src/core/coords';
 import {
   SICHT_SIEDLUNG,
+  einheitVorlage,
   garrisonUnits,
+  nestFraktionOf,
   isLandAt,
   knightMusterHex,
   nestOccupants,
@@ -54,6 +56,9 @@ describe('Bewohner der Lager', () => {
     const s = solo().state;
     const nest = hexesInRange(ORIGIN, 30).find((h) => nestAt(s.worldSeed, h.q, h.r))!;
     expect(garrisonUnits(s, [nest])).toHaveLength(nestOccupants(s.worldSeed, nest.q, nest.r).count);
+    for (const u of garrisonUnits(s, [nest])) {
+      expect(u.fraktion).toBe(nestFraktionOf(s, nest.q, nest.r));
+    }
     s.nestGarrison[hexKey(nest.q, nest.r)] = 1;
     expect(garrisonUnits(s, [nest])).toHaveLength(1);
     s.destroyedNests.push(hexKey(nest.q, nest.r));
@@ -98,7 +103,7 @@ describe('Sicht', () => {
     expect(sicht.has(hexKey(land.q + SICHT_SIEDLUNG, land.r))).toBe(true);
     expect(sicht.has(hexKey(land.q + SICHT_SIEDLUNG + 3, land.r))).toBe(false);
 
-    s.units.push({ id: 1, kind: 'ritter', owner: 'p0', q: land.q + 12, r: land.r, ziel: null, heimat: null });
+    s.units.push({ ...einheitVorlage('ritter', land.q + 12, land.r, { owner: 'p0' }), id: 1 });
     const mitRitter = sightOf(s, 'p0');
     expect(mitRitter.has(hexKey(land.q + 14, land.r))).toBe(true);
     expect(mitRitter.has(hexKey(land.q + 15, land.r))).toBe(false);

@@ -41,6 +41,21 @@ import type { MusicMode } from '../music';
 
 type Reiter = 'reich' | 'karten' | 'technik' | 'auftraege' | 'ton';
 
+/** Eine bekannte Fraktion, fertig fuer die Anzeige. */
+export type FraktionsZeile = {
+  id: string;
+  name: string;
+  art: 'raeuber' | 'goblin';
+  /** CSS-Farbe. */
+  farbe: string;
+  /** Aktive Lager auf der aufgedeckten Karte. */
+  lager: number;
+  /** Ihre Leute auf der Karte. */
+  unterwegs: number;
+  /** Abstand des naechsten Lagers zu den eigenen Siedlungen. */
+  naechster: number | null;
+};
+
 const REITER: ReadonlyArray<{ id: Reiter; kurz: string; titel: string }> = [
   { id: 'reich', kurz: 'RE', titel: 'Reich' },
   { id: 'karten', kurz: 'KA', titel: 'Karten' },
@@ -90,6 +105,7 @@ export function SideMenu({
   welt,
   ritter,
   lage,
+  fraktionen,
   befehl,
   beute,
   befehleMoeglich,
@@ -110,8 +126,10 @@ export function SideMenu({
   welt: readonly WeltEintrag[];
   /** Die eigenen Ritter. */
   ritter: readonly UnitState[];
-  /** Raubzuege unterwegs und wie nah der naechste den eigenen Siedlungen ist. */
-  lage: { unterwegs: number; naechster: number | null };
+  /** Raubzuege unterwegs, wie nah der naechste den eigenen Siedlungen ist, Kaempfe in Sicht. */
+  lage: { unterwegs: number; naechster: number | null; kaempfe: number };
+  /** Bekannte Fraktionen, die naechsten zuerst. */
+  fraktionen: readonly FraktionsZeile[];
   /** Ritter, der gerade auf sein Ziel wartet. */
   befehl: number | null;
   /** Uneingeloeste Beute. */
@@ -202,14 +220,43 @@ export function SideMenu({
               </b>
               <span>Deine Ritter</span>
               <b>{ritter.length}</b>
+              <span>Kaempfe in Sicht</span>
+              <b className={lage.kaempfe > 0 ? 'gefahr' : undefined}>{lage.kaempfe}</b>
               <span>Naechster Aufbruch</span>
               <b>{bisPluenderung === 1 ? 'naechste Runde' : `in ${bisPluenderung} Runden`}</b>
               <span className="menu-wache-hinweis">
                 {lage.unterwegs === 0
                   ? 'Ruhig. Zum Beginn jeder grossen Runde brechen Raubzuege aus nahen Lagern auf.'
-                  : 'Raeuber pluendern erst, wenn sie eine Siedlung erreichen. Ein Ritter in ihrem Weg stellt sie.'}
+                  : 'Raeuber pluendern erst an einer Siedlung und tragen die Beute heim. Ein Ritter in ihrem Weg stellt sie - und holt die Beute zurueck.'}
               </span>
             </div>
+
+            {/*
+              Die Fraktionen: wem die Lager ringsum gehoeren. Alle sind einander
+              und dir feind - die Haltung steht schon da, damit die Diplomatie
+              spaeter einen Platz hat.
+            */}
+            <h3>Fraktionen</h3>
+            {fraktionen.length === 0 ? (
+              <p className="menu-leer">Noch keine entdeckt.</p>
+            ) : (
+              <ul className="menu-fraktionen">
+                {fraktionen.map((f) => (
+                  <li key={f.id}>
+                    <span className="menu-fraktion-farbe" style={{ background: f.farbe }} />
+                    <span className="menu-fraktion-name">{f.name}</span>
+                    <span className="menu-fraktion-haltung" title="Diplomatie folgt">
+                      Krieg
+                    </span>
+                    <span className="menu-fraktion-info">
+                      {f.art === 'goblin' ? 'Goblins' : 'Raeuber'} · {f.lager} Lager
+                      {f.unterwegs > 0 ? ` · ${f.unterwegs} unterwegs` : ''}
+                      {f.naechster !== null ? ` · ${f.naechster} Felder` : ''}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
 
             {/*
               Das Protokoll stand frueher links neben dem Brett und ist beim

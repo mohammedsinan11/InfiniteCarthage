@@ -58,7 +58,7 @@ import {
   legalRoadEdges,
 } from './placement';
 import { computeProduction } from './production';
-import { sendRaiders, spawnKnight, tickArmy } from './army';
+import { beginBigRound, spawnKnight, tickArmy } from './army';
 import type { ArmyEvent } from './army';
 import { nextStep } from '../units';
 import { bigRoundChangedAt } from '../season';
@@ -216,6 +216,7 @@ export function createGame(
     nextUnitId: 1,
     destroyedNests: [],
     nestGarrison: {},
+    nestFraktion: {},
     exploredRuins: [],
   };
 
@@ -770,13 +771,14 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (phase.t !== 'main') return fail('Der Zug laesst sich jetzt nicht beenden.');
       nextTurn(s);
 
-      // Jede Runde zieht das Heer ein Feld: Ritter, Raeuber, Gefechte,
-      // Pluenderungen, Belagerungen (rules/army.ts).
+      // Jede Runde zieht das Heer ein Feld: Ritter, Raubzuege, Fehden, Wanderer,
+      // Kaempfe, Pluenderungen (rules/army.ts).
       tickArmy(s, world, events);
 
-      // Zum Beginn jeder grossen Runde brechen neue Raubzuege auf - nach dem
-      // Ziehen, damit ein frischer Raubzug nicht im selben Moment schon pluendert.
-      if (bigRoundChangedAt(s.turn)) sendRaiders(s, events);
+      // Zum Beginn jeder grossen Runde brechen Raubzuege auf, vielleicht eine
+      // Fehde und ein Wanderer - nach dem Ziehen, damit ein frischer Raubzug
+      // nicht im selben Moment schon pluendert.
+      if (bigRoundChangedAt(s.turn)) beginBigRound(s, events);
 
       events.push({ t: 'turn', player: s.order[s.current]! });
       break;

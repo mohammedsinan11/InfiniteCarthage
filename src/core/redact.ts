@@ -81,6 +81,7 @@ export type PublicState = {
   units: GameState['units'];
   destroyedNests: string[];
   nestGarrison: Record<string, number>;
+  nestFraktion: Record<string, string>;
   exploredRuins: string[];
 };
 
@@ -135,9 +136,14 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     draft: state.draft,
     trade: state.trade,
     myPoints: (me ? publicPoints(state, viewer) : 0) + hidden,
-    units: state.units,
+    // Was ein Raubzug heimtraegt, sieht nur der Beraubte - wie beim Pluendern
+    // selbst. Wie viel es ist, bleibt fuer alle sichtbar (traegt).
+    units: state.units.map((u) =>
+      u.fracht !== null && u.beraubt !== viewer ? { ...u, fracht: null } : u,
+    ),
     destroyedNests: state.destroyedNests,
     nestGarrison: state.nestGarrison,
+    nestFraktion: state.nestFraktion,
     exploredRuins: state.exploredRuins,
   };
 }
@@ -154,7 +160,10 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
  * ist Teil des Spielgeschehens - nur das Was nicht.
  */
 export function redactEventsFor(events: GameEvent[], viewer: PlayerId): GameEvent[] {
+  // Zurueckeroberte Beute ebenso: sie landet in einer Hand.
   return events.map((e) =>
-    e.t === 'plunder' && e.player !== viewer ? { ...e, taken: emptyHand() } : e,
+    (e.t === 'plunder' || e.t === 'lootRecovered') && e.player !== viewer
+      ? { ...e, taken: emptyHand() }
+      : e,
   );
 }

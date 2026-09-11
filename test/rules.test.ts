@@ -558,14 +558,16 @@ describe('Dauerlauf', () => {
       if (phaseOf(game) === 'main') must(game, { t: 'endTurn' }, pid);
     }
 
-    // Buchhaltung: keine negativen Beststaende, Bank plus Haende bleiben im Rahmen.
+    // Buchhaltung: keine negativen Bestaende; Bank, Haende und die Beute, die
+    // Raubzuege gerade heimtragen, ergeben zusammen die 19 je Rohstoff.
     for (const p of game.state.players) {
       for (const r of RESOURCES) expect(p.hand[r]).toBeGreaterThanOrEqual(0);
     }
     for (const r of RESOURCES) {
       expect(game.state.bank[r]).toBeGreaterThanOrEqual(0);
       const inHands = game.state.players.reduce((n, p) => n + p.hand[r], 0);
-      expect(game.state.bank[r] + inHands).toBe(19);
+      const unterwegs = game.state.units.reduce((n, u) => n + (u.fracht?.[r] ?? 0), 0);
+      expect(game.state.bank[r] + inHands + unterwegs).toBe(19);
     }
   });
 

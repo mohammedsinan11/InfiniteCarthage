@@ -1,14 +1,18 @@
 /**
- * Figuren auf der Karte - Einheiten und Lager.
+ * Figuren auf der Karte - Einheiten, Lager und Ruinen.
  *
  * PLATZHALTER aus Pixelkarten: jede Figur ist ein kleines Raster aus Zeichen,
  * gezeichnet im selben Kunstpixel wie die Kacheln. So sitzen sie im Pixelraster
  * der Karte, statt als glatte Vektoren darueberzuschweben - der Mangel, den
  * ASSETS.md beim alten Nest-Marker notiert hatte.
  *
+ * FARBE. 'p' in einer Pixelkarte ist die Farbe des Besitzers: die Spielerfarbe
+ * beim Ritter, die Fraktionsfarbe bei Raeubern, Goblins und dem Wimpel am Lager.
+ *
  * SPRITES FOLGEN. Liegt in src/assets/units eine Datei mit dem Namen der Art
- * (raeuber.png, goblin.png, ritter.png, lager.png, ruine.png), wird sie statt des
- * Platzhalters gezeichnet - ohne Codeaenderung. Format: README dort.
+ * (raeuber.png, goblin.png, ritter.png, wanderer.png, lager.png, ruine.png),
+ * wird sie statt des Platzhalters gezeichnet - ohne Codeaenderung. Ebenso
+ * kampf.png fuer die Schwerter ueber einem Kampf. Format: README dort.
  */
 
 import type { UnitKind } from '../core/units';
@@ -31,6 +35,8 @@ const PALETTE: Record<string, string> = {
   t: '#8a6a45', // Holz
   T: '#5b4430', // dunkles Holz
   c: '#c7b28a', // Zeltstoff
+  a: '#8d8a7e', // Wandermantel
+  A: '#6a675d', // dunkler Mantel
 };
 
 /** Die Platzhalter. '.' ist durchsichtig, 'p' die Farbe des Besitzers. */
@@ -40,8 +46,8 @@ const ART: Record<FigurArt, readonly string[]> = {
     '.khhhk.',
     'khhhhhk',
     'khssshk',
-    '.krrrk.',
-    'kbrrrbk',
+    '.kpppk.',
+    'kbpppbk',
     'kbbbbbk',
     'ksbBbsk',
     '.kbBbk.',
@@ -54,7 +60,7 @@ const ART: Record<FigurArt, readonly string[]> = {
     '.gkgggkg.',
     '..kwgwk..',
     '..kgggk..',
-    '..kGrGk..',
+    '..kGpGk..',
     '.kbbbbbk.',
     'kgkbbbkgk',
     '..kbkbk..',
@@ -74,6 +80,21 @@ const ART: Record<FigurArt, readonly string[]> = {
     '.kMkMk..',
     '.kk.kk..',
   ],
+  // Kapuzenmantel und Stab - neutral, ohne Farbe.
+  wanderer: [
+    '..kkk....',
+    '.kaaak..k',
+    'kaaaaak.t',
+    'kasssak.t',
+    '.kAaAk..t',
+    'kaaaaakst',
+    'kaAaAak.t',
+    'kaaaaak.t',
+    'kaAaAak.t',
+    '.kaaak..t',
+    '.kb.bk..t',
+    '.kk.kk..k',
+  ],
   ruine: [
     '..k.....k..',
     '.kmk...kmk.',
@@ -87,8 +108,8 @@ const ART: Record<FigurArt, readonly string[]> = {
   ],
   lager: [
     '......k........',
-    '......krr......',
-    '......krrr.....',
+    '......kpp......',
+    '......kppp.....',
     '......k........',
     '.....kkk.......',
     '....kcckk......',
@@ -109,6 +130,14 @@ const SPRITE_URLS = import.meta.glob('../assets/units/*.png', {
 }) as Record<string, string>;
 
 const SPRITES = new Map<string, HTMLImageElement>();
+
+/** Die Adresse eines gelieferten Sprites, oder null, solange es fehlt. */
+export function spriteUrl(name: string): string | null {
+  for (const [pfad, url] of Object.entries(SPRITE_URLS)) {
+    if (pfad.endsWith(`/${name}.png`)) return url;
+  }
+  return null;
+}
 
 /** Vorhandene Sprites laden. Fehlt der Ordner oder eine Datei, bleibt der Platzhalter. */
 export function preloadUnitSprites(): Promise<void> {
@@ -166,20 +195,57 @@ export function zeichneFigur(
     for (let zx = 0; zx < zeile.length; zx++) {
       const ch = zeile[zx]!;
       if (ch === '.') continue;
-      ctx.fillStyle = ch === 'p' ? (farbe ?? '#3a6fc4') : (PALETTE[ch] ?? '#ff00ff');
+      ctx.fillStyle = ch === 'p' ? (farbe ?? '#9c3226') : (PALETTE[ch] ?? '#ff00ff');
       ctx.fillRect(x0 + zx * f, y0 + zy * f, f, f);
     }
   }
 }
 
+/** Wie hoch eine Figur ist, in Kunstpixeln. */
+export function figurHoehe(art: FigurArt): number {
+  const sprite = SPRITES.get(art);
+  return sprite ? sprite.naturalHeight : ART[art].length;
+}
+
 /**
- * Wo Figuren auf einem Feld stehen, in Kunstpixeln relativ zur Feldmitte -
- * hinten zuerst, damit die vorderen die hinteren ueberdecken. Auf einem Lager
- * stehen sie davor, damit das Lager sichtbar bleibt.
+ * Leben ueber dem Kopf eines Verwundeten: ein Kunstpixel je Leben, rot fuer
+ * uebrige, dunkel fuer verlorene. Unverletzte bekommen keine Anzeige - sonst
+ * steht ueber jeder Figur ein Balken. PLATZHALTER (ASSETS.md).
+ */
+export function zeichneLeben(
+  ctx: CanvasRenderingContext2D,
+  art: FigurArt,
+  fx: number,
+  fy: number,
+  f: number,
+  leben: number,
+  max: number,
+): void {
+  const y = fy - (figurHoehe(art) + 1) * f;
+  const breite = max * 2 - 1;
+  const x0 = fx - Math.floor(breite / 2) * f;
+  ctx.fillStyle = '#1b130d';
+  ctx.fillRect(x0 - f, y - f, (breite + 2) * f, 3 * f);
+  for (let i = 0; i < max; i++) {
+    ctx.fillStyle = i < leben ? '#e0473a' : '#4a3a30';
+    ctx.fillRect(x0 + i * 2 * f, y, f, f);
+  }
+}
+
+/**
+ * Wo Figuren auf einem Feld stehen, in Kunstpixeln relativ zur Feldmitte. Auf
+ * einem Lager stehen sie davor, damit das Lager sichtbar bleibt. Ab vier
+ * Figuren stehen die ersten beiden links, die naechsten rechts - wer nach Seite
+ * sortiert zeichnet, bekommt so zwei Reihen, die einander gegenueberstehen.
  */
 export function aufstellung(anzahl: number, lager: boolean): ReadonlyArray<readonly [number, number]> {
-  if (lager) return anzahl <= 2 ? [[-6, 6], [6, 6]] : [[-7, 5], [7, 5], [0, 8]];
+  if (lager) {
+    if (anzahl <= 2) return [[-6, 6], [6, 6]];
+    if (anzahl === 3) return [[-7, 5], [7, 5], [0, 8]];
+    return [[-9, 4], [-6, 9], [9, 4], [6, 9], [0, 11]];
+  }
   if (anzahl <= 1) return [[0, 4]];
   if (anzahl === 2) return [[-4, 3], [4, 5]];
-  return [[-5, 2], [5, 2], [0, 6]];
+  if (anzahl === 3) return [[-5, 2], [5, 2], [0, 6]];
+  return [[-7, 1], [-5, 6], [7, 1], [5, 6], [0, 9]];
 }

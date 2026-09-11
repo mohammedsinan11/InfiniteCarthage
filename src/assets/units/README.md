@@ -6,11 +6,13 @@ bzw. den Dev-Server neu laden.
 
 | Datei | Was |
 | --- | --- |
-| `raeuber.png` | Bewohner eines Raeubernests |
-| `goblin.png` | Bewohner eines Goblinlagers (etwa jedes dritte Nest) |
-| `ritter.png` | Wache eines Spielers, steht an seinen Siedlungen |
-| `lager.png` | Das Nest selbst - Zelt, Palisade |
+| `raeuber.png` | Angehoeriger einer Raeuberbande - Besatzung, Raubzug, Fehde |
+| `goblin.png` | Angehoeriger eines Goblinstamms (etwa jede dritte Fraktion) |
+| `ritter.png` | Ritter eines Spielers - zieht, wohin man ihn schickt |
+| `wanderer.png` | Neutraler Wanderer, zieht umher |
+| `lager.png` | Das Lager selbst - Zelt, Palisade, Wimpel |
 | `ruine.png` | Eine noch nicht erkundete Ruine |
+| `kampf.png` | Ueber einem umkaempften Feld, etwa 12 x 12, Mitte = Feldmitte |
 
 ## Format
 
@@ -22,6 +24,8 @@ bzw. den Dev-Server neu laden.
 - **Anker unten mittig:** die unterste Pixelreihe sind die Fuesse, die Mitte der
   Breite steht auf dem Punkt. Bei ungerader Breite ist das die mittlere Spalte.
 - **Blickrichtung:** vorerst eine, leicht von vorn.
-- **Ritter:** die Spielerfarbe kann ein Sprite noch nicht uebernehmen - der
-  Platzhalter faerbt den Waffenrock. Fuer echte Sprites braeuchte es eine
-  zweite Datei als Farbmaske (`ritter_maske.png`); das ist noch nicht gebaut.
+- **Farben:** Ritter tragen die Spielerfarbe, Raeuber, Goblins und Lager die
+  Farbe ihrer Fraktion. Ein Sprite kann das noch nicht uebernehmen - der
+  Platzhalter faerbt Waffenrock, Halstuch, Guertel und Wimpel. Fuer echte
+  Sprites braeuchte es je eine zweite Datei als Farbmaske (etwa
+  `ritter_maske.png`); das ist noch nicht gebaut.

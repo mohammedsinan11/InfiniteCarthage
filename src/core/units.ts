@@ -18,6 +18,8 @@ import {
 } from './coords';
 import { nestAt } from './raiders';
 import { terrainAt } from './worldgen';
+import { fraktionAt, fraktionById } from './factions';
+import type { FraktionArt } from './factions';
 import type { Hex } from './coords';
 import type { GameState, PlayerId, UnitKind, UnitState } from './state';
 
@@ -27,7 +29,7 @@ export type Unit = UnitState;
 /** Was die Heeresrechnung vom Spielstand braucht - die redigierte Sicht genuegt. */
 export type ArmyView = Pick<
   GameState,
-  'worldSeed' | 'buildings' | 'units' | 'destroyedNests' | 'nestGarrison'
+  'worldSeed' | 'buildings' | 'units' | 'destroyedNests' | 'nestGarrison' | 'nestFraktion'
 >;
 
 const SALT_LAGER = 73;
@@ -38,19 +40,68 @@ export const SICHT_SIEDLUNG = 3;
 export const SICHT_EINHEIT = 2;
 
 /**
- * Wer ein Lager bewohnt.
+ * Kampfwerte je Art (core/combat.ts, trifft).
  *
- * Etwa jedes dritte ist ein Goblinlager. Fuer die Regeln ist das gleich, aber
- * die Karte bekommt zwei Gegner statt eines. Rein: dasselbe Lager hat immer
- * dieselben Bewohner.
+ * Ein Ritter trifft ab 3, ein Raeuber ab 4, ein Goblin ab 5. Goblins sind
+ * schwaecher, halten aber so viel aus wie Raeuber - ein Stamm lebt von der
+ * Menge, nicht vom Einzelnen. Wanderer kaempfen nicht.
+ */
+export const WERTE: Record<UnitKind, { angriff: number; leben: number }> = {
+  ritter: { angriff: 3, leben: 3 },
+  raeuber: { angriff: 2, leben: 2 },
+  goblin: { angriff: 1, leben: 2 },
+  wanderer: { angriff: 0, leben: 1 },
+};
+
+/** Mehr Besatzung hat kein Lager - auch nicht, wenn Trupps heimkehren. */
+export const BESATZUNG_MAX = 3;
+
+/** Eine neue Einheit mit vollen Leben und leeren Taschen. Die Nummer vergibt der Aufrufer. */
+export function einheitVorlage(
+  kind: UnitKind,
+  q: number,
+  r: number,
+  felder: Partial<Omit<UnitState, 'id' | 'kind' | 'q' | 'r'>> = {},
+): Omit<UnitState, 'id'> {
+  return {
+    kind,
+    owner: null,
+    fraktion: null,
+    q,
+    r,
+    ziel: null,
+    heimat: null,
+    auftrag: kind === 'ritter' ? 'befehl' : kind === 'wanderer' ? 'wandern' : 'raub',
+    leben: WERTE[kind].leben,
+    fracht: null,
+    traegt: 0,
+    beraubt: null,
+    dauer: null,
+    ...felder,
+  };
+}
+
+/**
+ * Wer ein Lager von Natur aus bewohnt: die Art seiner Fraktion und zwei bis drei
+ * Koepfe. Rein - dasselbe Lager hat immer dieselben Bewohner. Eroberungen
+ * aendern die Fraktion (nestFraktionOf), nicht diese Grundzahl.
  */
 export function nestOccupants(
   seed: number,
   q: number,
   r: number,
-): { kind: 'raeuber' | 'goblin'; count: number } {
+): { kind: FraktionArt; count: number } {
   const h = hash3i(seed, q, r, SALT_LAGER) >>> 0;
-  return { kind: h % 3 === 0 ? 'goblin' : 'raeuber', count: 2 + ((h >>> 8) % 2) };
+  return { kind: fraktionAt(seed, q, r).art, count: 2 + ((h >>> 8) % 2) };
+}
+
+/** Welche Fraktion ein Lager haelt - erobert oder von Natur aus. */
+export function nestFraktionOf(
+  view: Pick<GameState, 'worldSeed' | 'nestFraktion'>,
+  q: number,
+  r: number,
+): string {
+  return view.nestFraktion[hexKey(q, r)] ?? fraktionAt(view.worldSeed, q, r).id;
 }
 
 /**
@@ -102,10 +153,14 @@ export function garrisonUnits(view: ArmyView, hexes: Iterable<Hex>): Unit[] {
   const out: Unit[] = [];
   for (const h of hexes) {
     if (!isNestActive(view, h.q, h.r)) continue;
-    const kind = nestOccupants(view.worldSeed, h.q, h.r).kind;
+    const fraktion = nestFraktionOf(view, h.q, h.r);
+    const kind = fraktionById(view.worldSeed, fraktion).art;
     const n = garrisonOf(view, h.q, h.r);
     for (let i = 0; i < n; i++) {
-      out.push({ id: -1, kind, owner: null, q: h.q, r: h.r, ziel: null, heimat: hexKey(h.q, h.r) });
+      out.push({
+        ...einheitVorlage(kind, h.q, h.r, { fraktion, heimat: hexKey(h.q, h.r), auftrag: 'heimkehr' }),
+        id: -1,
+      });
     }
   }
   return out;

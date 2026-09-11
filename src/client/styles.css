@@ -1900,3 +1900,106 @@ em.off {
     animation: none;
   }
 }
+
+/* Kampf: zwei Schwerter ueber dem Feld. PLATZHALTER (ASSETS.md). In Stufen
+   statt fliessend, damit es zur Pixelgrafik passt. */
+.kampf-schwerter {
+  transform-box: fill-box;
+  transform-origin: 50% 80%;
+  animation: kampf-klirren 0.8s steps(1, end) infinite;
+}
+@keyframes kampf-klirren {
+  0% {
+    transform: rotate(-8deg) translateY(0);
+  }
+  50% {
+    transform: rotate(8deg) translateY(-2px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kampf-schwerter {
+    animation: none;
+  }
+}
+
+/* Feldinfo: was unter dem Zeiger steht. PLATZHALTER-Tafel (ASSETS.md). */
+.feld-info {
+  position: absolute;
+  top: 48px;
+  left: 64px;
+  z-index: 5;
+  max-width: 300px;
+  padding: 6px 9px;
+  background: rgba(23, 18, 12, 0.92);
+  border: 1px solid var(--line);
+  font-size: 11px;
+  line-height: 1.35;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.feld-info-zeile {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.feld-info-zeile.kampf {
+  color: var(--danger);
+  font-family: var(--pixel);
+  font-size: 9px;
+}
+.feld-info-farbe {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border: 1px solid #1b130d;
+  align-self: center;
+}
+
+/* Fraktionen im Menue (Reiter Reich). */
+.menu-fraktionen {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.menu-fraktionen li {
+  display: grid;
+  grid-template-columns: 10px 1fr auto;
+  gap: 2px 6px;
+  align-items: center;
+  padding: 4px 6px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid var(--line);
+}
+.menu-fraktion-farbe {
+  width: 10px;
+  height: 10px;
+  border: 1px solid #1b130d;
+}
+.menu-fraktion-name {
+  font-size: 11px;
+}
+.menu-fraktion-haltung {
+  font-family: var(--pixel);
+  font-size: 8px;
+  color: var(--danger);
+}
+.menu-fraktion-info {
+  grid-column: 2 / 4;
+  font-size: 10px;
+  color: var(--muted);
+}
+.menu-welt li.welt-feud,
+.menu-welt li.welt-capture,
+.menu-welt li.welt-home {
+  border-left-color: #d8742c;
+  color: #f0c9a0;
+}
+.menu-welt li.welt-wanderer {
+  border-left-color: var(--muted);
+  color: var(--muted);
+}

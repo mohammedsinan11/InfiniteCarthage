@@ -170,6 +170,44 @@ locken) und erhoeht den Verlust auf die Haelfte.
 
 ---
 
+## Fraktionen, Kampf und Wanderer
+
+Gebaut in `core/factions.ts`, `core/combat.ts` und `core/rules/army.ts`.
+
+- **Fraktionen.** Jedes Lager gehoert einer Raeuberbande oder einem
+  Goblinstamm. Die Gebiete entstehen aus Zellen von 18 Feldern mit verschobenen
+  Mittelpunkten; Name und eine von neun Farben kommen aus dem Seed, Nachbarn
+  tragen nie dieselbe. Im Spielstand steht nur, wer ein Lager erobert hat
+  (`nestFraktion`).
+- **Feindschaft.** Fraktionen gegeneinander und gegen Spieler, Spieler nicht
+  untereinander, Wanderer mit niemandem - alles in einer Funktion
+  (`feindlich`). Dort setzt spaeter die Diplomatie an.
+- **Kampf.** Stehen Feinde auf einem Feld, wird jede Runde gewuerfelt: ein
+  Treffer bei Wurf + Angriff >= 6 (Ritter 3, Raeuber 2, Goblin 1), eine Sechs
+  trifft immer, eine Eins nie. Leben: Ritter 3, Raeuber und Goblins 2. Wer
+  kaempft, zieht nicht. Wer stand, stuermt auf Feinde nebenan - so stellen
+  Ritter weiterhin, wer an ihnen vorbeiwill. Die Karte zeigt Kaempfe mit zwei
+  Schwertern.
+- **Lager** kaempfen mit: Angreifer -1 (Palisade), Besatzung -2 (ungeordnet),
+  ein Leben je Kopf - fuer den Ritter dieselben Werte wie bei der ersten
+  Belagerung. Faellt die Besatzung, zerstoeren Ritter das Lager und bekommen
+  Beute; fremde Fraktionen erobern es und werden seine Besatzung.
+- **Heimkehr.** Raubzuege tragen die Beute heim. Erst dort ist sie fort, und der
+  Trupp verstaerkt das Lager (hoechstens 3). Wer ihn unterwegs schlaegt, bekommt
+  die Beute. Faellt das eigene Lager, sucht der Trupp ein anderes seiner
+  Fraktion oder zerstreut sich.
+- **Fehden.** Je grosser Runde schickt mit halber Chance ein Lager nahe den
+  Spielern zwei Mann gegen ein feindliches Lager bis 7 Felder entfernt;
+  hoechstens eine Fehde zugleich.
+- **Wanderer.** Neutral, einer je Spieler, 20 Runden, das erste Ziel an einer
+  Siedlung. Noch ohne Wirkung - der Platz fuer Begegnungen.
+- **Ritter erholen sich** an eigenen Siedlungen um ein Leben je Runde.
+
+Offen: Diplomatie; was Wanderer bringen (Handel, Geruechte, Auftraege); ob
+Kaempfe zu mehreren zu schnell laufen, weil die Runde der Spielerzug ist.
+
+---
+
 ## Der Held
 
 Deine Idee einer zweiten, parallel laufenden Ebene. Sie passt gut zur
@@ -231,14 +269,17 @@ das Geruest schon.
    Goblins stehen im Spielstand und ziehen ein Feld je Runde. Raubzuege brechen
    zum Beginn jeder grossen Runde aus Lagern bis 8 Felder vor einer Siedlung auf
    - die naechsten zuerst, hoechstens einer mehr als Spieler am Tisch - und
-   pluendern erst bei Ankunft. Ritter stellen, wer ihnen nahe kommt
-   (Wurf ab 3).
+   pluendern erst bei Ankunft. Seit den Fraktionen tragen sie die Beute heim,
+   und Kaempfe dauern mehrere Runden (siehe "Fraktionen, Kampf und Wanderer").
 9. ~~**Belagerung**~~ — gebaut: Ritter auf einem Lager treffen ab 4, die
    Besatzung ab 6. Faellt das Lager, gibt es Beute - eine Kartenwahl.
    *Erkundung:* Nebel ausserhalb der Sicht, Ruinen mit Schatz, Beute, alter
    Karte oder Hinterhalt. Offen: der Held selbst, und ob Einheiten zu mehreren
    langsamer ziehen sollen - die Runde ist der Spielerzug.
 10. **Held** — erst wenn Karten und Einheiten stehen.
+11. ~~**Fraktionen und Kampf**~~ — gebaut: Banden und Staemme mit Namen und
+    Farben, Kaempfe ueber mehrere Runden, Heimkehr mit Beute, Fehden,
+    Eroberungen, Wanderer. Als naechstes: Diplomatie.
 
 ### Was beim Bauen aufgefallen ist
 

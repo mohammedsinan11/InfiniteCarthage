@@ -325,3 +325,12 @@ export function playRuin(): void {
   blip(988, 0.4, 0.04, 0.35, 'sine');
   blip(1318, 0.5, 0.03, 0.45, 'sine');
 }
+
+/** Klingen kreuzen sich: zwei helle Schlaege mit Metallrauschen. PLATZHALTER (ASSETS.md). */
+export function playClash(): void {
+  noise(0.09, 5200, 0.3, 0);
+  blip(1568, 0.16, 0.07, 0, 'square');
+  blip(2093, 0.2, 0.05, 0.01, 'triangle');
+  noise(0.08, 4600, 0.26, 0.16);
+  blip(1397, 0.18, 0.06, 0.16, 'square');
+}

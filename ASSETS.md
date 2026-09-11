@@ -71,21 +71,24 @@ Piktogramme, und in sechs Spielerfarben lesbar bleiben.
 *Aufwand:* 3 Formen x 6 Farben, oder 3 Graustufenbilder, die eingefaerbt
 werden.
 
-### Figuren: Lager, Ruinen, Raeuber, Goblins, Ritter — **Platzhalter, sprite-bereit**
+### Figuren: Lager, Ruinen, Raeuber, Goblins, Ritter, Wanderer — **Platzhalter, sprite-bereit**
 
 `src/client/units.ts`: kleine Pixelkarten aus Zeichen, gezeichnet im Kunstpixel
 der Kacheln auf dem Canvas - also im selben Raster wie die Karte und von den
 Kacheln davor richtig verdeckt.
 
-Zu sehen: Lager (Zelt, Palisade, Wimpel) mit ihrer Besatzung davor, noch nicht
-erkundete Ruinen (zwei Saeulen auf einem Sockel), Raubzuege, die ueber die Karte
-ziehen, und die Ritter der Spieler in ihrer Farbe. Alle Figuren blicken nach
-vorn und haben keine Laufanimation - sie springen je Runde ein Feld weiter.
+Zu sehen: Lager (Zelt, Palisade, Wimpel in Fraktionsfarbe) mit ihrer Besatzung
+davor, noch nicht erkundete Ruinen (zwei Saeulen auf einem Sockel), Raubzuege
+und Fehden, Wanderer (grauer Kapuzenmantel mit Stab) und die Ritter der
+Spieler. Raeuber tragen die Fraktionsfarbe am Halstuch, Goblins am Guertel,
+Ritter die Spielerfarbe am Waffenrock. Alle Figuren blicken nach vorn und haben
+keine Laufanimation - sie springen je Runde ein Feld weiter.
 
 **Sprites ohne Codeaenderung:** `raeuber.png`, `goblin.png`, `ritter.png`,
-`lager.png`, `ruine.png` nach `src/assets/units/` legen. Format und Anker stehen
-im README dort. Offen: eine Farbmaske fuer Ritter-Sprites, damit sie die
-Spielerfarbe tragen.
+`wanderer.png`, `lager.png`, `ruine.png` nach `src/assets/units/` legen. Format
+und Anker stehen im README dort. Offen: eine Farbmaske fuer Sprites, damit
+Ritter die Spielerfarbe und Raeuber, Goblins und Lager die Fraktionsfarbe
+tragen - ein geliefertes Sprite waere derzeit einfarbig.
 
 ### Nebel und Befehle — **Platzhalter**
 
@@ -94,6 +97,23 @@ Spielerfarbe tragen.
 - **Befehle:** gestrichelte Linie vom Ritter zum Ziel, eine Dreiecksfahne in
   Spielerfarbe, ein kreisender Ring um den ausgewaehlten Ritter, ein gelb
   umrandetes Feld unter dem Zeiger (SVG in `Board.tsx`).
+
+### Fraktionen und Kampf — **Platzhalter**
+
+- **Schwerter ueber einem Kampf:** zwei gekreuzte Klingen aus einer Pixelkarte,
+  die Parierstangen in den Farben der beiden Seiten, wackeln in zwei Stufen
+  (`board/Schwerter.tsx`, CSS `.kampf-schwerter`). Sprite-bereit: `kampf.png`
+  in `src/assets/units/` ersetzt sie.
+- **Fraktionsfarben:** neun feste Farben (`theme.ts`, `FRAKTION_COLORS`) statt
+  Wappen. Sie faerben Halstuch, Guertel, Lagerwimpel und die Punkte in Menue und
+  Feldinfo.
+- **Lebensanzeige:** rote Kunstpixel ueber verwundeten Figuren, dunkle fuer
+  verlorene Leben (`units.ts`, `zeichneLeben`).
+- **Feldinfo:** dunkle Tafel oben links mit Lager, Einheiten, Fraktion,
+  Vorhaben, Leben und Beute des Feldes unter dem Zeiger (CSS `.feld-info`).
+- **Fraktionsliste:** Farbpunkt, Name und "Krieg" im Reiter Reich - die Haltung
+  ist ein Platzhalter fuer die Diplomatie.
+- **Klang:** `playClash` (Rauschen und zwei helle Toene) beim Kampfbeginn.
 
 ### Zahlenmarker und Haefen — **tragbar**
 
@@ -161,12 +181,15 @@ wuerden.
 | **Technologien** | Symbole | Fuer den Reiter im Menue. |
 | **Auftraege und Ereignisse** | Symbole, evtl. kleine Bilder | Ereignisse koennten ein Bild vertragen, Auftraege genuegt ein Symbol. |
 | **Lager-Sprite** | 1 bis 3 Varianten (`lager.png`) | Ersetzt das Pixel-Zelt. Raeuber- und Goblinlager duerfen verschieden aussehen - dafuer braeuchte es zwei Dateien. |
-| **Einheiten-Sprites** | `raeuber.png`, `goblin.png`, `ritter.png`, spaeter je Einheit | Werden ohne Codeaenderung gezeichnet (README in `src/assets/units`). Fuer Bewegung spaeter zwei Blickrichtungen. |
+| **Einheiten-Sprites** | `raeuber.png`, `goblin.png`, `ritter.png`, `wanderer.png`, spaeter je Einheit | Werden ohne Codeaenderung gezeichnet (README in `src/assets/units`). Fuer Bewegung spaeter zwei Blickrichtungen. |
+| **Fraktionswappen** | 9 kleine Wappen oder Banner | Ersetzen die blossen Farbpunkte in Menue und Feldinfo; koennten auch am Lager haengen. |
+| **Kampf-Symbol** | `kampf.png`, etwa 12 x 12, gern 2 Einzelbilder | Ersetzt die Pixelschwerter ueber einem umkaempften Feld. |
+| **Lebensanzeige** | kleine Herzen oder Balken | Ersetzt die roten Kunstpixel ueber Verwundeten. |
 | **Kartenrahmen je Seltenheit** | 5 Rahmen, dazu Glanz als Einzelbildfolge | Ersetzt die CSS-Glut, Funken und Strahlen. Legendaer darf animiert sein, der Rest eher nicht. |
 | **Kartenrueckseite** | 1 Motiv | Fuer das Austeilen - derzeit fliegen die Vorderseiten herein. |
 | **Ritter-Farbmaske** | 1 Datei neben `ritter.png` | Ritter ziehen in Spielerfarbe ueber die Karte; ein Sprite koennte die Farbe aber noch nicht tragen. |
 | **Pluenderung** | kurze Einzelbildfolge | Derzeit nur Meldung und Klang. Eine Staubwolke an der Siedlung, wenn ein Raubzug ankommt. |
-| **Klaenge** | Aufnahmen oder komponiert | Ertrag, Karte nehmen (je Seltenheit), Marsch, Gefecht, Pluenderung, Ruine zuerst. |
+| **Klaenge** | Aufnahmen oder komponiert | Ertrag, Karte nehmen (je Seltenheit), Marsch, Klingen (Kampfbeginn), Sieg, Pluenderung, Ruine zuerst. |
 | **Ruinen-Sprite** | `ruine.png`, besser 2-3 Varianten | Ersetzt die Pixelsaeulen. Eine erkundete Ruine verschwindet derzeit - eine "leere" Variante waere schoener. |
 | **Nebel** | weiche Kante, evtl. ziehende Schwaden | Derzeit harte Tönung je Feld. Ein Uebergang am Sichtrand wuerde das meiste bringen. |
 | **Befehlsanzeige** | Fahne, Wegmarken, Auswahlring | Derzeit SVG-Formen. Eine gezeichnete Fahne und Fussspuren statt Strichlinie. |

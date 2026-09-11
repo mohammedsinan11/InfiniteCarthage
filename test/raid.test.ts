@@ -231,6 +231,7 @@ describe('Die Redaktion der Pluenderung', () => {
     round: 6,
     player,
     kind: 'raeuber' as const,
+    fraktion: 'f:0:0',
     q: 0,
     r: 0,
     taken,

@@ -21,7 +21,11 @@ import { DiceOverlay } from '../ui/DiceOverlay';
 import { Announcements } from '../ui/Announcements';
 import { CardDraft } from '../ui/CardDraft';
 import { SideMenu } from '../ui/SideMenu';
-import { sightOf } from '../../core/units';
+import type { FraktionsZeile } from '../ui/SideMenu';
+import { isNestActive, nestFraktionOf, sightOf } from '../../core/units';
+import { kampfFelder } from '../../core/combat';
+import { fraktionById } from '../../core/factions';
+import { fraktionColor } from '../theme';
 import { hexDistance, parseVertexKey, vertexAdjacentHexes } from '../../core/coords';
 import { initAudio, playBuild, playGain } from '../audio';
 import {
@@ -121,12 +125,18 @@ export function Game() {
     return () => window.removeEventListener('keydown', taste);
   }, [befehl]);
 
-  /** Raubzuege unterwegs und wie nah der naechste meinen Siedlungen ist. */
+  /** Die Felder an meinen Siedlungen - von hier aus wird gemessen. */
+  const meineFelder = useMemo(
+    () =>
+      Object.entries(state.buildings)
+        .filter(([, b]) => b.owner === you)
+        .flatMap(([vk]) => vertexAdjacentHexes(parseVertexKey(vk))),
+    [state.buildings, you],
+  );
+
+  /** Raubzuege unterwegs, wie nah der naechste meinen Siedlungen ist, Kaempfe in Sicht. */
   const lage = useMemo(() => {
-    const feinde = state.units.filter((u) => u.kind !== 'ritter');
-    const meineFelder = Object.entries(state.buildings)
-      .filter(([, b]) => b.owner === you)
-      .flatMap(([vk]) => vertexAdjacentHexes(parseVertexKey(vk)));
+    const feinde = state.units.filter((u) => u.auftrag === 'raub');
     let naechster: number | null = null;
     for (const f of feinde) {
       for (const h of meineFelder) {
@@ -134,8 +144,38 @@ export function Game() {
         if (naechster === null || d < naechster) naechster = d;
       }
     }
-    return { unterwegs: feinde.length, naechster };
-  }, [state.units, state.buildings, you]);
+    const kaempfe = [...kampfFelder(state).keys()].filter((k) => sicht === null || sicht.has(k)).length;
+    return { unterwegs: feinde.length, naechster, kaempfe };
+  }, [state, meineFelder, sicht]);
+
+  /**
+   * Die Fraktionen, die man kennt: denen die Lager auf der aufgedeckten Karte
+   * gehoeren - die naechsten zuerst.
+   */
+  const fraktionen = useMemo(() => {
+    const bezug = meineFelder.length > 0 ? meineFelder : [{ q: 0, r: 0 }];
+    const m = new Map<string, FraktionsZeile>();
+    for (const t of world.tiles.values()) {
+      if (!isNestActive(state, t.q, t.r)) continue;
+      const id = nestFraktionOf(state, t.q, t.r);
+      let zeile = m.get(id);
+      if (!zeile) {
+        const f = fraktionById(state.worldSeed, id);
+        zeile = { id, name: f.name, art: f.art, farbe: fraktionColor(f.farbe), lager: 0, unterwegs: 0, naechster: null };
+        m.set(id, zeile);
+      }
+      zeile.lager += 1;
+      const d = Math.min(...bezug.map((h) => hexDistance(h, t)));
+      if (zeile.naechster === null || d < zeile.naechster) zeile.naechster = d;
+    }
+    for (const u of state.units) {
+      const zeile = u.fraktion !== null ? m.get(u.fraktion) : undefined;
+      if (zeile) zeile.unterwegs += 1;
+    }
+    return [...m.values()]
+      .sort((a, b) => (a.naechster ?? Infinity) - (b.naechster ?? Infinity))
+      .slice(0, 8);
+  }, [world, state, meineFelder]);
   const hand = me?.hand;
   const phase = state.phase;
   const isMine = state.currentPlayer === you && phase.t !== 'finished';
@@ -301,6 +341,7 @@ export function Game() {
           welt={welt}
           ritter={meineRitter}
           lage={lage}
+          fraktionen={fraktionen}
           befehl={befehl}
           beute={me?.loot ?? 0}
           befehleMoeglich={befehleMoeglich}

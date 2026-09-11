@@ -23,6 +23,29 @@ export const playerColor = (i: number): string =>
   PLAYER_COLORS[i % PLAYER_COLORS.length]!;
 
 /**
+ * Neun Fraktionsfarben - die Nummern verteilt core/factions.ts so, dass
+ * benachbarte Gebiete nie dieselbe tragen.
+ *
+ * Bewusst abseits der Spielerfarben: kein reines Rot, Blau, Gold, Gruen,
+ * Violett oder Elfenbein. Ein Raeuber soll nie aussehen wie ein Mitspieler.
+ * PLATZHALTER, bis es Wappen gibt (ASSETS.md).
+ */
+export const FRAKTION_COLORS = [
+  '#d8742c', // Orange
+  '#2e9a93', // Tuerkis
+  '#b8407e', // Magenta
+  '#c8c43c', // Schwefel
+  '#86cde0', // Eis
+  '#8b9a3a', // Oliv
+  '#8e3a22', // Rost
+  '#e58aa8', // Rosa
+  '#6d7f8e', // Schiefer
+];
+
+export const fraktionColor = (i: number): string =>
+  FRAKTION_COLORS[((i % FRAKTION_COLORS.length) + FRAKTION_COLORS.length) % FRAKTION_COLORS.length]!;
+
+/**
  * Farbstimmung je Jahreszeit.
  *
  * Wird als halbdurchsichtige Schicht ueber das Gelaende gelegt, nicht in die

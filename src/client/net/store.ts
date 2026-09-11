@@ -12,11 +12,14 @@ import { openSocket, sendMsg } from './socket';
 import type { ClientMsg, RoomInfo, ServerMsg } from '../../core/protocol';
 import type { PublicState } from '../../core/redact';
 import type { Action, GameEvent } from '../../core/rules/reducer';
-import { playCardPick, playDefend, playGuard, playMarch, playRaid, playRuin } from '../audio';
+import { playCardPick, playClash, playDefend, playGuard, playMarch, playRaid, playRuin } from '../audio';
 import type { PlayerId } from '../../core/state';
 import { createWorld, revealChunks } from '../../core/world';
 import type { World } from '../../core/world';
-import { bundleText, describeEvent } from '../log';
+import { bundleText, describeEvent, fraktionName, seiteName } from '../log';
+import { spielerSeite } from '../../core/combat';
+import { sightOf } from '../../core/units';
+import { hexKey } from '../../core/coords';
 import { bigRoundChangedAt, bigRoundOf, roundOf, SEASON_NAME, seasonChangedAt, seasonOf } from '../../core/season';
 
 /**
@@ -30,7 +33,18 @@ import { bigRoundChangedAt, bigRoundOf, roundOf, SEASON_NAME, seasonChangedAt, s
 export type WeltEintrag = {
   id: number;
   runde: number;
-  art: 'march' | 'plunder' | 'fight' | 'nest' | 'ruin' | 'season' | 'bigRound';
+  art:
+    | 'march'
+    | 'plunder'
+    | 'fight'
+    | 'nest'
+    | 'capture'
+    | 'feud'
+    | 'home'
+    | 'wanderer'
+    | 'ruin'
+    | 'season'
+    | 'bigRound';
   text: string;
 };
 
@@ -114,38 +128,60 @@ function weltAus(
   you: PlayerId | null,
 ): WeltEintrag[] {
   const out: WeltEintrag[] = [];
-  const runde = state?.turn ?? 0;
-  const wen = (id: string) =>
-    id === you ? 'dich' : (state?.players.find((p) => p.id === id)?.name ?? 'jemanden');
-  const leute = (k: 'raeuber' | 'goblin') => (k === 'goblin' ? 'Goblins' : 'Raeuber');
+  const runde = roundOf(state?.turn ?? 0);
+  const wer = (id: string) => state?.players.find((p) => p.id === id)?.name ?? 'Jemand';
+  const name = (id: string) => fraktionName(state, id);
+  // Kaempfe anderer zaehlen nur, wenn man sie sieht - sonst rauscht die Liste.
+  const sicht = state && you ? sightOf(state, you) : null;
+  const sichtbar = (q: number, r: number) => sicht === null || sicht.has(hexKey(q, r));
+  const eintrag = (art: WeltEintrag['art'], text: string, r = runde) =>
+    out.push({ id: naechsteId++, runde: r, art, text });
   for (const e of events) {
     switch (e.t) {
       case 'march':
-        out.push({
-          id: naechsteId++,
-          runde: e.round,
-          art: 'march',
-          text:
-            e.parties.length === 1
-              ? `Ein Raubzug bricht auf (${leute(e.parties[0]!.kind)})`
-              : `${e.parties.length} Raubzuege brechen auf`,
-        });
+        eintrag(
+          'march',
+          e.parties.length === 1
+            ? `Raubzug bricht auf: ${name(e.parties[0]!.fraktion)}`
+            : `${e.parties.length} Raubzuege brechen auf`,
+          e.round,
+        );
+        break;
+      case 'feud':
+        eintrag('feud', `Fehde: ${name(e.fraktion)} gegen ${name(e.gegen)}`, e.round);
+        break;
+      case 'wanderer':
+        eintrag('wanderer', 'Ein Wanderer zieht durchs Land');
         break;
       case 'plunder':
-        out.push({ id: naechsteId++, runde: e.round, art: 'plunder', text: `${leute(e.kind)} pluendern ${wen(e.player)}: ${e.count}` });
+        eintrag(
+          'plunder',
+          `${e.player === you ? 'Du wirst' : `${wer(e.player)} wird`} gepluendert: ${e.count} (${name(e.fraktion)})`,
+          e.round,
+        );
         break;
-      case 'fight':
-        out.push({
-          id: naechsteId++,
-          runde,
-          art: 'fight',
-          text: e.knightWon
-            ? `Ritter schlaegt ${e.foe === 'goblin' ? 'einen Goblin' : 'einen Raeuber'}`
-            : `Ritter faellt gegen ${e.foe === 'goblin' ? 'einen Goblin' : 'einen Raeuber'}`,
-        });
+      case 'homecoming':
+        if (e.count > 0) eintrag('home', `${name(e.fraktion)}: ${e.count} Beute heimgebracht`);
         break;
+      case 'lootRecovered':
+        eintrag('fight', `Beute zurueckerobert: ${e.count} (${e.player === you ? 'du' : wer(e.player)})`);
+        break;
+      case 'fight': {
+        const meins = you !== null && e.seiten.includes(spielerSeite(you));
+        if (!meins && !sichtbar(e.q, e.r)) break;
+        const gegner = e.seiten.map((s) => seiteName(state, s, you)).join(' gegen ');
+        if (e.neu && !e.ende) eintrag('fight', `Kampf: ${gegner}`);
+        else if (e.ende) {
+          const sieger = e.sieger ? seiteName(state, e.sieger, you) : 'niemand';
+          eintrag('fight', e.neu ? `Kampf: ${gegner} - Sieg fuer ${sieger}` : `Kampf entschieden: Sieg fuer ${sieger}`);
+        }
+        break;
+      }
       case 'nestDestroyed':
-        out.push({ id: naechsteId++, runde, art: 'nest', text: `${e.kind === 'goblin' ? 'Goblinlager' : 'Raeuberlager'} zerstoert` });
+        eintrag('nest', `Lager zerstoert: ${name(e.fraktion)}`);
+        break;
+      case 'nestCaptured':
+        eintrag('capture', `${name(e.an)} erobern ein Lager von ${name(e.von)}`);
         break;
       case 'ruin':
         out.push({ id: naechsteId++, runde, art: 'ruin', text: `Ruine erkundet: ${RUINE_KURZ[e.result]}` });
@@ -181,12 +217,15 @@ function meldungenAus(
 ): Announcement[] {
   const out: Announcement[] = [];
   const wer = (id: string) => state?.players.find((p) => p.id === id)?.name ?? 'Jemand';
+  const name = (id: string) => fraktionName(state, id);
+  const sicht = state && you ? sightOf(state, you) : null;
+  const sichtbar = (q: number, r: number) => sicht === null || sicht.has(hexKey(q, r));
   for (const e of events) {
     if (e.t === 'plunder') {
       const karten = `${e.count} ${e.count === 1 ? 'Karte' : 'Karten'}`;
       if (e.player === you) {
         playRaid();
-        out.push({ id: naechsteId++, text: `${e.kind === 'goblin' ? 'Goblins' : 'Raeuber'} pluendern dich: ${karten}`, kind: 'raid' });
+        out.push({ id: naechsteId++, text: `${name(e.fraktion)} pluendern dich: ${karten}`, kind: 'raid' });
       } else {
         out.push({ id: naechsteId++, text: `${wer(e.player)} wird gepluendert: ${e.count}`, kind: 'raid' });
       }
@@ -194,38 +233,60 @@ function meldungenAus(
       playMarch();
       out.push({
         id: naechsteId++,
-        text: e.parties.length === 1 ? 'Ein Raubzug bricht auf' : `${e.parties.length} Raubzuege brechen auf`,
+        text:
+          e.parties.length === 1
+            ? `Raubzug: ${name(e.parties[0]!.fraktion)}`
+            : `${e.parties.length} Raubzuege brechen auf`,
         kind: 'raid',
       });
     } else if (e.t === 'fight') {
-      const meiner = e.owner !== null && e.owner === you;
-      if (meiner) {
-        if (e.knightWon) playDefend();
-        else playRaid();
-      }
-      const gegner = e.foe === 'goblin' ? 'Goblin' : 'Raeuber';
-      const wessen = meiner ? 'Dein' : 'Ein';
-      out.push({
-        id: naechsteId++,
-        text: e.knightWon
-          ? `${wessen} Ritter schlaegt einen ${gegner} (Wurf ${e.roll})`
-          : `${wessen} Ritter faellt gegen einen ${gegner} (Wurf ${e.roll})`,
-        kind: e.knightWon ? 'gain' : 'raid',
-      });
-    } else if (e.t === 'siege') {
-      if (you !== null && e.owners.includes(you) && e.left > 0) {
+      const eigene = you !== null ? spielerSeite(you) : null;
+      if (eigene !== null && e.seiten.includes(eigene)) {
+        const gegner = e.seiten
+          .filter((s) => s !== eigene)
+          .map((s) => seiteName(state, s, you))
+          .join(' und ');
+        if (e.neu) playClash();
+        if (e.neu && !e.ende) {
+          out.push({ id: naechsteId++, text: `Deine Ritter kaempfen gegen ${gegner}`, kind: 'raid' });
+        }
+        if (e.ende) {
+          const sieg = e.sieger === eigene;
+          if (sieg) playDefend();
+          else playRaid();
+          out.push({
+            id: naechsteId++,
+            text: sieg ? `Sieg gegen ${gegner}` : `Niederlage gegen ${gegner}`,
+            kind: sieg ? 'gain' : 'raid',
+          });
+        }
+      } else if (e.neu && sichtbar(e.q, e.r)) {
+        playClash();
         out.push({
           id: naechsteId++,
-          text: `Belagerung: ${e.hits} Treffer, noch ${e.left} Verteidiger${e.knightsLost > 0 ? `, ${e.knightsLost} Ritter gefallen` : ''}`,
+          text: `Kampf: ${e.seiten.map((s) => seiteName(state, s, you)).join(' gegen ')}`,
           kind: 'info',
         });
+      }
+    } else if (e.t === 'lootRecovered') {
+      if (e.player === you) {
+        playDefend();
+        out.push({ id: naechsteId++, text: `Beute zurueckerobert: ${bundleText(e.taken)}`, kind: 'gain' });
+      }
+    } else if (e.t === 'feud') {
+      if (sichtbar(e.q, e.r) || sichtbar(e.zq, e.zr)) {
+        out.push({ id: naechsteId++, text: `Fehde: ${name(e.fraktion)} gegen ${name(e.gegen)}`, kind: 'info' });
+      }
+    } else if (e.t === 'nestCaptured') {
+      if (sichtbar(e.q, e.r)) {
+        out.push({ id: naechsteId++, text: `${name(e.an)} erobern ein Lager von ${name(e.von)}`, kind: 'info' });
       }
     } else if (e.t === 'nestDestroyed') {
       const meins = you !== null && e.players.includes(you);
       if (meins) playCardPick(3);
       out.push({
         id: naechsteId++,
-        text: meins ? 'Lager zerstoert! Beute: eine Kartenwahl' : `${e.kind === 'goblin' ? 'Goblinlager' : 'Raeuberlager'} zerstoert`,
+        text: meins ? 'Lager zerstoert! Beute: eine Kartenwahl' : `Lager zerstoert: ${name(e.fraktion)}`,
         kind: 'gain',
       });
     } else if (e.t === 'ruin') {
@@ -399,7 +460,12 @@ export const useStore = create<Store>((set, get) => ({
             const neue = meldungenAus(msg.events, get().state, get().you);
             const weltNeu = weltAus(msg.events, get().state, get().you);
             set((s) => ({
-              log: [...s.log, ...msg.events.map((e: GameEvent) => describeEvent(e, s.state))].slice(-120),
+              log: [
+                ...s.log,
+                ...msg.events
+                  .map((e: GameEvent) => describeEvent(e, s.state))
+                  .filter((zeile: string) => zeile !== ''),
+              ].slice(-120),
               welt: [...s.welt, ...weltNeu].slice(-WELT_MAX),
               announcements: [...s.announcements, ...neue].slice(-6),
               ...(wurf && wurf.t === 'roll' ? { pendingRoll: wurf.dice } : {}),

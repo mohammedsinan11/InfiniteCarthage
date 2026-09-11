@@ -68,25 +68,50 @@ export type Player = {
 export type Building = { owner: PlayerId; type: 'settlement' | 'city' };
 
 /** Was auf der Karte laufen kann. */
-export type UnitKind = 'ritter' | 'raeuber' | 'goblin';
+export type UnitKind = 'ritter' | 'raeuber' | 'goblin' | 'wanderer';
+
+/**
+ * Was eine Einheit gerade vorhat.
+ *
+ *   befehl    Ritter: zieht, wohin der Spieler sie schickt (ziel), sonst steht sie.
+ *   raub      zieht zur naechsten Siedlung und pluendert dort.
+ *   heimkehr  zieht mit der Beute zurueck ins Lager.
+ *   fehde     zieht gegen das Lager einer feindlichen Fraktion (ziel).
+ *   wandern   neutral, zieht umher und verschwindet nach einer Weile.
+ */
+export type Auftrag = 'befehl' | 'raub' | 'heimkehr' | 'fehde' | 'wandern';
 
 /**
  * Eine Einheit im Spielstand.
  *
  * Ritter gehoeren einem Spieler und ziehen, wohin er sie schickt. Raeuber und
- * Goblins gehoeren niemandem, kommen aus einem Lager (heimat) und ziehen zur
- * naechsten Siedlung. Alle ziehen ein Feld je Runde (rules/army.ts).
+ * Goblins gehoeren einer Fraktion, kommen aus einem Lager (heimat) und kehren
+ * dorthin zurueck. Wanderer gehoeren niemandem. Alle ziehen ein Feld je Runde
+ * (rules/army.ts).
  */
 export type UnitState = {
   id: number;
   kind: UnitKind;
   owner: PlayerId | null;
+  /** Fraktion bei Raeubern und Goblins (core/factions.ts), sonst null. */
+  fraktion: string | null;
   q: number;
   r: number;
-  /** Wohin sie zieht. Bei Raeubern das Feld an ihrer Beute - fuer die Anzeige. */
+  /** Wohin sie zieht - fuer Befehle, Fehden und die Anzeige. */
   ziel: { q: number; r: number } | null;
-  /** Aus welchem Lager ein Raubzug kommt; je Lager ist hoechstens einer unterwegs. */
+  /** Aus welchem Lager sie kommt; je Lager ist hoechstens ein Trupp unterwegs. */
   heimat: string | null;
+  auftrag: Auftrag;
+  /** Verbleibende Leben. Bei 0 faellt die Einheit. */
+  leben: number;
+  /** Was sie an Beute traegt. Fuer alle ausser dem Beraubten redigiert (redact.ts). */
+  fracht: Hand | null;
+  /** Wie viele Karten sie traegt - oeffentlich, anders als die Fracht selbst. */
+  traegt: number;
+  /** Wem die Fracht gehoerte; null, wenn sie von mehreren stammt. */
+  beraubt: PlayerId | null;
+  /** Wanderer: wie viele Runden sie noch bleiben. Sonst null. */
+  dauer: number | null;
 };
 
 /**
@@ -178,6 +203,11 @@ export type GameState = {
    * unberuehrt und hat seine volle Besatzung (units.ts, nestOccupants).
    */
   nestGarrison: Record<string, number>;
+  /**
+   * Eroberte Lager: Feldschluessel -> Fraktion, die es jetzt haelt. Fehlt ein
+   * Lager hier, gehoert es der Fraktion seines Gebiets (core/factions.ts).
+   */
+  nestFraktion: Record<string, string>;
   /** Erkundete Ruinen - jede gibt ihr Ereignis nur einmal her. */
   exploredRuins: string[];
 };
