@@ -229,8 +229,9 @@ das Geruest schon.
    Kaufentscheidung und damit etwas mehr Oberflaeche.
 8. ~~**Einheiten**~~ — gebaut: Ritter (angeworben oder per Karte), Raeuber und
    Goblins stehen im Spielstand und ziehen ein Feld je Runde. Raubzuege brechen
-   zum Beginn jeder grossen Runde aus Lagern bis 10 Felder vor einer Siedlung auf
-   und pluendern erst bei Ankunft. Ritter stellen, wer ihnen nahe kommt
+   zum Beginn jeder grossen Runde aus Lagern bis 8 Felder vor einer Siedlung auf
+   - die naechsten zuerst, hoechstens einer mehr als Spieler am Tisch - und
+   pluendern erst bei Ankunft. Ritter stellen, wer ihnen nahe kommt
    (Wurf ab 3).
 9. ~~**Belagerung**~~ — gebaut: Ritter auf einem Lager treffen ab 4, die
    Besatzung ab 6. Faellt das Lager, gibt es Beute - eine Kartenwahl.

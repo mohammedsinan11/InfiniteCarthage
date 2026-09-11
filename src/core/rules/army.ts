@@ -47,8 +47,23 @@ import {
 import { raidLoss, takeFromLargest } from './raid';
 import { roundOf } from '../season';
 
-/** Lager bis zu dieser Entfernung von einer Siedlung schicken Raubzuege. */
-export const SPAWN_RANGE = 10;
+/**
+ * Lager bis zu dieser Entfernung von einer Siedlung schicken Raubzuege.
+ *
+ * Eine erste Fassung nahm 10. Im Spiel brachen damit in Runde 6 sechs Raubzuege
+ * gleichzeitig auf - auf den grossen Kontinenten liegen im Zehnerumkreis schnell
+ * fuenf, sechs Lager. Sechs Karten Verlust je grosser Runde gegen einen einzigen
+ * Ritter ist keine Bedrohung mehr, sondern eine Steuer. Deshalb 8 - und dazu
+ * die Obergrenze je Runde (maxAufbrueche).
+ */
+export const SPAWN_RANGE = 8;
+
+/**
+ * Wie viele Raubzuege je grosser Runde hoechstens aufbrechen: einer mehr, als
+ * Spieler am Tisch sitzen - allein also zwei. Die naechsten Lager zuerst, damit
+ * die Gefahr von dort kommt, wo man sie sieht.
+ */
+export const maxAufbrueche = (spieler: number): number => 1 + spieler;
 /** Ab diesem Wurf siegt ein Ritter im Gefecht. */
 export const RITTER_SIEGT_AB = 3;
 /** Ab diesem Wurf trifft ein Ritter bei der Belagerung. */
@@ -149,32 +164,40 @@ export function spawnKnight(s: GameState, id: PlayerId, events: Ereignisse): Uni
 /**
  * Raubzuege losschicken - zum Beginn jeder grossen Runde.
  *
- * Jedes aktive Lager bis SPAWN_RANGE von einer Siedlung schickt einen Raubzug,
- * sofern keiner von dort schon unterwegs ist und ein Landweg existiert. Lager
- * weiter draussen bleiben ruhig: auf einer Karte ohne Rand wuerde sonst die
- * ganze Welt marschieren.
+ * Aktive Lager bis SPAWN_RANGE von einer Siedlung schicken einen Raubzug, sofern
+ * keiner von dort schon unterwegs ist und ein Landweg existiert - die naechsten
+ * zuerst, hoechstens maxAufbrueche je Runde. Lager weiter draussen bleiben
+ * ruhig: auf einer Karte ohne Rand wuerde sonst die ganze Welt marschieren.
  */
 export function sendRaiders(s: GameState, events: Ereignisse): void {
   const ziele = settlementApproaches(s);
   if (ziele.size === 0) return;
   const zielSet = new Set(ziele.keys());
 
-  const lager = new Map<string, { q: number; r: number }>();
+  // Aktive Lager in Reichweite, jeweils mit dem Abstand zur naechsten Siedlung.
+  const lager = new Map<string, { q: number; r: number; d: number }>();
   for (const k of ziele.keys()) {
     const [q, r] = k.split(':').map(Number);
-    for (const c of hexesInRange({ q: q!, r: r! }, SPAWN_RANGE)) {
+    const an = { q: q!, r: r! };
+    for (const c of hexesInRange(an, SPAWN_RANGE)) {
+      if (!isNestActive(s, c.q, c.r)) continue;
       const ck = hexKey(c.q, c.r);
-      if (lager.has(ck)) continue;
-      if (isNestActive(s, c.q, c.r)) lager.set(ck, c);
+      const d = hexDistance(an, c);
+      const bisher = lager.get(ck);
+      if (!bisher || d < bisher.d) lager.set(ck, { q: c.q, r: c.r, d });
     }
   }
 
   const unterwegs = new Set(
     s.units.map((u) => u.heimat).filter((h): h is string => h !== null),
   );
+  const grenze = maxAufbrueche(s.order.length);
   const parties: { q: number; r: number; kind: Feind }[] = [];
-  const sortiert = [...lager].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-  for (const [k, nest] of sortiert) {
+  const reihe = [...lager].sort(
+    (a, b) => a[1].d - b[1].d || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0),
+  );
+  for (const [k, nest] of reihe) {
+    if (parties.length >= grenze) break;
     if (unterwegs.has(k)) continue;
     const schonDa = zielSet.has(k);
     const weg = schonDa ? null : nextStep(s.worldSeed, nest, zielSet, SUCHE_RAEUBER);

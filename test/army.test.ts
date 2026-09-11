@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import { applyAction, createGame } from '../src/core/rules/reducer';
 import type { Game } from '../src/core/rules/reducer';
-import { sendRaiders, tickArmy } from '../src/core/rules/army';
+import { maxAufbrueche, sendRaiders, tickArmy } from '../src/core/rules/army';
 import type { ArmyEvent } from '../src/core/rules/army';
 import { nestAt } from '../src/core/raiders';
 import { ruinAt } from '../src/core/ruins';
@@ -181,25 +181,31 @@ describe('Ziehen', () => {
 });
 
 describe('Raubzuege', () => {
-  it('brechen aus nahen Lagern auf, hoechstens einer je Lager', () => {
+  it('brechen aus nahen Lagern auf - hoechstens einer je Lager und nicht zu viele auf einmal', () => {
     const game = solo();
-    const { key } = lagerMitSiedlung(game);
+    lagerMitSiedlung(game);
     const events: ArmyEvent[] = [];
     sendRaiders(game.state, events);
-    expect(game.state.units.filter((u) => u.heimat === key)).toHaveLength(1);
+    const erste = game.state.units.length;
+    expect(erste).toBeGreaterThan(0);
+    expect(erste).toBeLessThanOrEqual(maxAufbrueche(1));
     expect(events.some((e) => e.t === 'march')).toBe(true);
+
+    // Eine zweite Runde darf weitere Lager schicken, aber keines doppelt.
     sendRaiders(game.state, []);
-    expect(game.state.units.filter((u) => u.heimat === key)).toHaveLength(1);
+    const heimaten = game.state.units.map((u) => u.heimat);
+    expect(new Set(heimaten).size).toBe(heimaten.length);
+    expect(game.state.units.length - erste).toBeLessThanOrEqual(maxAufbrueche(1));
   });
 
   it('brechen im Takt der grossen Runde auf', () => {
     const game = solo();
-    const { key } = lagerMitSiedlung(game);
+    lagerMitSiedlung(game);
     game.state.turn = ROUNDS_PER_BIG_ROUND;
     bauphase(game);
     const events = must(game, { t: 'endTurn' });
     expect(events.some((e) => e.t === 'march')).toBe(true);
-    expect(game.state.units.some((u) => u.heimat === key)).toBe(true);
+    expect(game.state.units.some((u) => u.kind !== 'ritter')).toBe(true);
   });
 
   it('ziehen je Runde ein Feld und pluendern erst an der Siedlung', () => {
