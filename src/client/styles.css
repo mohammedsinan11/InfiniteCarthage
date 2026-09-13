@@ -453,19 +453,28 @@ em.off {
  * Ring, der erst unter dem Zeiger fest wird.
  */
 .vertex-target {
-  fill: rgba(217, 164, 65, 0.14);
-  stroke: var(--accent);
-  stroke-width: 2;
   cursor: pointer;
 }
-.vertex-target:hover {
+/* Unsichtbar, aber anklickbar - die Trefferflaeche fuer Maus und Finger. */
+.vertex-treffer {
+  fill: transparent;
+}
+.vertex-raute {
+  fill: rgba(242, 231, 208, 0.85);
+  stroke: #2a2016;
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+.vertex-target:hover .vertex-raute,
+.vertex-target.aktiv .vertex-raute {
   fill: var(--accent);
   stroke: #fff;
+  stroke-width: 2;
 }
 
 .edge-target {
-  stroke: rgba(217, 164, 65, 0.4);
-  stroke-width: 11;
+  stroke: rgba(242, 231, 208, 0.32);
+  stroke-width: 8;
   stroke-linecap: round;
   cursor: pointer;
 }
@@ -801,6 +810,17 @@ em.off {
 }
 .roll-button:hover:not(:disabled) {
   background: var(--accent);
+}
+/*
+ * Der Knopf ist mit translateX(-50%) mittig gesetzt. Die allgemeine
+ * Druckregel (button:active, translate 1px) ersetzte diese Verschiebung -
+ * beim Druecken sprang der Knopf um seine halbe Breite nach rechts. Wer links
+ * gedrueckt hatte, liess ausserhalb los, und ein click entsteht nur, wenn
+ * Druecken und Loslassen auf demselben Element liegen: der Knopf federte,
+ * gewuerfelt wurde nicht. Deshalb hier beides zusammen.
+ */
+.roll-button:active:not(:disabled) {
+  transform: translateX(-50%) translate(1px, 1px);
 }
 
 .die-body {
@@ -1898,6 +1918,242 @@ em.off {
 @media (prefers-reduced-motion: reduce) {
   .auswahl-ring {
     animation: none;
+  }
+}
+
+/* --- Unten links: Hand und Aktionsleiste ---------------------------------- */
+
+.unten {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 6;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+}
+.unten > * {
+  pointer-events: auto;
+}
+/* Die Hand sitzt jetzt im Block, nicht mehr fuer sich in der Ecke. */
+.unten .hand {
+  position: static;
+}
+
+.dock {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  background: rgba(18, 14, 9, 0.82);
+  border: 2px solid var(--line);
+}
+.dock-reihe {
+  display: flex;
+  gap: 4px;
+  align-items: stretch;
+}
+.dock-trenner {
+  width: 2px;
+  margin: 3px 1px;
+  background: var(--line);
+}
+.dock-knopf {
+  position: relative;
+  width: 50px;
+  min-height: 58px;
+  padding: 4px 2px 3px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 3px;
+}
+.dock-sym {
+  display: block;
+}
+.dock-titel {
+  font-size: 7px;
+  line-height: 1;
+  white-space: nowrap;
+}
+.dock-kosten {
+  display: flex;
+  gap: 1px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.dock-kosten-teil {
+  display: inline-flex;
+  align-items: center;
+}
+.dock-kosten-teil b {
+  font-size: 7px;
+  font-weight: 400;
+  color: var(--accent);
+  margin-right: 1px;
+}
+.dock-mini {
+  display: block;
+}
+.dock-knopf.gewaehlt {
+  background: var(--accent-dark);
+  border-color: var(--accent);
+  color: #21170a;
+}
+.dock-knopf.leuchtet:not(:disabled) {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(217, 164, 65, 0.35);
+}
+.dock-zahl {
+  position: absolute;
+  top: -7px;
+  right: -6px;
+  min-width: 16px;
+  padding: 2px 3px;
+  font-size: 9px;
+  line-height: 1;
+  text-align: center;
+  color: #2a2016;
+  background: #f2e7d0;
+  border: 2px solid #2a2016;
+}
+.dock-hinweis {
+  font-family: var(--pixel);
+  font-size: 8px;
+  color: var(--muted);
+  text-align: center;
+}
+.dock-tafel {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+  width: max-content;
+  max-width: min(340px, 90vw);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  background: rgba(23, 18, 12, 0.97);
+  border: 2px solid var(--line-bright);
+}
+.dock-tafel-kopf {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--pixel);
+  font-size: 9px;
+  color: var(--accent);
+}
+.dock-zu {
+  padding: 2px 6px;
+  font-size: 9px;
+}
+.dock-tafel-zeile {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.dock-tafel-label {
+  width: 46px;
+  font-family: var(--pixel);
+  font-size: 8px;
+  color: var(--muted);
+}
+.dock-reswahl {
+  display: inline-flex;
+  gap: 3px;
+}
+.dock-res {
+  min-width: 30px;
+  padding: 3px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 8px;
+}
+.dock-res.gewaehlt {
+  background: var(--accent-dark);
+  border-color: var(--accent);
+  color: #21170a;
+}
+.dock-tafel-los {
+  font-size: 9px;
+}
+.dock-karte {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 8px;
+}
+.dock-karte-name {
+  flex: 1;
+  min-width: 110px;
+  font-family: var(--pixel);
+  font-size: 8px;
+}
+.dock-karte button {
+  font-size: 8px;
+  padding: 4px 7px;
+}
+.dock-karte-extra {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.dock-tafel-klein {
+  margin: 0;
+  font-size: 10px;
+  color: var(--muted);
+}
+/* Handel zwischen Spielern schwebt ueber der Hand, statt eine Leiste zu fuellen. */
+.handel-schwebe {
+  position: absolute;
+  left: 10px;
+  bottom: 150px;
+  z-index: 7;
+  max-width: min(560px, calc(100% - 250px));
+  max-height: 55%;
+  overflow-y: auto;
+}
+
+/* Schmale Fenster: der Block als Ganzes kleiner. */
+@media (max-width: 860px) {
+  .unten {
+    transform: scale(0.72);
+    transform-origin: bottom left;
+  }
+  .unten .hand {
+    transform: none;
+  }
+  .handel-schwebe {
+    max-width: calc(100% - 20px);
+  }
+}
+/* Handy hochkant: Hand ueber der Leiste, die Leiste darf umbrechen. */
+@media (max-width: 600px) {
+  .unten {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    transform: scale(0.62);
+    width: calc((100vw - 20px) / 0.62);
+  }
+  .dock-reihe {
+    flex-wrap: wrap;
+  }
+  .roll-button {
+    bottom: 50%;
+  }
+  /* Der Maus-Hinweis hilft auf dem Handy nicht und schimmerte hinter der Leiste. */
+  .board-hint {
+    display: none;
   }
 }
 

@@ -35,26 +35,8 @@ import {
 } from '../../core/rules/placement';
 import { productionSources } from '../../core/rules/production';
 import { tradeRatio } from '../../core/rules/trade';
-import {
-  COST_CITY,
-  COST_DEV,
-  COST_KNIGHT,
-  COST_ROAD,
-  COST_SETTLEMENT,
-  canAfford,
-} from '../../core/rules/costs';
-import type { Cost } from '../../core/rules/costs';
-import { RESOURCES } from '../../core/types';
-import type { Resource } from '../../core/types';
-import { devName, resourceName } from '../log';
-import type { DevCardType } from '../../core/state';
-
-type BuildMode = null | 'road' | 'settlement' | 'city';
-
-const COST_LABEL = (c: Cost): string =>
-  RESOURCES.filter((r) => (c[r] ?? 0) > 0)
-    .map((r) => `${c[r]}x ${resourceName(r)}`)
-    .join(', ');
+import { Aktionsleiste } from '../ui/Aktionsleiste';
+import type { BuildMode } from '../ui/Aktionsleiste';
 
 export function Game() {
   const state = useStore((s) => s.state)!;
@@ -72,10 +54,6 @@ export function Game() {
   const clearProduceEffect = useStore((s) => s.clearProduceEffect);
 
   const [mode, setMode] = useState<BuildMode>(null);
-  const [tradeGive, setTradeGive] = useState<Resource>('lumber');
-  const [tradeGet, setTradeGet] = useState<Resource>('ore');
-  const [yopA, setYopA] = useState<Resource>('lumber');
-  const [yopB, setYopB] = useState<Resource>('brick');
   /** Zahlen festpinnen - fuer alle, die sie lieber dauerhaft sehen. */
   const [pinNumbers, setPinNumbers] = useState(false);
 
@@ -102,7 +80,15 @@ export function Game() {
 
   const me = state.players.find((p) => p.id === you);
   /** Was ich sehe - alles andere liegt im Nebel. */
-  const sicht = useMemo(() => (you ? sightOf(state, you) : null), [state, you]);
+  /*
+   * Im Aufbau kein Nebel. Vor dem ersten Dorf sieht man nichts - die ganze Karte
+   * lag abgedunkelt da, genau in dem Moment, in dem man sie lesen muss, um einen
+   * Platz zu waehlen.
+   */
+  const sicht = useMemo(
+    () => (you && state.phase.t !== 'setup' ? sightOf(state, you) : null),
+    [state, you],
+  );
 
   /** Meine Ritter - und welcher gerade auf sein Ziel wartet. */
   const meineRitter = useMemo(
@@ -239,18 +225,6 @@ export function Game() {
   };
   const befehleMoeglich = isMine && (phase.t === 'main' || phase.t === 'roll') && mode === null;
 
-  const playableDev = (me?.dev ?? []).filter(
-    (d) => !d.played && d.type !== 'victoryPoint' && d.boughtTurn < state.turn,
-  );
-  const devCounts = new Map<DevCardType, number>();
-  for (const d of me?.dev ?? []) {
-    if (d.played) continue;
-    devCounts.set(d.type, (devCounts.get(d.type) ?? 0) + 1);
-  }
-  const canPlay = (t: DevCardType): boolean =>
-    !state.devPlayedThisTurn && playableDev.some((d) => d.type === t);
-
-  const ratio = you ? tradeRatio(state, world, you, tradeGive) : 4;
 
   /*
    * Welche Felder hat der Wurf getroffen, und was fliegt davon zu mir?
@@ -292,13 +266,12 @@ export function Game() {
 
 
   /*
-   * Waehrend eine Bauwahl offen ist, muss man Felder vergleichen koennen -
-   * dann helfen einzeln eingeblendete Zahlen nicht weiter.
+   * Waehrend einer Bauwahl standen frueher ALLE Zahlen auf der Karte, damit man
+   * Felder vergleichen kann. Im Aufbau deckten siebzig Marken und siebzig Ringe
+   * die Landschaft zu, genau wenn man sie lesen muss. Jetzt zeigt eine Ecke
+   * unter dem Zeiger die Zahlen ihrer drei Felder (Board) - wer alle will,
+   * pinnt sie im Menue fest.
    */
-  const waehltGerade =
-    (targets.vertices?.length ?? 0) > 0 ||
-    (targets.edges?.length ?? 0) > 0 ||
-    (targets.hexes?.length ?? 0) > 0;
 
   return (
     <div className="game">
@@ -381,7 +354,7 @@ export function Game() {
           world={world}
           state={state}
           targets={targets}
-          showAllNumbers={pinNumbers || waehltGerade}
+          showAllNumbers={pinNumbers}
           flashHexes={flashHexes}
           flights={flights}
           onPick={onPick}
@@ -392,7 +365,38 @@ export function Game() {
           auswahl={befehl}
           fokus={fokus}
         >
-          {hand && <HandPanel hand={hand} />}
+          {/*
+            Unten links Hand und Aktionsleiste als ein Block. Die Leiste steht
+            immer da, ausgegraut, solange nichts geht (ui/Aktionsleiste.tsx).
+          */}
+          <div className="unten">
+            {hand && <HandPanel hand={hand} />}
+            {hand && (
+              <Aktionsleiste
+                state={state}
+                me={me}
+                hand={hand}
+                isMine={isMine}
+                mode={mode}
+                setMode={setMode}
+                act={act}
+                verhaeltnis={(r) => (you ? tradeRatio(state, world, you, r) : 4)}
+              />
+            )}
+          </div>
+
+          {/*
+            Handel zwischen Spielern - nur zu mehreren. Steht ausserhalb des
+            Zugs: ein Angebot geht alle an, nicht nur den Spieler am Zug.
+          */}
+          {hand &&
+            you &&
+            state.order.length > 1 &&
+            (state.trade !== null || (isMine && phase.t === 'main')) && (
+              <div className="handel-schwebe">
+                <TradePanel state={state} you={you} hand={hand} act={act} />
+              </div>
+            )}
 
           {befehl !== null && (
             <div className="befehl-hinweis">Ziel fuer den Ritter waehlen · Esc bricht ab</div>
@@ -437,131 +441,6 @@ export function Game() {
           )}
         </Board>
 
-        <div className="bar">
-
-          {/*
-            Der Handel steht bewusst ausserhalb des isMine-Blocks: ein Angebot
-            geht alle an, nicht nur den Spieler am Zug.
-          */}
-          {hand &&
-            you &&
-            state.order.length > 1 &&
-            (state.trade !== null || (isMine && phase.t === 'main')) && (
-              <TradePanel state={state} you={you} hand={hand} act={act} />
-            )}
-
-          {isMine && phase.t === 'roll' && canPlay('knight') && (
-            <div className="actions">
-              <button onClick={() => act({ t: 'playKnight' })}>Ritterkarte vorab ausspielen</button>
-            </div>
-          )}
-
-          {isMine && phase.t === 'main' && hand && (
-            <div className="actions">
-              <button
-                className={mode === 'road' ? 'chosen' : ''}
-                disabled={!canAfford(hand, COST_ROAD)}
-                title={COST_LABEL(COST_ROAD)}
-                onClick={() => setMode(mode === 'road' ? null : 'road')}
-              >
-                Strasse
-              </button>
-              <button
-                className={mode === 'settlement' ? 'chosen' : ''}
-                disabled={!canAfford(hand, COST_SETTLEMENT)}
-                title={COST_LABEL(COST_SETTLEMENT)}
-                onClick={() => setMode(mode === 'settlement' ? null : 'settlement')}
-              >
-                Siedlung
-              </button>
-              <button
-                className={mode === 'city' ? 'chosen' : ''}
-                disabled={!canAfford(hand, COST_CITY)}
-                title={COST_LABEL(COST_CITY)}
-                onClick={() => setMode(mode === 'city' ? null : 'city')}
-              >
-                Stadt
-              </button>
-              <button
-                disabled={!canAfford(hand, COST_DEV)}
-                title={COST_LABEL(COST_DEV)}
-                onClick={() => act({ t: 'buyDev' })}
-              >
-                Karte kaufen ({state.deckLeft})
-              </button>
-              <button
-                disabled={!canAfford(hand, COST_KNIGHT)}
-                title={`Ein Ritter tritt an einer deiner Siedlungen an. ${COST_LABEL(COST_KNIGHT)}`}
-                onClick={() => act({ t: 'recruitKnight' })}
-              >
-                Ritter anwerben
-              </button>
-              {(me?.loot ?? 0) > 0 && (
-                <button className="chosen" onClick={() => act({ t: 'claimLoot' })}>
-                  Beute einloesen ({me?.loot})
-                </button>
-              )}
-
-              {canPlay('knight') && (
-                <button
-                  title="Ein Ritter tritt an einer deiner Siedlungen an."
-                  onClick={() => act({ t: 'playKnight' })}
-                >
-                  Ritterkarte ausspielen
-                </button>
-              )}
-              {canPlay('roadBuilding') && (
-                <button onClick={() => act({ t: 'playRoadBuilding' })}>Strassenbau</button>
-              )}
-              {canPlay('monopoly') && (
-                <MonopolyButton onPick={(r) => act({ t: 'playMonopoly', resource: r })} />
-              )}
-              {canPlay('yearOfPlenty') && (
-                <span className="inline">
-                  <ResSelect value={yopA} onChange={setYopA} />
-                  <ResSelect value={yopB} onChange={setYopB} />
-                  <button onClick={() => act({ t: 'playYearOfPlenty', a: yopA, b: yopB })}>
-                    Erfindung
-                  </button>
-                </span>
-              )}
-
-              <span className="inline">
-                <ResSelect value={tradeGive} onChange={setTradeGive} />
-                <span className="arrow">{ratio}:1</span>
-                <ResSelect value={tradeGet} onChange={setTradeGet} />
-                <button
-                  disabled={tradeGive === tradeGet || hand[tradeGive] < ratio}
-                  onClick={() => act({ t: 'bankTrade', give: tradeGive, receive: tradeGet })}
-                >
-                  Tauschen
-                </button>
-              </span>
-
-              {/* Nur zu mehreren - allein beendet der Wuerfelknopf den Zug. */}
-              {state.order.length > 1 && (
-                <button onClick={() => act({ t: 'endTurn' })}>Zug beenden</button>
-              )}
-            </div>
-          )}
-
-          {isMine && phase.t === 'roadBuilding' && (
-            <div className="actions">
-              <strong>Strassenbau: noch {phase.remaining} setzen</strong>
-            </div>
-          )}
-
-
-          {(me?.dev?.length ?? 0) > 0 && (
-            <div className="devlist">
-              {[...devCounts].map(([t, n]) => (
-                <span key={t} className="devcard">
-                  {devName(t)} x{n}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
       </main>
 
       {/* Abwerfen nach einer 7 */}
@@ -583,31 +462,4 @@ function DieIcon() {
   );
 }
 
-function ResSelect({
-  value,
-  onChange,
-}: {
-  value: Resource;
-  onChange: (r: Resource) => void;
-}) {
-  return (
-    <select value={value} onChange={(e) => onChange(e.target.value as Resource)}>
-      {RESOURCES.map((r) => (
-        <option key={r} value={r}>
-          {resourceName(r)}
-        </option>
-      ))}
-    </select>
-  );
-}
-
-function MonopolyButton({ onPick }: { onPick: (r: Resource) => void }) {
-  const [r, setR] = useState<Resource>('lumber');
-  return (
-    <span className="inline">
-      <ResSelect value={r} onChange={setR} />
-      <button onClick={() => onPick(r)}>Monopol</button>
-    </span>
-  );
-}
 

@@ -145,7 +145,11 @@ export function SideMenu({
   showNumbers: boolean;
   onToggleNumbers: () => void;
 }) {
-  const [offen, setOffen] = useState(true);
+  // Auf schmalen Bildschirmen zu Beginn eingeklappt - auf dem Handy deckte das
+  // Menue sonst ein gutes Drittel der Karte ab, bevor man sie gesehen hat.
+  const [offen, setOffen] = useState(
+    () => typeof window === 'undefined' || !window.matchMedia('(max-width: 700px)').matches,
+  );
   const [reiter, setReiter] = useState<Reiter>('reich');
   const [ton, setTon] = useState(getVolume);
   const [musik, setMusik] = useState<MusicMode>(getMusicMode);

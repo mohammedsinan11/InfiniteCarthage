@@ -146,11 +146,13 @@ const fail = (error: string): Result => ({ ok: false, error });
  * Nester die Karte gliedern, will man beim Start sehen, wie sie aussieht -
  * wo das Gebirge laeuft, wo die Kueste, wo das naechste Nest.
  *
- * Radius 9 sind 271 Felder, auf ganze Chunks aufgerundet etwas mehr. Die
- * Regel dahinter aendert sich nicht: danach waechst die Welt wie gehabt um
- * jedes Bauteil.
+ * Radius 9 (271 Felder) war beim Hereinkommen zu viel auf einmal. Radius 6
+ * sind 127 Felder, auf ganze Chunks aufgerundet etwas mehr: genug fuer Kueste,
+ * Gebirge und die ersten Lager, aber ein Bild, das man mit einem Blick fasst.
+ * Die Regel dahinter aendert sich nicht: danach waechst die Welt wie gehabt um
+ * jedes Bauteil. Vergleichsbilder: labor.html?art=aufdeckung.
  */
-const START_REVEAL_RADIUS = 9;
+const START_REVEAL_RADIUS = 6;
 
 
 export type NewPlayer = { id: PlayerId; name: string };

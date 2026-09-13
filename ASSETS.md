@@ -115,6 +115,16 @@ tragen - ein geliefertes Sprite waere derzeit einfarbig.
   ist ein Platzhalter fuer die Diplomatie.
 - **Klang:** `playClash` (Rauschen und zwei helle Toene) beim Kampfbeginn.
 
+### Aktionsleiste und Bauplaetze — **Platzhalter**
+
+- **Aktionsleiste** rechts neben der Hand (`ui/Aktionsleiste.tsx`): Symbole fuer
+  Strasse, Dorf, Stadt, Karte, Ritter, Handel, Karten, Beute und Zugende aus
+  wenigen SVG-Flaechen; Kosten als verkleinerte Rohstoffbilder. Handel und
+  Entwicklungskarten klappen als Tafeln auf.
+- **Bauplaetze:** kleine helle Rauten mit dunklem Rand statt Ringen, unter dem
+  Zeiger goldgelb; die drei Nachbarfelder zeigen dann ihre Zahlen. Strassen-
+  plaetze als blasse Striche.
+
 ### Zahlenmarker und Haefen — **tragbar**
 
 Kreis mit Zahl und Punktreihe; Hafen als Rechteck mit "2:1". Zweckmaessig und
@@ -184,6 +194,8 @@ wuerden.
 | **Einheiten-Sprites** | `raeuber.png`, `goblin.png`, `ritter.png`, `wanderer.png`, spaeter je Einheit | Werden ohne Codeaenderung gezeichnet (README in `src/assets/units`). Fuer Bewegung spaeter zwei Blickrichtungen. |
 | **Fraktionswappen** | 9 kleine Wappen oder Banner | Ersetzen die blossen Farbpunkte in Menue und Feldinfo; koennten auch am Lager haengen. |
 | **Kampf-Symbol** | `kampf.png`, etwa 12 x 12, gern 2 Einzelbilder | Ersetzt die Pixelschwerter ueber einem umkaempften Feld. |
+| **Aktionssymbole** | 9 Symbole, etwa 16 x 16 | Strasse, Dorf, Stadt, Karte, Ritter, Handel, Karten, Beute, Zugende in der Aktionsleiste. |
+| **Bauplatz-Marke** | 1 kleines Symbol, gern mit Hover-Variante | Ersetzt die Raute auf freien Ecken; eine Strassenmarke dazu. |
 | **Lebensanzeige** | kleine Herzen oder Balken | Ersetzt die roten Kunstpixel ueber Verwundeten. |
 | **Kartenrahmen je Seltenheit** | 5 Rahmen, dazu Glanz als Einzelbildfolge | Ersetzt die CSS-Glut, Funken und Strahlen. Legendaer darf animiert sein, der Rest eher nicht. |
 | **Kartenrueckseite** | 1 Motiv | Fuer das Austeilen - derzeit fliegen die Vorderseiten herein. |

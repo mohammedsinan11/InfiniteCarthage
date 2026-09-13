@@ -284,6 +284,14 @@ export function Board({
   const moved = useRef(false);
   /** Feld unter dem Zeiger - nur dessen Zahl wird eingeblendet. */
   const [hover, setHover] = useState<string | null>(null);
+  /** Bauplatz-Ecke unter dem Zeiger - ihre drei Felder zeigen ihre Zahlen. */
+  const [eckeHover, setEckeHover] = useState<string | null>(null);
+  /**
+   * Finger auf dem Brett, fuer die Zwei-Finger-Geste auf Touchgeraeten.
+   * kneifen haelt den Fingerabstand bei der letzten Zoomstufe.
+   */
+  const finger = useRef(new Map<number, { x: number; y: number }>());
+  const kneifen = useRef<{ abstand: number } | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   /**
    * Aufgelaufene Raddrehung.
@@ -699,6 +707,9 @@ export function Board({
     };
     const gesteAendern = (e: Event) => {
       e.preventDefault();
+      // Auf dem iPhone kommen dieselben zwei Finger auch als Zeiger an - dort
+      // zoomt schon die Zeigergeste, sonst schaltete jede Geste doppelt.
+      if (kneifen.current) return;
       const g = e as Event & { scale?: number; clientX?: number; clientY?: number };
       if (typeof g.scale !== 'number' || g.scale <= 0) return;
       const stufe = Math.round(Math.log2(g.scale) * 2);
@@ -778,6 +789,22 @@ export function Board({
      */
     if (aufBedienelement(e.target)) return;
 
+    /*
+     * Zwei Finger: zoomen statt schieben. Das Brett setzt touch-action: none,
+     * damit der Browser nicht selbst die Seite zoomt - dann muss es die Geste
+     * aber auch selbst verstehen. Safari auf dem Mac schickt dafuer eigene
+     * gesture-Ereignisse, Touchgeraete schicken Zeiger.
+     */
+    finger.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (finger.current.size >= 2) {
+      const [a, b] = [...finger.current.values()];
+      kneifen.current = { abstand: Math.hypot(a!.x - b!.x, a!.y - b!.y) };
+      drag.current = null;
+      moved.current = true; // kein Feldklick beim Loslassen
+      (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+      return;
+    }
+
     moved.current = false;
     drag.current = { x: e.clientX, y: e.clientY, cx: cam.cx, cy: cam.cy };
     // Auf dem Brett fangen, nicht auf der getroffenen Kachel: der Zug soll
@@ -786,6 +813,21 @@ export function Board({
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
+    if (finger.current.has(e.pointerId)) {
+      finger.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    }
+    const k = kneifen.current;
+    if (k && finger.current.size >= 2) {
+      const [a, b] = [...finger.current.values()];
+      const abstand = Math.hypot(a!.x - b!.x, a!.y - b!.y);
+      // Eine Stufe je rund 35 % Abstandsaenderung - wie die Geste in Safari.
+      const faktor = abstand / Math.max(1, k.abstand);
+      if (faktor > 1.35 || faktor < 1 / 1.35) {
+        zoomUm(faktor > 1 ? 1 : -1, (a!.x + b!.x) / 2, (a!.y + b!.y) / 2);
+        k.abstand = abstand;
+      }
+      return;
+    }
     const d = drag.current;
     if (!d && aufBedienelement(e.target)) {
       // Ueber der Bedienung gibt es kein Feld unter dem Zeiger - und schon gar
@@ -855,6 +897,14 @@ export function Board({
      * Ueber pointerup statt click: das Brett faengt den Zeiger ein, ein click
      * landete dann auf dem Brett statt auf dem Feld.
      */
+    finger.current.delete(e.pointerId);
+    if (kneifen.current) {
+      // Erst wenn alle Finger oben sind, ist die Geste vorbei - der letzte
+      // Finger soll die Karte nicht noch ein Stueck mitziehen.
+      if (finger.current.size === 0) kneifen.current = null;
+      drag.current = null;
+      return;
+    }
     const warGedrueckt = drag.current !== null;
     drag.current = null;
     if (!onHex || !warGedrueckt || moved.current || aufBedienelement(e.target)) return;
@@ -867,7 +917,9 @@ export function Board({
     onHex(hexKey(h.q, h.r));
   };
 
-  const onPointerLeave = () => {
+  const onPointerLeave = (e: React.PointerEvent) => {
+    // Beruehrungen verlassen das Brett beim Loslassen - das ist kein Abbruch.
+    if (e.pointerType === 'touch') return;
     drag.current = null;
     setHover(null);
   };
@@ -910,6 +962,11 @@ export function Board({
   }, [flights, view, scale, size]);
 
   const vertexTargets = new Set(targets.vertices ?? []);
+  /** Die drei Felder an der Bauplatz-Ecke unter dem Zeiger. */
+  const eckeNachbarn =
+    eckeHover !== null && vertexTargets.has(eckeHover)
+      ? new Set(vertexAdjacentHexes(parseVertexKey(eckeHover)).map((h) => hexKey(h.q, h.r)))
+      : null;
   const edgeTargets = new Set(targets.edges ?? []);
   const hexTargets = new Set(targets.hexes ?? []);
   const colorOf = (pid: string) =>
@@ -957,7 +1014,8 @@ export function Board({
            * offen ist, braucht man den Vergleich ueber mehrere Felder - da
            * werden alle gezeigt. Und der Nutzer kann sie festpinnen.
            */
-          const showNumber = t.number !== null && (showAllNumbers || hover === hk);
+          const showNumber =
+            t.number !== null && (showAllNumbers || hover === hk || (eckeNachbarn?.has(hk) ?? false));
           // Was auf dem Feld steht, steht auf seiner Hoehe - sonst schwebt es.
           const lift = liftHex(t.q, t.r) + (hover === hk ? LIFT : 0);
           return (
@@ -1072,18 +1130,33 @@ export function Board({
         })}
 
         {/* Anklickbare Ecken */}
+        {/*
+          Eine kleine Raute statt eines Rings. Im Aufbau stehen siebzig davon
+          gleichzeitig auf der Karte - Ringe deckten sie zu. Die unsichtbare
+          Scheibe darunter haelt die Trefferflaeche gross, auch fuer Finger.
+        */}
         {[...vertexTargets].map((vk) => {
           const ecke = parseVertexKey(vk);
           const p = vertexToPixel(ecke, LAYOUT);
+          const y = p.y - liftVertex(ecke);
           return (
-            <circle
+            <g
               key={'vt' + vk}
-              className="vertex-target"
-              cx={p.x}
-              cy={p.y - liftVertex(ecke)}
-              r={8}
+              className={eckeHover === vk ? 'vertex-target aktiv' : 'vertex-target'}
               onClick={pick('vertex', vk)}
-            />
+              onPointerEnter={() => setEckeHover(vk)}
+              onPointerLeave={() => setEckeHover((alt) => (alt === vk ? null : alt))}
+            >
+              <circle cx={p.x} cy={y} r={12} className="vertex-treffer" />
+              <rect
+                x={p.x - 3.5}
+                y={y - 3.5}
+                width={7}
+                height={7}
+                transform={`rotate(45 ${p.x} ${y})`}
+                className="vertex-raute"
+              />
+            </g>
           );
         })}
 
