@@ -200,7 +200,7 @@ Pixelkarten). In der Kartenwahl gross, im Menue klein.
   Strasse als Vorschau, sonst ein blasser Strich.
 - **Tonknopf** oben im Schild: Lautsprecher mit Wellen oder Kreuz (SVG).
 - **Wuerfelknopf** rechts neben der Leiste: Wuerfelsymbol, schrumpfender Balken
-  fuer die fuenf Sekunden bis zum Selbstwurf, pulsierender Schein, beim Wurf ein
+  fuer die dreissig Sekunden bis zum Selbstwurf, pulsierender Schein, beim Wurf ein
   Stoss und zwoelf Funken (CSS), dazu `playWurfStart`.
 
 ### Wetter, Tageszeit und Licht — **Platzhalter (Shader)**

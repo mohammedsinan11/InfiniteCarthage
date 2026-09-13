@@ -52,8 +52,8 @@ import { FRIEDEN_PREIS, TRIBUT_KARTEN, nimmtFrieden } from '../../core/rules/dip
 import { brennt } from '../../core/rules/feuer';
 import { Diagnose, diagnoseAn } from '../ui/Diagnose';
 
-/** Nach so vielen Millisekunden wuerfelt der Knopf von selbst. Anfangs fuenf - zu knapp zum Umsehen. */
-const AUTO_WURF_MS = 8000;
+/** Nach so vielen Millisekunden wuerfelt der Knopf von selbst. Erst fuenf, dann acht - beides zu knapp, um sich umzusehen und zu planen. */
+const AUTO_WURF_MS = 30000;
 const AUTO_WURF_KEY = 'infinitecarthage.autowurf';
 
 /**

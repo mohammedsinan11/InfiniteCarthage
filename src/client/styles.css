@@ -2357,7 +2357,7 @@ em.off {
       0 0 16px 3px rgba(255, 208, 102, 0.6);
   }
 }
-/* Die Uhr: ein Balken am Fuss, der in fuenf Sekunden auf null schrumpft. */
+/* Die Uhr: ein Balken am Fuss, der bis zum Selbstwurf auf null schrumpft (Game.tsx, AUTO_WURF_MS). */
 .wuerfel-uhr {
   position: absolute;
   left: 4px;
