@@ -255,10 +255,21 @@ Gebaut in `core/rules/diplomatie.ts` und `core/rules/auftraege.ts`.
   eine zu Beginn jeder grossen Runde, vom groessten Stapel; wer nicht zahlen
   kann, hat wieder Krieg. Krieg erklaeren geht jederzeit in der Bauphase.
 - **Auftraege.** Kommt ein Wanderer an einer Siedlung vorbei, bietet er ihrem
-  Besitzer an: ein feindliches Lager in der Naehe zerstoeren oder eine Ruine
-  erkunden. 6 Runden Bedenkzeit, 30 Runden Frist, Lohn eine Kartenwahl.
-  Verloren, wenn jemand anderes zuvorkommt. Hoechstens drei offene je Spieler,
-  einer je Wanderer. Antworten darf man auch ausserhalb des eigenen Zugs.
+  Besitzer einen an - Lohn immer eine Kartenwahl:
+  - *Lager:* ein feindliches Lager in der Naehe zerstoeren.
+  - *Ruine:* eine Ruine in der Naehe erkunden.
+  - *Liefern:* 4 Karten eines Rohstoffs abgeben, per Knopf, auch ausserhalb
+    des eigenen Zugs.
+  - *Jagd:* 3 Raeuber oder Goblins schlagen, gleich wo - gezaehlt wird in jedem
+    Kampf mit eigenen Leuten.
+  - *Geleit:* einen Ritter oder den Helden zum Wanderer bringen, solange er
+    noch im Land ist.
+  - *Kundschaft:* mit einem Ritter oder dem Helden ein Feld 7 bis 10 weit
+    draussen erreichen.
+
+  6 Runden Bedenkzeit, 30 Runden Frist. Verloren, wenn jemand anderes zuvorkommt
+  oder der Wanderer weiterzieht. Hoechstens drei offene je Spieler, von jeder
+  Art einer, einer je Wanderer.
 
 Offen: Auftraege, die Rohstoffe verlangen; Fraktionen, die von selbst Frieden
 anbieten oder brechen; ob Tribut mit der Groesse des Reichs steigen soll.
@@ -276,6 +287,35 @@ anbieten oder brechen; ob Tribut mit der Groesse des Reichs steigen soll.
   sie ziehen zum naechsten Feld, das Neues bringt - unerkundete Ruine oder Land,
   das noch niemand gesehen hat -, um Lager herum. Ein eigener Befehl beendet
   das. Gibt es in Reichweite nichts mehr, bleiben sie stehen.
+
+## Verbaende
+
+Alle eigenen Einheiten eines Feldes sind ein Verband. Ein Klick auf das Feld
+waehlt sie zusammen (im Menue: Verbaende, Ziel), und ein Ziel schickt alle.
+Sie ziehen im Tempo des Langsamsten - mit einem Ritter dabei also auch der Held
+nur ein Feld - und warten, solange einer von ihnen kaempft. Am Ziel loest sich
+der Verband. Wer einer einzelnen Einheit ein Ziel gibt, loest sie heraus.
+
+Offen: Verbaende ueber mehrere Felder (Banner), Formationen im Kampf.
+
+## Kartenwert
+
+Die Balance der Karten folgt einem ausdruecklichen Modell (`core/cards/wert.ts`),
+gerechnet in Rohstoffkarten ueber eine Partie: ein Rohstoff 1, ein beliebiger
+1,1, +1 Ertrag eines Gelaendes 8, -1 Ertrag -4, Bankhandel 1/2/3 guenstiger
+5/12/18, eine Handkarte mehr 0,6. Jede Seltenheit hat eine Spanne -
+gewoehnlich 3-6, ungewoehnlich 6-10, selten 10-14, episch 15-20, legendaer
+22-30 -, und ein Test prueft, dass jede Karte in ihrer liegt.
+
+Was sich dadurch geaendert hat: Dauerboni ohne Sofortwirkung sind nicht mehr
+gewoehnlich (Holzfaellerlager ist jetzt ungewoehnlich); Sofortwirkungen sind
+groesser; Karge Jahre bringt 14 statt 6; Grosse Scheune 12 statt 5. Neu: Holzstapel,
+Wollballen, Erzbrocken, Baumeister, Saegewerk, Fruchtbares Tal, Handelsflotte,
+Goldene Ernte - 24 Karten statt 15. Karten koennen mehrere Dauerwirkungen tragen.
+
+Offen: das Modell unterstellt eine mittlere Partie. Wer frueh einen Dauerbonus
+nimmt, gewinnt mehr als 8; wer spaet, weniger. Karten fuer Held, Feuer, Wetter
+und Diplomatie brauchen neue Wirkungsarten.
 
 ---
 

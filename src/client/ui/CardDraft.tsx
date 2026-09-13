@@ -19,6 +19,7 @@ import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import { cardById } from '../../core/cards/catalog';
 import type { DraftSource, Rarity } from '../../core/cards/types';
 import { playCardDeal, playCardHover, playCardPick, playCardVanish } from '../audio';
+import { KartenBild } from './KartenBild';
 
 const RARITY_NAME: Record<Rarity, string> = {
   gewoehnlich: 'gewoehnlich',
@@ -124,6 +125,7 @@ export function CardDraft({
                 <span className="draft-glanz" aria-hidden />
                 <span className="draft-selt">{RARITY_NAME[karte.rarity]}</span>
                 <span className="draft-name">{karte.name}</span>
+                <KartenBild karte={karte} />
                 <span className="draft-text">{karte.text}</span>
               </button>
               {stufe >= 3 && (

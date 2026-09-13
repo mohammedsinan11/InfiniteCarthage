@@ -33,7 +33,7 @@ export type DraftSource = 'fund' | 'belohnung' | 'markt';
  * Sofortwirkung - geschieht einmal beim Nehmen der Karte.
  */
 export type Instant =
-  /** Rohstoffe aus der Bank, soweit vorhanden. */
+  /** Diese Rohstoffe. */
   | { t: 'gain'; resources: Partial<Record<Resource, number>> }
   /** Beliebige Rohstoffe nach Wahl - der Einfachheit halber gleichmaessig verteilt. */
   | { t: 'gainAny'; count: number };
@@ -60,8 +60,15 @@ export type Card = {
   /** Ein Satz, der die Wirkung erklaert - erscheint auf der Karte. */
   text: string;
   instant?: Instant;
-  lasting?: Lasting;
+  /** Eine oder mehrere Dauerwirkungen. */
+  lasting?: Lasting | readonly Lasting[];
 };
+
+/** Die Dauerwirkungen einer Karte als Liste - ob sie eine oder mehrere hat. */
+export function dauerwirkungen(c: Pick<Card, 'lasting'>): readonly Lasting[] {
+  if (c.lasting === undefined) return [];
+  return Array.isArray(c.lasting) ? (c.lasting as readonly Lasting[]) : [c.lasting as Lasting];
+}
 
 /** Wie oft eine Seltenheitsstufe je Quelle gezogen wird. Summe egal, es wird gewichtet. */
 export const RARITY_WEIGHTS: Record<DraftSource, Record<Rarity, number>> = {

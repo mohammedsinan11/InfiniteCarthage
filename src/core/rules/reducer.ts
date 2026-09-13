@@ -63,7 +63,7 @@ import { beginBigRound, beginNight, heldenRunde, spawnHeld, spawnKnight, tickArm
 import { brandRunde, brennt, mitKarteLoeschen } from './feuer';
 import { abkommenRunde, tributRunde, verhandeln } from './diplomatie';
 import type { DiplomatieEvent, Verhandlung } from './diplomatie';
-import { auftraegePruefen, aufAuftragAntworten, wandererBieten } from './auftraege';
+import { auftraegePruefen, aufAuftragAntworten, auftragLiefern, wandererBieten } from './auftraege';
 import type { AuftragEvent } from './auftraege';
 import { nachtBeginntAt } from '../zeit';
 import type { ArmyEvent } from './army';
@@ -107,8 +107,11 @@ export type Action =
   | { t: 'chooseCard'; card: string }
   /** Einen Ritter anwerben - er tritt an einer eigenen Siedlung an. */
   | { t: 'recruitKnight' }
-  /** Einem eigenen Ritter ein Ziel geben. Sein eigenes Feld als Ziel heisst: halt. */
-  | { t: 'orderUnit'; unit: number; q: number; r: number }
+  /**
+   * Einem eigenen Ritter oder dem Helden ein Ziel geben. Sein eigenes Feld als
+   * Ziel heisst: halt. verband: alle eigenen Einheiten seines Feldes ziehen mit.
+   */
+  | { t: 'orderUnit'; unit: number; q: number; r: number; verband?: boolean }
   /** Eine Beute einloesen: eine Kartenwahl. */
   | { t: 'claimLoot' }
   /** Ein eigenes Feuer mit einer Rohstoffkarte loeschen (rules/feuer.ts). */
@@ -123,6 +126,8 @@ export type Action =
   | { t: 'diplomacy'; fraktion: string; art: Verhandlung }
   /** Einen Auftrag eines Wanderers annehmen oder ablehnen. Auch ausserhalb des Zugs. */
   | { t: 'answerQuest'; id: number; accept: boolean }
+  /** Die Rohstoffe fuer einen Lieferauftrag abgeben. Auch ausserhalb des Zugs. */
+  | { t: 'deliverQuest'; id: number }
   | { t: 'endTurn' };
 
 export type GameEvent =
@@ -357,7 +362,8 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
    * an Mitsprache - die Pluenderung nimmt selbst, und zwar ohne Phase, damit
    * ein abwesender Spieler die Runde nicht anhalten kann.
    */
-  const fromOthers = action.t === 'respondTrade' || action.t === 'answerQuest';
+  const fromOthers =
+    action.t === 'respondTrade' || action.t === 'answerQuest' || action.t === 'deliverQuest';
   if (!fromOthers && actor !== currentPlayerId(s)) return fail('Du bist nicht am Zug.');
 
   const phase = s.phase;
@@ -750,11 +756,24 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (einheit.owner !== actor || (einheit.kind !== 'ritter' && einheit.kind !== 'held')) {
         return fail('Das ist nicht dein Ritter.');
       }
-      // Ein eigener Befehl loest aus dem Gefolge und beendet das Erkunden.
-      einheit.folgt = null;
-      einheit.auftrag = 'befehl';
+      // Mit Verband: alle eigenen Ritter und der Held auf diesem Feld.
+      const mitglieder = action.verband
+        ? s.units.filter(
+            (u) =>
+              u.owner === actor &&
+              (u.kind === 'ritter' || u.kind === 'held') &&
+              u.q === einheit.q &&
+              u.r === einheit.r,
+          )
+        : [einheit];
+      // Ein eigener Befehl loest aus Gefolge und Verband und beendet das Erkunden.
+      for (const m of mitglieder) {
+        m.folgt = null;
+        m.auftrag = 'befehl';
+        m.verband = null;
+      }
       if (action.q === einheit.q && action.r === einheit.r) {
-        einheit.ziel = null;
+        for (const m of mitglieder) m.ziel = null;
         break;
       }
       const feld = tileAt(world, action.q, action.r);
@@ -763,7 +782,11 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (!nextStep(s.worldSeed, einheit, new Set([hexKey(action.q, action.r)]))) {
         return fail('Dorthin fuehrt kein Landweg.');
       }
-      einheit.ziel = { q: action.q, r: action.r };
+      const verbandId = mitglieder.length > 1 ? einheit.id : null;
+      for (const m of mitglieder) {
+        m.ziel = { q: action.q, r: action.r };
+        m.verband = verbandId;
+      }
       break;
     }
 
@@ -804,6 +827,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         return fail('Das ist nicht deine Einheit.');
       }
       einheit.folgt = null;
+      einheit.verband = null;
       einheit.ziel = null;
       einheit.auftrag = action.explore ? 'erkunden' : 'befehl';
       break;
@@ -823,6 +847,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       const held = s.units.find((u) => u.kind === 'held' && u.owner === actor);
       if (!held) return fail('Dein Held ist nicht auf der Karte.');
       ritter.folgt = held.id;
+      ritter.verband = null;
       ritter.auftrag = 'befehl';
       ritter.ziel = ritter.q === held.q && ritter.r === held.r ? null : { q: held.q, r: held.r };
       break;
@@ -831,6 +856,12 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
     case 'diplomacy': {
       if (phase.t !== 'main') return fail('Verhandelt wird in der Bauphase.');
       const why = verhandeln(s, actor, action.fraktion, action.art, events);
+      if (why) return fail(why);
+      break;
+    }
+
+    case 'deliverQuest': {
+      const why = auftragLiefern(s, actor, action.id, events);
       if (why) return fail(why);
       break;
     }

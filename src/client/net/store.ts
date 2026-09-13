@@ -236,7 +236,7 @@ function weltAus(
         if (e.player === you) eintrag('pact', `Krieg mit ${name(e.fraktion)}`);
         break;
       case 'questOffered':
-        if (e.player === you) eintrag('quest', `Auftrag angeboten: ${auftragText(state, e.art, e.fraktion)}`);
+        if (e.player === you) eintrag('quest', `Auftrag angeboten: ${auftragText(e, name)}`);
         break;
       case 'questDone':
         if (e.player === you) eintrag('quest', 'Auftrag erfuellt - eine Kartenwahl');
@@ -401,6 +401,8 @@ function meldungenAus(
         playAuftrag();
         meldung('Ein Wanderer bietet dir einen Auftrag an', 'info');
       }
+    } else if (e.t === 'questProgress') {
+      if (e.player === you) meldung(`Jagd: ${e.fortschritt} von ${e.menge} geschlagen`, 'info');
     } else if (e.t === 'questDone') {
       if (e.player === you) {
         playCardPick(3);

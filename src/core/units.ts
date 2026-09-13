@@ -86,6 +86,7 @@ export function einheitVorlage(
     beraubt: null,
     dauer: null,
     folgt: null,
+    verband: null,
     ...felder,
   };
 }

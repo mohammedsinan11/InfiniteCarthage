@@ -19,6 +19,7 @@ import { modifiersOf, terrainBonusFor } from '../src/core/cards/effects';
 import { RARITY_WEIGHTS } from '../src/core/cards/types';
 import type { DraftSource } from '../src/core/cards/types';
 import { productionSources } from '../src/core/rules/production';
+import { dauerwirkungen } from '../src/core/cards/types';
 import { tradeRatio } from '../src/core/rules/trade';
 import { RESOURCES } from '../src/core/types';
 
@@ -217,8 +218,8 @@ describe('Karten wirken auf die Regeln', () => {
     const gelaende = game.world.tiles.get(vorher[0]!.hex)!.terrain;
 
     // Passende Bonuskarte suchen und geben.
-    const karte = CARDS.find(
-      (c) => c.lasting?.t === 'terrainBonus' && c.lasting.terrain === gelaende && c.lasting.amount > 0,
+    const karte = CARDS.find((c) =>
+      dauerwirkungen(c).some((l) => l.t === 'terrainBonus' && l.terrain === gelaende && l.amount > 0),
     );
     if (!karte) return; // fuer dieses Gelaende gibt es keine Karte - kein Fehler
     p.cards.push(karte.id);

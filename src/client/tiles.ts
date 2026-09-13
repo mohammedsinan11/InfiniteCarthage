@@ -184,6 +184,21 @@ function waehleKachel(seed: number, terrain: Terrain, q: number, r: number): str
   return group[hash3i(seed, q, r, SALT_VARIANT) % group.length]!;
 }
 
+/** Eine Kachel fuer ein Gelaende, ausserhalb der Karte - etwa als Bild auf einer Spielkarte. */
+export function kachelFuer(terrain: Terrain, variante = 0): string | null {
+  const name: Record<Terrain, string> = {
+    forest: 'forest',
+    pasture: 'grass',
+    field: 'wheat',
+    hill: 'clay',
+    mountain: 'mountains',
+    desert: 'sand',
+    water: 'water',
+  };
+  const group = GROUPS[name[terrain]] ?? GROUPS['grass'];
+  return group && group.length > 0 ? group[variante % group.length]! : null;
+}
+
 /** Nur fuer die Diagnose: welche Kachelsorten stehen zur Verfuegung. */
 export const availableGroups = (): string[] => Object.keys(GROUPS).sort();
 

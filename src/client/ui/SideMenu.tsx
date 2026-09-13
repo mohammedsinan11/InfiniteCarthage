@@ -40,11 +40,12 @@ import { FRIEDEN_PREIS, TRIBUT_KARTEN } from '../../core/rules/diplomatie';
 import type { Verhandlung } from '../../core/rules/diplomatie';
 import { getVolume, initAudio, setVolume } from '../audio';
 import { LogPanel } from './LogPanel';
+import { KartenBild } from './KartenBild';
 import type { WeltEintrag } from '../net/store';
 import { TRACKS, getMusicMode, getMusicVolume, setMusicMode, setMusicVolume } from '../music';
 import type { MusicMode } from '../music';
 import { getUmgebungVolume, setUmgebungVolume } from '../ambiente';
-import { BRAND_WAS, bundleText, resourceName } from '../log';
+import { BRAND_WAS, auftragText, bundleText, resourceName } from '../log';
 
 type Reiter = 'reich' | 'karten' | 'technik' | 'auftraege' | 'ton';
 
@@ -149,6 +150,12 @@ export function SideMenu({
   onErkunden,
   stumm,
   onStumm,
+  verbaende,
+  verbandFeld,
+  onVerbandZiel,
+  onZeigenAuftrag,
+  kannLiefern,
+  onLiefern,
 }: {
   turn: number;
   /** Die eigenen genommenen Karten, in der Reihenfolge der Wahl. */
@@ -211,6 +218,15 @@ export function SideMenu({
   stumm: boolean;
   /** Ton an oder aus - schaltet um. */
   onStumm: () => void;
+  /** Felder, auf denen mehrere eigene Einheiten stehen - sie ziehen gemeinsam. */
+  verbaende: ReadonlyArray<{ q: number; r: number; einheiten: readonly UnitState[] }>;
+  /** Der Verband, der gerade auf sein Ziel wartet (Feldschluessel), oder null. */
+  verbandFeld: string | null;
+  onVerbandZiel: (q: number, r: number) => void;
+  /** Auf der Karte zeigen, wohin ein Auftrag fuehrt. */
+  onZeigenAuftrag: (a: WandererAuftrag) => void;
+  kannLiefern: (a: WandererAuftrag) => boolean;
+  onLiefern: (id: number) => void;
 }) {
   // Auf schmalen Bildschirmen zu Beginn eingeklappt - auf dem Handy deckte das
   // Menue sonst ein gutes Drittel der Karte ab, bevor man sie gesehen hat.
@@ -451,6 +467,7 @@ export function SideMenu({
                       // Dieselbe Karte kann mehrfach vorkommen - der Index
                       // gehoert dazu, sonst kollidieren die Schluessel.
                       <li key={`${id}-${i}`} className={`menu-karte selt-${karte.rarity}`}>
+                        <KartenBild karte={karte} klein />
                         <span className="menu-karte-name">{karte.name}</span>
                         <span className="menu-karte-text">{karte.text}</span>
                       </li>
@@ -535,8 +552,54 @@ export function SideMenu({
             </p>
 
             {/*
-              Auftraege der Wanderer: annehmen, zeigen, und was sie einbringen
-              (rules/auftraege.ts).
+              Verbaende: alle eigenen Einheiten eines Feldes. Ein Klick auf das
+              Feld waehlt sie zusammen, und sie ziehen gemeinsam (rules/army.ts).
+            */}
+            <h3>Verbaende</h3>
+            {verbaende.length === 0 ? (
+              <p className="menu-leer">
+                Stehen mehrere deiner Einheiten auf einem Feld, bilden sie einen Verband: ein Klick auf das Feld
+                waehlt alle, und sie ziehen gemeinsam im Tempo des Langsamsten. Ein Ziel fuer eine einzelne
+                Einheit - unten bei den Rittern - loest sie heraus.
+              </p>
+            ) : (
+              <ul className="menu-ritter">
+                {verbaende.map((v) => {
+                  const key = `${v.q}:${v.r}`;
+                  const held = v.einheiten.some((u) => u.kind === 'held');
+                  const ritter = v.einheiten.filter((u) => u.kind === 'ritter').length;
+                  const unterwegs = v.einheiten.find((u) => u.verband !== null && u.ziel);
+                  return (
+                    <li key={key} className={verbandFeld === key ? 'aktiv' : undefined}>
+                      <div className="menu-ritter-kopf">
+                        <span className="menu-ritter-name">
+                          {[held ? 'Held' : '', ritter > 0 ? `${ritter} ${ritter === 1 ? 'Ritter' : 'Ritter'}` : '']
+                            .filter(Boolean)
+                            .join(' + ')}
+                        </span>
+                        <span className="menu-ritter-ort">
+                          {unterwegs?.ziel ? `zieht, noch ${hexDistance(unterwegs, unterwegs.ziel)} Felder` : 'steht'}
+                        </span>
+                      </div>
+                      <div className="menu-ritter-knoepfe">
+                        <button onClick={() => onZeigenFeld(v.q, v.r)}>Zeigen</button>
+                        <button
+                          disabled={!befehleMoeglich}
+                          className={verbandFeld === key ? 'aktiv' : ''}
+                          onClick={() => onVerbandZiel(v.q, v.r)}
+                        >
+                          {verbandFeld === key ? 'Waehle Ziel' : 'Ziel'}
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+
+            {/*
+              Auftraege der Wanderer: annehmen, zeigen, liefern, und was sie
+              einbringen (rules/auftraege.ts).
             */}
             <h3>Auftraege</h3>
             {auftraege.length === 0 ? (
@@ -549,9 +612,8 @@ export function SideMenu({
                   <li key={a.id} className={`auftrag-${a.status}`}>
                     <div className="menu-ritter-kopf">
                       <span className="menu-ritter-name">
-                        {a.art === 'lager'
-                          ? `Zerstoere das Lager der ${a.fraktion ? nameVon(a.fraktion) : 'Raeuber'}`
-                          : 'Erkunde die alte Ruine'}
+                        {auftragText(a, nameVon)}
+                        {a.art === 'jagd' && a.status === 'angenommen' ? ` (${a.fortschritt}/${a.menge})` : ''}
                       </span>
                       <span className="menu-ritter-ort">
                         {a.status === 'angebot' ? 'Angebot' : 'angenommen'} · noch {Math.max(0, a.bis - turn + 1)}{' '}
@@ -559,7 +621,17 @@ export function SideMenu({
                       </span>
                     </div>
                     <div className="menu-ritter-knoepfe">
-                      <button onClick={() => onZeigenFeld(a.q, a.r)}>Zeigen</button>
+                      {a.art !== 'liefern' && <button onClick={() => onZeigenAuftrag(a)}>Zeigen</button>}
+                      {a.art === 'liefern' && a.status === 'angenommen' && (
+                        <button
+                          className="aktiv"
+                          disabled={!kannLiefern(a)}
+                          title={kannLiefern(a) ? 'Die Rohstoffe abgeben' : 'Dafuer fehlen dir noch Rohstoffe'}
+                          onClick={() => onLiefern(a.id)}
+                        >
+                          Liefern
+                        </button>
+                      )}
                       {a.status === 'angebot' && (
                         <>
                           <button className="aktiv" onClick={() => onAuftrag(a.id, true)}>

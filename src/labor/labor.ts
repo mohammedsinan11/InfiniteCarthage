@@ -11,6 +11,7 @@
  *   /labor.html?art=fluesse      Fluesse als Entwurf - nicht im Spiel
  *   /labor.html?art=leistung     Messung: Erzeugen und Zeichnen grosser Karten
  *   /labor.html?art=gebaeude     Dorf und Stadt: wie sie auf den Kacheln liegen
+ *   /labor.html?art=schaerfe     Kachelabstand: heute, gerastet, wie hexmap
  *
  * Gezeichnet wird wie auf dem Brett (board/Board.tsx): Kacheln zeilenweise von
  * hinten nach vorn, jede auf ihrer Hoehe, im selben Kunstpixelraster.
@@ -511,6 +512,120 @@ function gebaeudeBild(
   return fig;
 }
 
+// --- Schaerfe ------------------------------------------------------------------
+
+type Abstand = {
+  titel: string;
+  text: string;
+  /** Spaltenschritt und Zeilenschritt in Kunstpixeln. */
+  sx: number;
+  sy: number;
+  /** Auf ganze Kunstpixel gerastet - oder wie heute auf Geraetepixel gerundet. */
+  raster: boolean;
+};
+
+/**
+ * Wie scharf die Karte ist, haengt am Kachelabstand.
+ *
+ * Die Kacheln aus hexmap sind fuer 23 Spalten- und 17 Zeilenpixel gezeichnet
+ * (hexmap/map.py). Das Brett legt sie mit 24 und 18,75: jede Zeile landet
+ * zwischen den Kunstpixeln, und wo zwei Kacheln aneinanderstossen, sitzen ihre
+ * Pixel gegeneinander verschoben. Diese Seite zeigt denselben Ausschnitt in drei
+ * Abstaenden, bei zwei Zoomstufen, und daneben die Naht vergroessert.
+ */
+async function schaerfe(root: HTMLElement, seed: number) {
+  const reihe = kopf(
+    root,
+    'Schaerfe der Karte: der Abstand der Kacheln',
+    'Derselbe Ausschnitt in drei Kachelabstaenden. Links das Bild in Spielgroesse, rechts ein Ausschnitt dreifach vergroessert - dort sieht man, wie die Kanten zweier Kacheln aufeinandertreffen. Oben zwei Geraetepixel je Kunstpixel (Rechner beim Start), unten drei (Handy).',
+  );
+  const w = welt(seed, 8);
+  const vielfalt = (h: { q: number; r: number }) =>
+    new Set(hexesInRange(h, 2).map((x) => w.tiles.get(hexKey(x.q, x.r))?.terrain)).size;
+  const mitte = [...w.tiles.values()]
+    .filter((t) => hexDistance(t, ORIGIN) <= 4)
+    .sort((a, b) => vielfalt(b) - vielfalt(a))[0] ?? { q: 0, r: 0 };
+  const kacheln = [...w.tiles.values()]
+    .filter((t) => hexDistance(t, mitte) <= 3)
+    .sort((a, b) => a.r - b.r || a.q - b.q);
+  const abstaende: Abstand[] = [
+    { titel: 'Heute: 24 x 18,75', text: 'Zeilen zwischen den Kunstpixeln, auf Geraetepixel gerundet', sx: 24, sy: 18.75, raster: false },
+    { titel: 'A: 24 x 19, gerastet', text: 'jede Kachel auf ganzen Kunstpixeln, Abstand fast wie heute', sx: 24, sy: 19, raster: true },
+    { titel: 'B: 23 x 17 wie hexmap', text: 'der Abstand, fuer den die Kacheln gezeichnet sind - die Karte wird etwas dichter', sx: 23, sy: 17, raster: true },
+  ];
+  for (const f of [2, 3]) {
+    for (const a of abstaende) reihe.append(abstandBild(seed, kacheln, mitte, a, f));
+  }
+}
+
+function abstandBild(
+  seed: number,
+  kacheln: { q: number; r: number; terrain: import('../core/types').Terrain }[],
+  mitte: { q: number; r: number },
+  a: Abstand,
+  f: number,
+): HTMLElement {
+  const liftKunst = (q: number, r: number) => liftVon(seed, q, r, 1.5) / SCALE;
+  /** Linke obere Ecke des Kachelbilds in Kunstpixeln (Bruch, falls nicht gerastet). */
+  const ecke = (q: number, r: number) => {
+    if (!a.raster) {
+      // Wie das Brett: Mittelpunkt aus dem Layout, Bild um HEX_CX/HEX_CY versetzt.
+      return { x: a.sx * (q + r / 2) - HEX_CX, y: a.sy * r - HEX_CY - liftKunst(q, r) };
+    }
+    const x = a.sx === 23 ? 23 * q + Math.ceil(11.5 * r) : a.sx * q + (a.sx / 2) * r;
+    return { x: x - HEX_CX, y: Math.round(a.sy * r - HEX_CY) - liftKunst(q, r) };
+  };
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const t of kacheln) {
+    const e = ecke(t.q, t.r);
+    minX = Math.min(minX, e.x);
+    minY = Math.min(minY, e.y);
+    maxX = Math.max(maxX, e.x + IMG_W);
+    maxY = Math.max(maxY, e.y + IMG_H);
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.ceil((maxX - minX) * f);
+  canvas.height = Math.ceil((maxY - minY) * f);
+  const ctx = canvas.getContext('2d')!;
+  ctx.imageSmoothingEnabled = false;
+  for (const t of kacheln) {
+    const url = tileUrl(seed, t.terrain, t.q, t.r);
+    const img = url ? tileImage(url) : undefined;
+    if (!img) continue;
+    const e = ecke(t.q, t.r);
+    const x = a.raster ? Math.round(e.x - Math.floor(minX)) * f : Math.round((e.x - minX) * f);
+    const y = a.raster ? Math.round(e.y - Math.floor(minY)) * f : Math.round((e.y - minY) * f);
+    ctx.drawImage(img, x, y, IMG_W * f, IMG_H * f);
+  }
+  // Ausschnitt um die Mitte, dreifach vergroessert.
+  const m = ecke(mitte.q, mitte.r);
+  const ax = Math.max(0, Math.round((m.x - minX - 8) * f));
+  const ay = Math.max(0, Math.round((m.y - minY + 2) * f));
+  const breite = 44 * f;
+  const hoehe = 34 * f;
+  const lupe = document.createElement('canvas');
+  lupe.width = breite * 3;
+  lupe.height = hoehe * 3;
+  const l = lupe.getContext('2d')!;
+  l.imageSmoothingEnabled = false;
+  l.drawImage(canvas, ax, ay, breite, hoehe, 0, 0, breite * 3, hoehe * 3);
+  const rahmen = canvas.getContext('2d')!;
+  rahmen.strokeStyle = '#ffe08a';
+  rahmen.lineWidth = 2;
+  rahmen.strokeRect(ax, ay, breite, hoehe);
+
+  const fig = document.createElement('figure');
+  const cap = document.createElement('figcaption');
+  cap.innerHTML = `<b>${a.titel}</b> · ${f} Geraetepixel je Kunstpixel<br>${a.text}`;
+  const zeile = document.createElement('div');
+  zeile.style.display = 'flex';
+  zeile.style.gap = '8px';
+  zeile.style.alignItems = 'flex-start';
+  zeile.append(canvas, lupe);
+  fig.append(cap, zeile);
+  return fig;
+}
+
 async function los() {
   const root = document.getElementById('labor')!;
   const params = new URLSearchParams(location.search);
@@ -521,6 +636,7 @@ async function los() {
   else if (art === 'fluesse') await fluesse(root);
   else if (art === 'leistung') await leistung(root);
   else if (art === 'gebaeude') await gebaeude(root, seed);
+  else if (art === 'schaerfe') await schaerfe(root, seed);
   else await aufdeckung(root, seed);
   document.body.dataset.fertig = '1';
   void hexDistance;

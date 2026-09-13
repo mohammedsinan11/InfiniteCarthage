@@ -144,6 +144,24 @@ tragen - ein geliefertes Sprite waere derzeit einfarbig.
 *Was fehlt:* Aufnahmen. Wind, Regen, Voegel und ein Lagerfeuer sind die Posten,
 bei denen Synthese am deutlichsten nach Synthese klingt.
 
+### Kartenbilder — **Platzhalter**
+
+`ui/KartenBild.tsx`: jedes Kartenbild wird aus der Wirkung zusammengesetzt -
+Gelaendekachel(n) mit +1/-1, Rohstoff-Sinnbilder mit Anzahl, ein Sack fuer
+beliebige Rohstoffe, eine Waage fuer Handel, eine Truhe fuer Handkarten (kleine
+Pixelkarten). In der Kartenwahl gross, im Menue klein.
+
+*Was fehlt:* ein gezeichnetes Motiv je Karte (24 Karten), etwa 48 x 32 px.
+
+### Bewegung und Handy — **Platzhalter**
+
+- **Gleiten:** Einheiten gleiten in gut 0,4 s je Feld zum neuen Feld und
+  hopsen zweimal (`Board.tsx`, `GLEITEN_MS`) - keine Schrittbilder.
+- **Auftragszeichen** jetzt auch fuer Geleit (ueber dem Wanderer) und
+  Kundschaft (ueber dem Zielfeld).
+- **Handy hochkant:** Wuerfelknopf klein neben der Hand, Aktionsleiste in einer
+  scrollbaren Zeile, Zoom nur mit Plus und Minus.
+
 ### Nebel und Befehle — **Platzhalter**
 
 - **Nebel:** Kacheln ausserhalb der Sicht werden blaeulich eingetruebt
@@ -295,7 +313,8 @@ wuerden.
 | **Ruinen-Sprite** | `ruine.png`, besser 2-3 Varianten | Ersetzt die Pixelsaeulen. Eine erkundete Ruine verschwindet derzeit - eine "leere" Variante waere schoener. |
 | **Nebel** | weiche Kante, evtl. ziehende Schwaden | Derzeit harte Tönung je Feld. Ein Uebergang am Sichtrand wuerde das meiste bringen. |
 | **Befehlsanzeige** | Fahne, Wegmarken, Auswahlring | Derzeit SVG-Formen. Eine gezeichnete Fahne und Fussspuren statt Strichlinie. |
-| **Laufanimation** | 2-4 Einzelbilder je Einheit | Einheiten springen je Runde ein Feld. Ein kurzes Gleiten mit Schrittbildern wuerde Bewegung lesbar machen. |
+| **Laufanimation** | 2-4 Einzelbilder je Einheit | Einheiten gleiten schon mit zwei Hopsern je Feld; Schrittbilder wuerden daraus Gehen machen. |
+| **Kartenmotive** | 24 Motive, etwa 48 x 32 | Ersetzen die zusammengesetzten Bilder aus Kachel, Rohstoff, Sack, Waage und Truhe. |
 | **Gefecht und Belagerung** | kurze Einzelbildfolgen | Derzeit nur Meldung und Klang. Ein Schwertblitz, eine Rauchwolke ueber einem fallenden Lager. |
 | **Gegner und Kampf** | offen | Sobald der Held kaempfen soll. |
 | **Menuereiter** | 4 bis 8 Symbole | Derzeit stehen dort Kuerzel wie "RE" und "TE". Das ist offensichtlich vorlaeufig. |

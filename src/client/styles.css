@@ -2756,3 +2756,136 @@ em.off {
 .hud-ton.aus {
   color: var(--muted);
 }
+
+/* --- Kartenbilder (ui/KartenBild.tsx). PLATZHALTER (ASSETS.md) ------------ */
+
+.karten-bild {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+  min-height: 78px;
+  padding: 6px 4px;
+  background: linear-gradient(180deg, #33404c 0%, #27301f 100%);
+  border: 2px solid rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+.karten-bild.bild-selten { background: linear-gradient(180deg, #24405e 0%, #1f2b36 100%); }
+.karten-bild.bild-episch { background: linear-gradient(180deg, #43305a 0%, #261d33 100%); }
+.karten-bild.bild-legendaer { background: linear-gradient(180deg, #5a4520 0%, #2e2410 100%); }
+.karten-bild.klein {
+  min-height: 0;
+  padding: 3px;
+  gap: 3px;
+  justify-content: flex-start;
+  border-width: 1px;
+}
+.karten-bild img {
+  display: block;
+  image-rendering: pixelated;
+}
+.karten-bild svg {
+  display: block;
+}
+.karten-teil {
+  position: relative;
+  display: inline-flex;
+}
+.karten-teil b {
+  position: absolute;
+  right: -5px;
+  bottom: -3px;
+  padding: 0 3px;
+  font-family: var(--pixel);
+  font-size: 8px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: #21170a;
+  background: #f2c94c;
+  border: 1px solid #2a1f16;
+}
+.karten-teil.karg b {
+  color: #fff;
+  background: #c8402f;
+}
+.karten-rohstoffe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 7px;
+  max-width: 110px;
+  justify-content: center;
+}
+.karten-bild.klein .karten-teil b {
+  font-size: 7px;
+  right: -3px;
+  bottom: -2px;
+}
+
+/* --- Handy hochkant, zweiter Anlauf --------------------------------------
+   Nach dem Geraetetest: Wuerfelknopf ueber die ganze Breite und zwei Reihen
+   Aktionsknoepfe nahmen ein Drittel des Bildschirms; Safaris Leiste lag ueber
+   dem Wuerfelknopf. Jetzt: Wuerfelknopf klein neben der Hand, die Leiste in
+   einer Zeile, Zoom nur mit Plus und Minus (Kneifen geht ohnehin), unten Platz
+   fuer die Leiste des Browsers. */
+.game {
+  height: 100dvh;
+}
+@media (max-width: 600px) {
+  .unten {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      'hand wuerfel'
+      'dock dock';
+    align-items: end;
+    gap: 6px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    max-width: calc(100vw - 20px);
+  }
+  .unten .hand {
+    grid-area: hand;
+  }
+  .unten .dock {
+    grid-area: dock;
+  }
+  .unten .wuerfel-knopf {
+    grid-area: wuerfel;
+    justify-self: end;
+    align-self: stretch;
+    min-width: 88px;
+    padding: 4px 10px 8px;
+  }
+  .wuerfel-knopf .wuerfel-text {
+    font-size: 8px;
+  }
+  .wuerfel-knopf .wuerfel-inhalt {
+    flex-direction: row;
+    gap: 6px;
+  }
+  .dock-reihe {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .dock-trenner {
+    display: none;
+  }
+  .dock-knopf {
+    width: 42px;
+    min-height: 48px;
+    flex-shrink: 0;
+  }
+  .zoom-balken {
+    display: none;
+  }
+  .meldungen {
+    top: 52px;
+  }
+  .meldung {
+    font-size: 9px;
+    padding: 7px 10px 7px 8px;
+    white-space: normal;
+    max-width: 78vw;
+  }
+}

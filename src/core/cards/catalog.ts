@@ -1,31 +1,46 @@
 /**
  * Der Kartenkatalog.
  *
- * Ein erster Satz zum Ausprobieren, keine ausbalancierte Sammlung. Er soll
- * zeigen, ob das Geruest traegt: Sofortwirkung, Dauerwirkung, beides, und
- * eine Karte, bei der man ueberlegen muss, ob man sie ueberhaupt will.
+ * BALANCE. Jede Karte hat einen Wert nach einem ausdruecklichen Modell
+ * (wert.ts), und jede Seltenheit eine Wertspanne - ein Test haelt beides
+ * zusammen. Die erste Fassung hatte keines davon, und es zeigte sich:
  *
- * Kennungen sind Zeichenketten und wandern in den Spielstand. Sie duerfen
- * sich nie aendern - sonst verlieren gespeicherte Partien ihre Karten.
+ *   - Dauerwirkungen waren weit mehr wert als Sofortwirkungen derselben Stufe.
+ *     "Holzfaellerlager" (+1 Holz fuer immer) lag als gewoehnlich neben
+ *     "Reiche Ernte" (3 Getreide, einmal) - rund das Doppelte.
+ *   - "Karge Jahre" kostete mehr, als sie brachte.
+ *   - "Grosse Scheune" war fuer episch zu schwach.
+ *
+ * Seit die Bank unendlich ist, gibt es jede Sofortwirkung voll. Die Zahlen hier
+ * gleichen das aus. Neu dazu: je zwei Karten fuer die duennen Stufen und Karten
+ * mit mehreren Dauerwirkungen.
+ *
+ * Kennungen sind Zeichenketten und wandern in den Spielstand. Sie duerfen sich
+ * nie aendern - sonst verlieren gespeicherte Partien ihre Karten. Seltenheit,
+ * Text und Zahlen duerfen sich aendern.
+ *
+ * BILDER. Das Motiv jeder Karte waehlt client/ui/KartenBild.tsx aus ihrer
+ * Wirkung - Gelaende, Rohstoffe, Handel, Vorrat. Gezeichnete Motive je Karte
+ * stehen in ASSETS.md.
  */
 
 import type { Card } from './types';
 
 export const CARDS: readonly Card[] = [
-  // --- gewoehnlich ---------------------------------------------------------
+  // --- gewoehnlich: Wert 3 bis 6 --------------------------------------------
   {
     id: 'ernte',
     name: 'Reiche Ernte',
     rarity: 'gewoehnlich',
-    text: 'Nimm 3 Getreide.',
-    instant: { t: 'gain', resources: { grain: 3 } },
+    text: 'Nimm 4 Getreide.',
+    instant: { t: 'gain', resources: { grain: 4 } },
   },
   {
-    id: 'holzlager',
-    name: 'Holzfaellerlager',
+    id: 'lehmgrube',
+    name: 'Lehmgrube',
     rarity: 'gewoehnlich',
-    text: 'Waelder liefern dir dauerhaft +1 Holz.',
-    lasting: { t: 'terrainBonus', terrain: 'forest', amount: 1 },
+    text: 'Nimm 3 Lehm und 1 Holz.',
+    instant: { t: 'gain', resources: { brick: 3, lumber: 1 } },
   },
   {
     id: 'handelsposten',
@@ -35,14 +50,35 @@ export const CARDS: readonly Card[] = [
     lasting: { t: 'tradeDiscount', amount: 1 },
   },
   {
-    id: 'lehmgrube',
-    name: 'Lehmgrube',
+    id: 'holzstapel',
+    name: 'Holzstapel',
     rarity: 'gewoehnlich',
-    text: 'Nimm 2 Lehm.',
-    instant: { t: 'gain', resources: { brick: 2 } },
+    text: 'Nimm 2 Holz und 2 Lehm.',
+    instant: { t: 'gain', resources: { lumber: 2, brick: 2 } },
+  },
+  {
+    id: 'wollballen',
+    name: 'Wollballen',
+    rarity: 'gewoehnlich',
+    text: 'Nimm 3 Wolle und 2 Getreide.',
+    instant: { t: 'gain', resources: { wool: 3, grain: 2 } },
+  },
+  {
+    id: 'erzbrocken',
+    name: 'Erzbrocken',
+    rarity: 'gewoehnlich',
+    text: 'Nimm 3 Erz und 1 Getreide.',
+    instant: { t: 'gain', resources: { ore: 3, grain: 1 } },
   },
 
-  // --- ungewoehnlich -------------------------------------------------------
+  // --- ungewoehnlich: Wert 6 bis 10 -----------------------------------------
+  {
+    id: 'holzlager',
+    name: 'Holzfaellerlager',
+    rarity: 'ungewoehnlich',
+    text: 'Waelder liefern dir dauerhaft +1 Holz.',
+    lasting: { t: 'terrainBonus', terrain: 'forest', amount: 1 },
+  },
   {
     id: 'steinbruch',
     name: 'Steinbruch',
@@ -61,40 +97,56 @@ export const CARDS: readonly Card[] = [
     id: 'vorratskammer',
     name: 'Vorratskammer',
     rarity: 'ungewoehnlich',
-    text: 'Du darfst dauerhaft 3 Karten mehr halten, bevor du abwirfst.',
+    text: 'Nimm 4 beliebige Rohstoffe. Du darfst dauerhaft 3 Karten mehr halten.',
+    instant: { t: 'gainAny', count: 4 },
     lasting: { t: 'handLimit', amount: 3 },
   },
   {
     id: 'wanderhaendler',
     name: 'Wanderhaendler',
     rarity: 'ungewoehnlich',
-    text: 'Nimm 4 beliebige Rohstoffe.',
-    instant: { t: 'gainAny', count: 4 },
+    text: 'Nimm 7 beliebige Rohstoffe.',
+    instant: { t: 'gainAny', count: 7 },
+  },
+  {
+    id: 'baumeister',
+    name: 'Baumeister',
+    rarity: 'ungewoehnlich',
+    text: 'Nimm 2 Holz, 2 Lehm und je 1 Wolle, Getreide und Erz.',
+    instant: { t: 'gain', resources: { lumber: 2, brick: 2, wool: 1, grain: 1, ore: 1 } },
   },
 
-  // --- selten --------------------------------------------------------------
+  // --- selten: Wert 10 bis 14 -----------------------------------------------
   {
     id: 'muehlen',
     name: 'Muehlen am Fluss',
     rarity: 'selten',
-    text: 'Nimm 2 Getreide. Felder liefern dir dauerhaft +1 Getreide.',
-    instant: { t: 'gain', resources: { grain: 2 } },
+    text: 'Nimm 3 Getreide. Felder liefern dir dauerhaft +1 Getreide.',
+    instant: { t: 'gain', resources: { grain: 3 } },
     lasting: { t: 'terrainBonus', terrain: 'field', amount: 1 },
   },
   {
     id: 'ziegelei',
     name: 'Ziegelei',
     rarity: 'selten',
-    text: 'Nimm 2 Lehm. Huegel liefern dir dauerhaft +1 Lehm.',
-    instant: { t: 'gain', resources: { brick: 2 } },
+    text: 'Nimm 3 Lehm. Huegel liefern dir dauerhaft +1 Lehm.',
+    instant: { t: 'gain', resources: { brick: 3 } },
     lasting: { t: 'terrainBonus', terrain: 'hill', amount: 1 },
+  },
+  {
+    id: 'saegewerk',
+    name: 'Saegewerk',
+    rarity: 'selten',
+    text: 'Nimm 3 Holz. Waelder liefern dir dauerhaft +1 Holz.',
+    instant: { t: 'gain', resources: { lumber: 3 } },
+    lasting: { t: 'terrainBonus', terrain: 'forest', amount: 1 },
   },
   {
     id: 'karge_jahre',
     name: 'Karge Jahre',
     rarity: 'selten',
-    text: 'Nimm 6 beliebige Rohstoffe. Weiden liefern dir dauerhaft 1 weniger.',
-    instant: { t: 'gainAny', count: 6 },
+    text: 'Nimm 14 beliebige Rohstoffe. Weiden liefern dir dauerhaft 1 weniger.',
+    instant: { t: 'gainAny', count: 14 },
     lasting: { t: 'terrainBonus', terrain: 'pasture', amount: -1 },
   },
   {
@@ -105,15 +157,7 @@ export const CARDS: readonly Card[] = [
     lasting: { t: 'tradeDiscount', amount: 2 },
   },
 
-  // --- episch --------------------------------------------------------------
-  {
-    id: 'grosse_scheune',
-    name: 'Grosse Scheune',
-    rarity: 'episch',
-    text: 'Nimm 5 beliebige Rohstoffe. Du darfst dauerhaft 5 Karten mehr halten.',
-    instant: { t: 'gainAny', count: 5 },
-    lasting: { t: 'handLimit', amount: 5 },
-  },
+  // --- episch: Wert 15 bis 20 -----------------------------------------------
   {
     id: 'erzader',
     name: 'Reiche Erzader',
@@ -121,8 +165,34 @@ export const CARDS: readonly Card[] = [
     text: 'Berge liefern dir dauerhaft +2 Erz.',
     lasting: { t: 'terrainBonus', terrain: 'mountain', amount: 2 },
   },
+  {
+    id: 'grosse_scheune',
+    name: 'Grosse Scheune',
+    rarity: 'episch',
+    text: 'Nimm 12 beliebige Rohstoffe. Du darfst dauerhaft 5 Karten mehr halten.',
+    instant: { t: 'gainAny', count: 12 },
+    lasting: { t: 'handLimit', amount: 5 },
+  },
+  {
+    id: 'fruchtbares_tal',
+    name: 'Fruchtbares Tal',
+    rarity: 'episch',
+    text: 'Felder liefern dir dauerhaft +1 Getreide, Weiden +1 Wolle.',
+    lasting: [
+      { t: 'terrainBonus', terrain: 'field', amount: 1 },
+      { t: 'terrainBonus', terrain: 'pasture', amount: 1 },
+    ],
+  },
+  {
+    id: 'handelsflotte',
+    name: 'Handelsflotte',
+    rarity: 'episch',
+    text: 'Nimm 4 beliebige Rohstoffe. Bankhandel kostet dich dauerhaft zwei Karten weniger.',
+    instant: { t: 'gainAny', count: 4 },
+    lasting: { t: 'tradeDiscount', amount: 2 },
+  },
 
-  // --- legendaer -----------------------------------------------------------
+  // --- legendaer: Wert 22 bis 30 --------------------------------------------
   {
     id: 'der_fund',
     name: 'Der Fund',
@@ -130,6 +200,17 @@ export const CARDS: readonly Card[] = [
     text: 'Nimm 8 beliebige Rohstoffe. Waelder liefern dir dauerhaft +2 Holz.',
     instant: { t: 'gainAny', count: 8 },
     lasting: { t: 'terrainBonus', terrain: 'forest', amount: 2 },
+  },
+  {
+    id: 'goldene_ernte',
+    name: 'Goldene Ernte',
+    rarity: 'legendaer',
+    text: 'Nimm 3 Getreide. Felder liefern dir dauerhaft +2 Getreide, Weiden +1 Wolle.',
+    instant: { t: 'gain', resources: { grain: 3 } },
+    lasting: [
+      { t: 'terrainBonus', terrain: 'field', amount: 2 },
+      { t: 'terrainBonus', terrain: 'pasture', amount: 1 },
+    ],
   },
 ];
 

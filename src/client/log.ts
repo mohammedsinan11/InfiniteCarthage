@@ -11,6 +11,7 @@ import { cardById } from '../core/cards/catalog';
 import { fraktionById, istFraktion } from '../core/factions';
 import { istSpielerSeite, spielerAus } from '../core/combat';
 import type { Seite } from '../core/combat';
+import type { WandererAuftrag } from '../core/state';
 
 const RES_NAME: Record<Resource, string> = {
   lumber: 'Holz',
@@ -50,11 +51,25 @@ const LOESCHER = {
   verschont: 'knapp - das letzte Gebaeude bleibt stehen',
 } as const;
 
-/** Worum es in einem Auftrag geht. */
-export function auftragText(state: PublicState | null, art: 'lager' | 'ruine', fraktion: string | null): string {
-  return art === 'lager'
-    ? `Zerstoere das Lager ${fraktion ? `der ${fraktionName(state, fraktion)}` : ''}`.trim()
-    : 'Erkunde die alte Ruine';
+/** Worum es in einem Auftrag geht, in Worten. nameVon nennt eine Fraktion. */
+export function auftragText(
+  a: { art: WandererAuftrag['art']; fraktion: string | null; rohstoff: Resource | null; menge: number },
+  nameVon: (fraktion: string) => string,
+): string {
+  switch (a.art) {
+    case 'lager':
+      return a.fraktion ? `Zerstoere das Lager der ${nameVon(a.fraktion)}` : 'Zerstoere das Lager';
+    case 'ruine':
+      return 'Erkunde die alte Ruine';
+    case 'liefern':
+      return `Bring mir ${a.menge} ${a.rohstoff ? RES_NAME[a.rohstoff] : 'Rohstoffe'}`;
+    case 'jagd':
+      return `Schlage ${a.menge} Raeuber oder Goblins`;
+    case 'geleit':
+      return 'Bring einen Ritter oder deinen Helden zu mir';
+    case 'kundschaft':
+      return 'Kundschafte das ferne Land aus';
+  }
 }
 
 export const resourceName = (r: Resource): string => RES_NAME[r];
@@ -177,7 +192,9 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
     case 'tribute':
       return `${who(state, e.player)} zahlt ${fraktionName(state, e.fraktion)} Tribut: ${karten(e.count)}.`;
     case 'questOffered':
-      return `Ein Wanderer bietet ${who(state, e.player)} einen Auftrag an: ${auftragText(state, e.art, e.fraktion)}.`;
+      return `Ein Wanderer bietet ${who(state, e.player)} einen Auftrag an: ${auftragText(e, (id) => fraktionName(state, id))}.`;
+    case 'questProgress':
+      return `${who(state, e.player)} kommt bei der Jagd voran: ${e.fortschritt} von ${e.menge}.`;
     case 'questAccepted':
       return `${who(state, e.player)} nimmt einen Auftrag an.`;
     case 'questDone':

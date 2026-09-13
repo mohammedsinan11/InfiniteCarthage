@@ -725,8 +725,11 @@ function schreite(
       gezogen = true;
       wachsen(s, world, u, u.kind === 'held' ? ERKUNDUNG_HELD : ERKUNDUNG_RADIUS, events);
     }
-    // Am Ziel oder ohne Weg: der Befehl ist erledigt.
-    if (!weg || hexKey(u.q, u.r) === zk) u.ziel = null;
+    // Am Ziel oder ohne Weg: der Befehl ist erledigt - und der Verband auch.
+    if (!weg || hexKey(u.q, u.r) === zk) {
+      u.ziel = null;
+      u.verband = null;
+    }
     if (!weg) break;
     if (u.owner !== null && ruinAt(seed, u.q, u.r) && !s.exploredRuins.includes(hexKey(u.q, u.r))) {
       erkunde(s, world, rng, u, events);
@@ -769,6 +772,13 @@ function ziehe(
     }
 
     case 'befehl': {
+      // Im Verband: im Tempo des Langsamsten, also ein Feld. Ob der Verband
+      // wartet, weil einer kaempft, entscheidet tickArmy vor dem Ziehen.
+      if (u.verband !== null) {
+        const genossen = s.units.filter((x) => x.verband === u.verband && x.owner === u.owner);
+        if (genossen.length > 1) return schreite(s, world, rng, u, 1, events);
+        u.verband = null;
+      }
       // Im Gefolge: das Ziel ist, wo der Held gerade steht.
       let fuehrer: UnitState | undefined;
       if (u.folgt !== null) {
@@ -1033,10 +1043,16 @@ export function tickArmy(s: GameState, world: World, events: Ereignisse): void {
   // Im Schnee bleibt in jeder zweiten Runde alles stehen (core/zeit.ts).
   const rast = einheitenRasten(seed, s.turn);
 
-  // 1. Ziehen - der Held vor seinem Gefolge, sonst nach Nummer.
+  // 1. Ziehen - der Held vor seinem Gefolge, sonst nach Nummer. Ein Verband
+  // wartet, solange einer von ihnen kaempft - gefragt vor dem ersten Schritt,
+  // sonst liefe der Rest weiter, sobald der Erste in einen Kampf geraet.
   const reihe = [...s.units].sort((a, b) => (a.folgt === null ? 0 : 1) - (b.folgt === null ? 0 : 1) || a.id - b.id);
+  const verbandWartet = new Set(
+    s.units.filter((x) => x.verband !== null && imKampf(s, x)).map((x) => x.verband),
+  );
   for (const u of rast ? [] : reihe) {
     if (!s.units.includes(u) || imKampf(s, u)) continue;
+    if (u.verband !== null && verbandWartet.has(u.verband)) continue;
     if (ziehe(s, world, rng, u, zieleFuer, events)) gezogen.add(u.id);
   }
   // Wer auf einer Ruine steht, erkundet sie - auch wer dort erst antrat.

@@ -124,6 +124,12 @@ export type UnitState = {
   dauer: number | null;
   /** Ritter im Gefolge: die Nummer des Helden, dem sie folgen. Sonst null. */
   folgt: number | null;
+  /**
+   * Ein Verband, der gemeinsam zieht (rules/army.ts): alle eigenen Einheiten
+   * eines Feldes, die zusammen einen Befehl bekamen. Sie ziehen im Tempo des
+   * Langsamsten und warten, solange einer von ihnen kaempft. null: allein.
+   */
+  verband: number | null;
 };
 
 /**
@@ -172,10 +178,24 @@ export type Abkommen = {
 export type WandererAuftrag = {
   id: number;
   player: PlayerId;
-  /** lager: dieses Lager zerstoeren. ruine: diese Ruine erkunden. */
-  art: 'lager' | 'ruine';
+  /**
+   *   lager       dieses Lager zerstoeren
+   *   ruine       diese Ruine erkunden
+   *   liefern     dem Wanderer Rohstoffe bringen (menge x rohstoff)
+   *   jagd        menge Raeuber oder Goblins schlagen
+   *   geleit      einen Ritter oder den Helden zum Wanderer bringen
+   *   kundschaft  mit einem Ritter oder dem Helden dieses Feld erreichen
+   */
+  art: 'lager' | 'ruine' | 'liefern' | 'jagd' | 'geleit' | 'kundschaft';
+  /** Das Ziel - bei liefern und geleit, wo der Wanderer beim Angebot stand. */
   q: number;
   r: number;
+  /** Beim Liefern: welcher Rohstoff. Sonst null. */
+  rohstoff: Resource | null;
+  /** Wie viel es braucht: Rohstoffe beim Liefern, Gegner bei der Jagd, sonst 1. */
+  menge: number;
+  /** Wie weit es ist - bei der Jagd die geschlagenen Gegner. */
+  fortschritt: number;
   /** Bei Lagern die Fraktion, die es beim Angebot hielt - fuer den Text. */
   fraktion: string | null;
   status: 'angebot' | 'angenommen' | 'abgelehnt';

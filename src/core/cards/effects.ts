@@ -11,6 +11,7 @@
  */
 
 import { cardById } from './catalog';
+import { dauerwirkungen } from './types';
 import type { Terrain } from '../types';
 
 export type Modifiers = {
@@ -30,18 +31,19 @@ export function modifiersOf(cardIds: readonly string[]): Modifiers {
   const m: Modifiers = { terrainBonus: {}, tradeDiscount: 0, handLimitBonus: 0 };
   for (const id of cardIds) {
     const karte = cardById(id);
-    const l = karte?.lasting;
-    if (!l) continue;
-    switch (l.t) {
-      case 'terrainBonus':
-        m.terrainBonus[l.terrain] = (m.terrainBonus[l.terrain] ?? 0) + l.amount;
-        break;
-      case 'tradeDiscount':
-        m.tradeDiscount += l.amount;
-        break;
-      case 'handLimit':
-        m.handLimitBonus += l.amount;
-        break;
+    if (!karte) continue;
+    for (const l of dauerwirkungen(karte)) {
+      switch (l.t) {
+        case 'terrainBonus':
+          m.terrainBonus[l.terrain] = (m.terrainBonus[l.terrain] ?? 0) + l.amount;
+          break;
+        case 'tradeDiscount':
+          m.tradeDiscount += l.amount;
+          break;
+        case 'handLimit':
+          m.handLimitBonus += l.amount;
+          break;
+      }
     }
   }
   return m;

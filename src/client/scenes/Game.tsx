@@ -179,12 +179,32 @@ export function Game() {
     [meinHeld, meineRitter],
   );
   const [befehl, setBefehl] = useState<number | null>(null);
+  /** Gilt der wartende Befehl dem ganzen Verband auf dem Feld der Einheit? */
+  const [mitVerband, setMitVerband] = useState(false);
   const [fokus, setFokus] = useState<{ q: number; r: number; n: number } | null>(null);
   const zeigeFeld = (q: number, r: number) => setFokus((alt) => ({ q, r, n: (alt?.n ?? 0) + 1 }));
   // Faellt die Einheit, verfaellt auch der Befehl.
   useEffect(() => {
     if (befehl !== null && !meineEinheiten.some((u) => u.id === befehl)) setBefehl(null);
+    if (befehl === null) setMitVerband(false);
   }, [befehl, meineEinheiten]);
+
+  /** Felder mit mehreren eigenen Einheiten - Verbaende (rules/army.ts). */
+  const verbaende = useMemo(() => {
+    const m = new Map<string, { q: number; r: number; einheiten: typeof meineEinheiten }>();
+    for (const u of meineEinheiten) {
+      const k = `${u.q}:${u.r}`;
+      const v = m.get(k);
+      if (v) v.einheiten.push(u);
+      else m.set(k, { q: u.q, r: u.r, einheiten: [u] });
+    }
+    return [...m.values()].filter((v) => v.einheiten.length > 1);
+  }, [meineEinheiten]);
+  const befehlsEinheit = meineEinheiten.find((u) => u.id === befehl);
+  const verbandGroesse =
+    befehlsEinheit && mitVerband
+      ? meineEinheiten.filter((u) => u.q === befehlsEinheit.q && u.r === befehlsEinheit.r).length
+      : 1;
   // Esc bricht die Zielwahl ab.
   useEffect(() => {
     if (befehl === null) return;
@@ -325,12 +345,16 @@ export function Game() {
   const onHex = (key: string) => {
     const [q, r] = key.split(':').map(Number);
     if (befehl !== null) {
-      act({ t: 'orderUnit', unit: befehl, q: q!, r: r! });
+      act({ t: 'orderUnit', unit: befehl, q: q!, r: r!, verband: mitVerband });
       setBefehl(null);
       return;
     }
-    const einheit = meineEinheiten.find((u) => u.q === q && u.r === r);
-    if (einheit) setBefehl(einheit.id);
+    // Ein Klick auf ein eigenes Feld waehlt alle Einheiten darauf - den Verband.
+    const aufFeld = meineEinheiten.filter((u) => u.q === q && u.r === r);
+    if (aufFeld.length > 0) {
+      setBefehl(aufFeld[0]!.id);
+      setMitVerband(aufFeld.length > 1);
+    }
   };
   const befehleMoeglich = isMine && (phase.t === 'main' || phase.t === 'roll') && mode === null;
 
@@ -583,7 +607,10 @@ export function Game() {
           beute={me?.loot ?? 0}
           befehleMoeglich={befehleMoeglich}
           beuteMoeglich={isMine && phase.t === 'main'}
-          onBefehl={(id) => setBefehl((alt) => (alt === id ? null : id))}
+          onBefehl={(id) => {
+            setMitVerband(false);
+            setBefehl((alt) => (alt === id && !mitVerband ? null : id));
+          }}
           onHalt={(id) => {
             const u = meineEinheiten.find((x) => x.id === id);
             if (u) act({ t: 'orderUnit', unit: id, q: u.q, r: u.r });
@@ -619,6 +646,20 @@ export function Game() {
           loeschenMoeglich={loeschenMoeglich}
           onLoeschen={loeschen}
           onErkunden={(id, an) => act({ t: 'explore', unit: id, explore: an })}
+          verbaende={verbaende}
+          verbandFeld={mitVerband && befehlsEinheit ? `${befehlsEinheit.q}:${befehlsEinheit.r}` : null}
+          onVerbandZiel={(q, r) => {
+            const erste = meineEinheiten.find((u) => u.q === q && u.r === r);
+            if (!erste) return;
+            setBefehl(erste.id);
+            setMitVerband(true);
+          }}
+          onZeigenAuftrag={(a) => {
+            const w = a.art === 'geleit' ? state.units.find((u) => u.id === a.wanderer) : undefined;
+            zeigeFeld(w ? w.q : a.q, w ? w.r : a.r);
+          }}
+          kannLiefern={(a) => !!hand && a.rohstoff !== null && hand[a.rohstoff] >= a.menge}
+          onLiefern={(id) => act({ t: 'deliverQuest', id })}
           stumm={stumm}
           onStumm={tonUmschalten}
           autoWurf={autoWurf}
@@ -749,7 +790,13 @@ export function Game() {
 
           {befehl !== null && (
             <div className="befehl-hinweis">
-              Ziel fuer {befehl === meinHeld?.id ? 'den Helden' : 'den Ritter'} waehlen · Esc bricht ab
+              Ziel fuer{' '}
+              {verbandGroesse > 1
+                ? `den Verband (${verbandGroesse} Einheiten)`
+                : befehl === meinHeld?.id
+                  ? 'den Helden'
+                  : 'den Ritter'}{' '}
+              waehlen · Esc bricht ab
             </div>
           )}
           {diagnoseAn() && <Diagnose />}

@@ -23,6 +23,7 @@ import {
   edgeEndpoints,
   vertexToPixel,
   hexKey,
+  hexDistance,
 } from '../../core/coords';
 import type { Edge, Hex, Layout, Vertex } from '../../core/coords';
 import type { World } from '../../core/world';
@@ -126,6 +127,12 @@ const startStufe = (dpr: number): number => {
   }
   return best;
 };
+
+/**
+ * Wie lange eine Einheit fuer ein Feld braucht, wenn sie gleitet. Frueher
+ * sprangen Einheiten je Runde ein Feld weiter - wer nicht hinsah, verlor sie.
+ */
+const GLEITEN_MS = 420;
 
 /** Wie weit sich ein Feld unter dem Zeiger hebt. */
 const LIFT = 3 * SCALE;
@@ -491,6 +498,42 @@ export function Board({
     return m;
   }, [visible, state]);
 
+  /*
+   * Bewegung: zieht eine Einheit, gleitet sie vom alten zum neuen Feld, mit
+   * zwei kleinen Hopsern je Feld, statt zu springen. Gemerkt wird, wo jede
+   * Einheit beim letzten Zustand stand; die Animation laeuft nur, solange
+   * etwas gleitet. Wer Bewegung reduziert haben will, bekommt keine.
+   * PLATZHALTER fuer echte Schrittbilder (ASSETS.md).
+   */
+  const bewegung = useRef(new Map<number, { von: Hex; start: number; dauer: number; schritte: number }>());
+  const letzteFelder = useRef<Map<number, Hex> | null>(null);
+  const [animZeit, setAnimZeit] = useState(0);
+  useEffect(() => {
+    const vorher = letzteFelder.current;
+    letzteFelder.current = new Map(state.units.map((u) => [u.id, { q: u.q, r: u.r }]));
+    if (!vorher) return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    const jetzt = performance.now();
+    for (const u of state.units) {
+      const alt = vorher.get(u.id);
+      if (!alt || (alt.q === u.q && alt.r === u.r)) continue;
+      const schritte = hexDistance(alt, u);
+      // Weiter als drei Felder ist kein Zug, sondern ein Sprung - etwa nach dem Neuladen.
+      if (schritte > 3) continue;
+      bewegung.current.set(u.id, { von: alt, start: jetzt, dauer: GLEITEN_MS * schritte, schritte });
+    }
+    if (bewegung.current.size === 0) return;
+    let id = 0;
+    const bild = () => {
+      const t = performance.now();
+      for (const [k, b] of bewegung.current) if (t - b.start >= b.dauer) bewegung.current.delete(k);
+      setAnimZeit(t);
+      if (bewegung.current.size > 0) id = requestAnimationFrame(bild);
+    };
+    id = requestAnimationFrame(bild);
+    return () => cancelAnimationFrame(id);
+  }, [state.units]);
+
   /** Die Farbe einer Seite: Spielerfarbe, Fraktionsfarbe oder Grau fuer Neutrale. */
   const farbeSeite = useCallback(
     (seite: Seite | undefined): string => {
@@ -596,7 +639,9 @@ export function Board({
     }
     for (const a of state.auftraege) {
       if (a.player !== du || a.status !== 'angenommen' || a.q !== q || a.r !== r) continue;
-      zeilen.push({ text: a.art === 'lager' ? 'Dein Auftrag: dieses Lager zerstoeren' : 'Dein Auftrag: diese Ruine erkunden' });
+      if (a.art === 'lager') zeilen.push({ text: 'Dein Auftrag: dieses Lager zerstoeren' });
+      if (a.art === 'ruine') zeilen.push({ text: 'Dein Auftrag: diese Ruine erkunden' });
+      if (a.art === 'kundschaft') zeilen.push({ text: 'Dein Auftrag: dieses Feld auskundschaften' });
     }
     return zeilen.length > 0 ? zeilen : null;
   }, [hover, state, sicht, du, kampf, farbeSeite]);
@@ -645,6 +690,9 @@ export function Board({
     const f = Math.round(SCALE * scale * dpr);
     /** Abends und nachts tragen Einheiten Fackeln - das Licht dazu malt die WetterSchicht. */
     const fackeln = tageszeit === 'nacht' || tageszeit === 'abend';
+    /** Wer gerade gleitet - wird nach allen Kacheln an seiner Zwischenposition gezeichnet. */
+    const unterwegs: { u: Unit; fx: number; fy: number }[] = [];
+    const jetzt = performance.now();
 
     /**
      * Was auf dem Feld steht: erst das Lager, dann die Figuren von hinten nach
@@ -689,6 +737,10 @@ export function Board({
         const [ox, oy] = stellen[i]!;
         const fx = mx + ox * f;
         const fy = my + oy * f;
+        if (u.id >= 0 && bewegung.current.has(u.id)) {
+          unterwegs.push({ u, fx, fy });
+          return;
+        }
         zeichneFigur(ctx, u.kind, fx, fy, f, farbeSeite(seiteVon(u)));
         if (fackeln && u.id >= 0) zeichneFigur(ctx, 'fackel', fx + 5 * f, fy - 2 * f, f);
         const max = WERTE[u.kind].leben;
@@ -735,6 +787,25 @@ export function Board({
         zeichne(t, liftHex(t.q, t.r) + LIFT);
         zeichneBesatzung(t, liftHex(t.q, t.r) + LIFT);
       }
+    }
+
+    // Gleitende Einheiten: vom alten Feld zum Platz auf dem neuen, mit Hopsern.
+    for (const { u, fx, fy } of unterwegs) {
+      const b = bewegung.current.get(u.id);
+      if (!b) continue;
+      const p = Math.min(1, Math.max(0, (jetzt - b.start) / b.dauer));
+      const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+      const c0 = hexToPixel(b.von.q, b.von.r, LAYOUT);
+      const sx = Math.round((c0.x - IMG.dx - view.x) * scale * dpr) + Math.round(HEX_CX) * f;
+      const sy =
+        Math.round((c0.y - IMG.dy - liftHex(b.von.q, b.von.r) - view.y) * scale * dpr) + Math.round(HEX_CY) * f + 4 * f;
+      const hops = Math.round(Math.abs(Math.sin(p * Math.PI * 2 * b.schritte)) * 2) * f;
+      const x = Math.round(sx + (fx - sx) * e);
+      const y = Math.round(sy + (fy - sy) * e) - hops;
+      zeichneFigur(ctx, u.kind, x, y, f, farbeSeite(seiteVon(u)));
+      if (fackeln) zeichneFigur(ctx, 'fackel', x + 5 * f, y - 2 * f, f);
+      const max = WERTE[u.kind].leben;
+      if (u.leben < max) zeichneLeben(ctx, u.kind, x, y, f, u.leben, max);
     }
 
     /*
@@ -853,6 +924,7 @@ export function Board({
     geisterBau,
     tageszeit,
     dpr,
+    animZeit,
   ]);
 
   /** Eine Stufe naeher (+1) oder weiter weg (-1); der Punkt unter x/y bleibt stehen. */
@@ -1433,15 +1505,27 @@ export function Board({
           .filter((a) => a.player === du && a.status !== 'abgelehnt')
           .map((a) => {
             if (a.status === 'angenommen') {
-              const c = hexToPixel(a.q, a.r, LAYOUT);
+              // Liefern und Jagd haben kein Ziel auf der Karte; das Geleit folgt dem Wanderer.
+              if (a.art === 'liefern' || a.art === 'jagd') return null;
+              const begleitet = a.art === 'geleit' ? state.units.find((u) => u.id === a.wanderer) : undefined;
+              if (a.art === 'geleit' && !begleitet) return null;
+              const zq = begleitet ? begleitet.q : a.q;
+              const zr = begleitet ? begleitet.r : a.r;
+              const c = hexToPixel(zq, zr, LAYOUT);
+              const titel = {
+                lager: 'Auftrag: dieses Lager zerstoeren',
+                ruine: 'Auftrag: diese Ruine erkunden',
+                geleit: 'Auftrag: einen Ritter oder den Helden zu diesem Wanderer bringen',
+                kundschaft: 'Auftrag: dieses Feld auskundschaften',
+              }[a.art];
               return (
                 <AuftragsZeichen
                   key={'auftrag' + a.id}
                   x={c.x}
-                  y={c.y - liftHex(a.q, a.r) - LAYOUT.h * 0.5}
+                  y={c.y - liftHex(zq, zr) - LAYOUT.h * 0.5}
                   k={SCALE}
                   art="ziel"
-                  titel={a.art === 'lager' ? 'Auftrag: dieses Lager zerstoeren' : 'Auftrag: diese Ruine erkunden'}
+                  titel={titel}
                 />
               );
             }
