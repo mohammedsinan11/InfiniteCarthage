@@ -20,11 +20,19 @@
  * ERZEUGT
  *
  * Eine langsame Melodie in dorischem Modus ueber einem liegenden Bordunton,
- * dazu ein leiser Trommelschlag. Dorisch klingt mittelalterlich, ohne in
+ * dazu ein gezupfter Bass auf der Eins. Dorisch klingt mittelalterlich, ohne in
  * Kitsch zu kippen; der Bordun ist genau das, was eine Drehleier den ganzen
  * Abend macht. Die Toene gehen in kleinen Schritten statt zu springen, sonst
- * klingt es nach Zufallsgenerator statt nach Melodie.
+ * klingt es nach Zufallsgenerator statt nach Melodie. Ein kurzes Echo gibt
+ * Raum, als spiele jemand in einer Halle.
+ *
+ * LAUTSTAERKE. Die erste Fassung war kaum zu hoeren: 35 % auf einem eigenen
+ * Bus, dessen Toene selbst schon leise angelegt waren. Jetzt laeuft die Musik
+ * ueber den gemeinsamen Audiokontext (audio.ts) mit Grundpegel und Kompressor,
+ * startet von selbst nach dem ersten Klick und merkt sich Wahl und Regler.
  */
+
+import { audioKontext, initAudio } from './audio';
 
 /**
  * Stuecke aus dem Repo. Der Glob laeuft beim Bauen; ein leerer Ordner
@@ -47,6 +55,10 @@ export const TRACKS: Track[] = Object.entries(DATEIEN)
   .sort((a, b) => a.name.localeCompare(b.name));
 
 const MODE_KEY = 'infinitecarthage.musik';
+const VOLUME_KEY = 'infinitecarthage.musiklautstaerke';
+
+/** Grundpegel ueber dem Regler - wie PEGEL in audio.ts. */
+const MUSIK_PEGEL = 2.4;
 
 /** 'aus', 'erzeugt' oder die Kennung eines eingebauten Stuecks. */
 export type MusicMode = string;
@@ -54,7 +66,7 @@ export type MusicMode = string;
 let ctx: AudioContext | null = null;
 let bus: GainNode | null = null;
 let modus: MusicMode = ladeModus();
-let lautstaerke = 0.35;
+let lautstaerke = ladeLautstaerke();
 
 /** Fuer den erzeugten Modus. */
 let timer: number | null = null;
@@ -64,15 +76,25 @@ let stufe = 0;
 let element: HTMLAudioElement | null = null;
 let objektUrl: string | null = null;
 
+function ladeLautstaerke(): number {
+  try {
+    const v = Number(localStorage.getItem(VOLUME_KEY) ?? 'x');
+    return Number.isFinite(v) && v >= 0 && v <= 1 ? v : 0.6;
+  } catch {
+    return 0.6;
+  }
+}
+
 function ladeModus(): MusicMode {
   try {
-    const v = localStorage.getItem(MODE_KEY) ?? 'aus';
+    // Wer nie gewaehlt hat, bekommt Musik - sie ist ein Teil der Stimmung.
+    const v = localStorage.getItem(MODE_KEY) ?? 'erzeugt';
     // Ein gemerktes Stueck kann inzwischen fehlen - dann lieber still sein
     // als ins Leere greifen.
     if (v !== 'aus' && v !== 'erzeugt' && !TRACKS.some((t) => t.id === v)) return 'aus';
     return v;
   } catch {
-    return 'aus';
+    return 'erzeugt';
   }
 }
 
@@ -85,18 +107,28 @@ function sichereModus(m: MusicMode): void {
 }
 
 function ensureCtx(): boolean {
-  if (ctx) {
-    if (ctx.state === 'suspended') void ctx.resume();
-    return true;
-  }
-  const Ctor: typeof AudioContext | undefined =
-    window.AudioContext ??
-    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!Ctor) return false;
-  ctx = new Ctor();
-  bus = ctx.createGain();
-  bus.gain.value = lautstaerke;
-  bus.connect(ctx.destination);
+  initAudio();
+  const c = audioKontext();
+  if (!c) return false;
+  if (ctx === c && bus) return true;
+  ctx = c;
+  bus = c.createGain();
+  bus.gain.value = lautstaerke * MUSIK_PEGEL;
+  const kompressor = c.createDynamicsCompressor();
+  kompressor.threshold.value = -16;
+  kompressor.ratio.value = 3;
+  // Ein kurzes Echo mit Rueckkopplung - Raum statt trockener Toene.
+  const echo = c.createDelay(1);
+  echo.delayTime.value = 0.33;
+  const rueck = c.createGain();
+  rueck.gain.value = 0.3;
+  const echoPegel = c.createGain();
+  echoPegel.gain.value = 0.32;
+  bus.connect(kompressor);
+  bus.connect(echo);
+  echo.connect(rueck).connect(echo);
+  echo.connect(echoPegel).connect(kompressor);
+  kompressor.connect(c.destination);
   return true;
 }
 
@@ -162,6 +194,8 @@ const TAKT_MS = 2400;
 function spieleTakt(): void {
   if (!ctx || modus !== 'erzeugt') return;
   bordun(TAKT_MS / 1000);
+  // Bass auf der Eins: Grundton oder Quinte, wie eine Laute unter der Melodie.
+  zupf(halbtonZuHz(Math.random() < 0.7 ? -12 : -5), 1.8, 0.14, 0);
 
   for (let schlag = 0; schlag < 4; schlag++) {
     // Nicht auf jedem Schlag ein Ton - Luft gehoert dazu.
@@ -171,7 +205,12 @@ function spieleTakt(): void {
     stufe = Math.max(0, Math.min(SKALA.length * 2 - 1, stufe));
     const oktave = Math.floor(stufe / SKALA.length);
     const halb = SKALA[stufe % SKALA.length]! + 12 * oktave;
-    zupf(halbtonZuHz(halb), 1.1, 0.12, (schlag * TAKT_MS) / 4000);
+    zupf(halbtonZuHz(halb), 1.1, 0.16, (schlag * TAKT_MS) / 4000);
+    // Hin und wieder eine zweite Stimme eine Terz darueber.
+    if (Math.random() < 0.18) {
+      const terz = SKALA[(stufe + 2) % SKALA.length]! + 12 * Math.floor((stufe + 2) / SKALA.length);
+      zupf(halbtonZuHz(terz), 1.0, 0.07, (schlag * TAKT_MS) / 4000 + 0.02);
+    }
   }
 }
 
@@ -189,7 +228,7 @@ function spieleTrack(track: Track): void {
   stoppeAlles();
   element = new Audio(track.url);
   element.loop = true;
-  element.volume = lautstaerke;
+  element.volume = Math.min(1, lautstaerke * 1.4);
   void element.play().catch(() => {
     // Ohne Nutzergeste verweigert der Browser - dann bleibt es eben still,
     // bis der naechste Klick kommt.
@@ -211,6 +250,12 @@ function stoppeAlles(): void {
     URL.revokeObjectURL(objektUrl);
     objektUrl = null;
   }
+}
+
+/** Nach der Tonfreigabe (audio.ts): die gewaehlte Musik starten, falls sie noch schweigt. */
+export function musikFreigeben(): void {
+  if (modus === 'aus' || timer !== null || element !== null) return;
+  setMusicMode(modus);
 }
 
 export function getMusicMode(): MusicMode {
@@ -239,6 +284,11 @@ export function getMusicVolume(): number {
 
 export function setMusicVolume(v: number): void {
   lautstaerke = Math.min(1, Math.max(0, v));
-  if (bus && ctx) bus.gain.setTargetAtTime(lautstaerke, ctx.currentTime, 0.05);
-  if (element) element.volume = lautstaerke;
+  if (bus && ctx) bus.gain.setTargetAtTime(lautstaerke * MUSIK_PEGEL, ctx.currentTime, 0.05);
+  if (element) element.volume = Math.min(1, lautstaerke * 1.4);
+  try {
+    localStorage.setItem(VOLUME_KEY, String(lautstaerke));
+  } catch {
+    // Privater Modus - dann gilt es nur jetzt.
+  }
 }

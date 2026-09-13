@@ -76,6 +76,16 @@ links oben. Mittelalterlich:
   einzelne Steine. Wem sie gehoert, zeigt ein Wimpel in Spielerfarbe in der
   Mitte (`wimpel`).
 
+Seit der dritten Fassung stehen im Spiel **kompakte** Fassungen (`dorfKlein`
+11 x 10, `stadtKlein` 15 x 14) auf einer **Lichtung** aus festgetretener Erde
+(`lichtung`, 15 x 5), damit das Haus nicht ueber die Nachbarkacheln ragt. Die
+grossen Fassungen bleiben zum Vergleich; alle Varianten: `labor.html?art=gebaeude`.
+
+- **Wachturm** (`turm`, 7 x 13): Steinturm mit Feuerschale und Band in
+  Spielerfarbe, rechts hinter Dorf oder Stadt.
+- **Asche:** abgebrannte Strasse als verkohlter Weg mit Glutpunkten, ohne
+  Wimpel (`zeichneStrassen`, `verbrannt`).
+
 *Was fehlt:* gezeichnete Gebaeude mit Charakter und eine Strasse, die nach Weg
 aussieht statt nach Band. `dorf.png` und `stadt.png` werden ohne
 Codeaenderung gezeichnet; fuer die Spielerfarbe braeuchte es eine Farbmaske
@@ -102,6 +112,36 @@ keine Laufanimation - sie springen je Runde ein Feld weiter.
 und Anker stehen im README dort. Offen: eine Farbmaske fuer Sprites, damit
 Ritter die Spielerfarbe und Raeuber, Goblins und Lager die Fraktionsfarbe
 tragen - ein geliefertes Sprite waere derzeit einfarbig.
+
+### Held, Feuer, Auftraege, Diplomatie — **Platzhalter**
+
+- **Held** (`held`, 9 x 12): Krone, Umhang in Spielerfarbe, Ruestung mit
+  Goldschnalle. Nachts der groesste Lichtkreis im Shader. Sprite-bereit:
+  `held.png`.
+- **Flammen** (`board/Marken.tsx`): zwei Pixelbilder im Wechsel (CSS
+  `.flammen-a/-b`) an brennender Strasse oder brennendem Haus, anklickbar zum
+  Loeschen; nachts ein warmer Lichtkreis.
+- **Auftragszeichen** (`board/Marken.tsx`): Pergament mit Ausrufezeichen ueber
+  dem Ziel, Sprechblase mit Fragezeichen ueber einem Wanderer mit Angebot; wippen
+  in zwei Stufen.
+- **Diplomatie im Menue:** Haltung als Wort (Krieg rot, Frieden/Tribut gruen),
+  Knoepfe Frieden, Tribut, Krieg erklaeren - keine Wappen, keine Siegel.
+- **Aktionssymbol Turm** (`SymTurm`) aus SVG-Flaechen.
+- **Hand eingeklappt:** fuenf Rohstoff-Sinnbilder mit Zahl (`.hand-schmal`).
+- **Diagnose-Tafel** (`?diagnose=1`): reiner Text, nur fuer Tests.
+- **Klaenge:** `playLoeschen`, `playAbgebrannt`, `playHeld`, `playPakt`,
+  `playKrieg`, `playAuftrag`, `playTurm` in `audio.ts`.
+
+### Musik und Umgebung — **Platzhalter**
+
+- **Musik** (`music.ts`): erzeugte Melodie in D-dorisch ueber Bordun, Bass auf
+  der Eins, gelegentliche Terz, kurzes Echo. Startet nach dem ersten Klick.
+- **Umgebung** (`ambiente.ts`): Wind (braunes Rauschen mit Boeen), Regen
+  (Rauschen, Tropfen), Voegel, Grillen, Eule, Feuerknistern, ferner Hammer - je
+  nach Tageszeit, Wetter, Jahreszeit und Feuer.
+
+*Was fehlt:* Aufnahmen. Wind, Regen, Voegel und ein Lagerfeuer sind die Posten,
+bei denen Synthese am deutlichsten nach Synthese klingt.
 
 ### Nebel und Befehle — **Platzhalter**
 
@@ -235,7 +275,12 @@ wuerden.
 | **Bauplatz-Marke** | entfaellt | Freie Plaetze zeigen jetzt das Gebaeude als Vorschau. |
 | **Wetter-Sprites** | Regen- und Schneetextur, 3-4 Blitzbilder, Wolkenschatten | Ersetzen die gerechneten Muster im Shader. |
 | **Fackel und Feuer** | `fackel.png` 2-3 Einzelbilder, Lagerfeuer | Die Fackel an Figuren bei Nacht; das Licht bleibt im Shader. |
-| **Brand** | kurze Einzelbildfolge Flammen und Rauch | Wenn Pluenderer eine Strasse oder ein Haus anzuenden. |
+| **Brand** | kurze Einzelbildfolge Flammen und Rauch, dazu Asche | Ersetzt die zwei Pixelflammen (`Marken.tsx`) und die gezeichnete Asche. |
+| **Held** | `held.png`, Portraet fuers Menue, 2 Blickrichtungen | Ersetzt die Pixelfigur mit Krone. |
+| **Wachturm** | `turm.png`, etwa 7 x 13, Feuerschale animiert | Steht rechts hinter Dorf oder Stadt. |
+| **Auftragszeichen** | Pergament, Sprechblase, je 2 Bilder | Ueber Ziel und Wanderer. |
+| **Diplomatie** | Siegel fuer Frieden und Tribut, Kriegsbanner | Im Menue neben jeder Fraktion. |
+| **Umgebungsklaenge** | Wind, Regen, Voegel, Grillen, Eule, Feuer, Dorf | Ersetzen die Synthese in `ambiente.ts`. |
 | **Wettersymbole** | 7 Symbole, etwa 16 x 16 | Sonne, Mond, Wolke, Regen, Gewitter, Schnee, Nebel im Schild. |
 | **Wuerfelknopf** | Knopfgrafik, Funken-Einzelbilder | Ersetzt CSS-Stoss und -Funken. |
 | **Lebensanzeige** | kleine Herzen oder Balken | Ersetzt die roten Kunstpixel ueber Verwundeten. |

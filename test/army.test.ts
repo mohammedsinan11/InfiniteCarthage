@@ -658,14 +658,15 @@ describe('Brandschatzen', () => {
 
       const brand = tick(game).find((e) => e.t === 'burn');
       if (!brand || brand.t !== 'burn') continue;
+      // Es brennt erst - ab brennt es spaeter, wenn niemand loescht (feuer.test.ts).
+      expect(s.braende.map((b) => b.key)).toContain(brand.key);
       if (brand.art === 'strasse') {
         strasse = true;
-        expect(Object.keys(s.roads)).toHaveLength(strassenVorher - 1);
-        expect(s.roads[brand.key]).toBeUndefined();
+        expect(Object.keys(s.roads)).toHaveLength(strassenVorher);
       } else {
         stadt = true;
         expect(brand.art).toBe('stadt');
-        expect(s.buildings[vertexKey(ecke)]!.type).toBe('settlement');
+        expect(s.buildings[vertexKey(ecke)]!.type).toBe('city');
       }
     }
     expect(strasse).toBe(true);

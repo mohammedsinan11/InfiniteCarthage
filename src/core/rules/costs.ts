@@ -26,6 +26,18 @@ export const COST_DEV: Cost = { ore: 1, wool: 1, grain: 1 };
  */
 export const COST_KNIGHT: Cost = { ore: 2, grain: 1 };
 
+/**
+ * Ein Wachturm an einem eigenen Dorf oder einer Stadt. Holz fuer das Geruest,
+ * Lehm fuer den Sockel, Erz fuer die Feuerschale oben.
+ */
+export const COST_TOWER: Cost = { lumber: 1, brick: 1, ore: 1 };
+
+/**
+ * Eine abgebrannte Strasse wieder aufbauen: nur Holz. Der Damm liegt noch, es
+ * fehlen die Bohlen - und wer gebrannt wurde, soll nicht doppelt zahlen.
+ */
+export const COST_REBUILD_ROAD: Cost = { lumber: 1 };
+
 export function canAfford(hand: Hand, cost: Cost): boolean {
   for (const r of RESOURCES) {
     const need = cost[r] ?? 0;

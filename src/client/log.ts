@@ -28,15 +28,34 @@ const DEV_NAME = {
   monopoly: 'Monopol',
 } as const;
 
-const BUILD_NAME = { road: 'Strasse', settlement: 'Siedlung', city: 'Stadt' } as const;
+const BUILD_NAME = { road: 'Strasse', settlement: 'Siedlung', city: 'Stadt', tower: 'Wachturm' } as const;
 
 const ART_NAME = {
   ritter: 'Ritter',
   raeuber: 'Raeuber',
   goblin: 'Goblin',
   wanderer: 'Wanderer',
+  held: 'Held',
   besatzung: 'Verteidiger',
 } as const;
+
+/** Was brennt, in Worten: "eine Strasse", "ein Dorf", "eine Stadt". */
+export const BRAND_WAS = { strasse: 'eine Strasse', dorf: 'ein Dorf', stadt: 'eine Stadt' } as const;
+
+const LOESCHER = {
+  karte: 'mit einer Karte',
+  ritter: 'von einem Ritter',
+  held: 'vom Helden',
+  regen: 'vom Regen',
+  verschont: 'knapp - das letzte Gebaeude bleibt stehen',
+} as const;
+
+/** Worum es in einem Auftrag geht. */
+export function auftragText(state: PublicState | null, art: 'lager' | 'ruine', fraktion: string | null): string {
+  return art === 'lager'
+    ? `Zerstoere das Lager ${fraktion ? `der ${fraktionName(state, fraktion)}` : ''}`.trim()
+    : 'Erkunde die alte Ruine';
+}
 
 export const resourceName = (r: Resource): string => RES_NAME[r];
 export const devName = (d: keyof typeof DEV_NAME): string => DEV_NAME[d];
@@ -134,11 +153,43 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
     case 'horde':
       return `Goblin-Horde greift an! ${fraktionName(state, e.fraktion)} schicken ${e.anzahl} Goblins.`;
     case 'burn':
+      return `${fraktionName(state, e.fraktion)} legen Feuer an ${BRAND_WAS[e.art]} von ${who(state, e.player)}.`;
+    case 'burnPrevented':
+      return `Ein Wachturm von ${who(state, e.player)} vertreibt Brandstifter (${fraktionName(state, e.fraktion)}).`;
+    case 'extinguished':
+      return `Feuer bei ${who(state, e.player)} geloescht, ${LOESCHER[e.durch]}.`;
+    case 'burnedDown':
       return e.art === 'strasse'
-        ? `${fraktionName(state, e.fraktion)} brennen eine Strasse von ${who(state, e.player)} ab.`
+        ? `Eine Strasse von ${who(state, e.player)} ist abgebrannt.`
         : e.art === 'dorf'
-          ? `${fraktionName(state, e.fraktion)} brennen ein Dorf von ${who(state, e.player)} nieder.`
-          : `${fraktionName(state, e.fraktion)} brennen eine Stadt von ${who(state, e.player)} zum Dorf herunter.`;
+          ? `Ein Dorf von ${who(state, e.player)} ist niedergebrannt.`
+          : `Eine Stadt von ${who(state, e.player)} ist zum Dorf heruntergebrannt.`;
+    case 'heroReady':
+      return e.zurueck ? `Der Held von ${who(state, e.player)} kehrt zurueck.` : `${who(state, e.player)} bekommt einen Helden.`;
+    case 'heroFell':
+      return `Der Held von ${who(state, e.player)} faellt. Er kehrt in Runde ${e.zurueck} zurueck.`;
+    case 'pact':
+      return e.art === 'frieden'
+        ? `${who(state, e.player)} schliesst Frieden mit ${fraktionName(state, e.fraktion)} bis Runde ${e.bis}.`
+        : `${who(state, e.player)} zahlt ${fraktionName(state, e.fraktion)} Tribut.`;
+    case 'war':
+      return e.grund === 'erklaert'
+        ? `${who(state, e.player)} erklaert ${fraktionName(state, e.fraktion)} den Krieg.`
+        : e.grund === 'abgelaufen'
+          ? `Der Frieden zwischen ${who(state, e.player)} und ${fraktionName(state, e.fraktion)} ist vorbei.`
+          : `${who(state, e.player)} kann den Tribut nicht zahlen - ${fraktionName(state, e.fraktion)} ziehen wieder in den Krieg.`;
+    case 'tribute':
+      return `${who(state, e.player)} zahlt ${fraktionName(state, e.fraktion)} Tribut: ${karten(e.count)}.`;
+    case 'questOffered':
+      return `Ein Wanderer bietet ${who(state, e.player)} einen Auftrag an: ${auftragText(state, e.art, e.fraktion)}.`;
+    case 'questAccepted':
+      return `${who(state, e.player)} nimmt einen Auftrag an.`;
+    case 'questDone':
+      return `${who(state, e.player)} erfuellt einen Auftrag - Beute: eine Kartenwahl.`;
+    case 'questFailed':
+      return e.grund === 'abgelaufen'
+        ? `Ein Auftrag von ${who(state, e.player)} ist abgelaufen.`
+        : `Ein Auftrag von ${who(state, e.player)} ist verloren - jemand kam zuvor.`;
     case 'ruin':
       switch (e.result) {
         case 'schatz':

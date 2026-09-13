@@ -41,8 +41,19 @@ import { istSpielerSeite, istKampf, kampfFelder, seiteVon, spielerAus } from '..
 import type { Seite } from '../../core/combat';
 import { fraktionById, istFraktion } from '../../core/factions';
 import { ruinAt } from '../../core/ruins';
-import { aufstellung, preloadUnitSprites, zeichneFigur, zeichneLeben, zeichneStrassen } from '../units';
+import {
+  aufstellung,
+  preloadUnitSprites,
+  zeichneFigur,
+  zeichneGebaeude,
+  zeichneLeben,
+  zeichneStrassen,
+} from '../units';
 import { Schwerter } from './Schwerter';
+import { AuftragsZeichen, Flammen } from './Marken';
+import { loeschFelder } from '../../core/rules/feuer';
+import type { Brand } from '../../core/state';
+import { BRAND_WAS } from '../log';
 import { MAX_LICHTER, WetterSchicht } from './WetterSchicht';
 import type { Licht } from './WetterSchicht';
 import type { Tageszeit, Wetter } from '../../core/zeit';
@@ -209,7 +220,9 @@ type Props = {
   tageszeit?: Tageszeit;
   wetter?: Wetter;
   /** Was auf freien Bauplaetzen als Vorschau steht - statt einer Marke. */
-  geisterBau?: 'dorf' | 'stadt' | null;
+  geisterBau?: 'dorf' | 'stadt' | 'turm' | null;
+  /** Klick auf ein eigenes Feuer: loeschen. Ohne diese Angabe sind Feuer nur zu sehen. */
+  onFeuer?: (key: string) => void;
   /**
    * Aufgesetzte Anzeigen - Handblatt, Wuerfelknopf, Overlays.
    *
@@ -229,6 +242,7 @@ const ART_NAME = {
   raeuber: ['Raeuber', 'Raeuber'],
   goblin: ['Goblin', 'Goblins'],
   wanderer: ['Wanderer', 'Wanderer'],
+  held: ['Held', 'Helden'],
 } as const;
 
 const VORHABEN = {
@@ -285,6 +299,7 @@ export function Board({
   tageszeit = 'tag',
   wetter = 'klar',
   geisterBau = null,
+  onFeuer,
   children,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
@@ -369,6 +384,21 @@ export function Board({
       return hs.reduce((n, h) => n + liftHex(h.q, h.r), 0) / hs.length;
     },
     [liftHex],
+  );
+
+  /** Wo ein Feuer auf der Karte steht, in Welteinheiten: Mitte der Strasse oder die Ecke. */
+  const brandPunkt = useCallback(
+    (b: Brand): { x: number; y: number } => {
+      if (b.art === 'strasse') {
+        const kante = parseEdgeKey(b.key);
+        const [a, c] = edgeEndpoints(kante).map((v) => vertexToPixel(v, LAYOUT));
+        return { x: (a!.x + c!.x) / 2, y: (a!.y + c!.y) / 2 - liftEdge(kante) + 2 * SCALE };
+      }
+      const ecke = parseVertexKey(b.key);
+      const p = vertexToPixel(ecke, LAYOUT);
+      return { x: p.x, y: p.y - liftVertex(ecke) + SCALE };
+    },
+    [liftEdge, liftVertex],
   );
 
   /** Auf Wunsch zu einem Feld fahren - etwa wenn im Menue ein Ritter gezeigt wird. */
@@ -480,13 +510,23 @@ export function Board({
         continue;
       }
       const leute = besatzung.get(k)?.filter((u) => !nebel || (du !== null && u.owner === du));
-      if (leute && leute.length > 0) out.push({ x: p.x, y: p.y - 4 * f, r: 22 * f, waerme: 1 });
+      if (leute && leute.length > 0) {
+        // Der Held traegt das hellste Licht der Nacht.
+        const held = leute.some((u) => u.kind === 'held');
+        out.push({ x: p.x, y: p.y - 4 * f, r: (held ? 48 : 22) * f, waerme: held ? 1.15 : 1 });
+      }
     }
     for (const [vk, b] of Object.entries(state.buildings)) {
       const ecke = parseVertexKey(vk);
       const v = vertexToPixel(ecke, LAYOUT);
       const p = geraet(v.x, v.y - liftVertex(ecke));
-      out.push({ x: p.x, y: p.y, r: (b.type === 'city' ? 34 : 24) * f, waerme: 0.8 });
+      // Der Wachturm hat oben eine Feuerschale - er leuchtet weit.
+      out.push({ x: p.x, y: p.y, r: (b.turm ? 44 : b.type === 'city' ? 34 : 24) * f, waerme: b.turm ? 1 : 0.8 });
+    }
+    for (const b of state.braende) {
+      const w = brandPunkt(b);
+      const p = geraet(w.x, w.y);
+      out.push({ x: p.x, y: p.y - 3 * f, r: 30 * f, waerme: 1.3 });
     }
     const bw = size.w * DPR;
     const bh = size.h * DPR;
@@ -494,7 +534,7 @@ export function Board({
       .filter((l) => l.x > -l.r && l.y > -l.r && l.x < bw + l.r && l.y < bh + l.r)
       .sort((a, b) => Math.hypot(a.x - bw / 2, a.y - bh / 2) - Math.hypot(b.x - bw / 2, b.y - bh / 2))
       .slice(0, MAX_LICHTER);
-  }, [tageszeit, scale, view, visible, sicht, liftHex, liftVertex, state, besatzung, du, size]);
+  }, [tageszeit, scale, view, visible, sicht, liftHex, liftVertex, state, besatzung, du, size, brandPunkt]);
 
   /** Wo gekaempft wird - dieselbe Frage, nach der die Regel kaempfen laesst. */
   const kampf = useMemo(() => kampfFelder(state), [state]);
@@ -529,7 +569,16 @@ export function Board({
       for (const gruppe of gruppen.values()) {
         zeilen.push({ farbe: farbeSeite(seiteVon(gruppe[0]!)), text: einheitenText(state, du, gruppe) });
       }
-      if (istKampf(kampf.get(hover) ?? [])) zeilen.push({ text: 'Hier wird gekaempft', kampf: true });
+      if (istKampf(kampf.get(hover) ?? [], state)) zeilen.push({ text: 'Hier wird gekaempft', kampf: true });
+    }
+    for (const b of state.braende) {
+      if (loeschFelder(b).some((h) => h.q === q && h.r === r)) {
+        zeilen.push({ text: `Hier brennt ${BRAND_WAS[b.art]}`, kampf: true });
+      }
+    }
+    for (const a of state.auftraege) {
+      if (a.player !== du || a.status !== 'angenommen' || a.q !== q || a.r !== r) continue;
+      zeilen.push({ text: a.art === 'lager' ? 'Dein Auftrag: dieses Lager zerstoeren' : 'Dein Auftrag: diese Ruine erkunden' });
     }
     return zeilen.length > 0 ? zeilen : null;
   }, [hover, state, sicht, du, kampf, farbeSeite]);
@@ -683,6 +732,20 @@ export function Board({
     });
     const spielerFarbe = (id: string) =>
       playerColor(state.players.find((pl) => pl.id === id)?.color ?? 0);
+    // Asche abgebrannter Strassen zuerst - was darauf neu gebaut ist, liegt obenauf.
+    zeichneStrassen(
+      ctx,
+      Object.entries(state.asche)
+        .filter(([ek]) => state.roads[ek] === undefined)
+        .map(([ek, owner]) => {
+          const [a, b] = edgeEndpoints(parseEdgeKey(ek)).map((v) => {
+            const p = vertexToPixel(v, LAYOUT);
+            return geraet(p.x, p.y - liftVertex(v));
+          });
+          return { a: a!, b: b!, farbe: spielerFarbe(owner), verbrannt: true };
+        }),
+      f,
+    );
     zeichneStrassen(
       ctx,
       Object.entries(state.roads).map(([ek, owner]) => {
@@ -703,7 +766,7 @@ export function Board({
       // Von hinten nach vorn, damit das vordere Haus das hintere ueberdeckt.
       .sort((u, w) => u.y - w.y)
       .forEach(({ x, y, b }) =>
-        zeichneFigur(ctx, b.type === 'city' ? 'stadt' : 'dorf', x, y + 4 * f, f, spielerFarbe(b.owner)),
+        zeichneGebaeude(ctx, b.type === 'city' ? 'stadt' : 'dorf', x, y, f, spielerFarbe(b.owner), b.turm === true),
       );
 
     /*
@@ -722,7 +785,7 @@ export function Board({
         .sort((u, w) => u.y - w.y);
       for (const pl of plaetze) {
         ctx.globalAlpha = pl.vk === eckeHover ? 0.95 : 0.42;
-        zeichneFigur(ctx, geisterBau, pl.x, pl.y + 4 * f, f, eigeneFarbe);
+        zeichneGebaeude(ctx, geisterBau, pl.x, pl.y, f, eigeneFarbe);
       }
       ctx.globalAlpha = 1;
     }
@@ -1087,7 +1150,7 @@ export function Board({
     return flights.flatMap((f) => {
       const parts = f.hex.split(':').map(Number);
       const c = hexToPixel(parts[0]!, parts[1]!, LAYOUT);
-      const karte = el.querySelector(`.hand-card[data-res="${f.resource}"]`);
+      const karte = el.querySelector(`.hand [data-res="${f.resource}"]`);
       if (!karte) return [];
       const k = karte.getBoundingClientRect();
       return [
@@ -1317,6 +1380,70 @@ export function Board({
             />
           );
         })}
+
+        {/*
+          Feuer: Flammen an Strasse oder Haus. Ein eigenes Feuer laesst sich
+          anklicken und loeschen - so muss man nicht erst ins Menue.
+        */}
+        {state.braende.map((b) => {
+          const p = brandPunkt(b);
+          const eigen = du !== null && b.owner === du;
+          return (
+            <Flammen
+              key={'feuer' + b.key}
+              x={p.x}
+              y={p.y}
+              k={SCALE}
+              titel={
+                eigen && onFeuer
+                  ? `Es brennt ${BRAND_WAS[b.art]} - klicken zum Loeschen (eine Karte)`
+                  : `Es brennt ${BRAND_WAS[b.art]}`
+              }
+              onLoeschen={
+                eigen && onFeuer
+                  ? () => {
+                      if (!moved.current) onFeuer(b.key);
+                    }
+                  : undefined
+              }
+            />
+          );
+        })}
+
+        {/*
+          Auftraege: ein Pergament ueber dem Ziel eines angenommenen Auftrags,
+          eine Sprechblase ueber dem Wanderer, der dir etwas anbietet.
+        */}
+        {state.auftraege
+          .filter((a) => a.player === du && a.status !== 'abgelehnt')
+          .map((a) => {
+            if (a.status === 'angenommen') {
+              const c = hexToPixel(a.q, a.r, LAYOUT);
+              return (
+                <AuftragsZeichen
+                  key={'auftrag' + a.id}
+                  x={c.x}
+                  y={c.y - liftHex(a.q, a.r) - LAYOUT.h * 0.5}
+                  k={SCALE}
+                  art="ziel"
+                  titel={a.art === 'lager' ? 'Auftrag: dieses Lager zerstoeren' : 'Auftrag: diese Ruine erkunden'}
+                />
+              );
+            }
+            const w = state.units.find((u) => u.id === a.wanderer);
+            if (!w || (sicht !== null && !sicht.has(hexKey(w.q, w.r)))) return null;
+            const c = hexToPixel(w.q, w.r, LAYOUT);
+            return (
+              <AuftragsZeichen
+                key={'angebot' + a.id}
+                x={c.x + 8 * SCALE}
+                y={c.y - liftHex(w.q, w.r) - LAYOUT.h * 0.3}
+                k={SCALE}
+                art="angebot"
+                titel="Dieser Wanderer bietet dir einen Auftrag an - siehe Helden & Auftraege"
+              />
+            );
+          })}
 
         {/* Der ausgewaehlte Ritter bekommt einen Ring. */}
         {auswahl !== null &&

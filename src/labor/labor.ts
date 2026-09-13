@@ -10,6 +10,7 @@
  *   /labor.html?art=relief       Relief: flach, sanft, heute, steil
  *   /labor.html?art=fluesse      Fluesse als Entwurf - nicht im Spiel
  *   /labor.html?art=leistung     Messung: Erzeugen und Zeichnen grosser Karten
+ *   /labor.html?art=gebaeude     Dorf und Stadt: wie sie auf den Kacheln liegen
  *
  * Gezeichnet wird wie auf dem Brett (board/Board.tsx): Kacheln zeilenweise von
  * hinten nach vorn, jede auf ihrer Hoehe, im selben Kunstpixelraster.
@@ -19,13 +20,28 @@ import { createWorld, ensureGenerated } from '../core/world';
 import type { World } from '../core/world';
 import { fieldsAt, findPlayableSeed } from '../core/worldgen';
 import { reliefLimitedAt } from '../core/relief';
-import { hexDistance, hexKey, hexToPixel, neighbors } from '../core/coords';
+import {
+  edgeAdjacentHexes,
+  edgeEndpoints,
+  hexDistance,
+  hexEdges,
+  hexKey,
+  hexToPixel,
+  hexesInRange,
+  neighbors,
+  parseVertexKey,
+  vertexAdjacentHexes,
+  vertexKey,
+  vertexToPixel,
+} from '../core/coords';
+import type { Vertex } from '../core/coords';
 import type { Hex, Layout } from '../core/coords';
 import { hash3i } from '../core/hash';
 import { nestAt } from '../core/raiders';
 import { ruinAt } from '../core/ruins';
 import { HEX_CX, HEX_CY, HEX_H, HEX_W, IMG_H, IMG_W, preloadTiles, tileImage, tileUrl } from '../client/tiles';
-import { preloadUnitSprites, zeichneFigur } from '../client/units';
+import { preloadUnitSprites, zeichneFigur, zeichneStrassen } from '../client/units';
+import type { FigurArt } from '../client/units';
 
 /** Wie auf dem Brett: Welteinheiten je Kunstpixel. */
 const SCALE = 2;
@@ -355,6 +371,146 @@ async function leistung(root: HTMLElement) {
   document.title = 'fertig';
 }
 
+// --- Gebaeude ------------------------------------------------------------------
+
+type GebaeudeStil = {
+  titel: string;
+  text: string;
+  klein: boolean;
+  /** zuletzt: nach allen Kacheln. dahinter: vor der vorderen Kachel. davor: nach ihr. */
+  reihe: 'zuletzt' | 'dahinter' | 'davor';
+  lichtung: boolean;
+  /** Wie viele Kunstpixel unter der Ecke die Fuesse stehen. */
+  tiefer: number;
+};
+
+async function gebaeude(root: HTMLElement, seed: number) {
+  const reihe = kopf(
+    root,
+    'Dorf und Stadt: wie sie auf den Kacheln liegen',
+    'Zwei Ausschnitte - offenes Land und Wald - in vier Arten. Die Stadt traegt einen Wachturm, zwei Strassen fuehren zu den Doerfern. Kunstpixel der Kacheln, vierfach vergroessert (im Spiel beim Start: zweifach).',
+  );
+  const w = welt(seed, 12);
+  const terrainBei = (q: number, r: number) => w.tiles.get(hexKey(q, r))?.terrain;
+  const frei = (q: number, r: number) => {
+    const t = terrainBei(q, r);
+    return t !== undefined && t !== 'water' && !nestAt(seed, q, r) && !ruinAt(seed, q, r);
+  };
+  const waelder = (h: { q: number; r: number }) =>
+    hexesInRange(h, 2).filter((x) => terrainBei(x.q, x.r) === 'forest').length;
+  const kandidaten = [...w.tiles.values()].filter(
+    (t) => hexDistance(t, ORIGIN) <= 9 && hexesInRange(t, 2).every((x) => frei(x.q, x.r)),
+  );
+  const offen = [...kandidaten].sort((a, b) => waelder(a) - waelder(b))[0] ?? { q: 0, r: 0 };
+  const wald = [...kandidaten].sort((a, b) => waelder(b) - waelder(a))[0] ?? { q: 0, r: 0 };
+
+  const stile: GebaeudeStil[] = [
+    { titel: 'Heute', text: 'grosses Haus ueber der Ecke, nach allen Kacheln - ragt ueber die Nachbarfelder', klein: false, reihe: 'zuletzt', lichtung: false, tiefer: 4 },
+    { titel: 'A: Kompakt', text: 'dasselbe Haus, kleiner, ueber der Ecke', klein: true, reihe: 'zuletzt', lichtung: false, tiefer: 3 },
+    { titel: 'B: Kompakt auf Lichtung', text: 'kompakt, steht auf einem Fleck Erde - geerdet, nichts verdeckt es', klein: true, reihe: 'zuletzt', lichtung: true, tiefer: 3 },
+    { titel: 'C: Im Feld', text: 'kompakt auf der vorderen Kachel, knapp unter der Ecke - Baeume weiter vorn stehen davor', klein: true, reihe: 'davor', lichtung: true, tiefer: 7 },
+  ];
+
+  for (const [name, mitte] of [['Offenes Land', offen], ['Wald', wald]] as const) {
+    for (const stil of stile) reihe.append(gebaeudeBild(seed, w, mitte, stil, name));
+  }
+}
+
+function gebaeudeBild(
+  seed: number,
+  w: World,
+  mitte: { q: number; r: number },
+  stil: GebaeudeStil,
+  szene: string,
+): HTMLElement {
+  const kacheln = [...w.tiles.values()]
+    .filter((t) => hexDistance(t, mitte) <= 2)
+    .sort((a, b) => a.r - b.r || a.q - b.q);
+  const ecke = (q: number, r: number, d: 'N' | 'S'): Vertex => parseVertexKey(vertexKey({ q, r, d }));
+  const bauten: { v: Vertex; art: 'dorf' | 'stadt'; turm: boolean }[] = [
+    { v: ecke(mitte.q, mitte.r, 'N'), art: 'dorf', turm: false },
+    { v: ecke(mitte.q + 1, mitte.r, 'S'), art: 'stadt', turm: true },
+    { v: ecke(mitte.q - 1, mitte.r + 1, 'S'), art: 'dorf', turm: false },
+  ];
+  const kanten = hexEdges(mitte.q, mitte.r).filter((e) => {
+    const [a, b] = edgeEndpoints(e).map(vertexKey);
+    return bauten.some((x) => vertexKey(x.v) === a || vertexKey(x.v) === b);
+  });
+  const farbe = '#3a7ac2';
+
+  const dpr = window.devicePixelRatio || 1;
+  const kunst = Math.round(4 * dpr);
+  const k = kunst / SCALE;
+  const lift = (q: number, r: number) => liftVon(seed, q, r, 1.5);
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const t of kacheln) {
+    const p = hexToPixel(t.q, t.r, LAYOUT);
+    minX = Math.min(minX, p.x - IMG.dx);
+    maxX = Math.max(maxX, p.x - IMG.dx + IMG.w);
+    minY = Math.min(minY, p.y - IMG.dy - lift(t.q, t.r) - 20);
+    maxY = Math.max(maxY, p.y - IMG.dy - lift(t.q, t.r) + IMG.h);
+  }
+  const geraet = (x: number, y: number) => ({ x: Math.round((x - minX) * k), y: Math.round((y - minY) * k) });
+  const mittelLift = (hs: { q: number; r: number }[]) => hs.reduce((n, h) => n + lift(h.q, h.r), 0) / hs.length;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.ceil((maxX - minX) * k);
+  canvas.height = Math.ceil((maxY - minY) * k);
+  canvas.style.width = `${canvas.width / dpr}px`;
+  canvas.style.height = `${canvas.height / dpr}px`;
+  const ctx = canvas.getContext('2d')!;
+  ctx.imageSmoothingEnabled = false;
+
+  const vorn = (hs: { r: number }[]) => Math.max(...hs.map((h) => h.r));
+  const reiheVon = (hs: { r: number }[]) =>
+    stil.reihe === 'zuletzt' ? Infinity : stil.reihe === 'dahinter' ? vorn(hs) - 1 : vorn(hs);
+
+  const strasse = (e: (typeof kanten)[number]) => {
+    const [a, b] = edgeEndpoints(e).map((v) => {
+      const p = vertexToPixel(v, LAYOUT);
+      return geraet(p.x, p.y - mittelLift(vertexAdjacentHexes(v)));
+    });
+    zeichneStrassen(ctx, [{ a: a!, b: b!, farbe }], kunst);
+  };
+  const bau = (b: (typeof bauten)[number]) => {
+    const hs = vertexAdjacentHexes(b.v);
+    const p = vertexToPixel(b.v, LAYOUT);
+    const vordere = hs.filter((h) => h.r === vorn(hs));
+    const hoch = stil.reihe === 'davor' ? mittelLift(vordere) : mittelLift(hs);
+    const d = geraet(p.x, p.y - hoch);
+    const fy = d.y + stil.tiefer * kunst;
+    if (stil.lichtung) zeichneFigur(ctx, 'lichtung', d.x, fy + kunst, kunst);
+    const art: FigurArt = stil.klein ? (b.art === 'dorf' ? 'dorfKlein' : 'stadtKlein') : b.art;
+    if (b.turm) zeichneFigur(ctx, 'turm', d.x + (stil.klein ? 8 : 11) * kunst, fy - 2 * kunst, kunst, farbe);
+    zeichneFigur(ctx, art, d.x, fy, kunst, farbe);
+  };
+
+  const zeilen = [...new Set(kacheln.map((t) => t.r))].sort((a, b) => a - b);
+  for (const zr of zeilen) {
+    for (const t of kacheln.filter((x) => x.r === zr)) {
+      const url = tileUrl(seed, t.terrain, t.q, t.r);
+      const img = url ? tileImage(url) : undefined;
+      if (!img) continue;
+      const p = hexToPixel(t.q, t.r, LAYOUT);
+      const o = geraet(p.x - IMG.dx, p.y - IMG.dy - lift(t.q, t.r));
+      ctx.drawImage(img, o.x, o.y, Math.round(IMG.w * k), Math.round(IMG.h * k));
+    }
+    for (const e of kanten) if (reiheVon(edgeAdjacentHexes(e)) === zr) strasse(e);
+    for (const b of bauten) if (reiheVon(vertexAdjacentHexes(b.v)) === zr) bau(b);
+  }
+  for (const e of kanten) if (reiheVon(edgeAdjacentHexes(e)) === Infinity) strasse(e);
+  for (const b of [...bauten].sort((x, y) => vertexToPixel(x.v, LAYOUT).y - vertexToPixel(y.v, LAYOUT).y)) {
+    if (reiheVon(vertexAdjacentHexes(b.v)) === Infinity) bau(b);
+  }
+
+  const fig = document.createElement('figure');
+  const cap = document.createElement('figcaption');
+  cap.innerHTML = `<b>${szene} · ${stil.titel}</b><br>${stil.text}`;
+  cap.style.maxWidth = `${canvas.width / dpr}px`;
+  fig.append(cap, canvas);
+  return fig;
+}
+
 async function los() {
   const root = document.getElementById('labor')!;
   const params = new URLSearchParams(location.search);
@@ -364,6 +520,7 @@ async function los() {
   if (art === 'relief') await relief(root, seed);
   else if (art === 'fluesse') await fluesse(root);
   else if (art === 'leistung') await leistung(root);
+  else if (art === 'gebaeude') await gebaeude(root, seed);
   else await aufdeckung(root, seed);
   document.body.dataset.fertig = '1';
   void hexDistance;

@@ -14,21 +14,34 @@ import { handSize, playerById } from '../state';
 import type { GameState, Hand, PlayerId } from '../state';
 import type { BoardView } from './placement';
 import { modifiersOf } from '../cards/effects';
+import { sturm, wetterOf } from '../zeit';
 
 export const DEFAULT_RATIO = 4;
 
+/** Sind die Haefen gerade geschlossen? Bei Sturm (core/zeit.ts). */
+export function haefenZu(state: { worldSeed?: number; turn?: number }): boolean {
+  return state.worldSeed !== undefined && state.turn !== undefined && sturm(wetterOf(state.worldSeed, state.turn));
+}
+
 /**
  * Wie viele Karten dieser Spieler fuer eine Karte des gewuenschten Rohstoffs
- * hinlegen muss: 2 mit passendem 2:1-Hafen, 3 mit 3:1-Hafen, sonst 4.
+ * hinlegen muss: 2 mit passendem 2:1-Hafen, 3 mit 3:1-Hafen, sonst 4. Bei
+ * Sturm laeuft kein Schiff aus - dann gelten die Haefen nicht.
  */
 export function tradeRatio(
-  state: BoardView & { players?: ReadonlyArray<{ id: PlayerId; cards: string[] }> },
+  state: BoardView & {
+    players?: ReadonlyArray<{ id: PlayerId; cards: string[] }>;
+    worldSeed?: number;
+    turn?: number;
+  },
   world: World,
   player: PlayerId,
   give: Resource,
 ): number {
   let ratio = DEFAULT_RATIO;
+  const zu = haefenZu(state);
   for (const [vk, b] of Object.entries(state.buildings)) {
+    if (zu) break;
     if (b.owner !== player) continue;
     const port = portAt(world, vk);
     if (port === undefined) continue;

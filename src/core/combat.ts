@@ -12,7 +12,7 @@
 
 import { garrisonOf, isNestActive, nestFraktionOf } from './units';
 import type { ArmyView } from './units';
-import type { PlayerId, UnitState } from './state';
+import type { Abkommen, PlayerId, UnitState } from './state';
 
 export type Seite = string;
 
@@ -30,18 +30,44 @@ export function seiteVon(u: Pick<UnitState, 'kind' | 'owner' | 'fraktion'>): Sei
   return u.fraktion ?? NEUTRAL;
 }
 
+/** Was die Feindschaft vom Spielstand braucht: die Abkommen. */
+export type PaktSicht = { abkommen: readonly Abkommen[] };
+
+/** Das Abkommen zwischen einem Spieler und einer Fraktion, falls eines gilt. */
+export function abkommenVon(
+  view: PaktSicht,
+  player: PlayerId,
+  fraktion: string,
+): Abkommen | undefined {
+  return view.abkommen.find((a) => a.player === player && a.fraktion === fraktion);
+}
+
 /**
  * Sind zwei Seiten einander feind?
  *
- * Vorerst fest: jede Fraktion gegen jede andere und gegen alle Spieler. Spieler
- * untereinander nicht - dafuer gibt es noch keine Regeln. Hier soll spaeter die
- * Diplomatie ansetzen; alle Kampfregeln fragen nur diese eine Funktion.
+ * Jede Fraktion gegen jede andere und gegen alle Spieler; Spieler untereinander
+ * nicht, Wanderer mit niemandem. Hat ein Spieler mit einer Fraktion Frieden
+ * oder zahlt Tribut (rules/diplomatie.ts), sind beide einander nicht feind.
+ * Alle Kampfregeln fragen nur diese eine Funktion - ohne Spielstand (view)
+ * gilt der Krieg, etwa fuer Tests der reinen Regel.
  */
-export function feindlich(a: Seite, b: Seite): boolean {
+export function feindlich(a: Seite, b: Seite, view?: PaktSicht): boolean {
   if (a === b || a === NEUTRAL || b === NEUTRAL) return false;
-  if (istSpielerSeite(a) && istSpielerSeite(b)) return false;
+  const sa = istSpielerSeite(a);
+  const sb = istSpielerSeite(b);
+  if (sa && sb) return false;
+  if (view && sa !== sb) {
+    const [spieler, fraktion] = sa ? [spielerAus(a), b] : [spielerAus(b), a];
+    if (abkommenVon(view, spieler, fraktion)) return false;
+  }
   return true;
 }
+
+/**
+ * Wer mit einem Helden auf einem Feld steht, trifft leichter: +1 fuer die Ritter
+ * seines Spielers (rules/army.ts, schlacht).
+ */
+export const ANFUEHRUNG = 1;
 
 /** Ab dieser Summe aus Wurf, Angriff und Aufschlag sitzt ein Treffer. */
 export const TRIFFT_AB = 6;
@@ -78,10 +104,10 @@ export function seitenAuf(view: ArmyView, q: number, r: number): Seite[] {
 }
 
 /** Stehen unter diesen Seiten Feinde? */
-export function istKampf(seiten: readonly Seite[]): boolean {
+export function istKampf(seiten: readonly Seite[], view?: PaktSicht): boolean {
   for (let i = 0; i < seiten.length; i++) {
     for (let j = i + 1; j < seiten.length; j++) {
-      if (feindlich(seiten[i]!, seiten[j]!)) return true;
+      if (feindlich(seiten[i]!, seiten[j]!, view)) return true;
     }
   }
   return false;
@@ -91,7 +117,7 @@ export function istKampf(seiten: readonly Seite[]): boolean {
 export function imKampf(view: ArmyView, u: UnitState): boolean {
   const eigene = seiteVon(u);
   if (eigene === NEUTRAL) return false;
-  return seitenAuf(view, u.q, u.r).some((s) => feindlich(eigene, s));
+  return seitenAuf(view, u.q, u.r).some((s) => feindlich(eigene, s, view));
 }
 
 /** Alle Felder, auf denen gekaempft wird: Feldschluessel -> kaempfende Seiten. */
@@ -103,7 +129,7 @@ export function kampfFelder(view: ArmyView): Map<string, Seite[]> {
     if (gesehen.has(k)) continue;
     gesehen.add(k);
     const seiten = seitenAuf(view, u.q, u.r);
-    if (istKampf(seiten)) out.set(k, seiten);
+    if (istKampf(seiten, view)) out.set(k, seiten);
   }
   return out;
 }

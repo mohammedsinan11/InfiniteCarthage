@@ -1936,9 +1936,10 @@ em.off {
 .unten > * {
   pointer-events: auto;
 }
-/* Die Hand sitzt jetzt im Block, nicht mehr fuer sich in der Ecke. */
+/* Die Hand sitzt jetzt im Block, nicht mehr fuer sich in der Ecke. Relativ,
+   damit der Knopf zum Einklappen an ihrer Ecke sitzt und nicht am Block. */
 .unten .hand {
-  position: static;
+  position: relative;
 }
 
 .dock {
@@ -2556,4 +2557,175 @@ em.off {
   font-size: 11px;
   line-height: 1.45;
   color: var(--muted);
+}
+
+/* --- Hand eingeklappt ------------------------------------------------------ */
+
+.hand .hand-zu {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  z-index: 2;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+}
+.hand.hand-schmal {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 8px;
+  cursor: pointer;
+  background: rgba(18, 14, 9, 0.82);
+}
+.hand-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--pixel);
+  font-size: 11px;
+  color: #f2e7d0;
+}
+.hand-mini b {
+  font-weight: 400;
+  min-width: 10px;
+}
+.hand-mini.leer {
+  opacity: 0.45;
+}
+.hand-mini.zugewinn b {
+  color: var(--accent);
+}
+
+/* --- Menue: Feuer, Diplomatie, Held, Auftraege ------------------------------ */
+
+.menu h3.gefahr {
+  color: var(--danger);
+}
+.menu-braende {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.menu-braende li {
+  padding: 5px 6px;
+  font-size: 11px;
+  background: rgba(120, 40, 10, 0.25);
+  border: 1px solid #8e3a22;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.menu-fraktion-haltung.friedlich {
+  color: #7fc9a8;
+}
+.menu-fraktion-knoepfe {
+  grid-column: 2 / 4;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.menu-fraktion-knoepfe button {
+  font-size: 8px;
+  padding: 3px 6px;
+}
+.menu-ritter li.held {
+  border-color: var(--accent);
+}
+.menu-auftraege li.auftrag-angebot {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(217, 164, 65, 0.3);
+}
+.menu-welt li.welt-fire {
+  border-left-color: #e8641e;
+  color: #f5b58a;
+}
+.menu-welt li.welt-hero,
+.menu-welt li.welt-quest {
+  border-left-color: var(--accent);
+  color: #f2dca8;
+}
+.menu-welt li.welt-pact {
+  border-left-color: #7fc9a8;
+  color: #bfe3d2;
+}
+.hud-wirkung {
+  margin-left: 5px;
+  padding: 0 4px;
+  color: #21170a;
+  background: var(--accent);
+}
+
+/* --- Feuer und Auftragszeichen auf der Karte. PLATZHALTER (ASSETS.md) ------- */
+
+.flammen-b {
+  animation: flammen-wechsel 0.36s steps(1, end) infinite;
+}
+.flammen-a {
+  animation: flammen-wechsel 0.36s steps(1, end) infinite reverse;
+}
+@keyframes flammen-wechsel {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+.flammen.loeschbar {
+  cursor: pointer;
+}
+.auftrag-zeichen {
+  animation: zeichen-wippen 1.2s steps(2, end) infinite;
+}
+@keyframes zeichen-wippen {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flammen-a,
+  .flammen-b,
+  .auftrag-zeichen {
+    animation: none;
+  }
+  .flammen-b {
+    opacity: 0;
+  }
+}
+
+/* --- Diagnose (?diagnose=1) ---------------------------------------------- */
+
+.diagnose {
+  position: absolute;
+  top: 48px;
+  right: 50%;
+  transform: translateX(50%);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 90vw;
+  padding: 6px 9px;
+  font-size: 11px;
+  color: #d8f5d0;
+  background: rgba(0, 0, 0, 0.82);
+  border: 1px solid #4f9e5c;
+  pointer-events: none;
+}
+
+/* Handy hochkant: die Wurfanzeige lag auf "verlassen". Den Wurf zeigen ohnehin
+   die Wuerfel selbst. */
+@media (max-width: 600px) {
+  .hud-roll {
+    display: none;
+  }
 }

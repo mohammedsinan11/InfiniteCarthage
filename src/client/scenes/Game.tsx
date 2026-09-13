@@ -18,7 +18,10 @@ import {
   TAGESZEIT_NAME,
   WETTER_ARTEN,
   WETTER_NAME,
-  istNacht,
+  WETTER_WIRKUNG,
+  rundenBisTageszeit,
+  rundenBisWetter,
+  sichtLage,
   tageszeitOf,
   wetterOf,
 } from '../../core/zeit';
@@ -35,14 +38,22 @@ import { CardDraft } from '../ui/CardDraft';
 import { SideMenu } from '../ui/SideMenu';
 import type { FraktionsZeile } from '../ui/SideMenu';
 import { isNestActive, nestFraktionOf, sightOf } from '../../core/units';
-import { kampfFelder } from '../../core/combat';
+import { abkommenVon, kampfFelder } from '../../core/combat';
 import { fraktionById } from '../../core/factions';
 import { fraktionColor } from '../theme';
 import { hexDistance, parseVertexKey, vertexAdjacentHexes } from '../../core/coords';
-import { initAudio, playBuild, playGain, playWurfStart } from '../audio';
+import { initAudio, playBuild, playGain, playTurm, playWurfStart } from '../audio';
+import { setAmbiente } from '../ambiente';
+import { seasonOf } from '../../core/season';
+import { RESOURCES } from '../../core/types';
+import type { Resource } from '../../core/types';
+import { COST_ROAD, canAfford } from '../../core/rules/costs';
+import { FRIEDEN_PREIS, TRIBUT_KARTEN, nimmtFrieden } from '../../core/rules/diplomatie';
+import { brennt } from '../../core/rules/feuer';
+import { Diagnose, diagnoseAn } from '../ui/Diagnose';
 
-/** Nach so vielen Millisekunden wuerfelt der Knopf von selbst. */
-const AUTO_WURF_MS = 5000;
+/** Nach so vielen Millisekunden wuerfelt der Knopf von selbst. Anfangs fuenf - zu knapp zum Umsehen. */
+const AUTO_WURF_MS = 8000;
 const AUTO_WURF_KEY = 'infinitecarthage.autowurf';
 
 /**
@@ -121,7 +132,7 @@ export function Game() {
    * Platz zu waehlen.
    */
   const sicht = useMemo(
-    () => (you && state.phase.t !== 'setup' ? sightOf(state, you, istNacht(state.turn)) : null),
+    () => (you && state.phase.t !== 'setup' ? sightOf(state, you, sichtLage(state.worldSeed, state.turn)) : null),
     [state, you],
   );
 
@@ -129,18 +140,41 @@ export function Game() {
   const vorschau = useMemo(() => wetterVorschau(), []);
   const tageszeit = vorschau.zeit ?? tageszeitOf(state.turn);
   const wetter = vorschau.wetter ?? wetterOf(state.worldSeed, state.turn);
+  /** Das Wetter, nach dem die Regeln gehen - die Vorschau aendert nur die Anzeige. */
+  const echtesWetter = wetterOf(state.worldSeed, state.turn);
+
+  // Umgebungsgeraeusche folgen Tageszeit, Wetter und Feuer (ambiente.ts).
+  const feuerZahl = state.braende.length;
+  const winter = seasonOf(state.turn) === 'winter';
+  useEffect(() => {
+    setAmbiente({ tageszeit, wetter, feuer: feuerZahl, winter, aktiv: true });
+  }, [tageszeit, wetter, feuerZahl, winter]);
+  useEffect(
+    () => () => setAmbiente({ tageszeit: 'tag', wetter: 'klar', feuer: 0, winter: false, aktiv: false }),
+    [],
+  );
 
   /** Meine Ritter - und welcher gerade auf sein Ziel wartet. */
   const meineRitter = useMemo(
     () => state.units.filter((u) => u.kind === 'ritter' && u.owner === you),
     [state.units, you],
   );
+  const meinHeld = useMemo(
+    () => state.units.find((u) => u.kind === 'held' && u.owner === you) ?? null,
+    [state.units, you],
+  );
+  /** Alles, was Befehle annimmt: Ritter und der Held. */
+  const meineEinheiten = useMemo(
+    () => (meinHeld ? [meinHeld, ...meineRitter] : meineRitter),
+    [meinHeld, meineRitter],
+  );
   const [befehl, setBefehl] = useState<number | null>(null);
   const [fokus, setFokus] = useState<{ q: number; r: number; n: number } | null>(null);
-  // Faellt der Ritter, verfaellt auch der Befehl.
+  const zeigeFeld = (q: number, r: number) => setFokus((alt) => ({ q, r, n: (alt?.n ?? 0) + 1 }));
+  // Faellt die Einheit, verfaellt auch der Befehl.
   useEffect(() => {
-    if (befehl !== null && !meineRitter.some((u) => u.id === befehl)) setBefehl(null);
-  }, [befehl, meineRitter]);
+    if (befehl !== null && !meineEinheiten.some((u) => u.id === befehl)) setBefehl(null);
+  }, [befehl, meineEinheiten]);
   // Esc bricht die Zielwahl ab.
   useEffect(() => {
     if (befehl === null) return;
@@ -187,7 +221,17 @@ export function Game() {
       let zeile = m.get(id);
       if (!zeile) {
         const f = fraktionById(state.worldSeed, id);
-        zeile = { id, name: f.name, art: f.art, farbe: fraktionColor(f.farbe), lager: 0, unterwegs: 0, naechster: null };
+        zeile = {
+          id,
+          name: f.name,
+          art: f.art,
+          farbe: fraktionColor(f.farbe),
+          lager: 0,
+          unterwegs: 0,
+          naechster: null,
+          abkommen: you ? (abkommenVon(state, you, id) ?? null) : null,
+          nimmtFrieden: nimmtFrieden(state.worldSeed, id),
+        };
         m.set(id, zeile);
       }
       zeile.lager += 1;
@@ -217,7 +261,20 @@ export function Game() {
       case 'roadBuilding':
         return { edges: legalRoadEdges(state, world, you) };
       case 'main':
-        if (mode === 'road') return { edges: legalRoadEdges(state, world, you) };
+        if (mode === 'road') {
+          // Reicht es nur fuer den Wiederaufbau, stehen nur die eigenen Aschekanten zur Wahl.
+          const alle = legalRoadEdges(state, world, you);
+          return {
+            edges: hand && !canAfford(hand, COST_ROAD) ? alle.filter((ek) => state.asche[ek] === you) : alle,
+          };
+        }
+        if (mode === 'tower') {
+          return {
+            vertices: Object.entries(state.buildings)
+              .filter(([vk, b]) => b.owner === you && !b.turm && !brennt(state, vk))
+              .map(([vk]) => vk),
+          };
+        }
         if (mode === 'settlement') {
           return { vertices: legalSettlementVertices(state, world, you, { setup: false }) };
         }
@@ -226,7 +283,7 @@ export function Game() {
       default:
         return {};
     }
-  }, [state, world, you, isMine, phase, mode]);
+  }, [state, world, you, isMine, phase, mode, hand]);
 
   const onPick = (kind: 'vertex' | 'edge' | 'hex', key: string) => {
     if (!you) return;
@@ -244,7 +301,9 @@ export function Game() {
       if (mode === 'road' && kind === 'edge') act({ t: 'buildRoad', edge: key });
       if (mode === 'settlement' && kind === 'vertex') act({ t: 'buildSettlement', vertex: key });
       if (mode === 'city' && kind === 'vertex') act({ t: 'buildCity', vertex: key });
-      if (mode !== null) playBuild();
+      if (mode === 'tower' && kind === 'vertex') act({ t: 'buildTower', vertex: key });
+      if (mode === 'tower') playTurm();
+      else if (mode !== null) playBuild();
       setMode(null);
     }
   };
@@ -260,20 +319,37 @@ export function Game() {
       setBefehl(null);
       return;
     }
-    const ritter = meineRitter.find((u) => u.q === q && u.r === r);
-    if (ritter) setBefehl(ritter.id);
+    const einheit = meineEinheiten.find((u) => u.q === q && u.r === r);
+    if (einheit) setBefehl(einheit.id);
   };
   const befehleMoeglich = isMine && (phase.t === 'main' || phase.t === 'roll') && mode === null;
 
   /** Was auf freien Bauplaetzen als Vorschau steht (Board). */
-  const geisterBau: 'dorf' | 'stadt' | null =
+  const geisterBau: 'dorf' | 'stadt' | 'turm' | null =
     phase.t === 'setup' && phase.awaiting === 'settlement'
       ? 'dorf'
       : mode === 'settlement'
         ? 'dorf'
         : mode === 'city'
           ? 'stadt'
-          : null;
+          : mode === 'tower'
+            ? 'turm'
+            : null;
+
+  /** Loeschen kostet eine Karte - die vom groessten Stapel. */
+  const loeschKarte: Resource | null =
+    hand && RESOURCES.some((r) => hand[r] > 0)
+      ? RESOURCES.reduce((a, b) => (hand[b] > hand[a] ? b : a))
+      : null;
+  const loeschenMoeglich = isMine && (phase.t === 'main' || phase.t === 'roll');
+  const loeschen = (key: string) => {
+    if (loeschKarte && loeschenMoeglich) act({ t: 'putOut', key, mit: loeschKarte });
+  };
+  const meineBraende = useMemo(() => state.braende.filter((b) => b.owner === you), [state.braende, you]);
+  const meineAuftraege = useMemo(
+    () => state.auftraege.filter((a) => a.player === you && a.status !== 'abgelehnt'),
+    [state.auftraege, you],
+  );
 
   /*
    * Wuerfeln - von Hand oder nach AUTO_WURF_MS von selbst.
@@ -391,8 +467,8 @@ export function Game() {
    * was die Regel nicht deckt.
    */
   const quellen = useMemo(
-    () => (produceEffect ? productionSources(state, world, produceEffect.roll) : []),
-    [produceEffect, state, world],
+    () => (produceEffect ? productionSources(state, world, produceEffect.roll, echtesWetter) : []),
+    [produceEffect, state, world, echtesWetter],
   );
 
   const flashHexes = useMemo(() => [...new Set(quellen.map((q) => q.hex))], [quellen]);
@@ -447,10 +523,17 @@ export function Game() {
           <span className="hud-room">{useStore.getState().code}</span>
           <span
             className={`hud-wetter zeit-${tageszeit}`}
-            title={`${TAGESZEIT_NAME[tageszeit]} · ${WETTER_NAME[wetter]}`}
+            title={[
+              `${TAGESZEIT_NAME[tageszeit]} noch ${rundenBisTageszeit(state.turn)} Runden`,
+              `${WETTER_NAME[wetter]} noch ${rundenBisWetter(state.turn)} Runden`,
+              WETTER_WIRKUNG[echtesWetter],
+            ]
+              .filter(Boolean)
+              .join(' · ')}
           >
             <WetterSymbol tageszeit={tageszeit} wetter={wetter} />
             {TAGESZEIT_NAME[tageszeit]} · {WETTER_NAME[wetter]}
+            {WETTER_WIRKUNG[echtesWetter] && <span className="hud-wirkung">!</span>}
           </span>
           {state.order.length > 1 && (
             <span className="hud-turn">
@@ -485,16 +568,39 @@ export function Game() {
           beuteMoeglich={isMine && phase.t === 'main'}
           onBefehl={(id) => setBefehl((alt) => (alt === id ? null : id))}
           onHalt={(id) => {
-            const u = meineRitter.find((x) => x.id === id);
+            const u = meineEinheiten.find((x) => x.id === id);
             if (u) act({ t: 'orderUnit', unit: id, q: u.q, r: u.r });
           }}
           onZeigen={(id) => {
-            const u = meineRitter.find((x) => x.id === id);
-            if (u) setFokus((alt) => ({ q: u.q, r: u.r, n: (alt?.n ?? 0) + 1 }));
+            const u = meineEinheiten.find((x) => x.id === id);
+            if (u) zeigeFeld(u.q, u.r);
           }}
           onBeute={() => act({ t: 'claimLoot' })}
           showNumbers={pinNumbers}
           onToggleNumbers={() => setPinNumbers((v) => !v)}
+          autoWurfSekunden={AUTO_WURF_MS / 1000}
+          zeitInfo={{
+            tageszeit,
+            wetter,
+            bisTageszeit: rundenBisTageszeit(state.turn),
+            bisWetter: rundenBisWetter(state.turn),
+            wirkung: WETTER_WIRKUNG[echtesWetter],
+          }}
+          held={meinHeld}
+          heldZurueck={me?.heldZurueck ?? null}
+          onFolgen={(id, folgen) => act({ t: 'follow', unit: id, follow: folgen })}
+          diplomatieMoeglich={isMine && phase.t === 'main'}
+          friedenBezahlbar={!!hand && canAfford(hand, FRIEDEN_PREIS)}
+          tributBezahlbar={!!hand && RESOURCES.reduce((n, r) => n + hand[r], 0) >= TRIBUT_KARTEN}
+          onDiplomatie={(fraktion, art) => act({ t: 'diplomacy', fraktion, art })}
+          auftraege={meineAuftraege}
+          onAuftrag={(id, annehmen) => act({ t: 'answerQuest', id, accept: annehmen })}
+          onZeigenFeld={zeigeFeld}
+          nameVon={(id) => fraktionById(state.worldSeed, id).name}
+          braende={meineBraende}
+          loeschKarte={loeschKarte}
+          loeschenMoeglich={loeschenMoeglich}
+          onLoeschen={loeschen}
           autoWurf={autoWurf}
           onToggleAutoWurf={() =>
             setAutoWurf((v) => {
@@ -535,7 +641,8 @@ export function Game() {
           onPick={onPick}
           sicht={sicht}
           du={you}
-          onHex={befehleMoeglich && meineRitter.length > 0 ? onHex : undefined}
+          onHex={befehleMoeglich && meineEinheiten.length > 0 ? onHex : undefined}
+          onFeuer={loeschenMoeglich && loeschKarte ? loeschen : undefined}
           zielWahl={befehl !== null}
           auswahl={befehl}
           fokus={fokus}
@@ -575,7 +682,7 @@ export function Game() {
                 disabled={!wurfMoeglich}
                 title={
                   autoWurf
-                    ? 'Wuerfeln - geschieht nach 5 Sekunden von selbst (abschaltbar im Menue unter TO)'
+                    ? `Wuerfeln - geschieht nach ${AUTO_WURF_MS / 1000} Sekunden von selbst (abschaltbar im Menue unter TO)`
                     : 'Wuerfeln'
                 }
                 onClick={wuerfeln}
@@ -621,8 +728,11 @@ export function Game() {
             )}
 
           {befehl !== null && (
-            <div className="befehl-hinweis">Ziel fuer den Ritter waehlen · Esc bricht ab</div>
+            <div className="befehl-hinweis">
+              Ziel fuer {befehl === meinHeld?.id ? 'den Helden' : 'den Ritter'} waehlen · Esc bricht ab
+            </div>
           )}
+          {diagnoseAn() && <Diagnose />}
 
           {pendingRoll !== null && (
             <DiceOverlay dice={pendingRoll} onDone={clearPendingRoll} />

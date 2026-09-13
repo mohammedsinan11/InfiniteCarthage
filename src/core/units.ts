@@ -22,6 +22,7 @@ import { fraktionAt, fraktionById } from './factions';
 import type { FraktionArt } from './factions';
 import type { Hex } from './coords';
 import type { GameState, PlayerId, UnitKind, UnitState } from './state';
+import type { SichtLage } from './zeit';
 
 export type { UnitKind };
 export type Unit = UnitState;
@@ -29,7 +30,7 @@ export type Unit = UnitState;
 /** Was die Heeresrechnung vom Spielstand braucht - die redigierte Sicht genuegt. */
 export type ArmyView = Pick<
   GameState,
-  'worldSeed' | 'buildings' | 'units' | 'destroyedNests' | 'nestGarrison' | 'nestFraktion'
+  'worldSeed' | 'buildings' | 'units' | 'destroyedNests' | 'nestGarrison' | 'nestFraktion' | 'abkommen'
 >;
 
 const SALT_LAGER = 73;
@@ -38,6 +39,10 @@ const SALT_LAGER = 73;
 export const SICHT_SIEDLUNG = 3;
 /** Wie weit eine Einheit sieht. */
 export const SICHT_EINHEIT = 2;
+/** Wie weit ein Wachturm sieht - auch nachts. */
+export const SICHT_TURM = 5;
+/** Wie weit der Held sieht - auch nachts. */
+export const SICHT_HELD = 3;
 
 /**
  * Kampfwerte je Art (core/combat.ts, trifft).
@@ -51,6 +56,9 @@ export const WERTE: Record<UnitKind, { angriff: number; leben: number }> = {
   raeuber: { angriff: 2, leben: 2 },
   goblin: { angriff: 1, leben: 2 },
   wanderer: { angriff: 0, leben: 1 },
+  // Der Held haelt mehr aus als ein Ritter und trifft wie er - stark ist er
+  // durch das, was er fuer andere tut (ANFUEHRUNG, Sicht, Licht).
+  held: { angriff: 3, leben: 5 },
 };
 
 /** Mehr Besatzung hat kein Lager - auch nicht, wenn Trupps heimkehren. */
@@ -71,12 +79,13 @@ export function einheitVorlage(
     r,
     ziel: null,
     heimat: null,
-    auftrag: kind === 'ritter' ? 'befehl' : kind === 'wanderer' ? 'wandern' : 'raub',
+    auftrag: kind === 'ritter' || kind === 'held' ? 'befehl' : kind === 'wanderer' ? 'wandern' : 'raub',
     leben: WERTE[kind].leben,
     fracht: null,
     traegt: 0,
     beraubt: null,
     dauer: null,
+    folgt: null,
     ...felder,
   };
 }
@@ -174,11 +183,14 @@ export function garrisonUnits(view: ArmyView, hexes: Iterable<Hex>): Unit[] {
 export function settlementApproaches(
   view: Pick<GameState, 'worldSeed' | 'buildings'>,
   owner?: PlayerId,
+  /** Nur Gebaeude, deren Besitzer hier zustimmt - etwa: wer mit der Fraktion im Krieg ist. */
+  besitzerPasst?: (id: PlayerId) => boolean,
 ): Map<string, PlayerId> {
   const out = new Map<string, PlayerId>();
   for (const vk of Object.keys(view.buildings).sort()) {
     const b = view.buildings[vk]!;
     if (owner !== undefined && b.owner !== owner) continue;
+    if (besitzerPasst && !besitzerPasst(b.owner)) continue;
     for (const h of vertexAdjacentHexes(parseVertexKey(vk))) {
       if (!isLandAt(view.worldSeed, h.q, h.r)) continue;
       const k = hexKey(h.q, h.r);
@@ -262,23 +274,32 @@ export function knightMusterHex(view: ArmyView, id: PlayerId): Hex | null {
  * Nebel ist Anschauung, keine Geheimhaltung - die Karte folgt ohnehin aus dem
  * oeffentlichen Seed. Er zeigt, wo man gerade hinsieht und wo nicht, und
  * verbirgt dort fremde Einheiten.
+ *
+ * Nachts und im Nebel reicht der Blick je ein Feld weniger weit (core/zeit.ts),
+ * beides zusammen zwei. Wachtuerme und der Held sehen weiter, und die Nacht
+ * nimmt ihnen nichts - nur der Nebel.
  */
 export function sightOf(
   view: Pick<GameState, 'buildings' | 'units'>,
   id: PlayerId,
-  /** Nachts reicht der Blick ein Feld weniger weit (core/zeit.ts). */
-  nacht = false,
+  /** true heisst Nacht, wie frueher; sonst Nacht und Nebel einzeln. */
+  lage: boolean | Partial<SichtLage> = false,
 ): Set<string> {
+  const { nacht = false, nebel = false } = typeof lage === 'boolean' ? { nacht: lage } : lage;
   const out = new Set<string>();
   const dazu = (h: Hex, radius: number) => {
     for (const c of hexesInRange(h, radius)) out.add(hexKey(c.q, c.r));
   };
-  const siedlung = nacht ? SICHT_SIEDLUNG - 1 : SICHT_SIEDLUNG;
-  const einheit = nacht ? Math.max(1, SICHT_EINHEIT - 1) : SICHT_EINHEIT;
+  const abzug = (nacht ? 1 : 0) + (nebel ? 1 : 0);
+  const nebelAbzug = nebel ? 1 : 0;
+  const siedlung = Math.max(1, SICHT_SIEDLUNG - abzug);
+  const turm = Math.max(2, SICHT_TURM - nebelAbzug);
+  const einheit = Math.max(1, SICHT_EINHEIT - abzug);
+  const held = Math.max(2, SICHT_HELD - nebelAbzug);
   for (const [vk, b] of Object.entries(view.buildings)) {
     if (b.owner !== id) continue;
-    for (const h of vertexAdjacentHexes(parseVertexKey(vk))) dazu(h, siedlung);
+    for (const h of vertexAdjacentHexes(parseVertexKey(vk))) dazu(h, b.turm ? turm : siedlung);
   }
-  for (const u of view.units) if (u.owner === id) dazu(u, einheit);
+  for (const u of view.units) if (u.owner === id) dazu(u, u.kind === 'held' ? held : einheit);
   return out;
 }

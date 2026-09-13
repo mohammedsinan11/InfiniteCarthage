@@ -46,8 +46,10 @@ import {
   COST_CITY,
   COST_DEV,
   COST_KNIGHT,
+  COST_REBUILD_ROAD,
   COST_ROAD,
   COST_SETTLEMENT,
+  COST_TOWER,
   canAfford,
   pay,
 } from './costs';
@@ -58,7 +60,12 @@ import {
   legalRoadEdges,
 } from './placement';
 import { computeProduction } from './production';
-import { beginBigRound, beginNight, spawnKnight, tickArmy } from './army';
+import { beginBigRound, beginNight, heldenRunde, spawnHeld, spawnKnight, tickArmy } from './army';
+import { brandRunde, brennt, mitKarteLoeschen } from './feuer';
+import { abkommenRunde, tributRunde, verhandeln } from './diplomatie';
+import type { DiplomatieEvent, Verhandlung } from './diplomatie';
+import { auftraegePruefen, aufAuftragAntworten, wandererBieten } from './auftraege';
+import type { AuftragEvent } from './auftraege';
 import { nachtBeginntAt } from '../zeit';
 import type { ArmyEvent } from './army';
 import { nextStep } from '../units';
@@ -105,12 +112,22 @@ export type Action =
   | { t: 'orderUnit'; unit: number; q: number; r: number }
   /** Eine Beute einloesen: eine Kartenwahl. */
   | { t: 'claimLoot' }
+  /** Ein eigenes Feuer mit einer Rohstoffkarte loeschen (rules/feuer.ts). */
+  | { t: 'putOut'; key: string; mit: Resource }
+  /** Einen Wachturm an ein eigenes Dorf oder eine Stadt bauen. */
+  | { t: 'buildTower'; vertex: string }
+  /** Einen eigenen Ritter dem Helden folgen lassen - oder nicht mehr. */
+  | { t: 'follow'; unit: number; follow: boolean }
+  /** Frieden, Tribut oder Krieg mit einer Fraktion (rules/diplomatie.ts). */
+  | { t: 'diplomacy'; fraktion: string; art: Verhandlung }
+  /** Einen Auftrag eines Wanderers annehmen oder ablehnen. Auch ausserhalb des Zugs. */
+  | { t: 'answerQuest'; id: number; accept: boolean }
   | { t: 'endTurn' };
 
 export type GameEvent =
   | { t: 'roll'; player: PlayerId; dice: [number, number] }
   | { t: 'production'; payout: Record<PlayerId, Hand>; shortfall: Resource[] }
-  | { t: 'build'; player: PlayerId; kind: 'road' | 'settlement' | 'city'; at: string }
+  | { t: 'build'; player: PlayerId; kind: 'road' | 'settlement' | 'city' | 'tower'; at: string }
   | { t: 'buyDev'; player: PlayerId }
   | { t: 'playDev'; player: PlayerId; card: DevCardType }
   | { t: 'yearOfPlenty'; player: PlayerId; a: Resource; b: Resource }
@@ -126,8 +143,10 @@ export type GameEvent =
   | { t: 'chunks'; coords: ChunkCoord[] }
   | { t: 'turn'; player: PlayerId }
   | { t: 'win'; player: PlayerId }
-  /** Heer, Raubzuege, Gefechte, Lager und Ruinen - siehe rules/army.ts. */
-  | ArmyEvent;
+  /** Heer, Raubzuege, Gefechte, Lager, Ruinen, Held und Feuer - siehe rules/army.ts. */
+  | ArmyEvent
+  | DiplomatieEvent
+  | AuftragEvent;
 
 export type Game = { state: GameState; world: World };
 
@@ -192,6 +211,7 @@ export function createGame(
       cards: [],
       loot: 0,
       connected: true,
+      heldZurueck: null,
     })),
     order: players.map((p) => p.id),
     current: 0,
@@ -221,6 +241,11 @@ export function createGame(
     nestGarrison: {},
     nestFraktion: {},
     exploredRuins: [],
+    braende: [],
+    asche: {},
+    abkommen: [],
+    auftraege: [],
+    nextAuftragId: 1,
   };
 
   return { state, world };
@@ -341,7 +366,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
    * an Mitsprache - die Pluenderung nimmt selbst, und zwar ohne Phase, damit
    * ein abwesender Spieler die Runde nicht anhalten kann.
    */
-  const fromOthers = action.t === 'respondTrade';
+  const fromOthers = action.t === 'respondTrade' || action.t === 'answerQuest';
   if (!fromOthers && actor !== currentPlayerId(s)) return fail('Du bist nicht am Zug.');
 
   const phase = s.phase;
@@ -390,6 +415,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (why) return fail(why);
 
       s.roads[action.edge] = actor;
+      delete s.asche[action.edge];
       events.push({ t: 'build', player: actor, kind: 'road', at: action.edge });
 
       const e = parseEdgeKey(action.edge);
@@ -398,10 +424,11 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
 
       const step = phase.step + 1;
       if (step >= 2 * s.order.length) {
-        // Aufbau vorbei: der erste Spieler beginnt.
+        // Aufbau vorbei: der erste Spieler beginnt, und jeder bekommt seinen Helden.
         s.current = 0;
         s.turn = 1;
         s.phase = { t: 'roll' };
+        for (const id of s.order) spawnHeld(s, id, events);
         events.push({ t: 'turn', player: s.order[0]! });
       } else {
         s.phase = { t: 'setup', step, awaiting: 'settlement', lastVertex: null };
@@ -491,12 +518,15 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (phase.t !== 'main' && !inRoadBuilding) return fail('Jetzt kann nicht gebaut werden.');
       const why = canPlaceRoad(s, world, actor, action.edge);
       if (why) return fail(why);
-      if (!inRoadBuilding && !canAfford(actorPlayer.hand, COST_ROAD)) {
+      // Auf eigener Asche fehlen nur die Bohlen (rules/feuer.ts).
+      const kosten = s.asche[action.edge] === actor ? COST_REBUILD_ROAD : COST_ROAD;
+      if (!inRoadBuilding && !canAfford(actorPlayer.hand, kosten)) {
         return fail('Zu wenig Rohstoffe fuer eine Strasse.');
       }
 
-      if (!inRoadBuilding) pay(actorPlayer.hand, s.bank, COST_ROAD);
+      if (!inRoadBuilding) pay(actorPlayer.hand, s.bank, kosten);
       s.roads[action.edge] = actor;
+      delete s.asche[action.edge];
       events.push({ t: 'build', player: actor, kind: 'road', at: action.edge });
 
       const added = grow(
@@ -538,6 +568,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (phase.t !== 'main') return fail('Jetzt kann nicht gebaut werden.');
       const why = canPlaceCity(s, actor, action.vertex);
       if (why) return fail(why);
+      if (brennt(s, action.vertex)) return fail('Dort brennt es gerade.');
       if (!canAfford(actorPlayer.hand, COST_CITY)) {
         return fail('Zu wenig Rohstoffe fuer eine Stadt.');
       }
@@ -745,9 +776,11 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       }
       const einheit = s.units.find((u) => u.id === action.unit);
       if (!einheit) return fail('Diese Einheit gibt es nicht.');
-      if (einheit.owner !== actor || einheit.kind !== 'ritter') {
+      if (einheit.owner !== actor || (einheit.kind !== 'ritter' && einheit.kind !== 'held')) {
         return fail('Das ist nicht dein Ritter.');
       }
+      // Ein eigener Befehl loest aus dem Gefolge.
+      einheit.folgt = null;
       if (action.q === einheit.q && action.r === einheit.r) {
         einheit.ziel = null;
         break;
@@ -770,21 +803,89 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       break;
     }
 
+    case 'putOut': {
+      if (phase.t !== 'main' && phase.t !== 'roll') return fail('Jetzt kann nicht geloescht werden.');
+      const why = mitKarteLoeschen(s, actor, action.key, action.mit, events);
+      if (why) return fail(why);
+      break;
+    }
+
+    case 'buildTower': {
+      if (phase.t !== 'main') return fail('Jetzt kann nicht gebaut werden.');
+      const b = s.buildings[action.vertex];
+      if (!b || b.owner !== actor) return fail('Ein Wachturm braucht ein eigenes Dorf oder eine Stadt.');
+      if (b.turm) return fail('Dort steht schon ein Wachturm.');
+      if (brennt(s, action.vertex)) return fail('Dort brennt es gerade.');
+      if (!canAfford(actorPlayer.hand, COST_TOWER)) return fail('Zu wenig Rohstoffe fuer einen Wachturm.');
+      pay(actorPlayer.hand, s.bank, COST_TOWER);
+      b.turm = true;
+      events.push({ t: 'build', player: actor, kind: 'tower', at: action.vertex });
+      break;
+    }
+
+    case 'follow': {
+      if (phase.t !== 'main' && phase.t !== 'roll') {
+        return fail('Jetzt koennen keine Befehle gegeben werden.');
+      }
+      const ritter = s.units.find((u) => u.id === action.unit);
+      if (!ritter || ritter.owner !== actor || ritter.kind !== 'ritter') return fail('Das ist nicht dein Ritter.');
+      if (!action.follow) {
+        ritter.folgt = null;
+        ritter.ziel = null;
+        break;
+      }
+      const held = s.units.find((u) => u.kind === 'held' && u.owner === actor);
+      if (!held) return fail('Dein Held ist nicht auf der Karte.');
+      ritter.folgt = held.id;
+      ritter.ziel = ritter.q === held.q && ritter.r === held.r ? null : { q: held.q, r: held.r };
+      break;
+    }
+
+    case 'diplomacy': {
+      if (phase.t !== 'main') return fail('Verhandelt wird in der Bauphase.');
+      const why = verhandeln(s, actor, action.fraktion, action.art, events);
+      if (why) return fail(why);
+      break;
+    }
+
+    case 'answerQuest': {
+      const why = aufAuftragAntworten(s, actor, action.id, action.accept, events);
+      if (why) return fail(why);
+      break;
+    }
+
     case 'endTurn': {
       if (phase.t !== 'main') return fail('Der Zug laesst sich jetzt nicht beenden.');
+      const ender = actor;
+      const beendet = s.turn;
       nextTurn(s);
 
-      // Jede Runde zieht das Heer ein Feld: Ritter, Raubzuege, Fehden, Wanderer,
-      // Kaempfe, Pluenderungen (rules/army.ts).
+      // Jede Runde zieht das Heer: Ritter, der Held, Raubzuege, Fehden,
+      // Wanderer, Kaempfe, Pluenderungen und Feuer (rules/army.ts).
       tickArmy(s, world, events);
+
+      // Feuer: Regen und Helfer loeschen, was ein Zug lang brannte, brennt ab.
+      brandRunde(s, ender, beendet, events);
 
       // Zum Beginn jeder grossen Runde brechen Raubzuege auf, vielleicht eine
       // Fehde und ein Wanderer - nach dem Ziehen, damit ein frischer Raubzug
-      // nicht im selben Moment schon pluendert.
-      if (bigRoundChangedAt(s.turn)) beginBigRound(s, events);
+      // nicht im selben Moment schon pluendert. Und der Tribut wird faellig.
+      if (bigRoundChangedAt(s.turn)) {
+        beginBigRound(s, events);
+        tributRunde(s, events);
+      }
 
       // Mit der Nacht kommen die Goblins in Horden (core/zeit.ts).
       if (nachtBeginntAt(s.turn)) beginNight(s, events);
+
+      heldenRunde(s, events);
+      abkommenRunde(s, events);
+
+      // Auftraege: erst was diese Runde erfuellt hat, dann neue Angebote.
+      auftraegePruefen(s, events, events);
+      const rng = new Rng(s.rngState);
+      wandererBieten(s, world, rng, events);
+      s.rngState = rng.getState();
 
       events.push({ t: 'turn', player: s.order[s.current]! });
       break;

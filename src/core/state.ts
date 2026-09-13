@@ -63,12 +63,21 @@ export type Player = {
    */
   loot: number;
   connected: boolean;
+  /**
+   * Wann der gefallene Held zurueckkehrt (Zugnummer). null, solange er lebt -
+   * oder bevor er zum ersten Mal angetreten ist.
+   */
+  heldZurueck: number | null;
 };
 
-export type Building = { owner: PlayerId; type: 'settlement' | 'city' };
+/**
+ * Ein Gebaeude auf einer Ecke. turm: ein Wachturm steht daneben - er sieht
+ * weiter und laesst Brandstifter nicht an Haus und Strassen (rules/feuer.ts).
+ */
+export type Building = { owner: PlayerId; type: 'settlement' | 'city'; turm?: boolean };
 
 /** Was auf der Karte laufen kann. */
-export type UnitKind = 'ritter' | 'raeuber' | 'goblin' | 'wanderer';
+export type UnitKind = 'ritter' | 'raeuber' | 'goblin' | 'wanderer' | 'held';
 
 /**
  * Was eine Einheit gerade vorhat.
@@ -112,6 +121,67 @@ export type UnitState = {
   beraubt: PlayerId | null;
   /** Wanderer: wie viele Runden sie noch bleiben. Sonst null. */
   dauer: number | null;
+  /** Ritter im Gefolge: die Nummer des Helden, dem sie folgen. Sonst null. */
+  folgt: number | null;
+};
+
+/**
+ * Ein Feuer, das Pluenderer gelegt haben (rules/feuer.ts).
+ *
+ * Es brennt, bis sein Besitzer einen eigenen Zug hinter sich hat - so bleibt
+ * immer genau ein Zug, um es zu loeschen: mit einer Karte, einem Ritter oder
+ * dem Helden daneben, oder der Regen tut es. Danach brennt es ab.
+ */
+export type Brand = {
+  /** Kantenschluessel bei Strassen, Eckenschluessel bei Gebaeuden. */
+  key: string;
+  art: 'strasse' | 'dorf' | 'stadt';
+  owner: PlayerId;
+  /** Wer es gelegt hat. */
+  fraktion: string;
+  /** Das Feld der Pluenderer. */
+  q: number;
+  r: number;
+  /** Zug, in dem es gelegt wurde. */
+  seit: number;
+};
+
+/**
+ * Ein Abkommen zwischen einem Spieler und einer Fraktion (rules/diplomatie.ts).
+ *
+ *   frieden  einmal bezahlt, gilt eine Weile. Nur Raeuberbanden.
+ *   tribut   kostet je grosser Runde eine Karte, gilt, bis einer nicht zahlt.
+ *
+ * Solange es gilt, sind beide einander nicht feind (core/combat.ts, feindlich):
+ * keine Raubzuege, keine Kaempfe.
+ */
+export type Abkommen = {
+  player: PlayerId;
+  fraktion: string;
+  art: 'frieden' | 'tribut';
+  seit: number;
+  /** Letzter Zug, in dem es gilt. null: bis auf Weiteres. */
+  bis: number | null;
+};
+
+/**
+ * Ein Auftrag, den ein Wanderer anbietet (rules/auftraege.ts). Wer ihn
+ * erfuellt, bekommt eine Kartenwahl als Beute.
+ */
+export type WandererAuftrag = {
+  id: number;
+  player: PlayerId;
+  /** lager: dieses Lager zerstoeren. ruine: diese Ruine erkunden. */
+  art: 'lager' | 'ruine';
+  q: number;
+  r: number;
+  /** Bei Lagern die Fraktion, die es beim Angebot hielt - fuer den Text. */
+  fraktion: string | null;
+  status: 'angebot' | 'angenommen' | 'abgelehnt';
+  /** Letzter Zug: fuers Angebot die Bedenkzeit, fuer den Auftrag die Frist. */
+  bis: number;
+  /** Der Wanderer, der ihn angeboten hat. */
+  wanderer: number;
 };
 
 /**
@@ -210,6 +280,16 @@ export type GameState = {
   nestFraktion: Record<string, string>;
   /** Erkundete Ruinen - jede gibt ihr Ereignis nur einmal her. */
   exploredRuins: string[];
+  /** Brennende Strassen und Gebaeude. */
+  braende: Brand[];
+  /** Abgebrannte Strassen: Kante -> frueherer Besitzer. Er baut sie guenstiger wieder auf. */
+  asche: Record<string, PlayerId>;
+  /** Frieden und Tribut mit Fraktionen. */
+  abkommen: Abkommen[];
+  /** Auftraege der Wanderer - angeboten, angenommen oder abgelehnt. */
+  auftraege: WandererAuftrag[];
+  /** Naechste freie Auftragsnummer. */
+  nextAuftragId: number;
 };
 
 /** Die Bank haelt 19 Karten je Rohstoff - auch auf unendlicher Karte. */

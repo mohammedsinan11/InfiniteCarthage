@@ -20,10 +20,13 @@ import {
   COST_CITY,
   COST_DEV,
   COST_KNIGHT,
+  COST_REBUILD_ROAD,
   COST_ROAD,
   COST_SETTLEMENT,
+  COST_TOWER,
   canAfford,
 } from '../../core/rules/costs';
+import { haefenZu } from '../../core/rules/trade';
 import type { Cost } from '../../core/rules/costs';
 import type { Action } from '../../core/rules/reducer';
 import type { PublicPlayer, PublicState } from '../../core/redact';
@@ -31,7 +34,7 @@ import type { DevCardType, Hand } from '../../core/state';
 import { devName, resourceName } from '../log';
 import { ResourceGlyph } from './ResourceIcon';
 
-export type BuildMode = null | 'road' | 'settlement' | 'city';
+export type BuildMode = null | 'road' | 'settlement' | 'city' | 'tower';
 
 const kostenText = (c: Cost): string =>
   RESOURCES.filter((r) => (c[r] ?? 0) > 0)
@@ -82,6 +85,13 @@ const SymSiedlung = () => (
 const SymStadt = () => (
   <Symbol>
     <path d="M2 17 V9 L7 3 L12 9 H18 V17 Z" fill="#c9a46a" stroke="#2a2016" strokeWidth={1.6} strokeLinejoin="round" />
+  </Symbol>
+);
+const SymTurm = () => (
+  <Symbol>
+    <path d="M6 18 V7 H14 V18 Z" fill="#b9b3a6" stroke="#2a2016" strokeWidth={1.6} />
+    <path d="M5 7 V3 H7 V5 H9 V3 H11 V5 H13 V3 H15 V7 Z" fill="#b9b3a6" stroke="#2a2016" strokeWidth={1.4} strokeLinejoin="round" />
+    <rect x={9} y={10} width={2} height={3} fill="#f2c94c" />
   </Symbol>
 );
 const SymKarte = () => (
@@ -205,12 +215,15 @@ function HandelTafel({
   hand,
   verhaeltnis,
   darf,
+  sturm,
   onTausch,
   onZu,
 }: {
   hand: Hand;
   verhaeltnis: (r: Resource) => number;
   darf: boolean;
+  /** Bei Sturm sind die Haefen zu (core/zeit.ts). */
+  sturm: boolean;
   onTausch: (gib: Resource, nimm: Resource) => void;
   onZu: () => void;
 }) {
@@ -234,6 +247,7 @@ function HandelTafel({
       <button className="primary dock-tafel-los" disabled={!geht} onClick={() => onTausch(gib, nimm)}>
         {v}x {resourceName(gib)} gegen {resourceName(nimm)}
       </button>
+      {sturm && <p className="dock-tafel-klein">Sturm: die Haefen sind geschlossen.</p>}
     </Tafel>
   );
 }
@@ -362,6 +376,10 @@ export function Aktionsleiste({
             : '';
 
   const bau = (m: Exclude<BuildMode, null>) => () => setMode(mode === m ? null : m);
+  // Auf eigener Asche kostet eine Strasse nur Holz (rules/feuer.ts).
+  const eigeneAsche = Object.values(state.asche).some((id) => id === me?.id);
+  const strasseGeht = canAfford(hand, COST_ROAD) || (eigeneAsche && canAfford(hand, COST_REBUILD_ROAD));
+  const turmPlatz = Object.values(state.buildings).some((b) => b.owner === me?.id && !b.turm);
   const umschalten = (t: 'handel' | 'karten') => () => setTafel((alt) => (alt === t ? null : t));
 
   return (
@@ -372,6 +390,7 @@ export function Aktionsleiste({
           verhaeltnis={verhaeltnis}
           darf={bauen}
           onTausch={(give, receive) => act({ t: 'bankTrade', give, receive })}
+          sturm={haefenZu(state)}
           onZu={() => setTafel(null)}
         />
       )}
@@ -380,9 +399,26 @@ export function Aktionsleiste({
       )}
 
       <div className="dock-reihe">
-        <DockKnopf titel="Strasse" symbol={<SymStrasse />} kosten={COST_ROAD} gewaehlt={mode === 'road'} darf={bauen && canAfford(hand, COST_ROAD)} onClick={bau('road')} />
+        <DockKnopf
+          titel="Strasse"
+          symbol={<SymStrasse />}
+          kosten={COST_ROAD}
+          gewaehlt={mode === 'road'}
+          darf={bauen && strasseGeht}
+          tip={`Strasse: ${kostenText(COST_ROAD)}${eigeneAsche ? ` - auf eigener Asche nur ${kostenText(COST_REBUILD_ROAD)}` : ''}`}
+          onClick={bau('road')}
+        />
         <DockKnopf titel="Dorf" symbol={<SymSiedlung />} kosten={COST_SETTLEMENT} gewaehlt={mode === 'settlement'} darf={bauen && canAfford(hand, COST_SETTLEMENT)} onClick={bau('settlement')} />
         <DockKnopf titel="Stadt" symbol={<SymStadt />} kosten={COST_CITY} gewaehlt={mode === 'city'} darf={bauen && canAfford(hand, COST_CITY)} onClick={bau('city')} />
+        <DockKnopf
+          titel="Turm"
+          symbol={<SymTurm />}
+          kosten={COST_TOWER}
+          gewaehlt={mode === 'tower'}
+          darf={bauen && turmPlatz && canAfford(hand, COST_TOWER)}
+          tip={`Wachturm an ein Dorf oder eine Stadt: sieht weiter, auch nachts, und laesst Brandstifter nicht an Haus und Strassen. ${kostenText(COST_TOWER)}`}
+          onClick={bau('tower')}
+        />
         <span className="dock-trenner" />
         <DockKnopf titel="Karte" symbol={<SymKarte />} kosten={COST_DEV} darf={bauen && canAfford(hand, COST_DEV)} tip={`Entwicklungskarte kaufen (${state.deckLeft} im Stapel): ${kostenText(COST_DEV)}`} onClick={() => act({ t: 'buyDev' })} />
         <DockKnopf titel="Ritter" symbol={<SymRitter />} kosten={COST_KNIGHT} darf={bauen && canAfford(hand, COST_KNIGHT)} tip={`Ein Ritter tritt an einer deiner Siedlungen an: ${kostenText(COST_KNIGHT)}`} onClick={() => act({ t: 'recruitKnight' })} />

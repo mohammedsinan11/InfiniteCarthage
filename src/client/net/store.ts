@@ -13,21 +13,27 @@ import type { ClientMsg, RoomInfo, ServerMsg } from '../../core/protocol';
 import type { PublicState } from '../../core/redact';
 import type { Action, GameEvent } from '../../core/rules/reducer';
 import {
+  playAbgebrannt,
+  playAuftrag,
   playBrand,
   playCardPick,
   playClash,
   playDefend,
   playGuard,
+  playHeld,
   playHorde,
+  playKrieg,
+  playLoeschen,
   playMarch,
+  playPakt,
   playRaid,
   playRuin,
 } from '../audio';
-import { istNacht } from '../../core/zeit';
+import { sichtLage } from '../../core/zeit';
 import type { PlayerId } from '../../core/state';
 import { createWorld, mitAufgedeckt, revealChunks } from '../../core/world';
 import type { World } from '../../core/world';
-import { bundleText, describeEvent, fraktionName, seiteName } from '../log';
+import { BRAND_WAS, auftragText, bundleText, describeEvent, fraktionName, seiteName } from '../log';
 import { spielerSeite } from '../../core/combat';
 import { sightOf } from '../../core/units';
 import { hexKey } from '../../core/coords';
@@ -55,6 +61,10 @@ export type WeltEintrag = {
     | 'home'
     | 'wanderer'
     | 'ruin'
+    | 'fire'
+    | 'hero'
+    | 'pact'
+    | 'quest'
     | 'season'
     | 'bigRound';
   text: string;
@@ -145,7 +155,7 @@ function weltAus(
   const wer = (id: string) => state?.players.find((p) => p.id === id)?.name ?? 'Jemand';
   const name = (id: string) => fraktionName(state, id);
   // Kaempfe anderer zaehlen nur, wenn man sie sieht - sonst rauscht die Liste.
-  const sicht = state && you ? sightOf(state, you, istNacht(state.turn)) : null;
+  const sicht = state && you ? sightOf(state, you, sichtLage(state.worldSeed, state.turn)) : null;
   const sichtbar = (q: number, r: number) => sicht === null || sicht.has(hexKey(q, r));
   const eintrag = (art: WeltEintrag['art'], text: string, r = runde) =>
     out.push({ id: naechsteId++, runde: r, art, text });
@@ -202,15 +212,38 @@ function weltAus(
         break;
       case 'burn': {
         const bei = e.player === you ? 'Bei dir' : `Bei ${wer(e.player)}`;
-        const was =
-          e.art === 'strasse'
-            ? 'brennt eine Strasse ab'
-            : e.art === 'dorf'
-              ? 'brennt ein Dorf nieder'
-              : 'brennt eine Stadt zum Dorf herunter';
-        eintrag('plunder', `${bei} ${was} (${name(e.fraktion)})`);
+        eintrag('fire', `${bei} brennt ${BRAND_WAS[e.art]} (${name(e.fraktion)})`);
         break;
       }
+      case 'burnedDown': {
+        const bei = e.player === you ? 'Bei dir' : `Bei ${wer(e.player)}`;
+        eintrag('fire', `${bei} ist ${BRAND_WAS[e.art]} abgebrannt`);
+        break;
+      }
+      case 'extinguished':
+        if (e.player === you) eintrag('fire', `Feuer geloescht: ${BRAND_WAS[e.art]}`);
+        break;
+      case 'burnPrevented':
+        if (e.player === you) eintrag('fire', `Dein Wachturm vertreibt Brandstifter (${name(e.fraktion)})`);
+        break;
+      case 'heroFell':
+        eintrag('hero', `${e.player === you ? 'Dein Held' : `Der Held von ${wer(e.player)}`} faellt`);
+        break;
+      case 'pact':
+        if (e.player === you) eintrag('pact', `${e.art === 'frieden' ? 'Frieden' : 'Tribut'}: ${name(e.fraktion)}`);
+        break;
+      case 'war':
+        if (e.player === you) eintrag('pact', `Krieg mit ${name(e.fraktion)}`);
+        break;
+      case 'questOffered':
+        if (e.player === you) eintrag('quest', `Auftrag angeboten: ${auftragText(state, e.art, e.fraktion)}`);
+        break;
+      case 'questDone':
+        if (e.player === you) eintrag('quest', 'Auftrag erfuellt - eine Kartenwahl');
+        break;
+      case 'questFailed':
+        if (e.player === you) eintrag('quest', e.grund === 'abgelaufen' ? 'Auftrag abgelaufen' : 'Auftrag verloren');
+        break;
       case 'ruin':
         out.push({ id: naechsteId++, runde, art: 'ruin', text: `Ruine erkundet: ${RUINE_KURZ[e.result]}` });
         break;
@@ -246,8 +279,9 @@ function meldungenAus(
   const out: Announcement[] = [];
   const wer = (id: string) => state?.players.find((p) => p.id === id)?.name ?? 'Jemand';
   const name = (id: string) => fraktionName(state, id);
-  const sicht = state && you ? sightOf(state, you, istNacht(state.turn)) : null;
+  const sicht = state && you ? sightOf(state, you, sichtLage(state.worldSeed, state.turn)) : null;
   const sichtbar = (q: number, r: number) => sicht === null || sicht.has(hexKey(q, r));
+  const meldung = (text: string, kind: Announcement['kind']) => out.push({ id: naechsteId++, text, kind });
   for (const e of events) {
     if (e.t === 'plunder') {
       const karten = `${e.count} ${e.count === 1 ? 'Karte' : 'Karten'}`;
@@ -315,13 +349,66 @@ function meldungenAus(
     } else if (e.t === 'burn') {
       if (e.player === you) {
         playBrand();
-        const was =
-          e.art === 'strasse'
-            ? 'eine Strasse brennt ab'
-            : e.art === 'dorf'
-              ? 'ein Dorf brennt nieder'
-              : 'eine Stadt brennt zum Dorf herunter';
-        out.push({ id: naechsteId++, text: `Feuer! ${was}`, kind: 'raid' });
+        meldung(`Feuer! Es brennt ${BRAND_WAS[e.art]} - loeschen mit Karte, Ritter oder Held`, 'raid');
+      }
+    } else if (e.t === 'burnedDown') {
+      if (e.player === you) {
+        playAbgebrannt();
+        meldung(`${BRAND_WAS[e.art].replace(/^e/, 'E')} ist abgebrannt`, 'raid');
+      }
+    } else if (e.t === 'extinguished') {
+      if (e.player === you) {
+        playLoeschen();
+        meldung(
+          e.durch === 'regen' ? 'Der Regen loescht das Feuer' : e.durch === 'verschont' ? 'Das Feuer erlischt' : 'Feuer geloescht',
+          'gain',
+        );
+      }
+    } else if (e.t === 'burnPrevented') {
+      if (e.player === you) {
+        playDefend();
+        meldung('Dein Wachturm vertreibt Brandstifter', 'gain');
+      }
+    } else if (e.t === 'heroReady') {
+      if (e.player === you) {
+        playHeld();
+        meldung(e.zurueck ? 'Dein Held kehrt zurueck' : 'Dein Held tritt an', 'gain');
+      }
+    } else if (e.t === 'heroFell') {
+      if (e.player === you) {
+        playRaid();
+        meldung(`Dein Held faellt - er kehrt in Runde ${e.zurueck} zurueck`, 'raid');
+      }
+    } else if (e.t === 'pact') {
+      if (e.player === you) {
+        playPakt();
+        meldung(e.art === 'frieden' ? `Frieden mit ${name(e.fraktion)}` : `Tribut an ${name(e.fraktion)}`, 'info');
+      }
+    } else if (e.t === 'war') {
+      if (e.player === you) {
+        playKrieg();
+        meldung(
+          e.grund === 'unbezahlt'
+            ? `Kein Tribut - ${name(e.fraktion)} ziehen in den Krieg`
+            : e.grund === 'abgelaufen'
+              ? `Der Frieden mit ${name(e.fraktion)} ist vorbei`
+              : `Krieg mit ${name(e.fraktion)}`,
+          'raid',
+        );
+      }
+    } else if (e.t === 'questOffered') {
+      if (e.player === you) {
+        playAuftrag();
+        meldung('Ein Wanderer bietet dir einen Auftrag an', 'info');
+      }
+    } else if (e.t === 'questDone') {
+      if (e.player === you) {
+        playCardPick(3);
+        meldung('Auftrag erfuellt! Beute: eine Kartenwahl', 'gain');
+      }
+    } else if (e.t === 'questFailed') {
+      if (e.player === you) {
+        meldung(e.grund === 'abgelaufen' ? 'Ein Auftrag ist abgelaufen' : 'Ein Auftrag ist verloren', 'info');
       }
     } else if (e.t === 'nestCaptured') {
       if (sichtbar(e.q, e.r)) {
@@ -587,3 +674,12 @@ export const useStore = create<Store>((set, get) => ({
     set((s) => ({ announcements: s.announcements.filter((a) => a.id !== id) })),
   clearProduceEffect: () => set({ produceEffect: null }),
 }));
+
+/*
+ * Nur im Entwicklungsserver: der Store am Fenster, damit sich Anzeigen (Feuer,
+ * Auftraege, Held) im Browser pruefen lassen, ohne erst eine Pluenderung
+ * abzuwarten. Im Build faellt der Block weg.
+ */
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  (window as unknown as { __store?: typeof useStore }).__store = useStore;
+}

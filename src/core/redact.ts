@@ -36,6 +36,8 @@ export type PublicPlayer = {
   cards: string[];
   /** Uneingeloeste Beute - oeffentlich: wer ein Lager zerstoert, tut das vor aller Augen. */
   loot: number;
+  /** Wann der gefallene Held zurueckkehrt, oder null - oeffentlich wie sein Fall. */
+  heldZurueck: number | null;
   connected: boolean;
   /** Sichtbare Punkte, ohne verdeckte Siegpunktkarten. */
   points: number;
@@ -83,6 +85,15 @@ export type PublicState = {
   nestGarrison: Record<string, number>;
   nestFraktion: Record<string, string>;
   exploredRuins: string[];
+  /**
+   * Feuer, Asche, Abkommen und Auftraege - oeffentlich. Ein Feuer sieht man von
+   * weitem, und ein Abkommen aendert, wen die Raeuber angreifen: das muss jeder
+   * einordnen koennen.
+   */
+  braende: GameState['braende'];
+  asche: GameState['asche'];
+  abkommen: GameState['abkommen'];
+  auftraege: GameState['auftraege'];
 };
 
 export function redactStateFor(state: GameState, viewer: PlayerId): PublicState {
@@ -96,6 +107,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
       playedKnights: p.playedKnights,
       cards: [...p.cards],
       loot: p.loot,
+      heldZurueck: p.heldZurueck,
       connected: p.connected,
       points: publicPoints(state, p.id),
     };
@@ -145,6 +157,10 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     nestGarrison: state.nestGarrison,
     nestFraktion: state.nestFraktion,
     exploredRuins: state.exploredRuins,
+    braende: state.braende,
+    asche: state.asche,
+    abkommen: state.abkommen,
+    auftraege: state.auftraege,
   };
 }
 

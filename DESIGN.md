@@ -212,24 +212,56 @@ Kaempfe zu mehreren zu schnell laufen, weil die Runde der Spielerzug ist.
 
 Gebaut in `core/zeit.ts`, `core/rules/army.ts` und `client/board/WetterSchicht.tsx`.
 
-- **Tageszeit.** Jede grosse Runde ist ein Tag: Morgen, Tag, Tag, Abend, Nacht -
-  aus der Zugnummer abgeleitet wie die Jahreszeit.
+- **Tageszeit.** Ein Tag dauert zehn Runden: zwei Morgen, vier Tag, zwei Abend,
+  zwei Nacht - aus der Zugnummer abgeleitet wie die Jahreszeit. Anfangs war
+  jede grosse Runde ein Tag; das wechselte zu schnell, um es wahrzunehmen.
 - **Nacht.** Die Sicht reicht ein Feld weniger weit. Mit Beginn der Nacht bricht
   mit 60 % eine Goblin-Horde aus dem naechsten Goblinlager bis 12 Felder vor den
   Siedlungen auf: drei Goblins und einer je Spieler, hoechstens sechs. Im
   Weltprotokoll steht sie mit Ausrufezeichen.
-- **Wetter.** Wechselt alle zwei Runden, gewichtet nach Jahreszeit (Winter:
-  Schnee statt Regen, Sommer meist klar), aus dem oeffentlichen Seed. Bisher
-  reine Anschauung.
-- **Feuer.** Nach jeder Pluenderung wuerfelt der Pluenderer: 4-5 brennt eine
-  Strasse am Feld ab, 6 trifft ein Gebaeude - die Stadt brennt zum Dorf
-  herunter, das Dorf nieder. Das letzte Gebaeude eines Spielers bleibt stehen.
+- **Wetter.** Haelt fuenf Runden, gewichtet nach Jahreszeit (Winter: Schnee statt
+  Regen, Sommer meist klar), aus dem oeffentlichen Seed. Es wirkt:
+  Regen und Gewitter halbieren den Ertrag der Getreidefelder (abgerundet: ein
+  Dorf dort nichts, eine Stadt eins) und loeschen Feuer; Gewitter ist Sturm und
+  schliesst die Haefen; im Schnee ziehen Einheiten nur jede zweite Runde; Nebel
+  verkuerzt die Sicht um ein Feld, nachts zusammen um zwei.
+- **Feuer.** Nach jeder Pluenderung wuerfelt der Pluenderer: 4-5 legt Feuer an
+  eine Strasse am Feld, 6 an ein Gebaeude. Es brennt, bis sein Besitzer einen
+  eigenen Zug hinter sich hat - so bleibt immer genau ein Zug zum Loeschen: mit
+  einer Rohstoffkarte (Klick auf die Flammen oder im Menue), mit einem Ritter
+  oder dem Helden daneben, oder der Regen tut es. Sonst brennt die Strasse ab
+  und hinterlaesst Asche - dort baut ihr Besitzer sie fuer ein Holz wieder auf -,
+  die Stadt brennt zum Dorf herunter, das Dorf nieder. Das letzte Gebaeude eines
+  Spielers bleibt stehen.
+- **Wachturm.** Bauteil fuer Holz, Lehm und Erz an einem eigenen Dorf oder einer
+  Stadt: sieht fuenf Felder weit, auch nachts, und laesst Brandstifter nicht an
+  sein Haus und die Strassen an dieser Ecke - die Antwort auf die Nacht, die
+  nicht nur Ritter heisst. Er schuetzt Tag und Nacht.
 - **Shader.** Licht, Nacht, Wolken, Regen, Schnee, Nebel, Blitze; Einheiten
   tragen abends und nachts Fackeln, Doerfer und Lager leuchten. Zum Anschauen
   ueber die Adresse vorgebbar: `?zeit=nacht&wetter=gewitter`.
 
-Offen: ob Wetter Regeln aendern soll (Regen bremst, Nebel verkuerzt die Sicht);
-ob Ritter nachts staerker verteidigen; Brand-Animation.
+Offen: ob Ritter nachts staerker verteidigen; ob auch abgebrannte Doerfer
+guenstiger wieder aufzubauen sein sollen.
+
+## Diplomatie und Auftraege
+
+Gebaut in `core/rules/diplomatie.ts` und `core/rules/auftraege.ts`.
+
+- **Abkommen** gelten je Spieler und Fraktion und machen beide einander nicht
+  feind (`feindlich` mit dem Spielstand): keine Raubzuege, keine Horden gegen
+  ihn, keine Kaempfe. *Frieden* kostet 2 Getreide und 2 Wolle und gilt 20
+  Runden - nur Raeuberbanden nehmen ihn. *Tribut* kostet eine Karte sofort und
+  eine zu Beginn jeder grossen Runde, vom groessten Stapel; wer nicht zahlen
+  kann, hat wieder Krieg. Krieg erklaeren geht jederzeit in der Bauphase.
+- **Auftraege.** Kommt ein Wanderer an einer Siedlung vorbei, bietet er ihrem
+  Besitzer an: ein feindliches Lager in der Naehe zerstoeren oder eine Ruine
+  erkunden. 6 Runden Bedenkzeit, 30 Runden Frist, Lohn eine Kartenwahl.
+  Verloren, wenn jemand anderes zuvorkommt. Hoechstens drei offene je Spieler,
+  einer je Wanderer. Antworten darf man auch ausserhalb des eigenen Zugs.
+
+Offen: Auftraege, die Rohstoffe verlangen; Fraktionen, die von selbst Frieden
+anbieten oder brechen; ob Tribut mit der Groesse des Reichs steigen soll.
 
 ---
 
@@ -237,6 +269,15 @@ ob Ritter nachts staerker verteidigen; Brand-Animation.
 
 Deine Idee einer zweiten, parallel laufenden Ebene. Sie passt gut zur
 unbegrenzten Karte: bisher waechst die Welt, aber niemand geht hinaus.
+
+> **Gebaut, erste Fassung** (`core/rules/army.ts`): Jeder Spieler bekommt nach
+> dem Aufbau einen Helden. Er zieht zwei Felder je Runde auf ein gesetztes Ziel
+> (Ziel setzen ja, Weite wuerfeln noch nicht), deckt vier Felder weit auf,
+> geraet in Ruinen nie in einen Hinterhalt und findet eher Beute. Ritter auf
+> seinem Feld treffen um eins leichter; Ritter im Gefolge ziehen mit ihm, so
+> schnell wie er. Er hat 5 Leben, sieht drei Felder weit, auch nachts, und
+> traegt das hellste Licht. Faellt er, kehrt er nach 10 Runden zurueck.
+> Offen: gewuerfelte Weite, Begegnungen als Wahl, Gegenstaende.
 
 ### Grundzuege
 
@@ -301,10 +342,11 @@ das Geruest schon.
    *Erkundung:* Nebel ausserhalb der Sicht, Ruinen mit Schatz, Beute, alter
    Karte oder Hinterhalt. Offen: der Held selbst, und ob Einheiten zu mehreren
    langsamer ziehen sollen - die Runde ist der Spielerzug.
-10. **Held** — erst wenn Karten und Einheiten stehen.
+10. ~~**Held**~~ — erste Fassung gebaut, siehe "Der Held".
 11. ~~**Fraktionen und Kampf**~~ — gebaut: Banden und Staemme mit Namen und
     Farben, Kaempfe ueber mehrere Runden, Heimkehr mit Beute, Fehden,
-    Eroberungen, Wanderer. Als naechstes: Diplomatie.
+    Eroberungen, Wanderer. Seitdem auch Diplomatie (Frieden, Tribut) und
+    Auftraege der Wanderer.
 
 ### Was beim Bauen aufgefallen ist
 

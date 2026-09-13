@@ -65,6 +65,44 @@ export function initAudio(): void {
   master.connect(kompressor).connect(ctx.destination);
 }
 
+/** Der gemeinsame Audiokontext - Musik und Umgebung haengen sich daran. */
+export function audioKontext(): AudioContext | null {
+  return ctx;
+}
+
+const nachFreigabeListe: Array<() => void> = [];
+
+/** Wird aufgerufen, sobald der Browser Ton erlaubt - etwa um die Musik zu starten. */
+export function nachFreigabe(fn: () => void): void {
+  nachFreigabeListe.push(fn);
+}
+
+/**
+ * Ton bei der ersten Beruehrung, Taste oder dem ersten Klick freigeben - auf
+ * der ganzen Seite, nicht an einem bestimmten Knopf.
+ *
+ * Frueher geschah das nur beim Druck auf den Wuerfelknopf und am Regler. Seit
+ * der Knopf von selbst wuerfelt, drueckt ihn kaum noch jemand - und das Spiel
+ * blieb stumm, obwohl alle Klaenge da waren. Die Hoerer bleiben, bis der
+ * Kontext wirklich laeuft: Safari auf dem iPhone gibt ihn erst bei touchend frei.
+ */
+export function installiereTonFreigabe(): void {
+  const arten = ['pointerdown', 'keydown', 'touchend'] as const;
+  let erledigt = false;
+  const fertig = () => {
+    if (erledigt || !ctx || ctx.state !== 'running') return;
+    erledigt = true;
+    for (const a of arten) window.removeEventListener(a, los, true);
+    for (const fn of nachFreigabeListe) fn();
+  };
+  const los = () => {
+    initAudio();
+    if (ctx && ctx.state !== 'running') void ctx.resume().then(fertig, () => undefined);
+    fertig();
+  };
+  for (const a of arten) window.addEventListener(a, los, true);
+}
+
 export function getVolume(): number {
   return volume;
 }
@@ -362,4 +400,61 @@ export function playClash(): void {
   blip(2093, 0.2, 0.05, 0.01, 'triangle');
   noise(0.08, 4600, 0.26, 0.16);
   blip(1397, 0.18, 0.06, 0.16, 'square');
+}
+
+// --- Feuer, Held, Diplomatie, Auftraege ------------------------------------------
+//
+// PLATZHALTER wie alle Klaenge hier (ASSETS.md).
+
+/** Feuer geloescht: ein Zischen, das abklingt. */
+export function playLoeschen(): void {
+  noise(0.6, 5200, 0.22, 0);
+  noise(0.4, 2600, 0.12, 0.1);
+  glide(900, 300, 0.4, 0.03, 0.05, 'triangle');
+}
+
+/** Abgebrannt: Balken brechen, ein tiefer Einsturz. */
+export function playAbgebrannt(): void {
+  noise(0.5, 180, 0.45, 0);
+  noise(0.25, 900, 0.22, 0.12);
+  glide(220, 70, 0.7, 0.1, 0, 'sawtooth');
+}
+
+/** Der Held tritt an: kurze Fanfare. */
+export function playHeld(): void {
+  blip(392, 0.16, 0.1, 0, 'square');
+  blip(523, 0.16, 0.1, 0.14, 'square');
+  blip(659, 0.16, 0.1, 0.28, 'square');
+  blip(784, 0.45, 0.11, 0.42, 'triangle');
+  noise(0.08, 4800, 0.12, 0.42);
+}
+
+/** Ein Abkommen: zwei ruhige Glocken. */
+export function playPakt(): void {
+  blip(523, 0.5, 0.1, 0, 'sine');
+  blip(784, 0.7, 0.08, 0.18, 'sine');
+  blip(1046, 0.6, 0.04, 0.2, 'triangle');
+}
+
+/** Krieg: Trommel und ein tiefes Horn. */
+export function playKrieg(): void {
+  noise(0.2, 110, 0.45, 0);
+  noise(0.2, 110, 0.45, 0.25);
+  glide(110, 98, 0.8, 0.1, 0.1, 'sawtooth');
+}
+
+/** Ein Auftrag: Pergament rollt auf, dann ein heller Ton. */
+export function playAuftrag(): void {
+  noise(0.18, 3000, 0.14, 0);
+  noise(0.12, 2200, 0.1, 0.12);
+  blip(880, 0.3, 0.07, 0.28, 'sine');
+  blip(1318, 0.35, 0.05, 0.36, 'sine');
+}
+
+/** Ein Wachturm steht: Steine setzen. */
+export function playTurm(): void {
+  noise(0.08, 700, 0.3, 0);
+  noise(0.08, 600, 0.3, 0.15);
+  blip(196, 0.14, 0.1, 0.16, 'triangle');
+  blip(988, 0.25, 0.05, 0.3, 'sine');
 }

@@ -11,6 +11,11 @@
  * Karten mit Bestand null bleiben sichtbar, nur blass. Wer sie ausblendet,
  * laesst die Leiste bei jedem Wurf springen, und man verliert die feste
  * Reihenfolge, an der sich das Auge festhaelt.
+ *
+ * SCHMAL. Auf dem Handy nahm das Kartenblatt ueber der Aktionsleiste ein
+ * Viertel der Karte weg. Eingeklappt ist die Hand eine Zahlenleiste - fuenf
+ * kleine Sinnbilder mit ihrer Anzahl. Ein Tipp klappt sie auf und wieder zu;
+ * die Wahl bleibt gespeichert. Auf schmalen Bildschirmen beginnt sie schmal.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -18,10 +23,32 @@ import { RESOURCES } from '../../core/types';
 import type { Resource } from '../../core/types';
 import type { Hand } from '../../core/state';
 import { resourceName } from '../log';
-import { ResourceCard } from './ResourceIcon';
+import { ResourceCard, ResourceGlyph } from './ResourceIcon';
+
+const SCHMAL_KEY = 'infinitecarthage.handschmal';
+
+function schmalAnfangs(): boolean {
+  try {
+    const v = localStorage.getItem(SCHMAL_KEY);
+    if (v === 'schmal') return true;
+    if (v === 'breit') return false;
+  } catch {
+    // Privater Modus - dann nach Bildschirmbreite.
+  }
+  return typeof window !== 'undefined' && window.matchMedia('(max-width: 700px)').matches;
+}
 
 export function HandPanel({ hand }: { hand: Hand }) {
   const total = RESOURCES.reduce((n, r) => n + hand[r], 0);
+  const [schmal, setSchmal] = useState(schmalAnfangs);
+  const umschalten = (neu: boolean) => {
+    setSchmal(neu);
+    try {
+      localStorage.setItem(SCHMAL_KEY, neu ? 'schmal' : 'breit');
+    } catch {
+      // nur fuer diese Sitzung
+    }
+  };
 
   /*
    * Welche Zahl ist gerade gestiegen?
@@ -44,8 +71,36 @@ export function HandPanel({ hand }: { hand: Hand }) {
     return () => window.clearTimeout(t);
   }, [hand]);
 
+  if (schmal) {
+    return (
+      <button
+        className="hand hand-schmal"
+        title={`${total} Karten - antippen zum Aufklappen`}
+        onClick={() => umschalten(false)}
+      >
+        {RESOURCES.map((r) => (
+          <span
+            key={r}
+            data-res={r}
+            className={['hand-mini', hand[r] === 0 ? 'leer' : '', gestiegen.has(r) ? 'zugewinn' : '']
+              .filter(Boolean)
+              .join(' ')}
+          >
+            <svg viewBox="0 0 24 24" width={15} height={15} aria-hidden="true">
+              <ResourceGlyph r={r} />
+            </svg>
+            <b>{hand[r]}</b>
+          </span>
+        ))}
+      </button>
+    );
+  }
+
   return (
     <div className="hand" title={`${total} Karten insgesamt`}>
+      <button className="hand-zu" title="Hand einklappen" onClick={() => umschalten(true)}>
+        –
+      </button>
       {RESOURCES.map((r) => (
         <div
           key={r}

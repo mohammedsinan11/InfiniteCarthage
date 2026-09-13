@@ -41,19 +41,20 @@
  *
  * ZU MEHREREN ist die Runde der Spielerzug (state.turn), wie ueberall im Spiel.
  * Zu viert ziehen Einheiten also viermal, bis man selbst wieder dran ist.
+ *
+ * DER HELD. Jeder Spieler hat einen (spawnHeld). Er zieht zwei Felder je Runde,
+ * deckt weiter auf, geraet in Ruinen nie in einen Hinterhalt und findet eher
+ * Beute. Ritter auf seinem Feld treffen leichter (ANFUEHRUNG), und Ritter in
+ * seinem Gefolge (folgt) ziehen mit ihm, so schnell wie er. Faellt er, kehrt er
+ * nach HELD_RUECKKEHR Runden an einer Siedlung zurueck.
+ *
+ * WETTER. Im Schnee ziehen Einheiten nur jede zweite Runde (core/zeit.ts).
+ * DIPLOMATIE. Wer mit einer Fraktion Frieden hat oder Tribut zahlt, ist fuer
+ * ihre Raubzuege kein Ziel (feindlich mit dem Spielstand, rules/diplomatie.ts).
  */
 
 import { Rng } from '../rng';
-import {
-  edgeKey,
-  hexDistance,
-  hexEdges,
-  hexKey,
-  hexVertices,
-  hexesInRange,
-  neighbors,
-  vertexKey,
-} from '../coords';
+import { hexDistance, hexKey, hexesInRange, neighbors } from '../coords';
 import type { Hex } from '../coords';
 import { ensureGenerated } from '../world';
 import type { World } from '../world';
@@ -89,10 +90,14 @@ import {
   trifft,
 } from '../combat';
 import type { Seite } from '../combat';
+import { ANFUEHRUNG, spielerSeite } from '../combat';
 import { fraktionById } from '../factions';
 import type { FraktionArt } from '../factions';
 import { raidLoss, takeFromLargest } from './raid';
 import { roundOf } from '../season';
+import { einheitenRasten } from '../zeit';
+import { feuerLegen } from './feuer';
+import type { FeuerEvent } from './feuer';
 
 /**
  * Lager bis zu dieser Entfernung von einer Siedlung schicken Raubzuege.
@@ -118,6 +123,12 @@ export const HINTERHALT_UEBERSTEHT_AB = 3;
 export const KARTE_RADIUS = 8;
 /** Wie weit ein Ritter beim Ziehen aufdeckt - wie beim Bauen. */
 const ERKUNDUNG_RADIUS = 3;
+/** Wie weit der Held beim Ziehen aufdeckt. */
+const ERKUNDUNG_HELD = 4;
+/** Felder je Runde fuer den Helden und sein Gefolge. */
+export const HELD_SCHRITTE = 2;
+/** Nach so vielen Runden kehrt ein gefallener Held zurueck. */
+export const HELD_RUECKKEHR = 10;
 
 /** Wie weit ein Lager ein feindliches angreift. */
 export const FEHDE_REICHWEITE = 7;
@@ -216,6 +227,8 @@ export type ArmyEvent =
       result: RuinResult;
       gained: Hand;
       knightLost: boolean;
+      /** Der Held hat sie erkundet. */
+      held: boolean;
     }
   | {
       /** Nachts: eine Goblin-Horde bricht auf. */
@@ -226,17 +239,12 @@ export type ArmyEvent =
       fraktion: string;
       anzahl: number;
     }
-  | {
-      /** Pluenderer haben Feuer gelegt. */
-      t: 'burn';
-      player: PlayerId;
-      fraktion: string;
-      q: number;
-      r: number;
-      /** strasse: abgebrannt, dorf: niedergebrannt, stadt: zum Dorf heruntergebrannt. */
-      art: 'strasse' | 'dorf' | 'stadt';
-      key: string;
-    }
+  /** Der Held tritt an - zu Beginn oder nach seinem Fall (zurueck). */
+  | { t: 'heroReady'; player: PlayerId; unit: number; q: number; r: number; zurueck: boolean }
+  /** Der Held ist gefallen und kehrt in Zug zurueck wieder. */
+  | { t: 'heroFell'; player: PlayerId; q: number; r: number; zurueck: number }
+  /** Feuer: gelegt, abgewehrt, geloescht, abgebrannt (rules/feuer.ts). */
+  | FeuerEvent
   | { t: 'chunks'; coords: ChunkCoord[] };
 
 /** Nimmt Heeresereignisse auf - ein GameEvent[] passt hinein. */
@@ -320,6 +328,47 @@ function uebergib(s: GameState, tot: UnitState, erbe: UnitState, events: Ereigni
 
 // --- Aufbruch zu Beginn der grossen Runde -----------------------------------
 
+/**
+ * Den Helden eines Spielers antreten lassen - an einer eigenen Siedlung, auf der
+ * Seite der naechsten Gefahr. null ohne Siedlung oder wenn er schon steht.
+ */
+export function spawnHeld(s: GameState, id: PlayerId, events: Ereignisse): UnitState | null {
+  if (s.units.some((u) => u.kind === 'held' && u.owner === id)) return null;
+  const feldAn = knightMusterHex(s, id);
+  if (!feldAn) return null;
+  const p = playerById(s, id);
+  const zurueck = p?.heldZurueck !== null && p?.heldZurueck !== undefined;
+  const unit = aufstellen(s, einheitVorlage('held', feldAn.q, feldAn.r, { owner: id }));
+  if (p) p.heldZurueck = null;
+  events.push({ t: 'heroReady', player: id, unit: unit.id, q: unit.q, r: unit.r, zurueck });
+  return unit;
+}
+
+/** Nach jeder Runde: gefallene Helden kehren zurueck, wenn ihre Zeit um ist. */
+export function heldenRunde(s: GameState, events: Ereignisse): void {
+  for (const p of s.players) {
+    if (p.heldZurueck === null || s.turn < p.heldZurueck) continue;
+    spawnHeld(s, p.id, events);
+  }
+}
+
+/** Ein Held faellt: sein Gefolge steht allein, und er kehrt spaeter zurueck. */
+function heldFaellt(s: GameState, u: UnitState, events: Ereignisse): void {
+  if (u.owner === null) return;
+  const zurueck = s.turn + HELD_RUECKKEHR;
+  const p = playerById(s, u.owner);
+  if (p) p.heldZurueck = zurueck;
+  for (const x of s.units) if (x.folgt === u.id) x.folgt = null;
+  events.push({ t: 'heroFell', player: u.owner, q: u.q, r: u.r, zurueck });
+}
+
+/**
+ * Wer mit dieser Fraktion im Krieg ist - fuer die Wahl der Raubziele. Frieden
+ * und Tribut nehmen einen Spieler heraus (rules/diplomatie.ts).
+ */
+const imKriegMit = (s: GameState, fraktion: string | null) => (id: PlayerId): boolean =>
+  fraktion === null || feindlich(spielerSeite(id), fraktion, s);
+
 /** Einen Ritter fuer diesen Spieler antreten lassen. null ohne Siedlung. */
 export function spawnKnight(s: GameState, id: PlayerId, events: Ereignisse): UnitState | null {
   const feldAn = knightMusterHex(s, id);
@@ -340,14 +389,14 @@ export function spawnKnight(s: GameState, id: PlayerId, events: Ereignisse): Uni
 export function sendRaiders(s: GameState, events: Ereignisse): void {
   const ziele = settlementApproaches(s);
   if (ziele.size === 0) return;
-  const zielSet = new Set(ziele.keys());
 
   // Aktive Lager in Reichweite, jeweils mit dem Abstand zur naechsten Siedlung.
   const lager = new Map<string, { q: number; r: number; d: number }>();
-  for (const k of ziele.keys()) {
+  for (const [k, owner] of ziele) {
     const an = feld(k);
     for (const c of hexesInRange(an, SPAWN_RANGE)) {
       if (!isNestActive(s, c.q, c.r)) continue;
+      if (!imKriegMit(s, nestFraktionOf(s, c.q, c.r))(owner)) continue;
       const ck = hexKey(c.q, c.r);
       const d = hexDistance(an, c);
       const bisher = lager.get(ck);
@@ -364,10 +413,11 @@ export function sendRaiders(s: GameState, events: Ereignisse): void {
   for (const [k, nest] of reihe) {
     if (parties.length >= grenze) break;
     if (unterwegs.has(k)) continue;
+    const fraktion = nestFraktionOf(s, nest.q, nest.r);
+    const zielSet = new Set(settlementApproaches(s, undefined, imKriegMit(s, fraktion)).keys());
     const schonDa = zielSet.has(k);
     const weg = schonDa ? null : nextStep(s.worldSeed, nest, zielSet, SUCHE_RAEUBER);
     if (!weg && !schonDa) continue;
-    const fraktion = nestFraktionOf(s, nest.q, nest.r);
     const kind = fraktionById(s.worldSeed, fraktion).art;
     aufstellen(
       s,
@@ -412,7 +462,7 @@ export function sendFeud(s: GameState, rng: Rng, events: Ereignisse): void {
     const eigene = nestFraktionOf(s, von.q, von.r);
     for (const c of hexesInRange(von, FEHDE_REICHWEITE)) {
       if (!isNestActive(s, c.q, c.r)) continue;
-      if (!feindlich(eigene, nestFraktionOf(s, c.q, c.r))) continue;
+      if (!feindlich(eigene, nestFraktionOf(s, c.q, c.r), s)) continue;
       paare.push({ von, vk, nach: c, nk: hexKey(c.q, c.r) });
     }
   }
@@ -511,10 +561,9 @@ export function sendHorde(s: GameState, rng: Rng, events: Ereignisse): void {
   if (rng.next() / UINT >= HORDE_CHANCE) return;
   const ziele = settlementApproaches(s);
   if (ziele.size === 0) return;
-  const zielSet = new Set(ziele.keys());
 
   const lager = new Map<string, { q: number; r: number; d: number }>();
-  for (const k of ziele.keys()) {
+  for (const [k, owner] of ziele) {
     const an = feld(k);
     for (const c of hexesInRange(an, HORDE_REICHWEITE)) {
       if (!isNestActive(s, c.q, c.r)) continue;
@@ -523,15 +572,17 @@ export function sendHorde(s: GameState, rng: Rng, events: Ereignisse): void {
       const bisher = lager.get(ck);
       if (bisher && bisher.d <= d) continue;
       if (fraktionById(s.worldSeed, nestFraktionOf(s, c.q, c.r)).art !== 'goblin') continue;
+      if (!imKriegMit(s, nestFraktionOf(s, c.q, c.r))(owner)) continue;
       lager.set(ck, { q: c.q, r: c.r, d });
     }
   }
 
   const reihe = [...lager].sort((a, b) => a[1].d - b[1].d || nachSchluessel(a[0], b[0]));
   for (const [k, nest] of reihe) {
+    const fraktion = nestFraktionOf(s, nest.q, nest.r);
+    const zielSet = new Set(settlementApproaches(s, undefined, imKriegMit(s, fraktion)).keys());
     const weg = nextStep(s.worldSeed, nest, zielSet, SUCHE_RAEUBER * 2);
     if (!weg) continue;
-    const fraktion = nestFraktionOf(s, nest.q, nest.r);
     const anzahl = hordeGroesse(s.order.length);
     for (let i = 0; i < anzahl; i++) {
       aufstellen(
@@ -545,67 +596,9 @@ export function sendHorde(s: GameState, rng: Rng, events: Ereignisse): void {
 }
 
 // --- Brandschatzen --------------------------------------------------------------
-
-/** Ab diesem Wurf legt ein Pluenderer Feuer an eine Strasse. */
-export const BRAND_STRASSE_AB = 4;
-/** Ab diesem Wurf trifft das Feuer ein Gebaeude. */
-export const BRAND_GEBAEUDE_AB = 6;
-
-/**
- * Nach der Pluenderung wuerfelt der Pluenderer, ob er Feuer legt.
- *
- *   1-3  nichts weiter
- *   4-5  eine Strasse des Spielers an diesem Feld brennt ab
- *   6    ein Gebaeude an diesem Feld: eine Stadt brennt zum Dorf herunter, ein
- *        Dorf brennt nieder - ausser es ist das letzte Gebaeude des Spielers.
- *        Dann brennt stattdessen eine Strasse.
- *
- * Das letzte Gebaeude bleibt, weil ohne Siedlung kein Ritter mehr antreten und
- * nichts mehr wachsen kann: ein Ueberfall soll schmerzen, nicht die Partie
- * beenden.
- */
-function brandschatzen(
-  s: GameState,
-  rng: Rng,
-  u: UnitState,
-  owner: PlayerId,
-  events: Ereignisse,
-): void {
-  const w = wurf(rng);
-  if (w < BRAND_STRASSE_AB) return;
-  const fraktion = u.fraktion ?? '';
-
-  if (w >= BRAND_GEBAEUDE_AB) {
-    const ecken = hexVertices(u.q, u.r)
-      .map(vertexKey)
-      .filter((vk) => s.buildings[vk]?.owner === owner)
-      .sort();
-    const gebaeude = Object.values(s.buildings).filter((b) => b.owner === owner).length;
-    if (ecken.length > 0) {
-      const vk = ecken[rng.int(ecken.length)]!;
-      const b = s.buildings[vk]!;
-      if (b.type === 'city') {
-        b.type = 'settlement';
-        events.push({ t: 'burn', player: owner, fraktion, q: u.q, r: u.r, art: 'stadt', key: vk });
-        return;
-      }
-      if (gebaeude > 1) {
-        delete s.buildings[vk];
-        events.push({ t: 'burn', player: owner, fraktion, q: u.q, r: u.r, art: 'dorf', key: vk });
-        return;
-      }
-    }
-  }
-
-  const kanten = hexEdges(u.q, u.r)
-    .map(edgeKey)
-    .filter((ek) => s.roads[ek] === owner)
-    .sort();
-  if (kanten.length === 0) return;
-  const ek = kanten[rng.int(kanten.length)]!;
-  delete s.roads[ek];
-  events.push({ t: 'burn', player: owner, fraktion, q: u.q, r: u.r, art: 'strasse', key: ek });
-}
+//
+// Steht jetzt in rules/feuer.ts (feuerLegen): das Feuer brennt erst eine Runde
+// und laesst sich loeschen, bevor es abbrennt.
 
 // --- Die Runde ---------------------------------------------------------------
 
@@ -620,7 +613,9 @@ function erkunde(
   s.exploredRuins.push(hexKey(u.q, u.r));
   const owner = u.owner!;
   const p = playerById(s, owner);
-  const result = ruinResultFor(wurf(rng));
+  // Der Held kennt die alten Wege: ein Auge mehr - kein Hinterhalt, eher Beute.
+  const held = u.kind === 'held';
+  const result = ruinResultFor(Math.min(6, wurf(rng) + (held ? 1 : 0)));
   const gained = emptyHand();
   let knightLost = false;
 
@@ -643,7 +638,7 @@ function erkunde(
   } else if (result === 'karte') {
     wachsen(s, world, u, KARTE_RADIUS, events);
   }
-  events.push({ t: 'ruin', q: u.q, r: u.r, player: owner, result, gained, knightLost });
+  events.push({ t: 'ruin', q: u.q, r: u.r, player: owner, result, gained, knightLost, held });
 }
 
 /** Das Lager, zu dem ein Heimkehrer zieht: sein eigenes, sonst das naechste seiner Fraktion. */
@@ -684,7 +679,8 @@ function ziehe(
   world: World,
   rng: Rng,
   u: UnitState,
-  siedlungen: ReadonlySet<string>,
+  /** Die Siedlungsfelder, die fuer diese Fraktion Ziel sind. */
+  zieleFuer: (fraktion: string | null) => ReadonlySet<string>,
   events: Ereignisse,
 ): boolean {
   const seed = s.worldSeed;
@@ -695,19 +691,42 @@ function ziehe(
 
   switch (u.auftrag) {
     case 'befehl': {
-      if (!u.ziel) return false;
-      const zk = hexKey(u.ziel.q, u.ziel.r);
-      const weg = nextStep(seed, u, new Set([zk]), SUCHE_RITTER);
-      if (weg) {
-        schritt(weg.step);
-        wachsen(s, world, u, ERKUNDUNG_RADIUS, events);
+      // Im Gefolge: das Ziel ist, wo der Held gerade steht.
+      let fuehrer: UnitState | undefined;
+      if (u.folgt !== null) {
+        fuehrer = s.units.find((x) => x.id === u.folgt && x.owner === u.owner && x.kind === 'held');
+        if (!fuehrer) {
+          u.folgt = null;
+          u.ziel = null;
+          return false;
+        }
+        u.ziel = u.q === fuehrer.q && u.r === fuehrer.r ? null : { q: fuehrer.q, r: fuehrer.r };
       }
-      // Am Ziel oder ohne Weg: der Befehl ist erledigt.
-      if (!weg || hexKey(u.q, u.r) === zk) u.ziel = null;
-      return weg !== null;
+      const schritte = u.kind === 'held' || fuehrer ? HELD_SCHRITTE : 1;
+      let gezogen = false;
+      for (let i = 0; i < schritte && u.ziel; i++) {
+        const zk = hexKey(u.ziel.q, u.ziel.r);
+        const weg = nextStep(seed, u, new Set([zk]), SUCHE_RITTER);
+        if (weg) {
+          schritt(weg.step);
+          gezogen = true;
+          wachsen(s, world, u, u.kind === 'held' ? ERKUNDUNG_HELD : ERKUNDUNG_RADIUS, events);
+        }
+        // Am Ziel oder ohne Weg: der Befehl ist erledigt.
+        if (!weg || hexKey(u.q, u.r) === zk) u.ziel = null;
+        if (!weg) break;
+        // Unterwegs: Ruinen erkunden, vor Feinden stehen bleiben.
+        if (u.owner !== null && ruinAt(seed, u.q, u.r) && !s.exploredRuins.includes(hexKey(u.q, u.r))) {
+          erkunde(s, world, rng, u, events);
+          if (!s.units.includes(u)) return true;
+        }
+        if (imKampf(s, u)) break;
+      }
+      return gezogen;
     }
 
     case 'raub': {
+      const siedlungen = zieleFuer(u.fraktion);
       const weg = siedlungen.size > 0 ? nextStep(seed, u, siedlungen, SUCHE_RAEUBER) : null;
       if (weg) {
         schritt(weg.step);
@@ -730,7 +749,7 @@ function ziehe(
         !z ||
         u.fraktion === null ||
         !isNestActive(s, z.q, z.r) ||
-        !feindlich(u.fraktion, nestFraktionOf(s, z.q, z.r))
+        !feindlich(u.fraktion, nestFraktionOf(s, z.q, z.r), s)
       ) {
         u.auftrag = 'heimkehr';
         u.ziel = null;
@@ -813,8 +832,8 @@ function schlacht(
   const schaden = new Map<number, number>();
   let besatzungTreffer = 0;
   const schlage = (seite: Seite, angriff: number, aufschlag: number) => {
-    const einheiten = kaempfer.filter((x) => feindlich(seite, seiteVon(x)));
-    const plaetze = lagerSeite !== null && feindlich(seite, lagerSeite) ? besatzungVorher : 0;
+    const einheiten = kaempfer.filter((x) => feindlich(seite, seiteVon(x), s));
+    const plaetze = lagerSeite !== null && feindlich(seite, lagerSeite, s) ? besatzungVorher : 0;
     const anzahl = einheiten.length + plaetze;
     if (anzahl === 0) return;
     if (!trifft(wurf(rng), angriff, aufschlag)) return;
@@ -828,7 +847,9 @@ function schlacht(
   };
   for (const u of kaempfer) {
     const seite = seiteVon(u);
-    schlage(seite, WERTE[u.kind].angriff, lagerSeite !== null && seite !== lagerSeite ? -PALISADE : 0);
+    const angefuehrt =
+      u.kind === 'ritter' && kaempfer.some((x) => x.kind === 'held' && x.owner === u.owner) ? ANFUEHRUNG : 0;
+    schlage(seite, WERTE[u.kind].angriff + angefuehrt, lagerSeite !== null && seite !== lagerSeite ? -PALISADE : 0);
   }
   if (lagerSeite !== null && besatzungArt !== null) {
     for (let i = 0; i < besatzungVorher; i++) {
@@ -856,13 +877,14 @@ function schlacht(
   const besatzungVerlust = Math.min(besatzungTreffer, besatzungVorher);
   for (let i = 0; i < besatzungVerlust; i++) zaehle(lagerSeite!, 'besatzung');
   entfernen(s, gefallen);
+  for (const tot of gefallen) if (tot.kind === 'held') heldFaellt(s, tot, events);
   const stehen = kaempfer.filter((x) => !gefallen.includes(x));
 
   // Beute der Gefallenen: an einen Feind, der noch steht, sonst an einen Kameraden.
   for (const tot of gefallen) {
     if (tot.traegt === 0 && !tot.fracht) continue;
     const seite = seiteVon(tot);
-    const feinde = stehen.filter((x) => feindlich(seite, seiteVon(x)));
+    const feinde = stehen.filter((x) => feindlich(seite, seiteVon(x), s));
     const kameraden = stehen.filter((x) => seiteVon(x) === seite);
     const erben = feinde.length > 0 ? feinde : kameraden;
     if (erben.length === 0) frachtZurBank(s, tot);
@@ -876,11 +898,11 @@ function schlacht(
       s.nestGarrison[k] = rest;
     } else {
       const eigene = stehen.filter((x) => seiteVon(x) === lagerSeite);
-      const ritter = stehen.filter((x) => x.kind === 'ritter');
+      const ritter = stehen.filter((x) => x.kind === 'ritter' || x.kind === 'held');
       const fremde = new Map<Seite, UnitState[]>();
       for (const x of stehen) {
         const seite = seiteVon(x);
-        if (istSpielerSeite(seite) || !feindlich(seite, lagerSeite)) continue;
+        if (istSpielerSeite(seite) || !feindlich(seite, lagerSeite, s)) continue;
         fremde.set(seite, [...(fremde.get(seite) ?? []), x]);
       }
 
@@ -914,7 +936,7 @@ function schlacht(
   }
 
   const nachher = seitenAuf(s, q, r);
-  const ende = !istKampf(nachher);
+  const ende = !istKampf(nachher, s);
   const sieger = !ende
     ? null
     : (nachher[0] ?? (isNestActive(s, q, r) ? nestFraktionOf(s, q, r) : null));
@@ -927,24 +949,43 @@ export function tickArmy(s: GameState, world: World, events: Ereignisse): void {
   const rng = new Rng(s.rngState);
   const seed = s.worldSeed;
   const vorher = new Set(kampfFelder(s).keys());
-  const siedlungen = settlementApproaches(s);
-  const siedlungsFelder = new Set(siedlungen.keys());
   const gezogen = new Set<number>();
-
-  // 1. Ziehen.
-  for (const u of [...s.units].sort(nachNummer)) {
-    if (!s.units.includes(u) || imKampf(s, u)) continue;
-    if (ziehe(s, world, rng, u, siedlungsFelder, events)) gezogen.add(u.id);
-    const k = hexKey(u.q, u.r);
-    if (
-      s.units.includes(u) &&
-      u.kind === 'ritter' &&
-      u.owner !== null &&
-      ruinAt(seed, u.q, u.r) &&
-      !s.exploredRuins.includes(k)
-    ) {
-      erkunde(s, world, rng, u, events);
+  // Raubziele je Fraktion: wer mit ihr Frieden hat, ist keines.
+  const zielCache = new Map<string, Map<string, PlayerId>>();
+  const besitzerFuer = (fraktion: string | null): Map<string, PlayerId> => {
+    const k = fraktion ?? '';
+    let m = zielCache.get(k);
+    if (!m) {
+      m = settlementApproaches(s, undefined, imKriegMit(s, fraktion));
+      zielCache.set(k, m);
     }
+    return m;
+  };
+  const felderFuer = new Map<string, Set<string>>();
+  const zieleFuer = (fraktion: string | null): ReadonlySet<string> => {
+    const k = fraktion ?? '';
+    let f = felderFuer.get(k);
+    if (!f) {
+      f = new Set(besitzerFuer(fraktion).keys());
+      felderFuer.set(k, f);
+    }
+    return f;
+  };
+  const siedlungen = settlementApproaches(s);
+  // Im Schnee bleibt in jeder zweiten Runde alles stehen (core/zeit.ts).
+  const rast = einheitenRasten(seed, s.turn);
+
+  // 1. Ziehen - der Held vor seinem Gefolge, sonst nach Nummer.
+  const reihe = [...s.units].sort((a, b) => (a.folgt === null ? 0 : 1) - (b.folgt === null ? 0 : 1) || a.id - b.id);
+  for (const u of rast ? [] : reihe) {
+    if (!s.units.includes(u) || imKampf(s, u)) continue;
+    if (ziehe(s, world, rng, u, zieleFuer, events)) gezogen.add(u.id);
+  }
+  // Wer auf einer Ruine steht, erkundet sie - auch wer dort erst antrat.
+  for (const u of [...s.units].sort(nachNummer)) {
+    if (u.owner === null || (u.kind !== 'ritter' && u.kind !== 'held')) continue;
+    if (!ruinAt(seed, u.q, u.r) || s.exploredRuins.includes(hexKey(u.q, u.r))) continue;
+    erkunde(s, world, rng, u, events);
   }
 
   // 2. Heimkehr: am eigenen Lager angekommen.
@@ -960,14 +1001,14 @@ export function tickArmy(s: GameState, world: World, events: Ereignisse): void {
     events.push({ t: 'homecoming', q: u.q, r: u.r, fraktion: u.fraktion, count });
   }
 
-  // 3. Angriff: wer stand, stuermt auf Feinde nebenan.
-  for (const u of [...s.units].sort(nachNummer)) {
+  // 3. Angriff: wer stand, stuermt auf Feinde nebenan. Im Schnee nicht.
+  for (const u of rast ? [] : [...s.units].sort(nachNummer)) {
     if (!s.units.includes(u) || gezogen.has(u.id)) continue;
     if (u.auftrag === 'heimkehr' || u.auftrag === 'wandern') continue;
     const eigene = seiteVon(u);
     if (eigene === NEUTRAL || imKampf(s, u)) continue;
     const nebenan = neighbors(u.q, u.r).find((n) =>
-      s.units.some((x) => x.q === n.q && x.r === n.r && feindlich(eigene, seiteVon(x))),
+      s.units.some((x) => x.q === n.q && x.r === n.r && feindlich(eigene, seiteVon(x), s)),
     );
     if (!nebenan) continue;
     u.q = nebenan.q;
@@ -985,7 +1026,7 @@ export function tickArmy(s: GameState, world: World, events: Ereignisse): void {
 
   // 5. Pluenderung.
   for (const u of s.units.filter((x) => x.auftrag === 'raub').sort(nachNummer)) {
-    const owner = siedlungen.get(hexKey(u.q, u.r));
+    const owner = besitzerFuer(u.fraktion).get(hexKey(u.q, u.r));
     if (owner === undefined || imKampf(s, u)) continue;
     const p = playerById(s, owner);
     if (!p) continue;
@@ -1006,12 +1047,12 @@ export function tickArmy(s: GameState, world: World, events: Ereignisse): void {
       taken,
       count: menge,
     });
-    brandschatzen(s, rng, u, owner, events);
+    feuerLegen(s, rng, u, owner, events);
   }
 
   // 6. Erholung an eigenen Siedlungen.
   for (const u of s.units) {
-    if (u.kind !== 'ritter' || u.leben >= WERTE.ritter.leben) continue;
+    if ((u.kind !== 'ritter' && u.kind !== 'held') || u.leben >= WERTE[u.kind].leben) continue;
     const k = hexKey(u.q, u.r);
     if (gekaempft.has(k) || siedlungen.get(k) !== u.owner) continue;
     u.leben += 1;

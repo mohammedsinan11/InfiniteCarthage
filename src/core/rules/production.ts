@@ -16,6 +16,8 @@ import type { GameState, PlayerId } from '../state';
 import { modifiersOf, terrainBonusFor } from '../cards/effects';
 import { emptyHand } from '../state';
 import type { Hand } from '../state';
+import { regnet, wetterOf } from '../zeit';
+import type { Wetter } from '../zeit';
 
 export type Payout = Record<PlayerId, Hand>;
 
@@ -50,8 +52,14 @@ export function productionSources(
   state: Pick<GameState, 'buildings'> & { players: ReadonlyArray<{ id: PlayerId; cards: string[] }> },
   world: World,
   roll: number,
+  /**
+   * Das Wetter der Runde (core/zeit.ts). Bei Regen liefern Getreidefelder die
+   * Haelfte, abgerundet: ein Dorf dort nichts, eine Stadt eins.
+   */
+  wetter: Wetter = 'klar',
 ): ProductionSource[] {
   const out: ProductionSource[] = [];
+  const nass = regnet(wetter);
   const cardsOf = (id: PlayerId): string[] =>
     state.players.find((p) => p.id === id)?.cards ?? [];
   for (const tile of world.tiles.values()) {
@@ -66,7 +74,8 @@ export function productionSources(
       const grund = b.type === 'city' ? 2 : 1;
       // Karten koennen den Ertrag heben oder senken, aber nie unter null.
       const mods = modifiersOf(cardsOf(b.owner));
-      const amount = terrainBonusFor(mods, tile.terrain, grund);
+      const voll = terrainBonusFor(mods, tile.terrain, grund);
+      const amount = nass && tile.terrain === 'field' ? Math.floor(voll / 2) : voll;
       if (amount > 0) out.push({ hex: hk, owner: b.owner, resource, amount });
     }
   }
@@ -92,7 +101,7 @@ export function computeProduction(
     ore: new Map(),
   };
 
-  for (const q of productionSources(state, world, roll)) {
+  for (const q of productionSources(state, world, roll, wetterOf(state.worldSeed, state.turn))) {
     const m = claims[q.resource];
     m.set(q.owner, (m.get(q.owner) ?? 0) + q.amount);
   }

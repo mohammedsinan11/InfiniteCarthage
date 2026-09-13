@@ -30,14 +30,21 @@ import {
 } from '../../core/season';
 import { cardById } from '../../core/cards/catalog';
 import { modifiersOf } from '../../core/cards/effects';
-import type { Terrain } from '../../core/types';
-import type { UnitState } from '../../core/state';
+import type { Resource, Terrain } from '../../core/types';
+import type { Abkommen, Brand, UnitState, WandererAuftrag } from '../../core/state';
 import { hexDistance } from '../../core/coords';
+import { WERTE } from '../../core/units';
+import { TAGESZEIT_NAME, WETTER_NAME } from '../../core/zeit';
+import type { Tageszeit, Wetter } from '../../core/zeit';
+import { FRIEDEN_PREIS, TRIBUT_KARTEN } from '../../core/rules/diplomatie';
+import type { Verhandlung } from '../../core/rules/diplomatie';
 import { getVolume, initAudio, setVolume } from '../audio';
 import { LogPanel } from './LogPanel';
 import type { WeltEintrag } from '../net/store';
-import { TRACKS, getMusicMode, setMusicMode } from '../music';
+import { TRACKS, getMusicMode, getMusicVolume, setMusicMode, setMusicVolume } from '../music';
 import type { MusicMode } from '../music';
+import { getUmgebungVolume, setUmgebungVolume } from '../ambiente';
+import { BRAND_WAS, bundleText, resourceName } from '../log';
 
 type Reiter = 'reich' | 'karten' | 'technik' | 'auftraege' | 'ton';
 
@@ -54,6 +61,10 @@ export type FraktionsZeile = {
   unterwegs: number;
   /** Abstand des naechsten Lagers zu den eigenen Siedlungen. */
   naechster: number | null;
+  /** Das eigene Abkommen mit ihr, falls eines gilt. */
+  abkommen: Abkommen | null;
+  /** Schliesst sie Frieden? Nur Raeuberbanden (rules/diplomatie.ts). */
+  nimmtFrieden: boolean;
 };
 
 const REITER: ReadonlyArray<{ id: Reiter; kurz: string; titel: string }> = [
@@ -118,6 +129,23 @@ export function SideMenu({
   onToggleNumbers,
   autoWurf,
   onToggleAutoWurf,
+  autoWurfSekunden,
+  zeitInfo,
+  held,
+  heldZurueck,
+  onFolgen,
+  diplomatieMoeglich,
+  friedenBezahlbar,
+  tributBezahlbar,
+  onDiplomatie,
+  auftraege,
+  onAuftrag,
+  onZeigenFeld,
+  nameVon,
+  braende,
+  loeschKarte,
+  loeschenMoeglich,
+  onLoeschen,
 }: {
   turn: number;
   /** Die eigenen genommenen Karten, in der Reihenfolge der Wahl. */
@@ -146,9 +174,34 @@ export function SideMenu({
   onBeute: () => void;
   showNumbers: boolean;
   onToggleNumbers: () => void;
-  /** Wuerfelt der Knopf nach fuenf Sekunden von selbst? */
+  /** Wuerfelt der Knopf nach einigen Sekunden von selbst? */
   autoWurf: boolean;
   onToggleAutoWurf: () => void;
+  autoWurfSekunden: number;
+  /** Tageszeit und Wetter mit ihrer Dauer und dem, was das Wetter bewirkt. */
+  zeitInfo: { tageszeit: Tageszeit; wetter: Wetter; bisTageszeit: number; bisWetter: number; wirkung: string };
+  /** Der eigene Held, wenn er auf der Karte steht. */
+  held: UnitState | null;
+  /** Wann der gefallene Held zurueckkehrt. */
+  heldZurueck: number | null;
+  onFolgen: (id: number, folgen: boolean) => void;
+  /** Darf gerade verhandelt werden (eigene Bauphase)? */
+  diplomatieMoeglich: boolean;
+  friedenBezahlbar: boolean;
+  tributBezahlbar: boolean;
+  onDiplomatie: (fraktion: string, art: Verhandlung) => void;
+  /** Die eigenen Auftraege - Angebote und angenommene. */
+  auftraege: readonly WandererAuftrag[];
+  onAuftrag: (id: number, annehmen: boolean) => void;
+  onZeigenFeld: (q: number, r: number) => void;
+  /** Name einer Fraktion. */
+  nameVon: (fraktion: string) => string;
+  /** Die eigenen Feuer. */
+  braende: readonly Brand[];
+  /** Welche Karte das Loeschen kostet - der groesste Stapel -, null ohne Karten. */
+  loeschKarte: Resource | null;
+  loeschenMoeglich: boolean;
+  onLoeschen: (key: string) => void;
 }) {
   // Auf schmalen Bildschirmen zu Beginn eingeklappt - auf dem Handy deckte das
   // Menue sonst ein gutes Drittel der Karte ab, bevor man sie gesehen hat.
@@ -158,6 +211,8 @@ export function SideMenu({
   const [reiter, setReiter] = useState<Reiter>('reich');
   const [ton, setTon] = useState(getVolume);
   const [musik, setMusik] = useState<MusicMode>(getMusicMode);
+  const [musikPegel, setMusikPegel] = useState(getMusicVolume);
+  const [umgebung, setUmgebung] = useState(getUmgebungVolume);
 
   const saison = seasonOf(turn);
   // Raubzuege brechen zum Beginn jeder grossen Runde auf (rules/army.ts, sendRaiders).
@@ -193,6 +248,10 @@ export function SideMenu({
           Gr. {bigRoundOf(turn)}
         </div>
         <div className="menu-rest">noch {roundsLeftInSeason(turn)} bis zum Wechsel</div>
+        <div className="menu-rest">
+          {TAGESZEIT_NAME[zeitInfo.tageszeit]} noch {zeitInfo.bisTageszeit} · {WETTER_NAME[zeitInfo.wetter]} noch{' '}
+          {zeitInfo.bisWetter}
+        </div>
       </div>
 
       <div className="menu-reiter">
@@ -233,6 +292,9 @@ export function SideMenu({
               <b className={lage.kaempfe > 0 ? 'gefahr' : undefined}>{lage.kaempfe}</b>
               <span>Naechster Aufbruch</span>
               <b>{bisPluenderung === 1 ? 'naechste Runde' : `in ${bisPluenderung} Runden`}</b>
+              <span>Wetter</span>
+              <b className={zeitInfo.wirkung ? 'gefahr' : undefined}>{WETTER_NAME[zeitInfo.wetter]}</b>
+              {zeitInfo.wirkung && <span className="menu-wache-hinweis">{zeitInfo.wirkung}.</span>}
               <span className="menu-wache-hinweis">
                 {lage.unterwegs === 0
                   ? 'Ruhig. Zum Beginn jeder grossen Runde brechen Raubzuege aus nahen Lagern auf.'
@@ -241,9 +303,44 @@ export function SideMenu({
             </div>
 
             {/*
-              Die Fraktionen: wem die Lager ringsum gehoeren. Alle sind einander
-              und dir feind - die Haltung steht schon da, damit die Diplomatie
-              spaeter einen Platz hat.
+              Feuer: was brennt, und womit es sich loeschen laesst. Ein Zug
+              bleibt dafuer - danach brennt es ab (rules/feuer.ts).
+            */}
+            {braende.length > 0 && (
+              <>
+                <h3 className="gefahr">Es brennt</h3>
+                <ul className="menu-braende">
+                  {braende.map((b) => (
+                    <li key={b.key}>
+                      <span>
+                        Es brennt {BRAND_WAS[b.art]} - loeschen, sonst brennt es nach deinem Zug ab.
+                      </span>
+                      <div className="menu-ritter-knoepfe">
+                        <button onClick={() => onZeigenFeld(b.q, b.r)}>Zeigen</button>
+                        <button
+                          className="aktiv"
+                          disabled={!loeschenMoeglich || loeschKarte === null}
+                          title={
+                            loeschKarte
+                              ? `Loeschen kostet eine Karte: ${resourceName(loeschKarte)}`
+                              : 'Dafuer fehlt dir eine Karte'
+                          }
+                          onClick={() => onLoeschen(b.key)}
+                        >
+                          Loeschen{loeschKarte ? ` (1 ${resourceName(loeschKarte)})` : ''}
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <p className="menu-leer">Auch ein Ritter oder dein Held daneben loescht, und Regen tut es von selbst.</p>
+              </>
+            )}
+
+            {/*
+              Die Fraktionen: wem die Lager ringsum gehoeren. Mit jeder laesst sich
+              verhandeln - Frieden (nur Raeuber) oder Tribut. Solange ein Abkommen
+              gilt, ziehen ihre Raubzuege an dir vorbei (rules/diplomatie.ts).
             */}
             <h3>Fraktionen</h3>
             {fraktionen.length === 0 ? (
@@ -254,13 +351,47 @@ export function SideMenu({
                   <li key={f.id}>
                     <span className="menu-fraktion-farbe" style={{ background: f.farbe }} />
                     <span className="menu-fraktion-name">{f.name}</span>
-                    <span className="menu-fraktion-haltung" title="Diplomatie folgt">
-                      Krieg
+                    <span
+                      className={
+                        f.abkommen ? 'menu-fraktion-haltung friedlich' : 'menu-fraktion-haltung'
+                      }
+                    >
+                      {f.abkommen === null
+                        ? 'Krieg'
+                        : f.abkommen.art === 'tribut'
+                          ? 'Tribut'
+                          : `Frieden bis R${f.abkommen.bis}`}
                     </span>
                     <span className="menu-fraktion-info">
                       {f.art === 'goblin' ? 'Goblins' : 'Raeuber'} · {f.lager} Lager
                       {f.unterwegs > 0 ? ` · ${f.unterwegs} unterwegs` : ''}
                       {f.naechster !== null ? ` · ${f.naechster} Felder` : ''}
+                    </span>
+                    <span className="menu-fraktion-knoepfe">
+                      {f.abkommen === null ? (
+                        <>
+                          {f.nimmtFrieden && (
+                            <button
+                              disabled={!diplomatieMoeglich || !friedenBezahlbar}
+                              title={`Frieden fuer 20 Runden: ${bundleText(FRIEDEN_PREIS)}`}
+                              onClick={() => onDiplomatie(f.id, 'frieden')}
+                            >
+                              Frieden
+                            </button>
+                          )}
+                          <button
+                            disabled={!diplomatieMoeglich || !tributBezahlbar}
+                            title={`Tribut: ${TRIBUT_KARTEN} Karte sofort und zu Beginn jeder grossen Runde, vom groessten Stapel. Wer nicht zahlen kann, hat wieder Krieg.`}
+                            onClick={() => onDiplomatie(f.id, 'tribut')}
+                          >
+                            Tribut
+                          </button>
+                        </>
+                      ) : (
+                        <button disabled={!diplomatieMoeglich} onClick={() => onDiplomatie(f.id, 'krieg')}>
+                          Krieg erklaeren
+                        </button>
+                      )}
                     </span>
                   </li>
                 ))}
@@ -343,6 +474,86 @@ export function SideMenu({
         {reiter === 'auftraege' && (
           <>
             {/*
+              Der Held: eine Figur, die schneller zieht, Ruinen ohne Hinterhalt
+              erkundet und Ritter anfuehrt (rules/army.ts).
+            */}
+            <h3>Held</h3>
+            {held ? (
+              <ul className="menu-ritter">
+                <li className={befehl === held.id ? 'aktiv held' : 'held'}>
+                  <div className="menu-ritter-kopf">
+                    <span className="menu-ritter-name">Dein Held</span>
+                    <span className="menu-ritter-ort">
+                      Leben {held.leben}/{WERTE.held.leben} ·{' '}
+                      {held.ziel ? `zieht, noch ${hexDistance(held, held.ziel)} Felder` : 'steht'}
+                    </span>
+                  </div>
+                  <div className="menu-ritter-knoepfe">
+                    <button onClick={() => onZeigen(held.id)}>Zeigen</button>
+                    <button
+                      disabled={!befehleMoeglich}
+                      className={befehl === held.id ? 'aktiv' : ''}
+                      onClick={() => onBefehl(held.id)}
+                    >
+                      {befehl === held.id ? 'Waehle Ziel' : 'Ziel'}
+                    </button>
+                    <button disabled={!befehleMoeglich || !held.ziel} onClick={() => onHalt(held.id)}>
+                      Halt
+                    </button>
+                  </div>
+                </li>
+              </ul>
+            ) : (
+              <p className="menu-leer">
+                {heldZurueck !== null ? `Gefallen - er kehrt in Runde ${heldZurueck} zurueck.` : 'Er tritt nach dem Aufbau an.'}
+              </p>
+            )}
+            <p className="menu-leer">
+              Zieht zwei Felder je Runde, geraet in Ruinen nie in einen Hinterhalt. Ritter bei ihm treffen leichter,
+              Ritter im Gefolge ziehen so schnell wie er. Nachts traegt er das hellste Licht.
+            </p>
+
+            {/*
+              Auftraege der Wanderer: annehmen, zeigen, und was sie einbringen
+              (rules/auftraege.ts).
+            */}
+            <h3>Auftraege</h3>
+            {auftraege.length === 0 ? (
+              <p className="menu-leer">
+                Wanderer bieten Auftraege an, wenn sie an deinen Siedlungen vorbeikommen.
+              </p>
+            ) : (
+              <ul className="menu-ritter menu-auftraege">
+                {auftraege.map((a) => (
+                  <li key={a.id} className={`auftrag-${a.status}`}>
+                    <div className="menu-ritter-kopf">
+                      <span className="menu-ritter-name">
+                        {a.art === 'lager'
+                          ? `Zerstoere das Lager der ${a.fraktion ? nameVon(a.fraktion) : 'Raeuber'}`
+                          : 'Erkunde die alte Ruine'}
+                      </span>
+                      <span className="menu-ritter-ort">
+                        {a.status === 'angebot' ? 'Angebot' : 'angenommen'} · noch {Math.max(0, a.bis - turn + 1)}{' '}
+                        Runden · Lohn: eine Kartenwahl
+                      </span>
+                    </div>
+                    <div className="menu-ritter-knoepfe">
+                      <button onClick={() => onZeigenFeld(a.q, a.r)}>Zeigen</button>
+                      {a.status === 'angebot' && (
+                        <>
+                          <button className="aktiv" onClick={() => onAuftrag(a.id, true)}>
+                            Annehmen
+                          </button>
+                          <button onClick={() => onAuftrag(a.id, false)}>Ablehnen</button>
+                        </>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/*
               Die Ritter: wo sie stehen, wohin sie ziehen. Von hier bekommen sie
               ihre Befehle. Auf der Karte waehlt ein Klick auf den eigenen Ritter
               ihn ebenso aus.
@@ -361,7 +572,11 @@ export function SideMenu({
                       <div className="menu-ritter-kopf">
                         <span className="menu-ritter-name">Ritter {i + 1}</span>
                         <span className="menu-ritter-ort">
-                          {u.ziel ? `zieht, noch ${weit} ${weit === 1 ? 'Feld' : 'Felder'}` : 'steht'}
+                          {u.folgt !== null
+                            ? 'im Gefolge des Helden'
+                            : u.ziel
+                              ? `zieht, noch ${weit} ${weit === 1 ? 'Feld' : 'Felder'}`
+                              : 'steht'}
                         </span>
                       </div>
                       <div className="menu-ritter-knoepfe">
@@ -371,10 +586,18 @@ export function SideMenu({
                           className={befehl === u.id ? 'aktiv' : ''}
                           onClick={() => onBefehl(u.id)}
                         >
-                          {befehl === u.id ? 'Waehle Ziel' : 'Ziel'}
+                          {befehl === u.id ? 'Waehle Ziel' : u.folgt !== null ? 'Ziel' : 'Ziel'}
                         </button>
                         <button disabled={!befehleMoeglich || !u.ziel} onClick={() => onHalt(u.id)}>
                           Halt
+                        </button>
+                        <button
+                          disabled={!befehleMoeglich || (!held && u.folgt === null)}
+                          className={u.folgt !== null ? 'aktiv' : ''}
+                          title="Dem Helden folgen - so schnell wie er"
+                          onClick={() => onFolgen(u.id, u.folgt === null)}
+                        >
+                          {u.folgt !== null ? 'Folgt' : 'Folgen'}
                         </button>
                       </div>
                     </li>
@@ -394,17 +617,42 @@ export function SideMenu({
               </div>
             )}
 
-            <h3>Helden</h3>
-            <NochNicht was="Der Held" />
-
-            <h3>Auftraege</h3>
-            <NochNicht was="Auftraege" />
           </>
         )}
 
         {reiter === 'ton' && (
           <>
             <h3>Ton</h3>
+            <label className="menu-zeile">
+              Umgebung
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round(umgebung * 100)}
+                onChange={(e) => {
+                  initAudio();
+                  const v = Number(e.target.value) / 100;
+                  setUmgebungVolume(v);
+                  setUmgebung(v);
+                }}
+              />
+            </label>
+            <label className="menu-zeile">
+              Musik
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round(musikPegel * 100)}
+                onChange={(e) => {
+                  initAudio();
+                  const v = Number(e.target.value) / 100;
+                  setMusicVolume(v);
+                  setMusikPegel(v);
+                }}
+              />
+            </label>
             <label className="menu-zeile">
               Klaenge
               <input
@@ -473,7 +721,7 @@ export function SideMenu({
             <h3>Spiel</h3>
             <div className="menu-liste">
               <button className={autoWurf ? 'aktiv' : ''} onClick={onToggleAutoWurf}>
-                Nach 5 s selbst wuerfeln
+                Nach {autoWurfSekunden} s selbst wuerfeln
               </button>
             </div>
           </>
