@@ -8,9 +8,11 @@
 
 import { GameRoom } from './room';
 import type { Env } from './room';
+import { Verzeichnis } from './directory';
 import { isRoomCode } from '../core/protocol';
+import { VERZEICHNIS_NAME } from '../core/lobby';
 
-export { GameRoom };
+export { GameRoom, Verzeichnis };
 
 /**
  * Erlaubte Herkunft. In der Produktion die Pages-Adresse, in der Entwicklung
@@ -34,6 +36,27 @@ export default {
 
     if (url.pathname === '/health') {
       return new Response('ok', { headers: { 'content-type': 'text/plain' } });
+    }
+
+    // Die oeffentliche Raumliste fuer die Startseite (core/lobby.ts). Die Seite
+    // liegt auf github.io, der Worker woanders - deshalb die CORS-Kopfzeile fuer
+    // erlaubte Herkuenfte.
+    if (url.pathname === '/rooms' && request.method === 'GET') {
+      const origin = request.headers.get('Origin');
+      if (!originAllowed(origin, env)) {
+        return new Response('Herkunft nicht erlaubt.', { status: 403 });
+      }
+      const stub = env.VERZEICHNIS.get(env.VERZEICHNIS.idFromName(VERZEICHNIS_NAME));
+      const antwort = await stub.fetch('https://verzeichnis/liste');
+      const headers = new Headers({
+        'content-type': 'application/json',
+        'cache-control': 'no-store',
+      });
+      if (origin !== null) {
+        headers.set('Access-Control-Allow-Origin', origin);
+        headers.set('Vary', 'Origin');
+      }
+      return new Response(antwort.body, { status: antwort.status, headers });
     }
 
     // /room/<CODE>/ws

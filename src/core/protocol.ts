@@ -23,6 +23,8 @@ export type RoomInfo = {
   started: boolean;
   targetPoints: number;
   members: Member[];
+  /** In der oeffentlichen Raumliste sichtbar (core/lobby.ts). */
+  oeffentlich: boolean;
 };
 
 /**
@@ -55,7 +57,8 @@ export const targetPointsLabel = (n: number): string =>
 export type ClientMsg =
   /** token stammt aus einer frueheren Sitzung und holt den Platz zurueck. */
   | { t: 'join'; name: string; token?: string }
-  | { t: 'setOptions'; targetPoints: number }
+  /** Nur der Gastgeber, nur vor dem Start. Was fehlt, bleibt, wie es ist. */
+  | { t: 'setOptions'; targetPoints?: number; oeffentlich?: boolean }
   | { t: 'start' }
   | { t: 'action'; action: Action };
 

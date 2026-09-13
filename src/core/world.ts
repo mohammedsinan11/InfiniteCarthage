@@ -76,6 +76,22 @@ export function revealChunks(world: World, coords: Iterable<ChunkCoord>): void {
   for (const c of coords) addChunk(world, c.m, c.n);
 }
 
+/**
+ * Chunks aufnehmen - und eine NEUE Welt liefern, sobald etwas dazukam.
+ *
+ * revealChunks aendert die Welt an Ort und Stelle. Fuer den Client reichte das
+ * nicht: React vergleicht Referenzen, und das Brett merkt sich die sichtbaren
+ * Felder, bis sich Welt oder Ausschnitt aendern. Deckte ein Ritter beim Ziehen
+ * Land auf, blieb die Welt dasselbe Objekt, und die neuen Felder erschienen erst
+ * nach dem naechsten Verschieben oder einem Neuladen. Die Maps werden geteilt,
+ * nur die Huelle ist neu - das kostet nichts.
+ */
+export function mitAufgedeckt(world: World, coords: Iterable<ChunkCoord>): World {
+  const vorher = world.chunks.size;
+  revealChunks(world, coords);
+  return world.chunks.size === vorher ? world : { ...world };
+}
+
 export function tileAt(world: World, q: number, r: number): Tile | undefined {
   return world.tiles.get(hexKey(q, r));
 }

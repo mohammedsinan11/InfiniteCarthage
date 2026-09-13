@@ -10,14 +10,19 @@
  * beim Ritter, die Fraktionsfarbe bei Raeubern, Goblins und dem Wimpel am Lager.
  *
  * SPRITES FOLGEN. Liegt in src/assets/units eine Datei mit dem Namen der Art
- * (raeuber.png, goblin.png, ritter.png, wanderer.png, lager.png, ruine.png),
- * wird sie statt des Platzhalters gezeichnet - ohne Codeaenderung. Ebenso
- * kampf.png fuer die Schwerter ueber einem Kampf. Format: README dort.
+ * (raeuber.png, goblin.png, ritter.png, wanderer.png, lager.png, ruine.png,
+ * dorf.png, stadt.png), wird sie statt des Platzhalters gezeichnet - ohne
+ * Codeaenderung. Ebenso kampf.png fuer die Schwerter ueber einem Kampf.
+ * Format: README dort.
+ *
+ * DOERFER UND STAEDTE stehen seit der Ueberarbeitung auch hier. Vorher waren
+ * sie glatte SVG-Formen in Spielerfarbe, die ueber der Pixelkarte wie
+ * aufgeklebt wirkten. 'P' ist die Spielerfarbe im Schatten, 'q' im Licht.
  */
 
 import type { UnitKind } from '../core/units';
 
-export type FigurArt = UnitKind | 'lager' | 'ruine';
+export type FigurArt = UnitKind | 'lager' | 'ruine' | 'dorf' | 'stadt';
 
 const PALETTE: Record<string, string> = {
   k: '#1b130d', // Umriss
@@ -34,7 +39,8 @@ const PALETTE: Record<string, string> = {
   y: '#d9a441', // Gold
   t: '#8a6a45', // Holz
   T: '#5b4430', // dunkles Holz
-  c: '#c7b28a', // Zeltstoff
+  c: '#d8c49a', // Zeltstoff, Mauer im Licht
+  C: '#a88f63', // Mauer im Schatten
   a: '#8d8a7e', // Wandermantel
   A: '#6a675d', // dunkler Mantel
 };
@@ -121,7 +127,63 @@ const ART: Record<FigurArt, readonly string[]> = {
     'TtTtT.....TtTtT',
     '.kkk.......kkk.',
   ],
+  // Dorf: Giebeldach in Spielerfarbe, links im Licht, rechts im Schatten;
+  // helle Mauer, zwei erleuchtete Fenster, eine Tuer.
+  dorf: [
+    '......k......',
+    '.....kpk.....',
+    '....kqpPk....',
+    '...kqppPPk...',
+    '..kqpppPPPk..',
+    '.kqppppPPPPk.',
+    'kkkkkkkkkkkkk',
+    '.kcccccCCCCk.',
+    '.kcyyccCyyCk.',
+    '.kcyyccCyyCk.',
+    '.kccckkkCCCk.',
+    '.kccckbkCCCk.',
+    '.kkkkkkkkkkk.',
+  ],
+  // Stadt: ein steinerner Turm mit Wimpel neben einem Haus - hoeher und breiter
+  // als das Dorf, damit man den Unterschied auch klein erkennt.
+  stadt: [
+    '...k.............',
+    '...kpp...........',
+    '...kppp..........',
+    '...k.............',
+    '.kkkkkkk.........',
+    '.kmkmkMk.........',
+    '.kmmmMMk....k....',
+    '.kmmmMMk...kpk...',
+    '.kmyymMk..kqpPk..',
+    '.kmyymMk.kqppPPk.',
+    '.kmmmMMkkqpppPPPk',
+    '.kmmmMMkkkkkkkkkk',
+    '.kmmmMMk.kccCCCk.',
+    '.kmkkMMk.kcyCyCk.',
+    '.kmkbMMk.kccbCCk.',
+    '.kkkkkkk.kkkkkkk.',
+  ],
 };
+
+const hex2 = (n: number): string => Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0');
+
+/** Eine Farbe #rrggbb zu Schwarz (ziel 0) oder Weiss (ziel 255) hin verschieben. */
+function mische(farbe: string, ziel: number, anteil: number): string {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(farbe);
+  if (!m) return farbe;
+  return (
+    '#' +
+    [m[1]!, m[2]!, m[3]!]
+      .map((h) => {
+        const v = parseInt(h, 16);
+        return hex2(Math.round(v + (ziel - v) * anteil));
+      })
+      .join('')
+  );
+}
+export const dunkler = (farbe: string): string => mische(farbe, 0, 0.35);
+export const heller = (farbe: string): string => mische(farbe, 255, 0.35);
 
 const SPRITE_URLS = import.meta.glob('../assets/units/*.png', {
   eager: true,
@@ -190,14 +252,64 @@ export function zeichneFigur(
   ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
   ctx.fillRect(x0 + f, fy + f, Math.max(1, breite - 2) * f, f);
 
+  const grund = farbe ?? '#9c3226';
+  const schatten = dunkler(grund);
+  const licht = heller(grund);
   for (let zy = 0; zy < karte.length; zy++) {
     const zeile = karte[zy]!;
     for (let zx = 0; zx < zeile.length; zx++) {
       const ch = zeile[zx]!;
       if (ch === '.') continue;
-      ctx.fillStyle = ch === 'p' ? (farbe ?? '#9c3226') : (PALETTE[ch] ?? '#ff00ff');
+      ctx.fillStyle =
+        ch === 'p' ? grund : ch === 'P' ? schatten : ch === 'q' ? licht : (PALETTE[ch] ?? '#ff00ff');
       ctx.fillRect(x0 + zx * f, y0 + zy * f, f, f);
     }
+  }
+}
+
+export type Strassenstueck = {
+  a: { x: number; y: number };
+  b: { x: number; y: number };
+  farbe: string;
+};
+
+/**
+ * Strassen als Pixelband entlang der Feldkante, in Geraetepixeln.
+ *
+ * Schritt fuer Schritt ein Kunstpixel weit, auf das Kunstpixelraster gerundet:
+ * so bekommt die schraege Kante dieselben Treppenstufen wie die Kacheln, statt
+ * als glatte Linie darueberzuliegen. Erst alle Umrisse, dann aller Belag - wo
+ * Strassen sich treffen, fliessen sie ineinander, statt dass ein Umriss quer
+ * durch die Nachbarstrasse schneidet. Jeder vierte Stein ist heller, das liest
+ * sich als Pflaster. PLATZHALTER (ASSETS.md).
+ */
+export function zeichneStrassen(
+  ctx: CanvasRenderingContext2D,
+  stuecke: readonly Strassenstueck[],
+  f: number,
+): void {
+  const punkte = (s: Strassenstueck) => {
+    const n = Math.max(1, Math.ceil(Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y) / f));
+    const out: { x: number; y: number }[] = [];
+    for (let i = 0; i <= n; i++) {
+      out.push({
+        x: Math.round((s.a.x + ((s.b.x - s.a.x) * i) / n) / f) * f,
+        y: Math.round((s.a.y + ((s.b.y - s.a.y) * i) / n) / f) * f,
+      });
+    }
+    return out;
+  };
+  const alle = stuecke.map((s) => ({ s, p: punkte(s) }));
+  ctx.fillStyle = '#1b130d';
+  for (const { p } of alle) {
+    for (const q of p) ctx.fillRect(q.x - 2 * f, q.y - 2 * f, 4 * f, 4 * f);
+  }
+  for (const { s, p } of alle) {
+    const hell = heller(s.farbe);
+    p.forEach((q, i) => {
+      ctx.fillStyle = i % 4 === 2 ? hell : s.farbe;
+      ctx.fillRect(q.x - f, q.y - f, 2 * f, 2 * f);
+    });
   }
 }
 

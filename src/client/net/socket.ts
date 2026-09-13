@@ -7,6 +7,8 @@
  */
 
 import type { ClientMsg, ServerMsg } from '../../core/protocol';
+import { istRaumEintrag } from '../../core/lobby';
+import type { RaumEintrag } from '../../core/lobby';
 
 /**
  * Serveradresse aus dem Build.
@@ -57,10 +59,11 @@ export type SocketHandlers = {
 export function openSocket(
   code: string,
   create: boolean,
+  oeffentlich: boolean,
   handlers: SocketHandlers,
 ): WebSocket {
   const base = SERVER_URL.replace(/^http/, 'ws').replace(/\/$/, '');
-  const url = `${base}/room/${code}/ws${create ? '?create=1' : ''}`;
+  const url = `${base}/room/${code}/ws${create ? `?create=1${oeffentlich ? '' : '&public=0'}` : ''}`;
   const ws = new WebSocket(url);
 
   ws.onopen = handlers.onOpen;
@@ -74,6 +77,18 @@ export function openSocket(
     }
   };
   return ws;
+}
+
+/**
+ * Die oeffentliche Raumliste vom Worker (GET /rooms). Wirft, wenn er nicht
+ * antwortet - die Startseite zeigt das an, statt eine leere Liste vorzutaeuschen.
+ */
+export async function holeRaeume(): Promise<RaumEintrag[]> {
+  const base = SERVER_URL.replace(/^ws/, 'http').replace(/\/$/, '');
+  const res = await fetch(`${base}/rooms`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Raumliste: ${res.status}`);
+  const daten = (await res.json()) as unknown;
+  return Array.isArray(daten) ? daten.filter(istRaumEintrag) : [];
 }
 
 export function sendMsg(ws: WebSocket | null, msg: ClientMsg): void {

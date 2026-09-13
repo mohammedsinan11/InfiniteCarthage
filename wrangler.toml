@@ -6,9 +6,18 @@ compatibility_date = "2025-01-01"
 name = "GAME_ROOM"
 class_name = "GameRoom"
 
+# Die oeffentliche Raumliste - ein einziges Objekt (src/worker/directory.ts).
+[[durable_objects.bindings]]
+name = "VERZEICHNIS"
+class_name = "Verzeichnis"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["GameRoom"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Verzeichnis"]
 
 [vars]
 # Kommagetrennt. Leer bedeutet: keine Einschraenkung. localhost ist immer erlaubt.

@@ -56,6 +56,16 @@ export function Lobby() {
           </div>
         </label>
 
+        <label className="home-schalter">
+          <input
+            type="checkbox"
+            checked={room.oeffentlich}
+            disabled={!isHost}
+            onChange={(e) => send({ t: 'setOptions', oeffentlich: e.target.checked })}
+          />
+          Oeffentlich - steht in der Raumliste auf der Startseite
+        </label>
+
         {isHost ? (
           <button className="primary" disabled={!canStart} onClick={() => send({ t: 'start' })}>
             {room.members.length === 1 ? 'Allein starten' : 'Partie starten'}

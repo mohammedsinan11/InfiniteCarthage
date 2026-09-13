@@ -29,9 +29,14 @@ import {
   parseClientMsg,
 } from '../core/protocol';
 import type { ClientMsg, Member, RoomInfo, ServerMsg } from '../core/protocol';
+import { MELDEN_ALLE_MS, VERZEICHNIS_NAME } from '../core/lobby';
+import type { RaumEintrag } from '../core/lobby';
+import { roundOf } from '../core/season';
 
 export type Env = {
   GAME_ROOM: DurableObjectNamespace;
+  /** Die oeffentliche Raumliste (worker/directory.ts). */
+  VERZEICHNIS: DurableObjectNamespace;
   ALLOWED_ORIGINS?: string;
 };
 
@@ -43,6 +48,13 @@ type RoomData = {
   started: boolean;
   /** token -> playerId. Holt nach einem Verbindungsabbruch den Platz zurueck. */
   tokens: Record<string, PlayerId>;
+  /**
+   * In der Raumliste sichtbar? Fehlt bei Raeumen von vor der Liste - die gelten
+   * als oeffentlich, wie jeder neue Raum ohne ausdrueckliche Wahl.
+   */
+  oeffentlich?: boolean;
+  /** Eroeffnet und zuletzt aktiv, in Millisekunden seit 1970. */
+  erstellt?: number;
 };
 
 type Attachment = { playerId: PlayerId | null };
@@ -94,6 +106,8 @@ export class GameRoom implements DurableObject {
   private room: RoomData | null = null;
   /** Im Speicher gehaltene Partie. Nach Hibernation aus dem Storage neu aufgebaut. */
   private game: Game | null = null;
+  /** Wann sich der Raum zuletzt beim Verzeichnis gemeldet hat. */
+  private letzteMeldung = 0;
 
   constructor(
     private readonly ctx: DurableObjectState,
@@ -168,6 +182,8 @@ export class GameRoom implements DurableObject {
     }
     if (create && !exists) {
       room.code = code;
+      room.oeffentlich = url.searchParams.get('public') !== '0';
+      room.erstellt = Date.now();
       await this.save();
     }
 
@@ -248,13 +264,17 @@ export class GameRoom implements DurableObject {
           this.send(ws, { t: 'error', message: 'Die Partie laeuft bereits.' });
           return;
         }
-        if (!(TARGET_POINTS_CHOICES as readonly number[]).includes(msg.targetPoints)) {
-          this.send(ws, { t: 'error', message: 'Ungueltige Punktzahl.' });
-          return;
+        if (msg.targetPoints !== undefined) {
+          if (!(TARGET_POINTS_CHOICES as readonly number[]).includes(msg.targetPoints)) {
+            this.send(ws, { t: 'error', message: 'Ungueltige Punktzahl.' });
+            return;
+          }
+          room.targetPoints = msg.targetPoints;
         }
-        room.targetPoints = msg.targetPoints;
+        if (typeof msg.oeffentlich === 'boolean') room.oeffentlich = msg.oeffentlich;
         await this.save();
         this.broadcastRoom();
+        await this.melden();
         return;
       }
 
@@ -281,6 +301,7 @@ export class GameRoom implements DurableObject {
         await this.save();
         this.broadcastRoom();
         this.broadcastState();
+        await this.melden();
         return;
       }
 
@@ -298,6 +319,9 @@ export class GameRoom implements DurableObject {
         await this.save();
         this.broadcastState();
         this.broadcastEvents(result.events);
+        // Zuege gedrosselt - ausser dem letzten: eine beendete Partie soll
+        // sofort als beendet in der Liste stehen.
+        await this.melden(game.state.phase.t === 'finished');
         return;
       }
     }
@@ -346,6 +370,48 @@ export class GameRoom implements DurableObject {
     this.send(ws, { t: 'welcome', you: playerId, token, room: this.info(room) });
     this.broadcastRoom();
     if (game) this.sendState(ws, game.state, playerId);
+    await this.melden();
+  }
+
+  // --- Raumliste ------------------------------------------------------------
+
+  /**
+   * Beim Verzeichnis melden (worker/directory.ts).
+   *
+   * dringend: sofort. Sonst hoechstens alle MELDEN_ALLE_MS - bei Zuegen, die im
+   * Sekundentakt kommen koennen. "Zuletzt gespielt" hinkt dadurch hoechstens
+   * eine halbe Minute nach. Private Raeume melden sich auch, als privat: so
+   * verschwindet ein Raum aus der Liste, sobald der Gastgeber umschaltet.
+   */
+  private async melden(dringend = true): Promise<void> {
+    const room = this.room;
+    if (!room || room.code === '' || room.members.length === 0) return;
+    const jetzt = Date.now();
+    if (!dringend && jetzt - this.letzteMeldung < MELDEN_ALLE_MS) return;
+    this.letzteMeldung = jetzt;
+
+    const state = this.game?.state ?? null;
+    const eintrag: RaumEintrag = {
+      code: room.code,
+      oeffentlich: room.oeffentlich !== false,
+      status: !room.started ? 'lobby' : state?.phase.t === 'finished' ? 'beendet' : 'laeuft',
+      gastgeber: room.members.find((m) => m.id === room.hostId)?.name ?? room.members[0]!.name,
+      spieler: room.members.map((m) => m.name),
+      maxSpieler: MAX_PLAYERS,
+      runde: room.started && state ? roundOf(state.turn) : null,
+      zielpunkte: room.targetPoints,
+      erstellt: room.erstellt ?? jetzt,
+      zuletzt: jetzt,
+    };
+    try {
+      const stub = this.env.VERZEICHNIS.get(this.env.VERZEICHNIS.idFromName(VERZEICHNIS_NAME));
+      await stub.fetch('https://verzeichnis/melden', {
+        method: 'POST',
+        body: JSON.stringify(eintrag),
+      });
+    } catch {
+      // Die Liste ist Beiwerk - ein Fehler dort darf keinen Zug verhindern.
+    }
   }
 
   // --- Versand --------------------------------------------------------------
@@ -365,6 +431,7 @@ export class GameRoom implements DurableObject {
       started: room.started,
       targetPoints: room.targetPoints,
       members: room.members.map((m) => ({ ...m })),
+      oeffentlich: room.oeffentlich !== false,
     };
   }
 

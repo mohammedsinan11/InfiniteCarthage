@@ -60,16 +60,25 @@ spaetestens dann lohnt eine Zeichnung.
 
 *Aufwand:* 6 Augenzahlen je Wuerfelart, etwa 64 x 64 px.
 
-### Spielsteine: Siedlung, Stadt, Strasse — **Platzhalter**
+### Spielsteine: Dorf, Stadt, Strasse — **Platzhalter, Dorf und Stadt sprite-bereit**
 
-In `Board.tsx` als SVG-Pfade. Ein Haus mit Giebel, ein breiteres Haus, eine
-dicke Linie. In Spielerfarbe eingefaerbt.
+Seit der Ueberarbeitung Pixelgrafik auf dem Canvas (`client/units.ts`), im
+Kunstpixel der Kacheln statt als glatte SVG-Formen:
 
-*Was fehlt:* alles. Sie sollten wie gebaute Dinge aussehen, nicht wie
-Piktogramme, und in sechs Spielerfarben lesbar bleiben.
+- **Dorf** (13 x 13): Giebeldach in Spielerfarbe, links im Licht, rechts im
+  Schatten; helle Mauer, zwei erleuchtete Fenster, Tuer.
+- **Stadt** (17 x 16): Steinturm mit Zinnen und Wimpel in Spielerfarbe neben
+  einem Haus.
+- **Strasse:** Pixelband entlang der Feldkante, dunkler Umriss, Belag in
+  Spielerfarbe, jeder vierte Stein heller wie Pflaster.
 
-*Aufwand:* 3 Formen x 6 Farben, oder 3 Graustufenbilder, die eingefaerbt
-werden.
+*Was fehlt:* gezeichnete Gebaeude mit Charakter und eine Strasse, die nach Weg
+aussieht statt nach Band. `dorf.png` und `stadt.png` werden ohne
+Codeaenderung gezeichnet; fuer die Spielerfarbe braeuchte es eine Farbmaske
+(noch nicht gebaut).
+
+*Aufwand:* 2 Gebaeude, gern je 2 Varianten, dazu ein Strassenstueck in drei
+Richtungen; Farbe ueber Maske oder 6 eingefaerbte Fassungen.
 
 ### Figuren: Lager, Ruinen, Raeuber, Goblins, Ritter, Wanderer — **Platzhalter, sprite-bereit**
 

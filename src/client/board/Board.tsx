@@ -41,7 +41,7 @@ import { istSpielerSeite, istKampf, kampfFelder, seiteVon, spielerAus } from '..
 import type { Seite } from '../../core/combat';
 import { fraktionById, istFraktion } from '../../core/factions';
 import { ruinAt } from '../../core/ruins';
-import { aufstellung, preloadUnitSprites, zeichneFigur, zeichneLeben } from '../units';
+import { aufstellung, preloadUnitSprites, zeichneFigur, zeichneLeben, zeichneStrassen } from '../units';
 import { Schwerter } from './Schwerter';
 import {
   HEX_CX,
@@ -616,6 +616,42 @@ export function Board({
     }
 
     /*
+     * Strassen, Doerfer und Staedte als Pixelgrafik (units.ts). Frueher glatte
+     * SVG-Formen, die ueber der Pixelkarte wie aufgeklebt wirkten. Nach allen
+     * Kacheln, auch der angehobenen, damit kein Feld ein Haus verdeckt; erst die
+     * Strassen, dann die Gebaeude, die deren Enden decken. Ecken liegen auf dem
+     * Mittel ihrer drei Felder - Strassenenden und Haeuser treffen sich so.
+     */
+    const geraet = (x: number, y: number) => ({
+      x: Math.round((x - view.x) * scale * DPR),
+      y: Math.round((y - view.y) * scale * DPR),
+    });
+    const spielerFarbe = (id: string) =>
+      playerColor(state.players.find((pl) => pl.id === id)?.color ?? 0);
+    zeichneStrassen(
+      ctx,
+      Object.entries(state.roads).map(([ek, owner]) => {
+        const [a, b] = edgeEndpoints(parseEdgeKey(ek)).map((v) => {
+          const p = vertexToPixel(v, LAYOUT);
+          return geraet(p.x, p.y - liftVertex(v));
+        });
+        return { a: a!, b: b!, farbe: spielerFarbe(owner) };
+      }),
+      f,
+    );
+    Object.entries(state.buildings)
+      .map(([vk, b]) => {
+        const ecke = parseVertexKey(vk);
+        const p = vertexToPixel(ecke, LAYOUT);
+        return { ...geraet(p.x, p.y - liftVertex(ecke)), b };
+      })
+      // Von hinten nach vorn, damit das vordere Haus das hintere ueberdeckt.
+      .sort((u, w) => u.y - w.y)
+      .forEach(({ x, y, b }) =>
+        zeichneFigur(ctx, b.type === 'city' ? 'stadt' : 'dorf', x, y + 4 * f, f, spielerFarbe(b.owner)),
+      );
+
+    /*
      * Jahreszeit als Schicht ueber dem Gelaende, nicht in den Kacheln.
      *
      * So bleibt jede Sorte erkennbar - eine Wiese sieht im Herbst warm aus,
@@ -635,7 +671,7 @@ export function Board({
       ctx.fillRect(0, 0, bw, bh);
       ctx.restore();
     }
-  }, [visible, view, scale, size, hover, world, state, tilesReady, liftHex, besatzung, sicht, du, farbeSeite]);
+  }, [visible, view, scale, size, hover, world, state, tilesReady, liftHex, liftVertex, besatzung, sicht, du, farbeSeite]);
 
   /** Eine Stufe naeher (+1) oder weiter weg (-1); der Punkt unter x/y bleibt stehen. */
   const zoomUm = useCallback((richtung: number, mausX: number, mausY: number) => {
@@ -1079,21 +1115,7 @@ export function Board({
           ),
         )}
 
-        {/* Strassen */}
-        {Object.entries(state.roads).map(([ek, owner]) => {
-          const kante = parseEdgeKey(ek);
-          const hoch = liftEdge(kante);
-          const [a, b] = edgeEndpoints(kante).map((v) => {
-            const p = vertexToPixel(v, LAYOUT);
-            return { x: p.x, y: p.y - hoch };
-          });
-          return (
-            <g key={'r' + ek} pointerEvents="none">
-              <line x1={a!.x} y1={a!.y} x2={b!.x} y2={b!.y} className="road-base" />
-              <line x1={a!.x} y1={a!.y} x2={b!.x} y2={b!.y} stroke={colorOf(owner)} className="road" />
-            </g>
-          );
-        })}
+        {/* Strassen, Doerfer und Staedte liegen auf dem Canvas (siehe Zeichnen). */}
 
         {/* Anklickbare Kanten */}
         {[...edgeTargets].map((ek) => {
@@ -1116,18 +1138,6 @@ export function Board({
           );
         })}
 
-        {/* Gebaeude: Haus mit Giebel, Stadt mit Anbau */}
-        {Object.entries(state.buildings).map(([vk, b]) => {
-          const ecke = parseVertexKey(vk);
-          const roh = vertexToPixel(ecke, LAYOUT);
-          const p = { x: roh.x, y: roh.y - liftVertex(ecke) };
-          const fill = colorOf(b.owner);
-          const d =
-            b.type === 'city'
-              ? `M ${p.x - 13} ${p.y + 9} L ${p.x - 13} ${p.y - 2} L ${p.x - 4} ${p.y - 11} L ${p.x + 4} ${p.y - 2} L ${p.x + 13} ${p.y - 2} L ${p.x + 13} ${p.y + 9} Z`
-              : `M ${p.x - 9} ${p.y + 8} L ${p.x - 9} ${p.y - 2} L ${p.x} ${p.y - 11} L ${p.x + 9} ${p.y - 2} L ${p.x + 9} ${p.y + 8} Z`;
-          return <path key={'b' + vk} d={d} fill={fill} className="piece" pointerEvents="none" />;
-        })}
 
         {/* Anklickbare Ecken */}
         {/*

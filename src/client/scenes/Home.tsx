@@ -1,11 +1,22 @@
-/** Startseite: Raum eroeffnen oder mit Code beitreten. */
+/**
+ * Startseite: Raum eroeffnen, mit Code beitreten - oder aus der Raumliste.
+ *
+ * Die Liste zeigt oeffentliche Raeume der letzten sieben Tage (core/lobby.ts):
+ * offene mit Beitreten-Knopf, laufende und beendete nur zur Ansicht. Sie wird
+ * alle 15 Sekunden neu geholt, solange die Seite offen ist.
+ */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '../net/store';
-import { ROOM_CODE_LENGTH, isRoomCode } from '../../core/protocol';
-import { SERVER_MISSING } from '../net/socket';
+import { ROOM_CODE_LENGTH, isRoomCode, targetPointsLabel } from '../../core/protocol';
+import { VERFALL_TAGE, zuletztText } from '../../core/lobby';
+import type { RaumEintrag } from '../../core/lobby';
+import { SERVER_MISSING, holeRaeume } from '../net/socket';
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+/** Wie oft die Raumliste neu geholt wird. */
+const LISTE_ALLE_MS = 15_000;
 
 /** Raumcode ohne 0/O und 1/I - die werden beim Vorlesen zu oft verwechselt. */
 function freshCode(): string {
@@ -13,6 +24,8 @@ function freshCode(): string {
   crypto.getRandomValues(a);
   return [...a].map((b) => ALPHABET[b % ALPHABET.length]).join('');
 }
+
+const STATUS_TEXT = { lobby: 'wartet', laeuft: 'laeuft', beendet: 'beendet' } as const;
 
 export function Home() {
   const connect = useStore((s) => s.connect);
@@ -25,6 +38,33 @@ export function Home() {
     }
   });
   const [code, setCode] = useState('');
+  const [oeffentlich, setOeffentlich] = useState(true);
+  const [raeume, setRaeume] = useState<RaumEintrag[] | null>(null);
+  const [listeFehlt, setListeFehlt] = useState(false);
+  const [jetzt, setJetzt] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (SERVER_MISSING) return;
+    let lebt = true;
+    const laden = () => {
+      holeRaeume()
+        .then((r) => {
+          if (!lebt) return;
+          setRaeume(r);
+          setListeFehlt(false);
+          setJetzt(Date.now());
+        })
+        .catch(() => {
+          if (lebt) setListeFehlt(true);
+        });
+    };
+    laden();
+    const t = window.setInterval(laden, LISTE_ALLE_MS);
+    return () => {
+      lebt = false;
+      window.clearInterval(t);
+    };
+  }, []);
 
   const remember = (n: string) => {
     setName(n);
@@ -36,6 +76,35 @@ export function Home() {
   };
 
   const ready = name.trim().length > 0 && !SERVER_MISSING;
+  const verbindet = status === 'connecting';
+  const offen = (raeume ?? []).filter((r) => r.status === 'lobby');
+  const laufend = (raeume ?? []).filter((r) => r.status !== 'lobby');
+
+  const zeile = (r: RaumEintrag) => {
+    const voll = r.spieler.length >= r.maxSpieler;
+    return (
+      <li key={r.code} className="raum">
+        <div className="raum-kopf">
+          <span className="raum-code">{r.code}</span>
+          <span className={`raum-status ${r.status}`}>{STATUS_TEXT[r.status]}</span>
+        </div>
+        <div className="raum-info">
+          {r.spieler.length}/{r.maxSpieler} · {r.spieler.join(', ')}
+          {r.runde !== null ? ` · Runde ${r.runde}` : ''} · Ziel {targetPointsLabel(r.zielpunkte)} ·{' '}
+          {zuletztText(r.zuletzt, jetzt)}
+        </div>
+        {r.status === 'lobby' && (
+          <button
+            disabled={!ready || voll || verbindet}
+            title={!ready ? 'Erst einen Namen eingeben' : voll ? 'Der Raum ist voll' : undefined}
+            onClick={() => connect(r.code, name.trim(), false)}
+          >
+            {voll ? 'Voll' : 'Beitreten'}
+          </button>
+        )}
+      </li>
+    );
+  };
 
   return (
     <div className="home">
@@ -66,10 +135,18 @@ export function Home() {
           />
         </label>
 
+        <label className="home-schalter">
+          <input
+            type="checkbox"
+            checked={oeffentlich}
+            onChange={(e) => setOeffentlich(e.target.checked)}
+          />
+          Oeffentlich - der neue Raum steht in der Raumliste
+        </label>
         <button
           className="primary"
-          disabled={!ready || status === 'connecting'}
-          onClick={() => connect(freshCode(), name.trim(), true)}
+          disabled={!ready || verbindet}
+          onClick={() => connect(freshCode(), name.trim(), true, oeffentlich)}
         >
           Neuen Raum eroeffnen
         </button>
@@ -86,14 +163,37 @@ export function Home() {
           />
         </label>
         <button
-          disabled={!ready || !isRoomCode(code) || status === 'connecting'}
+          disabled={!ready || !isRoomCode(code) || verbindet}
           onClick={() => connect(code, name.trim(), false)}
         >
           Beitreten
         </button>
 
-        {status === 'connecting' && <p className="note">Verbinde...</p>}
+        {verbindet && <p className="note">Verbinde...</p>}
         {status === 'closed' && <p className="note">Verbindung getrennt.</p>}
+
+        {!SERVER_MISSING && (
+          <section className="raumliste">
+            <h2>Offene Raeume</h2>
+            {raeume === null && !listeFehlt && <p className="raumliste-leer">Lade...</p>}
+            {listeFehlt && <p className="raumliste-leer">Die Raumliste ist gerade nicht erreichbar.</p>}
+            {raeume !== null && offen.length === 0 && (
+              <p className="raumliste-leer">Gerade wartet niemand. Eroeffne selbst einen Raum.</p>
+            )}
+            {offen.length > 0 && <ul>{offen.map(zeile)}</ul>}
+
+            {laufend.length > 0 && (
+              <>
+                <h2>Laufende Partien</h2>
+                <ul>{laufend.map(zeile)}</ul>
+              </>
+            )}
+            <p className="raumliste-leer">
+              Oeffentliche Raeume der letzten {VERFALL_TAGE} Tage. Laufende Partien sind
+              nur zur Ansicht.
+            </p>
+          </section>
+        )}
       </div>
     </div>
   );

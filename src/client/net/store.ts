@@ -14,7 +14,7 @@ import type { PublicState } from '../../core/redact';
 import type { Action, GameEvent } from '../../core/rules/reducer';
 import { playCardPick, playClash, playDefend, playGuard, playMarch, playRaid, playRuin } from '../audio';
 import type { PlayerId } from '../../core/state';
-import { createWorld, revealChunks } from '../../core/world';
+import { createWorld, mitAufgedeckt, revealChunks } from '../../core/world';
 import type { World } from '../../core/world';
 import { bundleText, describeEvent, fraktionName, seiteName } from '../log';
 import { spielerSeite } from '../../core/combat';
@@ -106,7 +106,8 @@ export type Store = {
    */
   produceEffect: { id: number; roll: number } | null;
 
-  connect: (code: string, name: string, create: boolean) => void;
+  /** oeffentlich gilt nur beim Eroeffnen: erscheint der Raum in der Raumliste? */
+  connect: (code: string, name: string, create: boolean, oeffentlich?: boolean) => void;
   /** Nach einem Neuladen zurueck in die laufende Partie, falls moeglich. */
   resume: () => void;
   disconnect: () => void;
@@ -342,13 +343,12 @@ function saveToken(code: string, token: string): void {
 
 /**
  * Welt zum Zustand aufbauen. Wird nur neu gerechnet, wenn Chunks dazukamen -
- * die Erzeugung ist rein, also ist das reine Fleissarbeit, kein Risiko.
+ * die Erzeugung ist rein, also ist das reine Fleissarbeit, kein Risiko. Kam
+ * etwas dazu, ist es ein neues Objekt (mitAufgedeckt), sonst sieht das Brett
+ * die neuen Felder nicht.
  */
 function buildWorld(prev: World | null, state: PublicState): World {
-  if (prev && prev.seed === state.worldSeed) {
-    revealChunks(prev, state.chunks);
-    return prev;
-  }
+  if (prev && prev.seed === state.worldSeed) return mitAufgedeckt(prev, state.chunks);
   const w = createWorld(state.worldSeed);
   revealChunks(w, state.chunks);
   return w;
@@ -368,7 +368,7 @@ export const useStore = create<Store>((set, get) => ({
   announcements: [],
   produceEffect: null,
 
-  connect: (code, name, create) => {
+  connect: (code, name, create, oeffentlich = true) => {
     const alt = get().ws;
     if (alt) {
       /*
@@ -387,7 +387,7 @@ export const useStore = create<Store>((set, get) => ({
     }
     set({ status: 'connecting', error: null, code, log: [], welt: [], state: null, world: null });
 
-    const ws = openSocket(code, create, {
+    const ws = openSocket(code, create, oeffentlich, {
       onOpen: () => {
         sendMsg(ws, { t: 'join', name, token: loadToken(code) });
       },
