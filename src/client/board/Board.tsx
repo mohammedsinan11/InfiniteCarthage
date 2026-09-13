@@ -102,20 +102,22 @@ const IMG = {
  * Geraetepixel ein Kunstpixel bedecken soll (ganzzahlig), daraus ergibt sich
  * der Zoomfaktor.
  */
-const DPR = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
+const leseDpr = (): number => (typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1);
+/** Die Skalierung beim Laden - nur fuer die Meldung unten. Das Brett verfolgt sie (dpr). */
+const DPR_START = leseDpr();
 
 /** Geraetepixel je Kunstpixel. Ganze Zahlen, sonst wird interpoliert. */
 const DEVICE_FACTORS = [1, 2, 3, 4, 6, 8] as const;
 
-const ZOOM_STEPS = DEVICE_FACTORS.map((f) => f / (SCALE * DPR));
+const zoomStufen = (dpr: number): number[] => DEVICE_FACTORS.map((f) => f / (SCALE * dpr));
 
 /**
  * Startstufe: rund zwei CSS-Pixel je Kunstpixel, also Kacheln von etwa 48
  * Pixeln Breite. Bei hoher Bildschirmskalierung entspricht das mehr
  * Geraetepixeln - die Kachel bleibt dabei gleich gross, nur schaerfer.
  */
-const DEFAULT_ZOOM_INDEX = (() => {
-  const wunsch = 2 * DPR;
+const startStufe = (dpr: number): number => {
+  const wunsch = 2 * dpr;
   let best = 0;
   for (let i = 1; i < DEVICE_FACTORS.length; i++) {
     if (Math.abs(DEVICE_FACTORS[i]! - wunsch) < Math.abs(DEVICE_FACTORS[best]! - wunsch)) {
@@ -123,7 +125,7 @@ const DEFAULT_ZOOM_INDEX = (() => {
     }
   }
   return best;
-})();
+};
 
 /** Wie weit sich ein Feld unter dem Zeiger hebt. */
 const LIFT = 3 * SCALE;
@@ -170,8 +172,8 @@ const PINCH_THRESHOLD = 28;
  */
 if (typeof console !== 'undefined') {
   console.info(
-    `InfiniteCarthage: devicePixelRatio ${DPR}, Zoomstufen als Geraetepixel je ` +
-      `Kunstpixel: ${DEVICE_FACTORS.join(', ')} (Start: ${DEVICE_FACTORS[DEFAULT_ZOOM_INDEX]})`,
+    `InfiniteCarthage: devicePixelRatio ${DPR_START}, Zoomstufen als Geraetepixel je ` +
+      `Kunstpixel: ${DEVICE_FACTORS.join(', ')} (Start: ${DEVICE_FACTORS[startStufe(DPR_START)]})`,
   );
 }
 
@@ -247,6 +249,7 @@ const ART_NAME = {
 
 const VORHABEN = {
   befehl: '',
+  erkunden: 'erkundet',
   raub: 'auf Raubzug',
   heimkehr: 'auf dem Heimweg',
   fehde: 'in einer Fehde',
@@ -304,8 +307,23 @@ export function Board({
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
-  const [cam, setCam] = useState<Camera>({ cx: 0, cy: 0, zi: DEFAULT_ZOOM_INDEX });
-  const scale = ZOOM_STEPS[cam.zi]!;
+  /**
+   * Die Bildschirmskalierung - verfolgt, nicht einmal gelesen.
+   *
+   * Sie aendert sich, wenn man die Seite mit Cmd/Strg und Plus zoomt oder das
+   * Fenster auf einen anderen Bildschirm zieht. Mit dem Wert vom Laden passte
+   * danach nichts mehr aufs Geraetepixel, und die ganze Karte wurde weich.
+   */
+  const [dpr, setDpr] = useState(leseDpr);
+  useEffect(() => {
+    const mq = window.matchMedia(`(resolution: ${dpr}dppx)`);
+    const neu = () => setDpr(leseDpr());
+    mq.addEventListener('change', neu);
+    return () => mq.removeEventListener('change', neu);
+  }, [dpr]);
+  const zoomSteps = useMemo(() => zoomStufen(dpr), [dpr]);
+  const [cam, setCam] = useState<Camera>(() => ({ cx: 0, cy: 0, zi: startStufe(leseDpr()) }));
+  const scale = zoomSteps[cam.zi]!;
   const drag = useRef<{ x: number; y: number; cx: number; cy: number } | null>(null);
   const moved = useRef(false);
   /** Feld unter dem Zeiger - nur dessen Zahl wird eingeblendet. */
@@ -417,9 +435,9 @@ export function Board({
      * Ein ganzzahliger Vergroesserungsfaktor allein genuegt nicht: faengt der
      * Ausschnitt auf einem halben Geraetepixel an, liegt jede Kachel um einen
      * halben Pixel daneben und der Browser interpoliert trotzdem. Ein
-     * Geraetepixel entspricht 1/(scale*DPR) Welteinheiten.
+     * Geraetepixel entspricht 1/(scale*dpr) Welteinheiten.
      */
-    const raster = 1 / (scale * DPR);
+    const raster = 1 / (scale * dpr);
     const snap = (v: number) => Math.round(v / raster) * raster;
     return {
       x: snap(cam.cx - size.w / 2 / scale),
@@ -427,7 +445,7 @@ export function Board({
       w: size.w / scale,
       h: size.h / scale,
     };
-  }, [cam, size, scale]);
+  }, [cam, size, scale, dpr]);
 
   /**
    * Sichtbare Felder, zeilenweise sortiert. Der Rand von einer Kachelgroesse
@@ -494,10 +512,10 @@ export function Board({
    */
   const lichter = useMemo((): Licht[] => {
     if (tageszeit !== 'nacht' && tageszeit !== 'abend') return [];
-    const f = Math.round(SCALE * scale * DPR);
+    const f = Math.round(SCALE * scale * dpr);
     const geraet = (x: number, y: number) => ({
-      x: (x - view.x) * scale * DPR,
-      y: (y - view.y) * scale * DPR,
+      x: (x - view.x) * scale * dpr,
+      y: (y - view.y) * scale * dpr,
     });
     const out: Licht[] = [];
     for (const t of visible) {
@@ -528,13 +546,13 @@ export function Board({
       const p = geraet(w.x, w.y);
       out.push({ x: p.x, y: p.y - 3 * f, r: 30 * f, waerme: 1.3 });
     }
-    const bw = size.w * DPR;
-    const bh = size.h * DPR;
+    const bw = size.w * dpr;
+    const bh = size.h * dpr;
     return out
       .filter((l) => l.x > -l.r && l.y > -l.r && l.x < bw + l.r && l.y < bh + l.r)
       .sort((a, b) => Math.hypot(a.x - bw / 2, a.y - bh / 2) - Math.hypot(b.x - bw / 2, b.y - bh / 2))
       .slice(0, MAX_LICHTER);
-  }, [tageszeit, scale, view, visible, sicht, liftHex, liftVertex, state, besatzung, du, size, brandPunkt]);
+  }, [tageszeit, scale, view, visible, sicht, liftHex, liftVertex, state, besatzung, du, size, brandPunkt, dpr]);
 
   /** Wo gekaempft wird - dieselbe Frage, nach der die Regel kaempfen laesst. */
   const kampf = useMemo(() => kampfFelder(state), [state]);
@@ -597,8 +615,8 @@ export function Board({
     const ctx = cv.getContext('2d');
     if (!ctx) return;
 
-    const bw = Math.round(size.w * DPR);
-    const bh = Math.round(size.h * DPR);
+    const bw = Math.round(size.w * dpr);
+    const bh = Math.round(size.h * dpr);
     if (cv.width !== bw) cv.width = bw;
     if (cv.height !== bh) cv.height = bh;
 
@@ -616,15 +634,15 @@ export function Board({
       const img = imNebel(t.q, t.r) ? tileImageFog(url) : tileImage(url);
       if (!img) return;
       const c = hexToPixel(t.q, t.r, LAYOUT);
-      const x = Math.round((c.x - IMG.dx - view.x) * scale * DPR);
-      const y = Math.round((c.y - IMG.dy - lift - view.y) * scale * DPR);
-      const w = Math.round(IMG.w * scale * DPR);
-      const h = Math.round(IMG.h * scale * DPR);
+      const x = Math.round((c.x - IMG.dx - view.x) * scale * dpr);
+      const y = Math.round((c.y - IMG.dy - lift - view.y) * scale * dpr);
+      const w = Math.round(IMG.w * scale * dpr);
+      const h = Math.round(IMG.h * scale * dpr);
       ctx.drawImage(img, x, y, w, h);
     };
 
     /** Geraetepixel je Kunstpixel - bei jeder Zoomstufe ganzzahlig. */
-    const f = Math.round(SCALE * scale * DPR);
+    const f = Math.round(SCALE * scale * dpr);
     /** Abends und nachts tragen Einheiten Fackeln - das Licht dazu malt die WetterSchicht. */
     const fackeln = tageszeit === 'nacht' || tageszeit === 'abend';
 
@@ -646,8 +664,8 @@ export function Board({
       if (!lager && !ruine && (!leute || leute.length === 0)) return;
       const c = hexToPixel(t.q, t.r, LAYOUT);
       // Ursprung wie in zeichne, damit Figuren im selben Pixelraster sitzen.
-      const x0 = Math.round((c.x - IMG.dx - view.x) * scale * DPR);
-      const y0 = Math.round((c.y - IMG.dy - lift - view.y) * scale * DPR);
+      const x0 = Math.round((c.x - IMG.dx - view.x) * scale * dpr);
+      const y0 = Math.round((c.y - IMG.dy - lift - view.y) * scale * dpr);
       const mx = x0 + Math.round(HEX_CX) * f;
       const my = y0 + Math.round(HEX_CY) * f;
       if (nebel) ctx.globalAlpha = 0.6;
@@ -704,10 +722,10 @@ export function Board({
         ctx.fillStyle = 'rgba(0,0,0,0.45)';
         ctx.beginPath();
         ctx.ellipse(
-          (c.x - view.x) * scale * DPR,
-          (c.y + LAYOUT.h * 0.42 - liftHex(t.q, t.r) - view.y) * scale * DPR,
-          LAYOUT.w * 0.34 * scale * DPR,
-          LAYOUT.h * 0.09 * scale * DPR,
+          (c.x - view.x) * scale * dpr,
+          (c.y + LAYOUT.h * 0.42 - liftHex(t.q, t.r) - view.y) * scale * dpr,
+          LAYOUT.w * 0.34 * scale * dpr,
+          LAYOUT.h * 0.09 * scale * dpr,
           0,
           0,
           Math.PI * 2,
@@ -727,8 +745,8 @@ export function Board({
      * Mittel ihrer drei Felder - Strassenenden und Haeuser treffen sich so.
      */
     const geraet = (x: number, y: number) => ({
-      x: Math.round((x - view.x) * scale * DPR),
-      y: Math.round((y - view.y) * scale * DPR),
+      x: Math.round((x - view.x) * scale * dpr),
+      y: Math.round((y - view.y) * scale * dpr),
     });
     const spielerFarbe = (id: string) =>
       playerColor(state.players.find((pl) => pl.id === id)?.color ?? 0);
@@ -770,23 +788,18 @@ export function Board({
       );
 
     /*
-     * Vorschau statt Marke: auf freien Bauplaetzen steht das Gebaeude, wie es
-     * stuende - blass, unter dem Zeiger fast deckend. Ueber einer Kante steht
-     * die Strasse. Ohne Zeiger (Touch) sieht man so trotzdem alle Plaetze.
+     * Vorschau unter dem Zeiger: auf dem Bauplatz, ueber dem der Zeiger steht,
+     * steht das Gebaeude, wie es stuende; ueber einer Kante die Strasse. Die
+     * Plaetze selbst zeigen Ringe (SVG). Eine blasse Vorschau auf JEDEM Platz
+     * war im Aufbau unuebersichtlich - siebzig halbe Haeuser.
      */
     const eigeneFarbe = du ? spielerFarbe(du) : '#c9a46a';
-    if (geisterBau !== null) {
-      const plaetze = (targets.vertices ?? [])
-        .map((vk) => {
-          const ecke = parseVertexKey(vk);
-          const p = vertexToPixel(ecke, LAYOUT);
-          return { vk, ...geraet(p.x, p.y - liftVertex(ecke)) };
-        })
-        .sort((u, w) => u.y - w.y);
-      for (const pl of plaetze) {
-        ctx.globalAlpha = pl.vk === eckeHover ? 0.95 : 0.42;
-        zeichneGebaeude(ctx, geisterBau, pl.x, pl.y, f, eigeneFarbe);
-      }
+    if (geisterBau !== null && eckeHover !== null && (targets.vertices ?? []).includes(eckeHover)) {
+      const ecke = parseVertexKey(eckeHover);
+      const p = vertexToPixel(ecke, LAYOUT);
+      const pl = geraet(p.x, p.y - liftVertex(ecke));
+      ctx.globalAlpha = 0.9;
+      zeichneGebaeude(ctx, geisterBau, pl.x, pl.y, f, eigeneFarbe);
       ctx.globalAlpha = 1;
     }
     if (kanteHover !== null && (targets.edges ?? []).includes(kanteHover)) {
@@ -839,16 +852,17 @@ export function Board({
     kanteHover,
     geisterBau,
     tageszeit,
+    dpr,
   ]);
 
   /** Eine Stufe naeher (+1) oder weiter weg (-1); der Punkt unter x/y bleibt stehen. */
   const zoomUm = useCallback((richtung: number, mausX: number, mausY: number) => {
     setCam((c) => {
-      const zi = Math.min(ZOOM_STEPS.length - 1, Math.max(0, c.zi + richtung));
+      const zi = Math.min(zoomSteps.length - 1, Math.max(0, c.zi + richtung));
       if (zi === c.zi) return c;
 
-      const alt = ZOOM_STEPS[c.zi]!;
-      const neu = ZOOM_STEPS[zi]!;
+      const alt = zoomSteps[c.zi]!;
+      const neu = zoomSteps[zi]!;
       const rect = ref.current?.getBoundingClientRect();
       if (!rect) return { ...c, zi };
       // Der Punkt unter dem Zeiger soll stehen bleiben.
@@ -860,7 +874,7 @@ export function Board({
         cy: c.cy + my / alt - my / neu,
       };
     });
-  }, []);
+  }, [zoomSteps]);
 
   const onWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
@@ -954,10 +968,10 @@ export function Board({
    */
   const setZoom = useCallback((zi: number) => {
     setCam((c) => {
-      const z = Math.min(ZOOM_STEPS.length - 1, Math.max(0, zi));
+      const z = Math.min(zoomSteps.length - 1, Math.max(0, zi));
       return z === c.zi ? c : { ...c, zi: z };
     });
-  }, []);
+  }, [zoomSteps]);
 
   /** Wird der Balken gerade gezogen? */
   const balkenZug = useRef(false);
@@ -966,7 +980,7 @@ export function Board({
   const zoomAusBalken = (e: React.PointerEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const t = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
-    setZoom(Math.round((1 - t) * (ZOOM_STEPS.length - 1)));
+    setZoom(Math.round((1 - t) * (zoomSteps.length - 1)));
   };
 
   /**
@@ -1201,9 +1215,9 @@ export function Board({
       <WetterSchicht
         breite={size.w}
         hoehe={size.h}
-        dpr={DPR}
-        pixel={Math.round(SCALE * scale * DPR)}
-        kamera={{ x: view.x * scale * DPR, y: view.y * scale * DPR }}
+        dpr={dpr}
+        pixel={Math.round(SCALE * scale * dpr)}
+        kamera={{ x: view.x * scale * dpr, y: view.y * scale * dpr }}
         tageszeit={tageszeit}
         wetter={wetter}
         lichter={lichter}
@@ -1321,9 +1335,9 @@ export function Board({
 
         {/* Anklickbare Ecken */}
         {/*
-          Eine kleine Raute statt eines Rings. Im Aufbau stehen siebzig davon
-          gleichzeitig auf der Karte - Ringe deckten sie zu. Die unsichtbare
-          Scheibe darunter haelt die Trefferflaeche gross, auch fuer Finger.
+          Ein Ring je Bauplatz, wie ganz am Anfang - unter dem Zeiger gefuellt,
+          dazu das Gebaeude als Vorschau. Die unsichtbare Scheibe darunter haelt
+          die Trefferflaeche gross, auch fuer Finger.
         */}
         {[...vertexTargets].map((vk) => {
           const ecke = parseVertexKey(vk);
@@ -1338,13 +1352,14 @@ export function Board({
               onPointerLeave={() => setEckeHover((alt) => (alt === vk ? null : alt))}
             >
               <circle cx={p.x} cy={y} r={12} className="vertex-treffer" />
+              <circle cx={p.x} cy={y} r={7} className="vertex-ring" />
             </g>
           );
         })}
 
-        {/* Befehle: Weg und Ziel eigener Ritter. */}
+        {/* Befehle: Weg und Ziel eigener Ritter und des Helden. Frueher nur der Ritter - der Held zog, aber man sah es nicht. */}
         {state.units
-          .filter((u) => u.kind === 'ritter' && du !== null && u.owner === du && u.ziel !== null)
+          .filter((u) => (u.kind === 'ritter' || u.kind === 'held') && du !== null && u.owner === du && u.ziel !== null)
           .map((u) => {
             const a = hexToPixel(u.q, u.r, LAYOUT);
             const b = hexToPixel(u.ziel!.q, u.ziel!.r, LAYOUT);
@@ -1501,7 +1516,7 @@ export function Board({
         <button
           className="zoom-knopf"
           title="Naeher heran"
-          disabled={cam.zi >= ZOOM_STEPS.length - 1}
+          disabled={cam.zi >= zoomSteps.length - 1}
           onClick={() => setZoom(cam.zi + 1)}
         >
           +
@@ -1513,7 +1528,7 @@ export function Board({
           aria-label="Zoom"
           aria-orientation="vertical"
           aria-valuemin={0}
-          aria-valuemax={ZOOM_STEPS.length - 1}
+          aria-valuemax={zoomSteps.length - 1}
           aria-valuenow={cam.zi}
           onPointerDown={(e) => {
             balkenZug.current = true;
@@ -1536,9 +1551,9 @@ export function Board({
             e.preventDefault();
           }}
         >
-          {ZOOM_STEPS.map((_, i) => {
+          {zoomSteps.map((_, i) => {
             // Von oben nach unten: hoechste Stufe zuerst.
-            const stufe = ZOOM_STEPS.length - 1 - i;
+            const stufe = zoomSteps.length - 1 - i;
             const cls =
               stufe === cam.zi ? 'zoom-stufe aktiv' : stufe < cam.zi ? 'zoom-stufe voll' : 'zoom-stufe';
             return <span key={stufe} className={cls} />;

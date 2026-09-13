@@ -1,16 +1,14 @@
 /**
  * Rohstoffertrag nach einem Wurf.
  *
- * Die feine Regel, die oft falsch umgesetzt wird: reicht die Bank fuer einen
- * Rohstoff nicht aus und haetten MEHRERE Spieler Anspruch, bekommt niemand
- * etwas davon. Nur wenn genau ein Spieler Anspruch hat, erhaelt er, was noch
- * da ist. Auf unserer Karte trifft das oefter zu als im Original, weil eine
- * lange Partie die Bank leerraeumt.
+ * Die Bank ist unendlich (state.ts) - jeder bekommt, was seine Felder liefern.
+ * Frueher fiel ein Rohstoff fuer alle aus, wenn die Bank nicht fuer jeden
+ * reichte; das ist mit dem Bestand verschwunden.
  */
 
 import { hexVertices, hexKey, vertexKey } from '../coords';
 import type { World } from '../world';
-import { RESOURCES, TERRAIN_RESOURCE } from '../types';
+import { TERRAIN_RESOURCE } from '../types';
 import type { Resource } from '../types';
 import type { GameState, PlayerId } from '../state';
 import { modifiersOf, terrainBonusFor } from '../cards/effects';
@@ -82,57 +80,16 @@ export function productionSources(
   return out;
 }
 
-/**
- * Was der Wurf einbringt, ohne den Zustand zu aendern.
- * Liefert je Spieler die Karten und die Rohstoffe, die wegen Bankmangel
- * ausgefallen sind.
- */
+/** Was der Wurf einbringt, je Spieler - ohne den Zustand zu aendern. */
 export function computeProduction(
   state: GameState,
   world: World,
   roll: number,
-): { payout: Payout; shortfall: Resource[] } {
-  // Erst den Anspruch sammeln, dann gegen die Bank pruefen.
-  const claims: Record<Resource, Map<PlayerId, number>> = {
-    lumber: new Map(),
-    wool: new Map(),
-    grain: new Map(),
-    brick: new Map(),
-    ore: new Map(),
-  };
-
-  for (const q of productionSources(state, world, roll, wetterOf(state.worldSeed, state.turn))) {
-    const m = claims[q.resource];
-    m.set(q.owner, (m.get(q.owner) ?? 0) + q.amount);
-  }
-
+): { payout: Payout } {
   const payout: Payout = {};
-  const shortfall: Resource[] = [];
-
-  for (const res of RESOURCES) {
-    const m = claims[res];
-    if (m.size === 0) continue;
-    let total = 0;
-    for (const n of m.values()) total += n;
-
-    if (total > state.bank[res]) {
-      if (m.size > 1) {
-        // Mehrere Anspruchsberechtigte, zu wenig in der Bank: niemand bekommt etwas.
-        shortfall.push(res);
-        continue;
-      }
-      // Genau einer: er bekommt den Rest der Bank.
-      const [only] = [...m.keys()];
-      m.set(only!, state.bank[res]);
-      if (state.bank[res] < total) shortfall.push(res);
-    }
-
-    for (const [pid, n] of m) {
-      if (n <= 0) continue;
-      payout[pid] ??= emptyHand();
-      payout[pid]![res] += n;
-    }
+  for (const q of productionSources(state, world, roll, wetterOf(state.worldSeed, state.turn))) {
+    payout[q.owner] ??= emptyHand();
+    payout[q.owner]![q.resource] += q.amount;
   }
-
-  return { payout, shortfall };
+  return { payout };
 }

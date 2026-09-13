@@ -57,7 +57,6 @@ function zahleTribut(s: GameState, player: PlayerId): boolean {
   const genommen = takeFromLargest(p.hand, TRIBUT_KARTEN);
   for (const r of RESOURCES) {
     p.hand[r] -= genommen[r];
-    s.bank[r] += genommen[r];
   }
   return true;
 }
@@ -87,7 +86,7 @@ export function verhandeln(
   if (art === 'frieden') {
     if (!nimmtFrieden(s.worldSeed, fraktion)) return 'Goblins schliessen keinen Frieden - sie nehmen nur Tribut.';
     if (!canAfford(p.hand, FRIEDEN_PREIS)) return 'Fuer den Frieden fehlen dir die Gaben.';
-    pay(p.hand, s.bank, FRIEDEN_PREIS);
+    pay(p.hand, FRIEDEN_PREIS);
   } else if (!zahleTribut(s, actor)) {
     return 'Fuer den Tribut fehlt dir eine Karte.';
   }

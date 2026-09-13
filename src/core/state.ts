@@ -83,12 +83,13 @@ export type UnitKind = 'ritter' | 'raeuber' | 'goblin' | 'wanderer' | 'held';
  * Was eine Einheit gerade vorhat.
  *
  *   befehl    Ritter: zieht, wohin der Spieler sie schickt (ziel), sonst steht sie.
+ *   erkunden  Ritter und Held: ziehen von selbst zur naechsten Ruine oder ins Unbekannte.
  *   raub      zieht zur naechsten Siedlung und pluendert dort.
  *   heimkehr  zieht mit der Beute zurueck ins Lager.
  *   fehde     zieht gegen das Lager einer feindlichen Fraktion (ziel).
  *   wandern   neutral, zieht umher und verschwindet nach einer Weile.
  */
-export type Auftrag = 'befehl' | 'raub' | 'heimkehr' | 'fehde' | 'wandern';
+export type Auftrag = 'befehl' | 'erkunden' | 'raub' | 'heimkehr' | 'fehde' | 'wandern';
 
 /**
  * Eine Einheit im Spielstand.
@@ -242,13 +243,11 @@ export type GameState = {
   buildings: Record<string, Building>;
   roads: Record<string, PlayerId>;
 
-  bank: Hand;
   deck: DevCardType[];
   packIndex: number;
 
   /** Zaehlt jeden Spielerzug hoch. Grundlage der Sperre fuer frische Karten. */
   turn: number;
-  devPlayedThisTurn: boolean;
   lastRoll: [number, number] | null;
 
   targetPoints: number;
@@ -292,8 +291,12 @@ export type GameState = {
   nextAuftragId: number;
 };
 
-/** Die Bank haelt 19 Karten je Rohstoff - auch auf unendlicher Karte. */
-export const BANK_PER_RESOURCE = 19;
+/*
+ * Eine Bank mit Bestand gibt es nicht mehr: sie ist unendlich. Frueher hielt sie
+ * 19 Karten je Rohstoff, und in langen Partien fiel Ertrag aus, weil der
+ * Vorrat leer war - auf einer Karte ohne Rand eine Knappheit, die niemand
+ * versteht. Bezahltes verschwindet, Ertrag entsteht.
+ */
 
 export function playerById(state: GameState, id: PlayerId): Player | undefined {
   return state.players.find((p) => p.id === id);

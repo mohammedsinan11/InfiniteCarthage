@@ -289,7 +289,6 @@ describe('Raubzuege', () => {
     siedlung(game, mitte);
     const p = game.state.players[0]!;
     for (const r of RESOURCES) p.hand[r] = 1;
-    const bank = { ...game.state.bank };
     const ziele = siedlungsFelder(game);
     const abstand = (h: { q: number; r: number }) => Math.min(...ziele.map((z) => hexDistance(h, z)));
     const start = hexesInRange(mitte, 4).find((h) => abstand(h) === 2)!;
@@ -298,13 +297,12 @@ describe('Raubzuege', () => {
     expect(tick(game).some((e) => e.t === 'plunder')).toBe(false);
     expect(tick(game).some((e) => e.t === 'plunder')).toBe(true);
 
-    // Er steht noch - mit der Beute auf dem Heimweg. Die Bank bekommt nichts.
+    // Er steht noch - mit der Beute auf dem Heimweg.
     expect(game.state.units).toContain(u);
     expect(u.auftrag).toBe('heimkehr');
     expect(u.traegt).toBe(1);
     expect(handSize(u.fracht!)).toBe(1);
     expect(handSize(p.hand)).toBe(4);
-    expect(game.state.bank).toEqual(bank);
 
     // Was er traegt, sieht nur der Beraubte.
     const eigen = redactStateFor(game.state, 'p0').units.find((x) => x.id === u.id)!;
@@ -338,12 +336,10 @@ describe('Raubzuege', () => {
         beraubt: 'p0',
       }),
     );
-    const erz = s.bank.ore;
     const events = tick(game);
     expect(events.find((e) => e.t === 'homecoming')).toMatchObject({ count: 2, fraktion });
     expect(s.units).not.toContain(u);
     expect(garrisonOf(s, nest.q, nest.r)).toBe(2);
-    expect(s.bank.ore).toBe(erz + 2);
   });
 
   it('zerstreuen sich, wenn ihre Fraktion kein Lager mehr hat', () => {
@@ -353,10 +349,8 @@ describe('Raubzuege', () => {
       game,
       raeuber(land.q, land.r, { auftrag: 'heimkehr', fracht: { ...emptyHand(), wool: 1 }, traegt: 1 }),
     );
-    const wolle = game.state.bank.wool;
     tick(game);
     expect(game.state.units).not.toContain(u);
-    expect(game.state.bank.wool).toBe(wolle + 1);
   });
 });
 
@@ -421,7 +415,7 @@ describe('Kaempfe', () => {
       const p = game.state.players[0]!;
       for (const r of RESOURCES) p.hand[r] = 0;
       einheit(game, ritter(land.q, land.r));
-      const dieb = einheit(
+      einheit(
         game,
         raeuber(land.q, land.r, {
           auftrag: 'heimkehr',
@@ -430,15 +424,8 @@ describe('Kaempfe', () => {
           beraubt: 'p0',
         }),
       );
-      const wolle = () =>
-        game.state.bank.wool +
-        p.hand.wool +
-        game.state.units.reduce((n, u) => n + (u.fracht?.wool ?? 0), 0) +
-        (game.state.units.includes(dieb) ? 0 : (dieb.fracht?.wool ?? 0));
-      const vorher = wolle();
       for (let runde = 0; runde < 40; runde++) {
         const events = tick(game);
-        expect(wolle()).toBe(vorher);
         const zurueck = events.find((e) => e.t === 'lootRecovered');
         if (zurueck) {
           expect(p.hand.wool).toBe(3);
@@ -729,6 +716,33 @@ describe('Nacht', () => {
       expect(trupp.every((u) => u.auftrag === 'raub' && u.fraktion === horde.fraktion)).toBe(true);
     }
     expect(gesehen).toBe(true);
+  });
+});
+
+describe('Erkunden', () => {
+  it('ein Ritter erkundet von selbst - er zieht ins Unbekannte, und die Karte waechst', () => {
+    const game = solo();
+    const land = landFlaeche(game, 1, ORIGIN, 7);
+    const u = einheit(game, { ...ritter(land.q, land.r), auftrag: 'erkunden' });
+    const vorher = game.state.chunks.length;
+    for (let i = 0; i < 15 && game.state.units.includes(u); i++) tick(game);
+    expect(game.state.chunks.length).toBeGreaterThan(vorher);
+  });
+
+  it('ein Befehl beendet das Erkunden, der Knopf schaltet es an und aus', () => {
+    const game = solo();
+    const land = landFlaeche(game, 1, ORIGIN, 7);
+    bauphase(game);
+    const u = einheit(game, ritter(land.q, land.r));
+    must(game, { t: 'explore', unit: u.id, explore: true });
+    expect(game.state.units.find((x) => x.id === u.id)!.auftrag).toBe('erkunden');
+    must(game, { t: 'orderUnit', unit: u.id, q: land.q, r: land.r });
+    expect(game.state.units.find((x) => x.id === u.id)!.auftrag).toBe('befehl');
+    must(game, { t: 'explore', unit: u.id, explore: true });
+    must(game, { t: 'explore', unit: u.id, explore: false });
+    expect(game.state.units.find((x) => x.id === u.id)!.auftrag).toBe('befehl');
+    const fremd = einheit(game, ritter(land.q, land.r, 'p9'));
+    expect(applyAction(game, { t: 'explore', unit: fremd.id, explore: true }, 'p0').ok).toBe(false);
   });
 });
 

@@ -2729,3 +2729,30 @@ em.off {
     display: none;
   }
 }
+
+/* Bauplaetze: ein Ring je Platz, wie ganz am Anfang. Unter dem Zeiger gefuellt,
+   dazu die Vorschau des Gebaeudes. PLATZHALTER (ASSETS.md). */
+.vertex-ring {
+  fill: rgba(217, 164, 65, 0.14);
+  stroke: var(--accent);
+  stroke-width: 2;
+  pointer-events: none;
+}
+.vertex-target:hover .vertex-ring,
+.vertex-target.aktiv .vertex-ring {
+  fill: var(--accent);
+  stroke: #fff;
+}
+
+/* Ton aus/an im Schild oben. */
+.hud-ton {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 7px;
+  color: var(--accent);
+}
+.hud-ton.aus {
+  color: var(--muted);
+}

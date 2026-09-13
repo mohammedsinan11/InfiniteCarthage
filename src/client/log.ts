@@ -109,11 +109,7 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
           .join(', ');
         return `${who(state, pid)}: ${got}`;
       });
-      const short =
-        e.shortfall.length > 0
-          ? ` (Bank leer: ${e.shortfall.map((r) => RES_NAME[r]).join(', ')})`
-          : '';
-      return parts.length > 0 ? `Ertrag - ${parts.join(' | ')}${short}` : `Niemand bekommt etwas.${short}`;
+      return parts.length > 0 ? `Ertrag - ${parts.join(' | ')}` : 'Niemand bekommt etwas.';
     }
     case 'build':
       return `${who(state, e.player)} baut ${BUILD_NAME[e.kind]}.`;

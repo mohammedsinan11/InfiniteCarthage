@@ -31,7 +31,6 @@ import type { ChunkCoord } from '../chunks';
 import { RESOURCES, TERRAIN_RESOURCE } from '../types';
 import type { Resource } from '../types';
 import {
-  BANK_PER_RESOURCE,
   currentPlayerId,
   emptyHand,
   handSize,
@@ -116,6 +115,8 @@ export type Action =
   | { t: 'putOut'; key: string; mit: Resource }
   /** Einen Wachturm an ein eigenes Dorf oder eine Stadt bauen. */
   | { t: 'buildTower'; vertex: string }
+  /** Einen eigenen Ritter oder den Helden von selbst erkunden lassen - oder nicht mehr. */
+  | { t: 'explore'; unit: number; explore: boolean }
   /** Einen eigenen Ritter dem Helden folgen lassen - oder nicht mehr. */
   | { t: 'follow'; unit: number; follow: boolean }
   /** Frieden, Tribut oder Krieg mit einer Fraktion (rules/diplomatie.ts). */
@@ -126,7 +127,7 @@ export type Action =
 
 export type GameEvent =
   | { t: 'roll'; player: PlayerId; dice: [number, number] }
-  | { t: 'production'; payout: Record<PlayerId, Hand>; shortfall: Resource[] }
+  | { t: 'production'; payout: Record<PlayerId, Hand> }
   | { t: 'build'; player: PlayerId; kind: 'road' | 'settlement' | 'city' | 'tower'; at: string }
   | { t: 'buyDev'; player: PlayerId }
   | { t: 'playDev'; player: PlayerId; card: DevCardType }
@@ -218,17 +219,9 @@ export function createGame(
     phase: { t: 'setup', step: 0, awaiting: 'settlement', lastVertex: null },
     buildings: {},
     roads: {},
-    bank: {
-      lumber: BANK_PER_RESOURCE,
-      wool: BANK_PER_RESOURCE,
-      grain: BANK_PER_RESOURCE,
-      brick: BANK_PER_RESOURCE,
-      ore: BANK_PER_RESOURCE,
-    },
     deck: [],
     packIndex: 0,
     turn: 0,
-    devPlayedThisTurn: false,
     lastRoll: null,
     targetPoints,
     largestArmy: null,
@@ -275,7 +268,6 @@ function grow(state: GameState, world: World, hexes: { q: number; r: number }[])
 function nextTurn(state: GameState): void {
   state.current = (state.current + 1) % state.order.length;
   state.turn += 1;
-  state.devPlayedThisTurn = false;
   // Ein Angebot gehoert zum Zug seines Anbieters und verfaellt mit ihm.
   state.trade = null;
   state.phase = { t: 'roll' };
@@ -310,7 +302,6 @@ function findPlayableDev(
 }
 
 function devPlayGuard(state: GameState, p: Player, type: DevCardType): string | null {
-  if (state.devPlayedThisTurn) return 'In diesem Zug wurde schon eine Karte gespielt.';
   if (findPlayableDev(state, p, type) < 0) {
     const owned = p.dev.some((d) => d.type === type && !d.played);
     return owned
@@ -394,8 +385,6 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
           if (!tile) continue;
           const res = TERRAIN_RESOURCE[tile.terrain];
           if (res === null) continue;
-          if (s.bank[res] <= 0) continue;
-          s.bank[res] -= 1;
           actorPlayer.hand[res] += 1;
         }
       }
@@ -453,16 +442,15 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         // den Pluenderungen.
         enterDraft(s, 'fund', events);
       } else {
-        const { payout, shortfall } = computeProduction(s, world, sum);
+        const { payout } = computeProduction(s, world, sum);
         for (const [pid, gain] of Object.entries(payout)) {
           const p = playerById(s, pid);
           if (!p) continue;
           for (const r of RESOURCES) {
             p.hand[r] += gain[r];
-            s.bank[r] -= gain[r];
           }
         }
-        events.push({ t: 'production', payout, shortfall });
+        events.push({ t: 'production', payout });
         s.phase = { t: 'main' };
       }
       break;
@@ -480,14 +468,10 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
 
       actorPlayer.cards.push(karte.id);
 
-      // Sofortwirkung, soweit die Bank sie decken kann.
+      // Sofortwirkung - die Bank ist unendlich.
       if (karte.instant) {
         if (karte.instant.t === 'gain') {
-          for (const r of RESOURCES) {
-            const n = Math.min(karte.instant.resources[r] ?? 0, s.bank[r]);
-            s.bank[r] -= n;
-            actorPlayer.hand[r] += n;
-          }
+          for (const r of RESOURCES) actorPlayer.hand[r] += karte.instant.resources[r] ?? 0;
         } else {
           // "Beliebige" Rohstoffe: gleichmaessig verteilt, damit die Regel
           // ohne Rueckfrage auskommt. Eine echte Wahl waere eine eigene
@@ -496,8 +480,6 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
           for (let runde = 0; runde < karte.instant.count && offen > 0; runde++) {
             for (const r of RESOURCES) {
               if (offen <= 0) break;
-              if (s.bank[r] <= 0) continue;
-              s.bank[r] -= 1;
               actorPlayer.hand[r] += 1;
               offen -= 1;
             }
@@ -524,7 +506,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         return fail('Zu wenig Rohstoffe fuer eine Strasse.');
       }
 
-      if (!inRoadBuilding) pay(actorPlayer.hand, s.bank, kosten);
+      if (!inRoadBuilding) pay(actorPlayer.hand, kosten);
       s.roads[action.edge] = actor;
       delete s.asche[action.edge];
       events.push({ t: 'build', player: actor, kind: 'road', at: action.edge });
@@ -554,7 +536,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         return fail('Zu wenig Rohstoffe fuer eine Siedlung.');
       }
 
-      pay(actorPlayer.hand, s.bank, COST_SETTLEMENT);
+      pay(actorPlayer.hand, COST_SETTLEMENT);
       s.buildings[action.vertex] = { owner: actor, type: 'settlement' };
       events.push({ t: 'build', player: actor, kind: 'settlement', at: action.vertex });
 
@@ -573,7 +555,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         return fail('Zu wenig Rohstoffe fuer eine Stadt.');
       }
 
-      pay(actorPlayer.hand, s.bank, COST_CITY);
+      pay(actorPlayer.hand, COST_CITY);
       s.buildings[action.vertex] = { owner: actor, type: 'city' };
       events.push({ t: 'build', player: actor, kind: 'city', at: action.vertex });
       checkWin(s, events);
@@ -586,7 +568,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (!canAfford(actorPlayer.hand, COST_DEV)) {
         return fail('Zu wenig Rohstoffe fuer eine Entwicklungskarte.');
       }
-      pay(actorPlayer.hand, s.bank, COST_DEV);
+      pay(actorPlayer.hand, COST_DEV);
       const card = drawDevCard(s);
       actorPlayer.dev.push({ type: card, boughtTurn: s.turn, played: false });
       events.push({ t: 'buyDev', player: actor });
@@ -603,7 +585,6 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
 
       actorPlayer.dev[findPlayableDev(s, actorPlayer, 'knight')]!.played = true;
       actorPlayer.playedKnights += 1;
-      s.devPlayedThisTurn = true;
       events.push({ t: 'playDev', player: actor, card: 'knight' });
       spawnKnight(s, actor, events);
 
@@ -627,7 +608,6 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (why) return fail(why);
 
       actorPlayer.dev[findPlayableDev(s, actorPlayer, 'roadBuilding')]!.played = true;
-      s.devPlayedThisTurn = true;
       events.push({ t: 'playDev', player: actor, card: 'roadBuilding' });
 
       const possible = 2;
@@ -645,16 +625,10 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       const want: Partial<Record<Resource, number>> = {};
       want[action.a] = (want[action.a] ?? 0) + 1;
       want[action.b] = (want[action.b] ?? 0) + 1;
-      for (const r of RESOURCES) {
-        if ((want[r] ?? 0) > s.bank[r]) return fail('Die Bank hat davon nicht genug.');
-      }
 
       actorPlayer.dev[findPlayableDev(s, actorPlayer, 'yearOfPlenty')]!.played = true;
-      s.devPlayedThisTurn = true;
       for (const r of RESOURCES) {
-        const n = want[r] ?? 0;
-        s.bank[r] -= n;
-        actorPlayer.hand[r] += n;
+        actorPlayer.hand[r] += want[r] ?? 0;
       }
       events.push({ t: 'playDev', player: actor, card: 'yearOfPlenty' });
       events.push({ t: 'yearOfPlenty', player: actor, a: action.a, b: action.b });
@@ -667,7 +641,6 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (why) return fail(why);
 
       actorPlayer.dev[findPlayableDev(s, actorPlayer, 'monopoly')]!.played = true;
-      s.devPlayedThisTurn = true;
       let taken = 0;
       for (const p of s.players) {
         if (p.id === actor) continue;
@@ -687,8 +660,6 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (why) return fail(why);
       const ratio = tradeRatio(s, world, actor, action.give);
       actorPlayer.hand[action.give] -= ratio;
-      s.bank[action.give] += ratio;
-      s.bank[action.receive] -= 1;
       actorPlayer.hand[action.receive] += 1;
       events.push({ t: 'trade', player: actor, give: action.give, receive: action.receive, ratio });
       break;
@@ -763,7 +734,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (!canAfford(actorPlayer.hand, COST_KNIGHT)) {
         return fail('Zu wenig Rohstoffe fuer einen Ritter.');
       }
-      pay(actorPlayer.hand, s.bank, COST_KNIGHT);
+      pay(actorPlayer.hand, COST_KNIGHT);
       if (!spawnKnight(s, actor, events)) {
         return fail('Keine Siedlung, an der ein Ritter antreten koennte.');
       }
@@ -779,8 +750,9 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (einheit.owner !== actor || (einheit.kind !== 'ritter' && einheit.kind !== 'held')) {
         return fail('Das ist nicht dein Ritter.');
       }
-      // Ein eigener Befehl loest aus dem Gefolge.
+      // Ein eigener Befehl loest aus dem Gefolge und beendet das Erkunden.
       einheit.folgt = null;
+      einheit.auftrag = 'befehl';
       if (action.q === einheit.q && action.r === einheit.r) {
         einheit.ziel = null;
         break;
@@ -817,9 +789,23 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (b.turm) return fail('Dort steht schon ein Wachturm.');
       if (brennt(s, action.vertex)) return fail('Dort brennt es gerade.');
       if (!canAfford(actorPlayer.hand, COST_TOWER)) return fail('Zu wenig Rohstoffe fuer einen Wachturm.');
-      pay(actorPlayer.hand, s.bank, COST_TOWER);
+      pay(actorPlayer.hand, COST_TOWER);
       b.turm = true;
       events.push({ t: 'build', player: actor, kind: 'tower', at: action.vertex });
+      break;
+    }
+
+    case 'explore': {
+      if (phase.t !== 'main' && phase.t !== 'roll') {
+        return fail('Jetzt koennen keine Befehle gegeben werden.');
+      }
+      const einheit = s.units.find((u) => u.id === action.unit);
+      if (!einheit || einheit.owner !== actor || (einheit.kind !== 'ritter' && einheit.kind !== 'held')) {
+        return fail('Das ist nicht deine Einheit.');
+      }
+      einheit.folgt = null;
+      einheit.ziel = null;
+      einheit.auftrag = action.explore ? 'erkunden' : 'befehl';
       break;
     }
 
@@ -837,6 +823,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       const held = s.units.find((u) => u.kind === 'held' && u.owner === actor);
       if (!held) return fail('Dein Held ist nicht auf der Karte.');
       ritter.folgt = held.id;
+      ritter.auftrag = 'befehl';
       ritter.ziel = ritter.q === held.q && ritter.r === held.r ? null : { q: held.q, r: held.r };
       break;
     }

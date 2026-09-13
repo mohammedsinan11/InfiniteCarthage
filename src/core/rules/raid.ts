@@ -8,7 +8,7 @@
  * Genommen wird vom groessten Stapel. Kein Zufall: der Verlust soll
  * nachvollziehbar sein, und wer viel von einer Sorte haelt, verliert davon.
  * Horten wird bestraft - wer ueber der Handkartengrenze liegt, verliert die
- * Haelfte statt einer Karte. Was genommen wird, geht an die Bank zurueck.
+ * Haelfte statt einer Karte. Was genommen wird, tragen die Raeuber heim.
  */
 
 import { RESOURCES } from '../types';

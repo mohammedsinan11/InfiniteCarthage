@@ -77,9 +77,10 @@ links oben. Mittelalterlich:
   Mitte (`wimpel`).
 
 Seit der dritten Fassung stehen im Spiel **kompakte** Fassungen (`dorfKlein`
-11 x 10, `stadtKlein` 15 x 14) auf einer **Lichtung** aus festgetretener Erde
-(`lichtung`, 15 x 5), damit das Haus nicht ueber die Nachbarkacheln ragt. Die
-grossen Fassungen bleiben zum Vergleich; alle Varianten: `labor.html?art=gebaeude`.
+11 x 10, `stadtKlein` 15 x 14) ueber der Ecke, damit das Haus nicht ueber die
+Nachbarkacheln ragt (Variante A). Die Lichtung darunter (`lichtung`, 15 x 5,
+Variante B) ist wieder draussen. Die grossen Fassungen bleiben zum Vergleich;
+alle Varianten: `labor.html?art=gebaeude`.
 
 - **Wachturm** (`turm`, 7 x 13): Steinturm mit Feuerschale und Band in
   Spielerfarbe, rechts hinter Dorf oder Stadt.
@@ -174,10 +175,12 @@ bei denen Synthese am deutlichsten nach Synthese klingt.
   Strasse, Dorf, Stadt, Karte, Ritter, Handel, Karten, Beute und Zugende aus
   wenigen SVG-Flaechen; Kosten als verkleinerte Rohstoffbilder. Handel und
   Entwicklungskarten klappen als Tafeln auf.
-- **Bauplaetze:** keine Marke mehr, sondern das Gebaeude selbst als Vorschau -
-  blass auf jedem freien Platz, unter dem Zeiger fast deckend; die drei
-  Nachbarfelder zeigen dann ihre Zahlen. Ueber einer Strassenkante steht die
+- **Bauplaetze:** ein goldener Ring je freiem Platz (CSS `.vertex-ring`), unter
+  dem Zeiger gefuellt; dort steht dann auch das Gebaeude als Vorschau, und die
+  drei Nachbarfelder zeigen ihre Zahlen. Die blasse Vorschau auf jedem Platz war
+  unuebersichtlich und ist wieder draussen. Ueber einer Strassenkante steht die
   Strasse als Vorschau, sonst ein blasser Strich.
+- **Tonknopf** oben im Schild: Lautsprecher mit Wellen oder Kreuz (SVG).
 - **Wuerfelknopf** rechts neben der Leiste: Wuerfelsymbol, schrumpfender Balken
   fuer die fuenf Sekunden bis zum Selbstwurf, pulsierender Schein, beim Wurf ein
   Stoss und zwoelf Funken (CSS), dazu `playWurfStart`.
@@ -272,7 +275,7 @@ wuerden.
 | **Fraktionswappen** | 9 kleine Wappen oder Banner | Ersetzen die blossen Farbpunkte in Menue und Feldinfo; koennten auch am Lager haengen. |
 | **Kampf-Symbol** | `kampf.png`, etwa 12 x 12, gern 2 Einzelbilder | Ersetzt die Pixelschwerter ueber einem umkaempften Feld. |
 | **Aktionssymbole** | 9 Symbole, etwa 16 x 16 | Strasse, Dorf, Stadt, Karte, Ritter, Handel, Karten, Beute, Zugende in der Aktionsleiste. |
-| **Bauplatz-Marke** | entfaellt | Freie Plaetze zeigen jetzt das Gebaeude als Vorschau. |
+| **Bauplatz-Marke** | Ring oder Fundament, etwa 12 x 8 | Ersetzt den gezeichneten Ring auf freien Bauplaetzen. |
 | **Wetter-Sprites** | Regen- und Schneetextur, 3-4 Blitzbilder, Wolkenschatten | Ersetzen die gerechneten Muster im Shader. |
 | **Fackel und Feuer** | `fackel.png` 2-3 Einzelbilder, Lagerfeuer | Die Fackel an Figuren bei Nacht; das Licht bleibt im Shader. |
 | **Brand** | kurze Einzelbildfolge Flammen und Rauch, dazu Asche | Ersetzt die zwei Pixelflammen (`Marken.tsx`) und die gezeichnete Asche. |

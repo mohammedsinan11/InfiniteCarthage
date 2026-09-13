@@ -54,7 +54,6 @@ function give(game: Game, pid: PlayerId, res: Partial<Hand>): void {
   for (const r of RESOURCES) {
     const n = res[r] ?? 0;
     p.hand[r] += n;
-    game.state.bank[r] -= n;
   }
 }
 
@@ -240,7 +239,7 @@ function phaseOf(game: Game): string {
 
 
 describe('Bauen und Kosten', () => {
-  it('zieht Kosten ab und gibt sie der Bank', () => {
+  it('zieht die Kosten ab', () => {
     const game = newGame(3);
     runSetup(game);
     must(game, { t: 'roll' }, 'p0');
@@ -250,15 +249,12 @@ describe('Bauen und Kosten', () => {
     give(game, 'p0', { lumber: 1, brick: 1 });
     const p = playerById(game.state, 'p0')!;
     const before = { ...p.hand };
-    const bankBefore = { ...game.state.bank };
-
     const es = legalRoadEdges(game.state, game.world, 'p0');
     must(game, { t: 'buildRoad', edge: es[0]! }, 'p0');
 
     const after = playerById(game.state, 'p0')!;
     expect(after.hand.lumber).toBe(before.lumber - 1);
     expect(after.hand.brick).toBe(before.brick - 1);
-    expect(game.state.bank.lumber).toBe(bankBefore.lumber + 1);
     expect(Object.values(game.state.roads).filter((o) => o === 'p0')).toHaveLength(3);
   });
 
@@ -365,20 +361,28 @@ describe('Entwicklungskarten', () => {
     }
   });
 
-  it('erlaubt hoechstens eine Karte pro Zug', () => {
+  it('erlaubt beliebig viele Karten in einem Zug', () => {
     const game = newGame(3);
     runSetup(game);
-    // Zwei Ritter direkt einsetzen, mit einer Kaufrunde in der Vergangenheit.
     const p = playerById(game.state, 'p0')!;
     p.dev.push({ type: 'knight', boughtTurn: 0, played: false });
     p.dev.push({ type: 'knight', boughtTurn: 0, played: false });
 
     toMain(game, 'p0');
     must(game, { t: 'playKnight' }, 'p0');
-    // Raeuber setzen, danach zweiter Ritter -> muss scheitern.
     resolveDraft(game);
+    must(game, { t: 'playKnight' }, 'p0');
+    expect(playerById(game.state, 'p0')!.playedKnights).toBe(2);
+  });
+
+  it('eine frisch gekaufte Karte ist erst im naechsten Zug spielbar', () => {
+    const game = newGame(3);
+    runSetup(game);
+    toMain(game, 'p0');
+    const p = playerById(game.state, 'p0')!;
+    p.dev.push({ type: 'knight', boughtTurn: game.state.turn, played: false });
     const r = applyAction(game, { t: 'playKnight' }, 'p0');
-    expect(r).toEqual({ ok: false, error: 'In diesem Zug wurde schon eine Karte gespielt.' });
+    expect(r).toEqual({ ok: false, error: 'Diese Karte ist erst im naechsten Zug spielbar.' });
   });
 
   it('vergibt die Groesste Rittermacht ab drei Rittern', () => {
@@ -414,7 +418,7 @@ describe('Entwicklungskarten', () => {
     expect(playerById(game.state, 'p2')!.hand.wool).toBe(0);
   });
 
-  it('Erfindung nimmt zwei Karten aus der Bank', () => {
+  it('Erfindung bringt zwei Karten', () => {
     const game = newGame(3);
     runSetup(game);
     const p = playerById(game.state, 'p0')!;
@@ -422,10 +426,8 @@ describe('Entwicklungskarten', () => {
     toMain(game, 'p0');
 
     const oreBefore = playerById(game.state, 'p0')!.hand.ore;
-    const bankBefore = game.state.bank.ore;
     must(game, { t: 'playYearOfPlenty', a: 'ore', b: 'ore' }, 'p0');
     expect(playerById(game.state, 'p0')!.hand.ore).toBe(oreBefore + 2);
-    expect(game.state.bank.ore).toBe(bankBefore - 2);
   });
 
   it('Strassenbau setzt zwei Strassen ohne Kosten', () => {
@@ -558,16 +560,12 @@ describe('Dauerlauf', () => {
       if (phaseOf(game) === 'main') must(game, { t: 'endTurn' }, pid);
     }
 
-    // Buchhaltung: keine negativen Bestaende; Bank, Haende und die Beute, die
-    // Raubzuege gerade heimtragen, ergeben zusammen die 19 je Rohstoff.
+    // Buchhaltung: keine negativen Bestaende - weder in Haenden noch in der Beute.
     for (const p of game.state.players) {
       for (const r of RESOURCES) expect(p.hand[r]).toBeGreaterThanOrEqual(0);
     }
-    for (const r of RESOURCES) {
-      expect(game.state.bank[r]).toBeGreaterThanOrEqual(0);
-      const inHands = game.state.players.reduce((n, p) => n + p.hand[r], 0);
-      const unterwegs = game.state.units.reduce((n, u) => n + (u.fracht?.[r] ?? 0), 0);
-      expect(game.state.bank[r] + inHands + unterwegs).toBe(19);
+    for (const u of game.state.units) {
+      for (const r of RESOURCES) expect(u.fracht?.[r] ?? 0).toBeGreaterThanOrEqual(0);
     }
   });
 

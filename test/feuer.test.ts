@@ -100,12 +100,10 @@ describe('Feuer', () => {
     expect(applyAction(game, { t: 'putOut', key: ek, mit: 'wool' }, 'p0').ok).toBe(false);
 
     game.state.players[0]!.hand.wool = 1;
-    const bank = game.state.bank.wool;
     const res = applyAction(game, { t: 'putOut', key: ek, mit: 'wool' }, 'p0');
     expect(res.ok).toBe(true);
     expect(game.state.braende).toHaveLength(0);
     expect(game.state.players[0]!.hand.wool).toBe(0);
-    expect(game.state.bank.wool).toBe(bank + 1);
     expect(game.state.roads[ek]).toBe('p0');
   });
 

@@ -263,6 +263,20 @@ Gebaut in `core/rules/diplomatie.ts` und `core/rules/auftraege.ts`.
 Offen: Auftraege, die Rohstoffe verlangen; Fraktionen, die von selbst Frieden
 anbieten oder brechen; ob Tribut mit der Groesse des Reichs steigen soll.
 
+## Kleinere Regeln, zuletzt geaendert
+
+- **Die Bank ist unendlich.** Kein Bestand mehr, kein Ertrag, der ausfaellt,
+  weil die Bank leer ist, kein Bankhandel, der daran scheitert. Bezahltes ist
+  fort, Ertrag entsteht. Knapp ist nur noch die eigene Hand - und die
+  Handkartengrenze bei Pluenderungen.
+- **Entwicklungskarten: beliebig viele je Zug.** Die Grenze von einer Karte je
+  Zug ist gefallen. Geblieben ist, dass eine frisch gekaufte Karte erst im
+  naechsten Zug spielbar ist.
+- **Erkunden.** Ritter und der Held lassen sich per Knopf von selbst erkunden:
+  sie ziehen zum naechsten Feld, das Neues bringt - unerkundete Ruine oder Land,
+  das noch niemand gesehen hat -, um Lager herum. Ein eigener Befehl beendet
+  das. Gibt es in Reichweite nichts mehr, bleiben sie stehen.
+
 ---
 
 ## Der Held

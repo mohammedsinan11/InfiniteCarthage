@@ -395,9 +395,10 @@ export function zeichneFigur(
  * (x, y) ist die Ecke selbst. Frueher stand hier das grosse Haus (15 x 15, die
  * Stadt 21 x 19) mit den Fuessen knapp unter der Ecke - es ragte weit ueber die
  * drei Nachbarfelder. Jetzt steht ein kompaktes Haus (11 x 10, die Stadt
- * 15 x 14) auf einem Fleck festgetretener Erde: es bleibt ueber der Ecke, deckt
- * wenig, und die Lichtung erdet es auf der Kachel. Die Varianten zum Vergleich:
- * labor.html?art=gebaeude. Der Wachturm steht rechts hinter dem Haus.
+ * 15 x 14) ueber der Ecke und deckt wenig (Variante A). Eine Fassung mit
+ * Lichtung darunter (B) war die erste Wahl - ohne wirkt es ruhiger. Die
+ * Varianten zum Vergleich: labor.html?art=gebaeude. Der Wachturm steht rechts
+ * hinter dem Haus.
  * PLATZHALTER (ASSETS.md).
  */
 export function zeichneGebaeude(
@@ -414,7 +415,6 @@ export function zeichneGebaeude(
     zeichneFigur(ctx, 'turm', x + 8 * f, fy - 2 * f, f, farbe);
     return;
   }
-  zeichneFigur(ctx, 'lichtung', x, fy + f, f);
   if (turm) zeichneFigur(ctx, 'turm', x + 8 * f, fy - 2 * f, f, farbe);
   zeichneFigur(ctx, art === 'stadt' ? 'stadtKlein' : 'dorfKlein', x, fy, f, farbe);
 }

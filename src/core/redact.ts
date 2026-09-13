@@ -56,11 +56,9 @@ export type PublicState = {
   phase: Phase;
   buildings: GameState['buildings'];
   roads: GameState['roads'];
-  bank: Hand;
   /** Wie viele Entwicklungskarten im laufenden Pack noch liegen. */
   deckLeft: number;
   turn: number;
-  devPlayedThisTurn: boolean;
   lastRoll: [number, number] | null;
   targetPoints: number;
   largestArmy: PlayerId | null;
@@ -138,10 +136,8 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     phase: state.phase,
     buildings: state.buildings,
     roads: state.roads,
-    bank: { ...state.bank },
     deckLeft: state.deck.length,
     turn: state.turn,
-    devPlayedThisTurn: state.devPlayedThisTurn,
     lastRoll: state.lastRoll,
     targetPoints: state.targetPoints,
     largestArmy: state.largestArmy,

@@ -18,7 +18,7 @@
  * hier mehr als bei jedem anderen Klang.
  */
 
-import { audioKontext, initAudio } from './audio';
+import { audioKontext, initAudio, tonAusgang } from './audio';
 import type { Tageszeit, Wetter } from '../core/zeit';
 
 const KEY = 'infinitecarthage.umgebung';
@@ -83,12 +83,13 @@ function schleife(c: AudioContext, puffer: AudioBuffer): AudioBufferSourceNode {
 function aufbauen(): boolean {
   initAudio();
   const c = audioKontext();
-  if (!c) return false;
+  const aus = tonAusgang();
+  if (!c || !aus) return false;
   if (ctx === c && bus) return true;
   ctx = c;
   bus = c.createGain();
   bus.gain.value = lautstaerke * PEGEL;
-  bus.connect(c.destination);
+  bus.connect(aus);
 
   // Wind: braunes Rauschen durch einen wandernden Tiefpass, dazu Boeen.
   const wind = schleife(c, rauschPuffer(c, true));

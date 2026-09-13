@@ -32,7 +32,7 @@
  * startet von selbst nach dem ersten Klick und merkt sich Wahl und Regler.
  */
 
-import { audioKontext, initAudio } from './audio';
+import { audioKontext, beiStumm, initAudio, istStumm, tonAusgang } from './audio';
 
 /**
  * Stuecke aus dem Repo. Der Glob laeuft beim Bauen; ein leerer Ordner
@@ -72,6 +72,9 @@ let lautstaerke = ladeLautstaerke();
 let timer: number | null = null;
 let stufe = 0;
 
+/** Alle Knoten der laufenden Musik - beim Ausschalten werden sie getrennt. */
+let kette: AudioNode[] = [];
+
 /** Fuer den Dateimodus. */
 let element: HTMLAudioElement | null = null;
 let objektUrl: string | null = null;
@@ -109,7 +112,8 @@ function sichereModus(m: MusicMode): void {
 function ensureCtx(): boolean {
   initAudio();
   const c = audioKontext();
-  if (!c) return false;
+  const aus = tonAusgang();
+  if (!c || !aus) return false;
   if (ctx === c && bus) return true;
   ctx = c;
   bus = c.createGain();
@@ -128,7 +132,8 @@ function ensureCtx(): boolean {
   bus.connect(echo);
   echo.connect(rueck).connect(echo);
   echo.connect(echoPegel).connect(kompressor);
-  kompressor.connect(c.destination);
+  kompressor.connect(aus);
+  kette = [bus, kompressor, echo, rueck, echoPegel];
   return true;
 }
 
@@ -228,6 +233,7 @@ function spieleTrack(track: Track): void {
   stoppeAlles();
   element = new Audio(track.url);
   element.loop = true;
+  element.muted = istStumm();
   element.volume = Math.min(1, lautstaerke * 1.4);
   void element.play().catch(() => {
     // Ohne Nutzergeste verweigert der Browser - dann bleibt es eben still,
@@ -242,6 +248,20 @@ function stoppeAlles(): void {
     window.clearInterval(timer);
     timer = null;
   }
+  /*
+   * Die schon eingeplanten Toene sofort ausblenden und die Kette trennen.
+   * Frueher lief nach "aus" noch der angefangene Takt weiter, samt Echo - bis
+   * zu drei Sekunden, die sich anfuehlten, als habe das Ausschalten nicht
+   * gewirkt.
+   */
+  if (bus && ctx) {
+    const alt = kette;
+    bus.gain.cancelScheduledValues(ctx.currentTime);
+    bus.gain.setTargetAtTime(0, ctx.currentTime, 0.03);
+    window.setTimeout(() => alt.forEach((n) => n.disconnect()), 300);
+  }
+  bus = null;
+  kette = [];
   if (element) {
     element.pause();
     element = null;
@@ -292,3 +312,9 @@ export function setMusicVolume(v: number): void {
     // Privater Modus - dann gilt es nur jetzt.
   }
 }
+
+// Musik aus Dateien laeuft nicht ueber den Audiokontext - sie folgt der
+// Stummschaltung eigens.
+beiStumm((s) => {
+  if (element) element.muted = s;
+});

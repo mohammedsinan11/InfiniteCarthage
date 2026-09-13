@@ -84,7 +84,6 @@ export function canBankTrade(
   if (!p) return 'Unbekannter Spieler.';
   const ratio = tradeRatio(state, world, player, give);
   if (p.hand[give] < ratio) return `Dafuer brauchst du ${ratio} ${give}.`;
-  if (state.bank[receive] < 1) return 'Die Bank hat davon nichts mehr.';
   return null;
 }
 

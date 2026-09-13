@@ -56,7 +56,7 @@
 import { Rng } from '../rng';
 import { hexDistance, hexKey, hexesInRange, neighbors } from '../coords';
 import type { Hex } from '../coords';
-import { ensureGenerated } from '../world';
+import { ensureGenerated, isGenerated } from '../world';
 import type { World } from '../world';
 import type { ChunkCoord } from '../chunks';
 import { ruinAt, ruinResultFor } from '../ruins';
@@ -293,9 +293,9 @@ function ladeAuf(u: UnitState, hand: Hand, beraubt: PlayerId | null): void {
   u.beraubt = vorher === 0 || u.beraubt === beraubt ? beraubt : null;
 }
 
-/** Was niemand mehr traegt, geht an die Bank zurueck. */
+/** Was niemand mehr traegt, ist fort - die Bank ist unendlich und fuehrt keinen Bestand. */
 function frachtZurBank(s: GameState, u: UnitState): void {
-  if (u.fracht) for (const r of RESOURCES) s.bank[r] += u.fracht[r];
+  void s;
   u.fracht = null;
   u.traegt = 0;
   u.beraubt = null;
@@ -310,8 +310,6 @@ function uebergib(s: GameState, tot: UnitState, erbe: UnitState, events: Ereigni
     if (p) {
       for (const r of RESOURCES) p.hand[r] += fracht[r];
       events.push({ t: 'lootRecovered', player: erbe.owner, q: erbe.q, r: erbe.r, taken: { ...fracht }, count });
-    } else {
-      for (const r of RESOURCES) s.bank[r] += fracht[r];
     }
   } else {
     ladeAuf(erbe, fracht, tot.beraubt);
@@ -626,10 +624,7 @@ function erkunde(
     }
   } else if (result === 'schatz' && p) {
     for (let i = 0; i < 3; i++) {
-      const vorrat = RESOURCES.filter((r) => s.bank[r] > 0);
-      if (vorrat.length === 0) break;
-      const r = vorrat[rng.int(vorrat.length)]!;
-      s.bank[r] -= 1;
+      const r = RESOURCES[rng.int(RESOURCES.length)]!;
       p.hand[r] += 1;
       gained[r] += 1;
     }
@@ -660,6 +655,39 @@ function heimFuer(s: GameState, u: UnitState): Hex | null {
   return best;
 }
 
+/** Wie viele Felder die Suche eines Erkunders hoechstens abgeht. */
+const ERKUNDEN_SUCHE = 1500;
+
+/**
+ * Wohin ein Erkunder zieht: zum naechsten Feld, das Neues bringt - eine
+ * unerkundete Ruine oder Land, das noch niemand gesehen hat. Breitensuche ueber
+ * Land, um Lager herum statt hindurch. null, wenn in Reichweite nichts mehr ist.
+ */
+function erkundungsziel(s: GameState, world: World, u: UnitState): Hex | null {
+  const seed = s.worldSeed;
+  const gesehen = new Set([hexKey(u.q, u.r)]);
+  const warte: Hex[] = [{ q: u.q, r: u.r }];
+  for (let i = 0; i < warte.length && gesehen.size < ERKUNDEN_SUCHE; i++) {
+    const h = warte[i]!;
+    for (const n of neighbors(h.q, h.r)) {
+      const k = hexKey(n.q, n.r);
+      if (gesehen.has(k) || !isLandAt(seed, n.q, n.r)) continue;
+      gesehen.add(k);
+      if (isNestActive(s, n.q, n.r)) continue;
+      if (!isGenerated(world, n.q, n.r)) return n;
+      if (ruinAt(seed, n.q, n.r) && !s.exploredRuins.includes(k)) return n;
+      warte.push(n);
+    }
+  }
+  return null;
+}
+
+/** Bringt dieses Ziel einem Erkunder noch etwas? */
+function lohntSich(s: GameState, world: World, z: Hex): boolean {
+  if (!isGenerated(world, z.q, z.r)) return true;
+  return ruinAt(s.worldSeed, z.q, z.r) && !s.exploredRuins.includes(hexKey(z.q, z.r));
+}
+
 /** Ein neues Ziel fuer einen Wanderer, fuenf bis acht Felder weiter. */
 function wanderziel(s: GameState, rng: Rng, von: Hex): Hex | null {
   const kandidaten = hexesInRange(von, 8).filter(
@@ -671,6 +699,42 @@ function wanderziel(s: GameState, rng: Rng, von: Hex): Hex | null {
     if (nextStep(s.worldSeed, von, new Set([hexKey(h.q, h.r)]), 600)) return h;
   }
   return null;
+}
+
+/**
+ * Ritter und Held gehen bis zu `schritte` Felder auf ihr Ziel zu, decken dabei
+ * auf, erkunden Ruinen am Weg und bleiben vor Feinden stehen. true, wenn sie
+ * gezogen sind.
+ */
+function schreite(
+  s: GameState,
+  world: World,
+  rng: Rng,
+  u: UnitState,
+  schritte: number,
+  events: Ereignisse,
+): boolean {
+  const seed = s.worldSeed;
+  let gezogen = false;
+  for (let i = 0; i < schritte && u.ziel; i++) {
+    const zk = hexKey(u.ziel.q, u.ziel.r);
+    const weg = nextStep(seed, u, new Set([zk]), SUCHE_RITTER);
+    if (weg) {
+      u.q = weg.step.q;
+      u.r = weg.step.r;
+      gezogen = true;
+      wachsen(s, world, u, u.kind === 'held' ? ERKUNDUNG_HELD : ERKUNDUNG_RADIUS, events);
+    }
+    // Am Ziel oder ohne Weg: der Befehl ist erledigt.
+    if (!weg || hexKey(u.q, u.r) === zk) u.ziel = null;
+    if (!weg) break;
+    if (u.owner !== null && ruinAt(seed, u.q, u.r) && !s.exploredRuins.includes(hexKey(u.q, u.r))) {
+      erkunde(s, world, rng, u, events);
+      if (!s.units.includes(u)) return true;
+    }
+    if (imKampf(s, u)) break;
+  }
+  return gezogen;
 }
 
 /** Ein Schritt. true, wenn die Einheit gezogen ist. */
@@ -690,6 +754,20 @@ function ziehe(
   };
 
   switch (u.auftrag) {
+    case 'erkunden': {
+      // Ein Ziel, das nichts mehr bringt - schon aufgedeckt, schon erkundet -,
+      // wird gegen das naechste getauscht.
+      if (!u.ziel || (u.q === u.ziel.q && u.r === u.ziel.r) || !lohntSich(s, world, u.ziel)) {
+        u.ziel = erkundungsziel(s, world, u);
+      }
+      if (!u.ziel) {
+        // Nichts mehr zu entdecken in Reichweite: stehen bleiben.
+        u.auftrag = 'befehl';
+        return false;
+      }
+      return schreite(s, world, rng, u, u.kind === 'held' ? HELD_SCHRITTE : 1, events);
+    }
+
     case 'befehl': {
       // Im Gefolge: das Ziel ist, wo der Held gerade steht.
       let fuehrer: UnitState | undefined;
@@ -702,27 +780,7 @@ function ziehe(
         }
         u.ziel = u.q === fuehrer.q && u.r === fuehrer.r ? null : { q: fuehrer.q, r: fuehrer.r };
       }
-      const schritte = u.kind === 'held' || fuehrer ? HELD_SCHRITTE : 1;
-      let gezogen = false;
-      for (let i = 0; i < schritte && u.ziel; i++) {
-        const zk = hexKey(u.ziel.q, u.ziel.r);
-        const weg = nextStep(seed, u, new Set([zk]), SUCHE_RITTER);
-        if (weg) {
-          schritt(weg.step);
-          gezogen = true;
-          wachsen(s, world, u, u.kind === 'held' ? ERKUNDUNG_HELD : ERKUNDUNG_RADIUS, events);
-        }
-        // Am Ziel oder ohne Weg: der Befehl ist erledigt.
-        if (!weg || hexKey(u.q, u.r) === zk) u.ziel = null;
-        if (!weg) break;
-        // Unterwegs: Ruinen erkunden, vor Feinden stehen bleiben.
-        if (u.owner !== null && ruinAt(seed, u.q, u.r) && !s.exploredRuins.includes(hexKey(u.q, u.r))) {
-          erkunde(s, world, rng, u, events);
-          if (!s.units.includes(u)) return true;
-        }
-        if (imKampf(s, u)) break;
-      }
-      return gezogen;
+      return schreite(s, world, rng, u, u.kind === 'held' || fuehrer ? HELD_SCHRITTE : 1, events);
     }
 
     case 'raub': {

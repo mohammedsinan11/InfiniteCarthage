@@ -118,8 +118,6 @@ describe('Allein spielen', () => {
       // Baumaterial zuschiessen, damit wirklich nach aussen gebaut wird.
       p.hand.lumber += 2;
       p.hand.brick += 2;
-      game.state.bank.lumber -= 2;
-      game.state.bank.brick -= 2;
       const es = legalRoadEdges(game.state, game.world, 'p0');
       // Strassen gibt es beliebig viele - gebaut wird, solange Platz ist.
       if (es.length > 0) {

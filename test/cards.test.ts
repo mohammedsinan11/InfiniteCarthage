@@ -182,25 +182,22 @@ describe('Der Fund', () => {
     });
   });
 
-  it('gibt die Sofortwirkung aus der Bank', () => {
+  it('gibt die volle Sofortwirkung - die Bank ist unendlich', () => {
     const game = solo();
     runSetup(game);
     expect(wuerfelBisSieben(game)).toBe(true);
 
     const vorher = { ...playerById(game.state, 'p0')!.hand };
-    const bankVorher = { ...game.state.bank };
     const wahl = game.state.draft!.options[0]!;
     const karte = cardById(wahl)!;
     must(game, { t: 'chooseCard', card: wahl }, 'p0');
 
     const nachher = playerById(game.state, 'p0')!.hand;
     const zugewinn = RESOURCES.reduce((n, r) => n + (nachher[r] - vorher[r]), 0);
-    const bankVerlust = RESOURCES.reduce((n, r) => n + (bankVorher[r] - game.state.bank[r]), 0);
-
-    // Was der Spieler bekommt, verliert die Bank - Karten entstehen nicht aus dem Nichts.
-    expect(zugewinn).toBe(bankVerlust);
     if (!karte.instant) expect(zugewinn).toBe(0);
-    else expect(zugewinn).toBeGreaterThan(0);
+    else if (karte.instant.t === 'gain') {
+      expect(zugewinn).toBe(RESOURCES.reduce((n, r) => n + ((karte.instant as { resources: Partial<Record<string, number>> }).resources[r] ?? 0), 0));
+    } else expect(zugewinn).toBe(karte.instant.count);
   });
 });
 

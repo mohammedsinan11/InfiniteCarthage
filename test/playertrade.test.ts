@@ -204,13 +204,12 @@ describe('Antworten', () => {
 });
 
 describe('Abschluss', () => {
-  it('schiebt Karten in beide Richtungen, ohne die Bank zu beruehren', () => {
+  it('schiebt Karten in beide Richtungen', () => {
     const game = newGame();
     const me = toMain(game);
     const other = game.state.order.find((id) => id !== me)!;
     setHand(game, me, { lumber: 3, wool: 1 });
     setHand(game, other, { ore: 2 });
-    const bankBefore = { ...game.state.bank };
 
     must(game, { t: 'offerTrade', give: { lumber: 2 }, want: { ore: 1 } }, me);
     must(game, { t: 'respondTrade', accept: true }, other);
@@ -223,8 +222,6 @@ describe('Abschluss', () => {
     expect(a.hand.wool).toBe(1); // unbeteiligt
     expect(b.hand.lumber).toBe(2);
     expect(b.hand.ore).toBe(1);
-    // Handel zwischen Spielern ist ein Nullsummenspiel gegenueber der Bank.
-    expect(game.state.bank).toEqual(bankBefore);
     expect(game.state.trade).toBeNull();
   });
 
@@ -345,7 +342,7 @@ describe('Buchhaltung', () => {
     setHand(game, other, { ore: 3, wool: 1 });
 
     const total = (r: Resource) =>
-      game.state.bank[r] + game.state.players.reduce((n, p) => n + p.hand[r], 0);
+      game.state.players.reduce((n, p) => n + p.hand[r], 0);
     const before = Object.fromEntries(RESOURCES.map((r) => [r, total(r)]));
 
     must(game, { t: 'offerTrade', give: { lumber: 3, grain: 1 }, want: { ore: 2 } }, me);

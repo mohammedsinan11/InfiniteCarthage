@@ -146,6 +146,9 @@ export function SideMenu({
   loeschKarte,
   loeschenMoeglich,
   onLoeschen,
+  onErkunden,
+  stumm,
+  onStumm,
 }: {
   turn: number;
   /** Die eigenen genommenen Karten, in der Reihenfolge der Wahl. */
@@ -202,6 +205,12 @@ export function SideMenu({
   loeschKarte: Resource | null;
   loeschenMoeglich: boolean;
   onLoeschen: (key: string) => void;
+  /** Ritter oder Held von selbst erkunden lassen - oder nicht mehr. */
+  onErkunden: (id: number, an: boolean) => void;
+  /** Ist aller Ton aus? */
+  stumm: boolean;
+  /** Ton an oder aus - schaltet um. */
+  onStumm: () => void;
 }) {
   // Auf schmalen Bildschirmen zu Beginn eingeklappt - auf dem Handy deckte das
   // Menue sonst ein gutes Drittel der Karte ab, bevor man sie gesehen hat.
@@ -485,7 +494,11 @@ export function SideMenu({
                     <span className="menu-ritter-name">Dein Held</span>
                     <span className="menu-ritter-ort">
                       Leben {held.leben}/{WERTE.held.leben} ·{' '}
-                      {held.ziel ? `zieht, noch ${hexDistance(held, held.ziel)} Felder` : 'steht'}
+                      {held.auftrag === 'erkunden'
+                        ? 'erkundet von selbst'
+                        : held.ziel
+                          ? `zieht, noch ${hexDistance(held, held.ziel)} Felder`
+                          : 'steht'}
                     </span>
                   </div>
                   <div className="menu-ritter-knoepfe">
@@ -499,6 +512,14 @@ export function SideMenu({
                     </button>
                     <button disabled={!befehleMoeglich || !held.ziel} onClick={() => onHalt(held.id)}>
                       Halt
+                    </button>
+                    <button
+                      disabled={!befehleMoeglich}
+                      className={held.auftrag === 'erkunden' ? 'aktiv' : ''}
+                      title="Von selbst erkunden: zur naechsten Ruine oder ins Unbekannte"
+                      onClick={() => onErkunden(held.id, held.auftrag !== 'erkunden')}
+                    >
+                      {held.auftrag === 'erkunden' ? 'Erkundet' : 'Erkunden'}
                     </button>
                   </div>
                 </li>
@@ -572,7 +593,9 @@ export function SideMenu({
                       <div className="menu-ritter-kopf">
                         <span className="menu-ritter-name">Ritter {i + 1}</span>
                         <span className="menu-ritter-ort">
-                          {u.folgt !== null
+                          {u.auftrag === 'erkunden'
+                            ? 'erkundet von selbst'
+                            : u.folgt !== null
                             ? 'im Gefolge des Helden'
                             : u.ziel
                               ? `zieht, noch ${weit} ${weit === 1 ? 'Feld' : 'Felder'}`
@@ -599,6 +622,14 @@ export function SideMenu({
                         >
                           {u.folgt !== null ? 'Folgt' : 'Folgen'}
                         </button>
+                        <button
+                          disabled={!befehleMoeglich}
+                          className={u.auftrag === 'erkunden' ? 'aktiv' : ''}
+                          title="Von selbst erkunden: zur naechsten Ruine oder ins Unbekannte"
+                          onClick={() => onErkunden(u.id, u.auftrag !== 'erkunden')}
+                        >
+                          {u.auftrag === 'erkunden' ? 'Erkundet' : 'Erkunden'}
+                        </button>
                       </div>
                     </li>
                   );
@@ -623,6 +654,17 @@ export function SideMenu({
         {reiter === 'ton' && (
           <>
             <h3>Ton</h3>
+            <div className="menu-liste">
+              <button
+                className={stumm ? 'aktiv' : ''}
+                onClick={onStumm}
+              >
+                {stumm ? 'Ton ist aus - einschalten' : 'Ton ausschalten'}
+              </button>
+            </div>
+            <p className="menu-leer">
+              Schaltet alles zusammen ab: Umgebung, Musik und Klaenge. Der Knopf steht auch oben neben dem Wetter.
+            </p>
             <label className="menu-zeile">
               Umgebung
               <input

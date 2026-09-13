@@ -42,7 +42,7 @@ import { abkommenVon, kampfFelder } from '../../core/combat';
 import { fraktionById } from '../../core/factions';
 import { fraktionColor } from '../theme';
 import { hexDistance, parseVertexKey, vertexAdjacentHexes } from '../../core/coords';
-import { initAudio, playBuild, playGain, playTurm, playWurfStart } from '../audio';
+import { beiStumm, initAudio, istStumm, playBuild, playGain, playTurm, playWurfStart, setStumm } from '../audio';
 import { setAmbiente } from '../ambiente';
 import { seasonOf } from '../../core/season';
 import { RESOURCES } from '../../core/types';
@@ -142,6 +142,16 @@ export function Game() {
   const wetter = vorschau.wetter ?? wetterOf(state.worldSeed, state.turn);
   /** Das Wetter, nach dem die Regeln gehen - die Vorschau aendert nur die Anzeige. */
   const echtesWetter = wetterOf(state.worldSeed, state.turn);
+
+  /** Aller Ton aus? Oben im Schild und im Menue umschaltbar (audio.ts). */
+  const [stumm, setStummZustand] = useState(istStumm);
+  useEffect(() => beiStumm(setStummZustand), []);
+  // Liest den Stand beim Klick, nicht aus dem letzten Rendern - sonst schalten
+  // zwei schnelle Klicks beide in dieselbe Richtung.
+  const tonUmschalten = () => {
+    initAudio();
+    setStumm(!istStumm());
+  };
 
   // Umgebungsgeraeusche folgen Tageszeit, Wetter und Feuer (ambiente.ts).
   const feuerZahl = state.braende.length;
@@ -535,6 +545,13 @@ export function Game() {
             {TAGESZEIT_NAME[tageszeit]} · {WETTER_NAME[wetter]}
             {WETTER_WIRKUNG[echtesWetter] && <span className="hud-wirkung">!</span>}
           </span>
+          <button
+            className={stumm ? 'hud-ton aus' : 'hud-ton'}
+            title={stumm ? 'Ton einschalten' : 'Ton ausschalten - Umgebung, Musik und Klaenge'}
+            onClick={tonUmschalten}
+          >
+            <TonSymbol aus={stumm} />
+          </button>
           {state.order.length > 1 && (
             <span className="hud-turn">
               {isMine
@@ -601,6 +618,9 @@ export function Game() {
           loeschKarte={loeschKarte}
           loeschenMoeglich={loeschenMoeglich}
           onLoeschen={loeschen}
+          onErkunden={(id, an) => act({ t: 'explore', unit: id, explore: an })}
+          stumm={stumm}
+          onStumm={tonUmschalten}
           autoWurf={autoWurf}
           onToggleAutoWurf={() =>
             setAutoWurf((v) => {
@@ -743,6 +763,20 @@ export function Game() {
 
       {/* Abwerfen nach einer 7 */}
     </div>
+  );
+}
+
+/** Lautsprecher mit Wellen oder mit Kreuz. PLATZHALTER (ASSETS.md). */
+function TonSymbol({ aus }: { aus: boolean }) {
+  return (
+    <svg width={16} height={16} viewBox="0 0 16 16" aria-hidden="true" shapeRendering="crispEdges">
+      <path d="M2 6 H5 L9 2 V14 L5 10 H2 Z" fill="currentColor" />
+      {aus ? (
+        <path d="M11 5 L15 11 M15 5 L11 11" stroke="currentColor" strokeWidth={1.6} />
+      ) : (
+        <path d="M11 5 Q13 8 11 11 M13 3 Q16 8 13 13" stroke="currentColor" strokeWidth={1.4} fill="none" />
+      )}
+    </svg>
   );
 }
 

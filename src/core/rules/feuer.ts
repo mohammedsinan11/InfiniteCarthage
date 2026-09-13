@@ -222,7 +222,6 @@ export function mitKarteLoeschen(
   const p = playerById(s, actor);
   if (!p || p.hand[mit] < 1) return 'Dafuer fehlt dir die Karte.';
   p.hand[mit] -= 1;
-  s.bank[mit] += 1;
   s.braende = s.braende.filter((x) => x !== b);
   events.push({ t: 'extinguished', ...basis(b), durch: 'karte' });
   return null;

@@ -1,13 +1,11 @@
 /**
- * Baukosten und Kontobewegungen zwischen Spieler und Bank.
+ * Baukosten.
  *
- * Die Bank ist endlich (19 je Rohstoff). Auf einer unendlichen Karte ist das
- * die einzige verbleibende Knappheit - ohne sie wuerde eine lange Partie
- * jede Spannung verlieren.
+ * Die Bank ist unendlich (state.ts): wer bezahlt, gibt die Karten ab, und sie
+ * sind fort. Knapp ist nur, was man selbst hat.
  */
 
 import type { Hand } from '../state';
-import { emptyHand } from '../state';
 import { RESOURCES } from '../types';
 import type { Bundle } from '../types';
 
@@ -46,27 +44,8 @@ export function canAfford(hand: Hand, cost: Cost): boolean {
   return true;
 }
 
-/** Zieht die Kosten ab und gibt sie der Bank zurueck. */
-export function pay(hand: Hand, bank: Hand, cost: Cost): void {
-  for (const r of RESOURCES) {
-    const need = cost[r] ?? 0;
-    hand[r] -= need;
-    bank[r] += need;
-  }
+/** Zieht die Kosten von der Hand ab. */
+export function pay(hand: Hand, cost: Cost): void {
+  for (const r of RESOURCES) hand[r] -= cost[r] ?? 0;
 }
 
-/**
- * Gibt Karten aus der Bank aus, soweit vorhanden. Liefert, was wirklich
- * geflossen ist - der Aufrufer soll den Unterschied melden koennen.
- */
-export function payout(hand: Hand, bank: Hand, want: Cost): Hand {
-  const given = emptyHand();
-  for (const r of RESOURCES) {
-    const n = Math.min(want[r] ?? 0, bank[r]);
-    if (n <= 0) continue;
-    bank[r] -= n;
-    hand[r] += n;
-    given[r] = n;
-  }
-  return given;
-}

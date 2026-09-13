@@ -24,7 +24,28 @@ const VOLUME_KEY = 'infinitecarthage.volume';
 const PEGEL = 1.8;
 
 let ctx: AudioContext | null = null;
+/** Die Klaenge (Wuerfel, Bauen, Karten ...) - unter dem Regler "Klaenge". */
 let master: GainNode | null = null;
+/**
+ * Der eine Ausgang, ueber den ALLES laeuft: Klaenge, Musik, Umgebung. Die
+ * Stummschaltung sitzt hier.
+ *
+ * Frueher gingen Musik und Umgebung an ihm vorbei direkt zu den Lautsprechern.
+ * Wer den Regler "Klaenge" auf null zog, hoerte die Musik weiter - und die
+ * Umgebung liess sich gar nicht abschalten. Seit alles hier zusammenlaeuft,
+ * ist "Ton aus" wirklich aus.
+ */
+let ausgang: GainNode | null = null;
+
+const STUMM_KEY = 'infinitecarthage.stumm';
+let stumm = (() => {
+  try {
+    return localStorage.getItem(STUMM_KEY) === '1';
+  } catch {
+    return false;
+  }
+})();
+const stummHoerer: Array<(s: boolean) => void> = [];
 
 /** 0 = stumm, 1 = voll. */
 let volume = load();
@@ -52,6 +73,9 @@ export function initAudio(): void {
     (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!Ctor) return;
   ctx = new Ctor();
+  ausgang = ctx.createGain();
+  ausgang.gain.value = stumm ? 0 : 1;
+  ausgang.connect(ctx.destination);
   master = ctx.createGain();
   master.gain.value = volume * PEGEL;
   // Lauter heisst sonst schnell uebersteuert, sobald Ertrag, Karte und Wuerfel
@@ -62,7 +86,37 @@ export function initAudio(): void {
   kompressor.ratio.value = 4;
   kompressor.attack.value = 0.004;
   kompressor.release.value = 0.18;
-  master.connect(kompressor).connect(ctx.destination);
+  master.connect(kompressor).connect(ausgang);
+}
+
+/** Wohin Musik und Umgebung sich haengen - hinter der Stummschaltung. */
+export function tonAusgang(): AudioNode | null {
+  return ausgang;
+}
+
+export function istStumm(): boolean {
+  return stumm;
+}
+
+/** Aller Ton aus oder an - Klaenge, Musik und Umgebung zusammen. Wird gemerkt. */
+export function setStumm(neu: boolean): void {
+  stumm = neu;
+  if (ausgang && ctx) ausgang.gain.setTargetAtTime(neu ? 0 : 1, ctx.currentTime, 0.03);
+  try {
+    localStorage.setItem(STUMM_KEY, neu ? '1' : '0');
+  } catch {
+    // Privater Modus - dann gilt es nur jetzt.
+  }
+  for (const fn of stummHoerer) fn(neu);
+}
+
+/** Meldet jede Stummschaltung - fuer Anzeigen und die Musik aus Dateien. */
+export function beiStumm(fn: (s: boolean) => void): () => void {
+  stummHoerer.push(fn);
+  return () => {
+    const i = stummHoerer.indexOf(fn);
+    if (i >= 0) stummHoerer.splice(i, 1);
+  };
 }
 
 /** Der gemeinsame Audiokontext - Musik und Umgebung haengen sich daran. */

@@ -309,7 +309,7 @@ function KartenTafel({
         }
       })}
       <p className="dock-tafel-klein">
-        Gekaufte Karten sind ab dem naechsten Zug spielbar, eine je Zug.
+        Gekaufte Karten sind ab dem naechsten Zug spielbar - dann beliebig viele.
       </p>
     </Tafel>
   );
@@ -354,7 +354,6 @@ export function Aktionsleiste({
   for (const d of offen) anzahl.set(d.type, (anzahl.get(d.type) ?? 0) + 1);
   const kannSpielen = (t: DevCardType): boolean =>
     isMine &&
-    !state.devPlayedThisTurn &&
     t !== 'victoryPoint' &&
     (phase.t === 'main' || (t === 'knight' && phase.t === 'roll')) &&
     offen.some((d) => d.type === t && d.boughtTurn < state.turn);
