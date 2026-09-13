@@ -1,51 +1,54 @@
 /**
- * Figuren auf der Karte - Einheiten, Lager und Ruinen.
+ * Figuren auf der Karte - Einheiten, Lager, Ruinen, Doerfer, Staedte, Strassen.
  *
  * PLATZHALTER aus Pixelkarten: jede Figur ist ein kleines Raster aus Zeichen,
  * gezeichnet im selben Kunstpixel wie die Kacheln. So sitzen sie im Pixelraster
- * der Karte, statt als glatte Vektoren darueberzuschweben - der Mangel, den
- * ASSETS.md beim alten Nest-Marker notiert hatte.
+ * der Karte, statt als glatte Vektoren darueberzuschweben.
  *
- * FARBE. 'p' in einer Pixelkarte ist die Farbe des Besitzers: die Spielerfarbe
- * beim Ritter, die Fraktionsfarbe bei Raeubern, Goblins und dem Wimpel am Lager.
+ * FARBE. 'p' ist die Farbe des Besitzers: die Spielerfarbe bei Rittern, Doerfern
+ * und Staedten, die Fraktionsfarbe bei Raeubern, Goblins und Lagerwimpeln. 'P'
+ * ist sie im Schatten, 'q' im Licht.
+ *
+ * STIL DER KACHELN. Doerfer und Staedte haben einen weichen, dunkelbraunen
+ * Umriss statt Schwarz, Licht von links oben, Schatten rechts - wie die
+ * Gelaendekacheln. Mittelalterlich: Fachwerk auf Steinsockel, Dach in
+ * Spielerfarbe; die Stadt als Mauerring mit Tor, Turm und Wimpel.
  *
  * SPRITES FOLGEN. Liegt in src/assets/units eine Datei mit dem Namen der Art
  * (raeuber.png, goblin.png, ritter.png, wanderer.png, lager.png, ruine.png,
- * dorf.png, stadt.png), wird sie statt des Platzhalters gezeichnet - ohne
- * Codeaenderung. Ebenso kampf.png fuer die Schwerter ueber einem Kampf.
- * Format: README dort.
- *
- * DOERFER UND STAEDTE stehen seit der Ueberarbeitung auch hier. Vorher waren
- * sie glatte SVG-Formen in Spielerfarbe, die ueber der Pixelkarte wie
- * aufgeklebt wirkten. 'P' ist die Spielerfarbe im Schatten, 'q' im Licht.
+ * dorf.png, stadt.png, fackel.png, wimpel.png), wird sie statt des Platzhalters
+ * gezeichnet - ohne Codeaenderung. Ebenso kampf.png fuer die Schwerter ueber
+ * einem Kampf. Format: README dort.
  */
 
 import type { UnitKind } from '../core/units';
 
-export type FigurArt = UnitKind | 'lager' | 'ruine' | 'dorf' | 'stadt';
+export type FigurArt = UnitKind | 'lager' | 'ruine' | 'dorf' | 'stadt' | 'fackel' | 'wimpel';
 
 const PALETTE: Record<string, string> = {
   k: '#1b130d', // Umriss
+  d: '#3a2a1e', // weicher Umriss, wie bei den Kacheln
   h: '#3a2a22', // Kapuze
   s: '#d9a066', // Haut
   r: '#9c3226', // Rot
-  b: '#5e3d25', // Leder
+  b: '#5e3d25', // Leder, Tuer
   B: '#3f2818', // dunkles Leder
   g: '#6aa83e', // Goblingruen
   G: '#3f6f24', // dunkles Gruen
   w: '#f2efe6', // Augen
-  m: '#c9ccd6', // Metall
-  M: '#7d818f', // dunkles Metall
-  y: '#d9a441', // Gold
+  m: '#b9b3a6', // Stein im Licht
+  M: '#857e70', // Stein im Schatten
+  y: '#f2c94c', // Gold, erleuchtetes Fenster
+  o: '#f08a24', // Flamme
   t: '#8a6a45', // Holz
-  T: '#5b4430', // dunkles Holz
-  c: '#d8c49a', // Zeltstoff, Mauer im Licht
-  C: '#a88f63', // Mauer im Schatten
+  T: '#4f3a28', // Fachwerk, dunkles Holz
+  c: '#e2d2ab', // Putz im Licht, Zeltstoff
+  C: '#b39c73', // Putz im Schatten
   a: '#8d8a7e', // Wandermantel
   A: '#6a675d', // dunkler Mantel
 };
 
-/** Die Platzhalter. '.' ist durchsichtig, 'p' die Farbe des Besitzers. */
+/** Die Platzhalter. '.' ist durchsichtig. */
 const ART: Record<FigurArt, readonly string[]> = {
   raeuber: [
     '..kkk..',
@@ -86,7 +89,6 @@ const ART: Record<FigurArt, readonly string[]> = {
     '.kMkMk..',
     '.kk.kk..',
   ],
-  // Kapuzenmantel und Stab - neutral, ohne Farbe.
   wanderer: [
     '..kkk....',
     '.kaaak..k',
@@ -127,63 +129,53 @@ const ART: Record<FigurArt, readonly string[]> = {
     'TtTtT.....TtTtT',
     '.kkk.......kkk.',
   ],
-  // Dorf: Giebeldach in Spielerfarbe, links im Licht, rechts im Schatten;
-  // helle Mauer, zwei erleuchtete Fenster, eine Tuer.
+  // Dorf: Fachwerkhaus auf Steinsockel, Satteldach in Spielerfarbe mit
+  // Ziegelreihen, Schornstein, erleuchtete Fenster, Tuer.
   dorf: [
-    '......k......',
-    '.....kpk.....',
-    '....kqpPk....',
-    '...kqppPPk...',
-    '..kqpppPPPk..',
-    '.kqppppPPPPk.',
-    'kkkkkkkkkkkkk',
-    '.kcccccCCCCk.',
-    '.kcyyccCyyCk.',
-    '.kcyyccCyyCk.',
-    '.kccckkkCCCk.',
-    '.kccckbkCCCk.',
-    '.kkkkkkkkkkk.',
+    '......ddd......',
+    '.....dqpPd.....',
+    '....dqppPPd.dd.',
+    '...dqpppPPPdMd.',
+    '..dqpPpPpPPPdd.',
+    '.dqppppppPPPPd.',
+    'dqpPpPpPpPpPPPd',
+    'ddddddddddddddd',
+    '.dcTcccTcccTCd.',
+    '.dcTcyyTyycTCd.',
+    '.dTTTTTTTTTTTd.',
+    '.dcTccdddcCTCd.',
+    '.dcTccdbdcCTCd.',
+    '.dmMmmdbdmMmMd.',
+    '.ddddddddddddd.',
   ],
-  // Stadt: ein steinerner Turm mit Wimpel neben einem Haus - hoeher und breiter
-  // als das Dorf, damit man den Unterschied auch klein erkennt.
+  // Stadt: Mauerring mit Zinnen und Tor, dahinter Turm mit Wimpel und ein
+  // Fachwerkhaus - groesser als das Dorf, damit man es auch klein erkennt.
   stadt: [
-    '...k.............',
-    '...kpp...........',
-    '...kppp..........',
-    '...k.............',
-    '.kkkkkkk.........',
-    '.kmkmkMk.........',
-    '.kmmmMMk....k....',
-    '.kmmmMMk...kpk...',
-    '.kmyymMk..kqpPk..',
-    '.kmyymMk.kqppPPk.',
-    '.kmmmMMkkqpppPPPk',
-    '.kmmmMMkkkkkkkkkk',
-    '.kmmmMMk.kccCCCk.',
-    '.kmkkMMk.kcyCyCk.',
-    '.kmkbMMk.kccbCCk.',
-    '.kkkkkkk.kkkkkkk.',
+    '....d................',
+    '....dpp..............',
+    '....dppp.............',
+    '....d................',
+    '..ddddddd............',
+    '..dmdmdmd.....ddd....',
+    '..dmmmmMd....dqpPd...',
+    '..dmyymMd...dqppPPd..',
+    '..dmyymMd..dqpPpPPPd.',
+    '..dmmmmMd.dqppppPPPPd',
+    '..dmmmmMddddddddddddd',
+    '..dmmmmMd.dcTccTcCTd.',
+    '..dmmmmMd.dcTyyTyCTd.',
+    'ddddddddddddddddddddd',
+    'dmMmdmMmdmMmdmMmdmMmd',
+    'dmmmmmmmmmdddmmmmmmMd',
+    'dmmMmmmmmdbbbdmmmMmMd',
+    'dmmmmmMmmdbbbdmMmmmMd',
+    'ddddddddddddddddddddd',
   ],
+  // Fackel, die Einheiten nachts tragen.
+  fackel: ['.o.', 'oyo', '.o.', '.t.', '.t.', '.T.'],
+  // Wimpel in Spielerfarbe an einer Strasse - wem sie gehoert.
+  wimpel: ['tpp.', 'tPpp', 'tpp.', 't...', 't...', 'T...'],
 };
-
-const hex2 = (n: number): string => Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0');
-
-/** Eine Farbe #rrggbb zu Schwarz (ziel 0) oder Weiss (ziel 255) hin verschieben. */
-function mische(farbe: string, ziel: number, anteil: number): string {
-  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(farbe);
-  if (!m) return farbe;
-  return (
-    '#' +
-    [m[1]!, m[2]!, m[3]!]
-      .map((h) => {
-        const v = parseInt(h, 16);
-        return hex2(Math.round(v + (ziel - v) * anteil));
-      })
-      .join('')
-  );
-}
-export const dunkler = (farbe: string): string => mische(farbe, 0, 0.35);
-export const heller = (farbe: string): string => mische(farbe, 255, 0.35);
 
 const SPRITE_URLS = import.meta.glob('../assets/units/*.png', {
   eager: true,
@@ -220,6 +212,63 @@ export function preloadUnitSprites(): Promise<void> {
   ).then(() => undefined);
 }
 
+const hex2 = (n: number): string => Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0');
+
+/** Eine Farbe #rrggbb zu Schwarz (ziel 0) oder Weiss (ziel 255) hin verschieben. */
+function mische(farbe: string, ziel: number, anteil: number): string {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(farbe);
+  if (!m) return farbe;
+  return (
+    '#' +
+    [m[1]!, m[2]!, m[3]!]
+      .map((h) => {
+        const v = parseInt(h, 16);
+        return hex2(Math.round(v + (ziel - v) * anteil));
+      })
+      .join('')
+  );
+}
+export const dunkler = (farbe: string): string => mische(farbe, 0, 0.35);
+export const heller = (farbe: string): string => mische(farbe, 255, 0.35);
+
+/**
+ * Vorgezeichnete Figuren je Art, Farbe und Groesse.
+ *
+ * Im Aufbau stehen siebzig Vorschau-Doerfer auf der Karte, und jede
+ * Zeigerbewegung zeichnet neu - Pixel fuer Pixel waeren das zehntausende
+ * fillRect je Bild. Einmal auf ein kleines Canvas gezeichnet, ist jede Figur
+ * danach ein einziges drawImage.
+ */
+const BILDER = new Map<string, HTMLCanvasElement>();
+const BILDER_MAX = 400;
+
+function figurBild(art: FigurArt, grund: string, f: number): HTMLCanvasElement {
+  const schluessel = `${art}|${grund}|${f}`;
+  const da = BILDER.get(schluessel);
+  if (da) return da;
+  const karte = ART[art];
+  const breite = Math.max(...karte.map((z) => z.length));
+  const c = document.createElement('canvas');
+  c.width = breite * f;
+  c.height = karte.length * f;
+  const g = c.getContext('2d')!;
+  const schatten = dunkler(grund);
+  const licht = heller(grund);
+  for (let zy = 0; zy < karte.length; zy++) {
+    const zeile = karte[zy]!;
+    for (let zx = 0; zx < zeile.length; zx++) {
+      const ch = zeile[zx]!;
+      if (ch === '.') continue;
+      g.fillStyle =
+        ch === 'p' ? grund : ch === 'P' ? schatten : ch === 'q' ? licht : (PALETTE[ch] ?? '#ff00ff');
+      g.fillRect(zx * f, zy * f, f, f);
+    }
+  }
+  if (BILDER.size >= BILDER_MAX) BILDER.clear();
+  BILDER.set(schluessel, c);
+  return c;
+}
+
 /**
  * Eine Figur zeichnen.
  *
@@ -249,22 +298,11 @@ export function zeichneFigur(
   const y0 = fy - (karte.length - 1) * f;
 
   // Ein Pixelstreifen Schatten unter den Fuessen.
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
-  ctx.fillRect(x0 + f, fy + f, Math.max(1, breite - 2) * f, f);
-
-  const grund = farbe ?? '#9c3226';
-  const schatten = dunkler(grund);
-  const licht = heller(grund);
-  for (let zy = 0; zy < karte.length; zy++) {
-    const zeile = karte[zy]!;
-    for (let zx = 0; zx < zeile.length; zx++) {
-      const ch = zeile[zx]!;
-      if (ch === '.') continue;
-      ctx.fillStyle =
-        ch === 'p' ? grund : ch === 'P' ? schatten : ch === 'q' ? licht : (PALETTE[ch] ?? '#ff00ff');
-      ctx.fillRect(x0 + zx * f, y0 + zy * f, f, f);
-    }
+  if (art !== 'fackel' && art !== 'wimpel') {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+    ctx.fillRect(x0 + f, fy + f, Math.max(1, breite - 2) * f, f);
   }
+  ctx.drawImage(figurBild(art, farbe ?? '#9c3226', f), x0, y0);
 }
 
 export type Strassenstueck = {
@@ -274,14 +312,16 @@ export type Strassenstueck = {
 };
 
 /**
- * Strassen als Pixelband entlang der Feldkante, in Geraetepixeln.
+ * Strassen als Feldweg entlang der Feldkante, in Geraetepixeln.
  *
- * Schritt fuer Schritt ein Kunstpixel weit, auf das Kunstpixelraster gerundet:
- * so bekommt die schraege Kante dieselben Treppenstufen wie die Kacheln, statt
- * als glatte Linie darueberzuliegen. Erst alle Umrisse, dann aller Belag - wo
- * Strassen sich treffen, fliessen sie ineinander, statt dass ein Umriss quer
- * durch die Nachbarstrasse schneidet. Jeder vierte Stein ist heller, das liest
- * sich als Pflaster. PLATZHALTER (ASSETS.md).
+ * Wie ein Pfad auf den Kacheln: dunkler, weicher Rand, festgetretene Erde,
+ * einzelne Steine. Schritt fuer Schritt ein Kunstpixel weit, auf das
+ * Kunstpixelraster gerundet, so bekommt die schraege Kante dieselben
+ * Treppenstufen wie die Kacheln. Wem die Strasse gehoert, zeigt ein Wimpel in
+ * Spielerfarbe in ihrer Mitte - der Weg selbst bleibt Weg.
+ *
+ * Erst alle Raender, dann alle Wege: wo Strassen sich treffen, fliessen sie
+ * ineinander. PLATZHALTER (ASSETS.md).
  */
 export function zeichneStrassen(
   ctx: CanvasRenderingContext2D,
@@ -300,16 +340,22 @@ export function zeichneStrassen(
     return out;
   };
   const alle = stuecke.map((s) => ({ s, p: punkte(s) }));
-  ctx.fillStyle = '#1b130d';
+
+  ctx.fillStyle = '#3a2a1e';
+  for (const { p } of alle) for (const q of p) ctx.fillRect(q.x - 2 * f, q.y - 2 * f, 5 * f, 5 * f);
+  ctx.fillStyle = '#9a7b52';
+  for (const { p } of alle) for (const q of p) ctx.fillRect(q.x - f, q.y - f, 3 * f, 3 * f);
   for (const { p } of alle) {
-    for (const q of p) ctx.fillRect(q.x - 2 * f, q.y - 2 * f, 4 * f, 4 * f);
+    p.forEach((q, i) => {
+      if (i % 3 !== 1) return;
+      const hell = i % 2 === 1;
+      ctx.fillStyle = hell ? '#c8ad7f' : '#6f5638';
+      ctx.fillRect(q.x + (hell ? 0 : -f), q.y + (hell ? -f : f), f, f);
+    });
   }
   for (const { s, p } of alle) {
-    const hell = heller(s.farbe);
-    p.forEach((q, i) => {
-      ctx.fillStyle = i % 4 === 2 ? hell : s.farbe;
-      ctx.fillRect(q.x - f, q.y - f, 2 * f, 2 * f);
-    });
+    const m = p[Math.floor(p.length / 2)]!;
+    zeichneFigur(ctx, 'wimpel', m.x + 3 * f, m.y + f, f, s.farbe);
   }
 }
 

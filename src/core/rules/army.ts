@@ -44,7 +44,16 @@
  */
 
 import { Rng } from '../rng';
-import { hexDistance, hexKey, hexesInRange, neighbors } from '../coords';
+import {
+  edgeKey,
+  hexDistance,
+  hexEdges,
+  hexKey,
+  hexVertices,
+  hexesInRange,
+  neighbors,
+  vertexKey,
+} from '../coords';
 import type { Hex } from '../coords';
 import { ensureGenerated } from '../world';
 import type { World } from '../world';
@@ -207,6 +216,26 @@ export type ArmyEvent =
       result: RuinResult;
       gained: Hand;
       knightLost: boolean;
+    }
+  | {
+      /** Nachts: eine Goblin-Horde bricht auf. */
+      t: 'horde';
+      round: number;
+      q: number;
+      r: number;
+      fraktion: string;
+      anzahl: number;
+    }
+  | {
+      /** Pluenderer haben Feuer gelegt. */
+      t: 'burn';
+      player: PlayerId;
+      fraktion: string;
+      q: number;
+      r: number;
+      /** strasse: abgebrannt, dorf: niedergebrannt, stadt: zum Dorf heruntergebrannt. */
+      art: 'strasse' | 'dorf' | 'stadt';
+      key: string;
     }
   | { t: 'chunks'; coords: ChunkCoord[] };
 
@@ -454,6 +483,128 @@ export function beginBigRound(s: GameState, events: Ereignisse): void {
   sendFeud(s, rng, events);
   sendWanderer(s, rng, events);
   s.rngState = rng.getState();
+}
+
+// --- Die Nacht -----------------------------------------------------------------
+
+/** Wie viele Goblins eine Horde zaehlt: drei und einer je Spieler, hoechstens sechs. */
+export const hordeGroesse = (spieler: number): number => Math.min(6, 3 + spieler);
+/** Chance, dass eine Nacht eine Horde bringt. */
+const HORDE_CHANCE = 0.6;
+/** Wie weit ein Goblinlager fuer eine Horde ausholt - weiter als ein Raubzug. */
+const HORDE_REICHWEITE = SPAWN_RANGE + 4;
+
+/** Zu Beginn jeder Nacht (core/zeit.ts). */
+export function beginNight(s: GameState, events: Ereignisse): void {
+  const rng = new Rng(s.rngState);
+  sendHorde(s, rng, events);
+  s.rngState = rng.getState();
+}
+
+/**
+ * Eine Goblin-Horde losschicken: das naechste Goblinlager mit Landweg schickt
+ * hordeGroesse Goblins auf einmal gegen die Siedlungen. Sie ziehen als ein
+ * Haufen, pluendern jeder fuer sich und legen jeder fuer sich Feuer - eine
+ * Horde, die ankommt, ist ein Ereignis, kein Nadelstich.
+ */
+export function sendHorde(s: GameState, rng: Rng, events: Ereignisse): void {
+  if (rng.next() / UINT >= HORDE_CHANCE) return;
+  const ziele = settlementApproaches(s);
+  if (ziele.size === 0) return;
+  const zielSet = new Set(ziele.keys());
+
+  const lager = new Map<string, { q: number; r: number; d: number }>();
+  for (const k of ziele.keys()) {
+    const an = feld(k);
+    for (const c of hexesInRange(an, HORDE_REICHWEITE)) {
+      if (!isNestActive(s, c.q, c.r)) continue;
+      const ck = hexKey(c.q, c.r);
+      const d = hexDistance(an, c);
+      const bisher = lager.get(ck);
+      if (bisher && bisher.d <= d) continue;
+      if (fraktionById(s.worldSeed, nestFraktionOf(s, c.q, c.r)).art !== 'goblin') continue;
+      lager.set(ck, { q: c.q, r: c.r, d });
+    }
+  }
+
+  const reihe = [...lager].sort((a, b) => a[1].d - b[1].d || nachSchluessel(a[0], b[0]));
+  for (const [k, nest] of reihe) {
+    const weg = nextStep(s.worldSeed, nest, zielSet, SUCHE_RAEUBER * 2);
+    if (!weg) continue;
+    const fraktion = nestFraktionOf(s, nest.q, nest.r);
+    const anzahl = hordeGroesse(s.order.length);
+    for (let i = 0; i < anzahl; i++) {
+      aufstellen(
+        s,
+        einheitVorlage('goblin', nest.q, nest.r, { fraktion, heimat: k, auftrag: 'raub', ziel: weg.ziel }),
+      );
+    }
+    events.push({ t: 'horde', round: roundOf(s.turn), q: nest.q, r: nest.r, fraktion, anzahl });
+    return;
+  }
+}
+
+// --- Brandschatzen --------------------------------------------------------------
+
+/** Ab diesem Wurf legt ein Pluenderer Feuer an eine Strasse. */
+export const BRAND_STRASSE_AB = 4;
+/** Ab diesem Wurf trifft das Feuer ein Gebaeude. */
+export const BRAND_GEBAEUDE_AB = 6;
+
+/**
+ * Nach der Pluenderung wuerfelt der Pluenderer, ob er Feuer legt.
+ *
+ *   1-3  nichts weiter
+ *   4-5  eine Strasse des Spielers an diesem Feld brennt ab
+ *   6    ein Gebaeude an diesem Feld: eine Stadt brennt zum Dorf herunter, ein
+ *        Dorf brennt nieder - ausser es ist das letzte Gebaeude des Spielers.
+ *        Dann brennt stattdessen eine Strasse.
+ *
+ * Das letzte Gebaeude bleibt, weil ohne Siedlung kein Ritter mehr antreten und
+ * nichts mehr wachsen kann: ein Ueberfall soll schmerzen, nicht die Partie
+ * beenden.
+ */
+function brandschatzen(
+  s: GameState,
+  rng: Rng,
+  u: UnitState,
+  owner: PlayerId,
+  events: Ereignisse,
+): void {
+  const w = wurf(rng);
+  if (w < BRAND_STRASSE_AB) return;
+  const fraktion = u.fraktion ?? '';
+
+  if (w >= BRAND_GEBAEUDE_AB) {
+    const ecken = hexVertices(u.q, u.r)
+      .map(vertexKey)
+      .filter((vk) => s.buildings[vk]?.owner === owner)
+      .sort();
+    const gebaeude = Object.values(s.buildings).filter((b) => b.owner === owner).length;
+    if (ecken.length > 0) {
+      const vk = ecken[rng.int(ecken.length)]!;
+      const b = s.buildings[vk]!;
+      if (b.type === 'city') {
+        b.type = 'settlement';
+        events.push({ t: 'burn', player: owner, fraktion, q: u.q, r: u.r, art: 'stadt', key: vk });
+        return;
+      }
+      if (gebaeude > 1) {
+        delete s.buildings[vk];
+        events.push({ t: 'burn', player: owner, fraktion, q: u.q, r: u.r, art: 'dorf', key: vk });
+        return;
+      }
+    }
+  }
+
+  const kanten = hexEdges(u.q, u.r)
+    .map(edgeKey)
+    .filter((ek) => s.roads[ek] === owner)
+    .sort();
+  if (kanten.length === 0) return;
+  const ek = kanten[rng.int(kanten.length)]!;
+  delete s.roads[ek];
+  events.push({ t: 'burn', player: owner, fraktion, q: u.q, r: u.r, art: 'strasse', key: ek });
 }
 
 // --- Die Runde ---------------------------------------------------------------
@@ -855,6 +1006,7 @@ export function tickArmy(s: GameState, world: World, events: Ereignisse): void {
       taken,
       count: menge,
     });
+    brandschatzen(s, rng, u, owner, events);
   }
 
   // 6. Erholung an eigenen Siedlungen.

@@ -326,6 +326,35 @@ export function playRuin(): void {
   blip(1318, 0.5, 0.03, 0.45, 'sine');
 }
 
+/** Der Wurf geht los: ein Wusch und ein aufsteigender Klang. PLATZHALTER (ASSETS.md). */
+export function playWurfStart(): void {
+  noise(0.22, 1800, 0.22, 0);
+  blip(523, 0.12, 0.08, 0.02, 'square');
+  blip(659, 0.12, 0.08, 0.08, 'square');
+  blip(784, 0.18, 0.09, 0.14, 'square');
+  blip(1047, 0.28, 0.07, 0.2, 'triangle');
+}
+
+/** Donner: ein tiefes Grollen, das zweimal nachrollt. */
+export function playDonner(): void {
+  noise(1.4, 90, 0.55, 0);
+  noise(0.9, 140, 0.3, 0.35);
+  noise(1.2, 70, 0.35, 0.8);
+}
+
+/** Eine Goblin-Horde: Kriegshorn und Trommeln. */
+export function playHorde(): void {
+  glide(98, 147, 0.9, 0.12, 0, 'sawtooth');
+  glide(147, 110, 0.6, 0.1, 0.9, 'sawtooth');
+  for (let i = 0; i < 4; i++) noise(0.16, 120, 0.4, 0.2 + i * 0.3);
+}
+
+/** Feuer: knisternde, kurze Rauschstoesse ueber einem leisen Fauchen. */
+export function playBrand(): void {
+  for (let i = 0; i < 7; i++) noise(0.05 + (i % 3) * 0.03, 2500 + (i % 4) * 900, 0.18, i * 0.07);
+  noise(0.8, 400, 0.12, 0.05);
+}
+
 /** Klingen kreuzen sich: zwei helle Schlaege mit Metallrauschen. PLATZHALTER (ASSETS.md). */
 export function playClash(): void {
   noise(0.09, 5200, 0.3, 0);

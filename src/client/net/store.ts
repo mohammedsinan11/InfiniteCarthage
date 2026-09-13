@@ -12,7 +12,18 @@ import { openSocket, sendMsg } from './socket';
 import type { ClientMsg, RoomInfo, ServerMsg } from '../../core/protocol';
 import type { PublicState } from '../../core/redact';
 import type { Action, GameEvent } from '../../core/rules/reducer';
-import { playCardPick, playClash, playDefend, playGuard, playMarch, playRaid, playRuin } from '../audio';
+import {
+  playBrand,
+  playCardPick,
+  playClash,
+  playDefend,
+  playGuard,
+  playHorde,
+  playMarch,
+  playRaid,
+  playRuin,
+} from '../audio';
+import { istNacht } from '../../core/zeit';
 import type { PlayerId } from '../../core/state';
 import { createWorld, mitAufgedeckt, revealChunks } from '../../core/world';
 import type { World } from '../../core/world';
@@ -39,6 +50,7 @@ export type WeltEintrag = {
     | 'fight'
     | 'nest'
     | 'capture'
+    | 'horde'
     | 'feud'
     | 'home'
     | 'wanderer'
@@ -133,7 +145,7 @@ function weltAus(
   const wer = (id: string) => state?.players.find((p) => p.id === id)?.name ?? 'Jemand';
   const name = (id: string) => fraktionName(state, id);
   // Kaempfe anderer zaehlen nur, wenn man sie sieht - sonst rauscht die Liste.
-  const sicht = state && you ? sightOf(state, you) : null;
+  const sicht = state && you ? sightOf(state, you, istNacht(state.turn)) : null;
   const sichtbar = (q: number, r: number) => sicht === null || sicht.has(hexKey(q, r));
   const eintrag = (art: WeltEintrag['art'], text: string, r = runde) =>
     out.push({ id: naechsteId++, runde: r, art, text });
@@ -184,6 +196,21 @@ function weltAus(
       case 'nestCaptured':
         eintrag('capture', `${name(e.an)} erobern ein Lager von ${name(e.von)}`);
         break;
+      case 'horde':
+        // Das Menue setzt vor diese Zeile ein Ausrufezeichen (styles.css, welt-horde).
+        eintrag('horde', `Goblin-Horde greift an: ${name(e.fraktion)}, ${e.anzahl} Goblins`, e.round);
+        break;
+      case 'burn': {
+        const bei = e.player === you ? 'Bei dir' : `Bei ${wer(e.player)}`;
+        const was =
+          e.art === 'strasse'
+            ? 'brennt eine Strasse ab'
+            : e.art === 'dorf'
+              ? 'brennt ein Dorf nieder'
+              : 'brennt eine Stadt zum Dorf herunter';
+        eintrag('plunder', `${bei} ${was} (${name(e.fraktion)})`);
+        break;
+      }
       case 'ruin':
         out.push({ id: naechsteId++, runde, art: 'ruin', text: `Ruine erkundet: ${RUINE_KURZ[e.result]}` });
         break;
@@ -219,7 +246,7 @@ function meldungenAus(
   const out: Announcement[] = [];
   const wer = (id: string) => state?.players.find((p) => p.id === id)?.name ?? 'Jemand';
   const name = (id: string) => fraktionName(state, id);
-  const sicht = state && you ? sightOf(state, you) : null;
+  const sicht = state && you ? sightOf(state, you, istNacht(state.turn)) : null;
   const sichtbar = (q: number, r: number) => sicht === null || sicht.has(hexKey(q, r));
   for (const e of events) {
     if (e.t === 'plunder') {
@@ -277,6 +304,24 @@ function meldungenAus(
     } else if (e.t === 'feud') {
       if (sichtbar(e.q, e.r) || sichtbar(e.zq, e.zr)) {
         out.push({ id: naechsteId++, text: `Fehde: ${name(e.fraktion)} gegen ${name(e.gegen)}`, kind: 'info' });
+      }
+    } else if (e.t === 'horde') {
+      playHorde();
+      out.push({
+        id: naechsteId++,
+        text: `Goblin-Horde greift an! ${name(e.fraktion)}: ${e.anzahl} Goblins`,
+        kind: 'raid',
+      });
+    } else if (e.t === 'burn') {
+      if (e.player === you) {
+        playBrand();
+        const was =
+          e.art === 'strasse'
+            ? 'eine Strasse brennt ab'
+            : e.art === 'dorf'
+              ? 'ein Dorf brennt nieder'
+              : 'eine Stadt brennt zum Dorf herunter';
+        out.push({ id: naechsteId++, text: `Feuer! ${was}`, kind: 'raid' });
       }
     } else if (e.t === 'nestCaptured') {
       if (sichtbar(e.q, e.r)) {

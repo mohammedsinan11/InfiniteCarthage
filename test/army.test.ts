@@ -13,17 +13,29 @@ import {
   FEHDE_REICHWEITE,
   FEHDE_TRUPP,
   WANDERER_DAUER,
+  hordeGroesse,
   maxAufbrueche,
   maxWanderer,
   sendFeud,
+  sendHorde,
   sendRaiders,
   sendWanderer,
   tickArmy,
 } from '../src/core/rules/army';
+import { fraktionById } from '../src/core/factions';
 import type { ArmyEvent } from '../src/core/rules/army';
 import { nestAt } from '../src/core/raiders';
 import { ruinAt } from '../src/core/ruins';
-import { hexDistance, hexKey, hexesInRange, neighbors, vertexKey } from '../src/core/coords';
+import {
+  edgeKey,
+  hexDistance,
+  hexEdges,
+  hexKey,
+  hexesInRange,
+  neighbors,
+  vertexAdjacentHexes,
+  vertexKey,
+} from '../src/core/coords';
 import {
   WERTE,
   einheitVorlage,
@@ -624,6 +636,98 @@ describe('Ruinen', () => {
 
     einheit(game, ritter(ruine.q, ruine.r));
     expect(tick(game).some((e) => e.t === 'ruin')).toBe(false);
+  });
+});
+
+describe('Brandschatzen', () => {
+  it('Pluenderer legen mitunter Feuer - an Strassen und Staedten', () => {
+    let strasse = false;
+    let stadt = false;
+    for (let versuch = 0; versuch < 80 && !(strasse && stadt); versuch++) {
+      const game = solo(9000 + versuch);
+      const s = game.state;
+      const mitte = landFlaeche(game, 4);
+      const ecke = { q: mitte.q, r: mitte.r, d: 'N' as const };
+      s.buildings[vertexKey(ecke)] = { owner: 'p0', type: 'city' };
+      s.buildings[vertexKey({ q: mitte.q + 3, r: mitte.r + 1, d: 'S' })] = { owner: 'p0', type: 'settlement' };
+      const an = vertexAdjacentHexes(ecke).find((h) => isLandAt(s.worldSeed, h.q, h.r))!;
+      for (const e of hexEdges(an.q, an.r)) s.roads[edgeKey(e)] = 'p0';
+      for (const r of RESOURCES) s.players[0]!.hand[r] = 2;
+      const strassenVorher = Object.keys(s.roads).length;
+      einheit(game, raeuber(an.q, an.r));
+
+      const brand = tick(game).find((e) => e.t === 'burn');
+      if (!brand || brand.t !== 'burn') continue;
+      if (brand.art === 'strasse') {
+        strasse = true;
+        expect(Object.keys(s.roads)).toHaveLength(strassenVorher - 1);
+        expect(s.roads[brand.key]).toBeUndefined();
+      } else {
+        stadt = true;
+        expect(brand.art).toBe('stadt');
+        expect(s.buildings[vertexKey(ecke)]!.type).toBe('settlement');
+      }
+    }
+    expect(strasse).toBe(true);
+    expect(stadt).toBe(true);
+  });
+
+  it('das letzte Dorf eines Spielers brennt nie nieder', () => {
+    for (let versuch = 0; versuch < 60; versuch++) {
+      const game = solo(9500 + versuch);
+      const s = game.state;
+      const mitte = landFlaeche(game, 4);
+      const ecke = { q: mitte.q, r: mitte.r, d: 'N' as const };
+      s.buildings[vertexKey(ecke)] = { owner: 'p0', type: 'settlement' };
+      const an = vertexAdjacentHexes(ecke).find((h) => isLandAt(s.worldSeed, h.q, h.r))!;
+      for (const r of RESOURCES) s.players[0]!.hand[r] = 2;
+      einheit(game, raeuber(an.q, an.r));
+      const events = tick(game);
+      expect(events.some((e) => e.t === 'burn' && e.art === 'dorf')).toBe(false);
+      expect(s.buildings[vertexKey(ecke)]).toBeDefined();
+    }
+  });
+});
+
+describe('Nacht', () => {
+  /** Ein Goblinlager und eine erreichbare Siedlung. */
+  function goblinLagerMitSiedlung(game: Game) {
+    const s = game.state;
+    const seed = s.worldSeed;
+    for (const nest of hexesInRange(ORIGIN, 40)) {
+      if (!nestAt(seed, nest.q, nest.r)) continue;
+      if (fraktionById(seed, nestFraktionOf(s, nest.q, nest.r)).art !== 'goblin') continue;
+      const nah = hexesInRange(nest, 5).find(
+        (h) =>
+          hexDistance(h, nest) === 5 &&
+          isLandAt(seed, h.q, h.r) &&
+          !nestAt(seed, h.q, h.r) &&
+          nextStep(seed, nest, new Set([hexKey(h.q, h.r)]), 900) !== null,
+      );
+      if (nah) {
+        siedlung(game, nah);
+        return;
+      }
+    }
+    throw new Error('kein Goblinlager mit erreichbarer Siedlung');
+  }
+
+  it('bringt eine Goblin-Horde aus einem nahen Goblinlager', () => {
+    let gesehen = false;
+    for (let i = 1; i <= 30 && !gesehen; i++) {
+      const game = solo();
+      goblinLagerMitSiedlung(game);
+      const events: ArmyEvent[] = [];
+      sendHorde(game.state, new Rng(i), events);
+      const horde = events.find((e) => e.t === 'horde');
+      if (!horde || horde.t !== 'horde') continue;
+      gesehen = true;
+      const trupp = game.state.units.filter((u) => u.kind === 'goblin');
+      expect(trupp).toHaveLength(hordeGroesse(1));
+      expect(horde.anzahl).toBe(hordeGroesse(1));
+      expect(trupp.every((u) => u.auftrag === 'raub' && u.fraktion === horde.fraktion)).toBe(true);
+    }
+    expect(gesehen).toBe(true);
   });
 });
 

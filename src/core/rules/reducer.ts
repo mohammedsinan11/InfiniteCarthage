@@ -58,7 +58,8 @@ import {
   legalRoadEdges,
 } from './placement';
 import { computeProduction } from './production';
-import { beginBigRound, spawnKnight, tickArmy } from './army';
+import { beginBigRound, beginNight, spawnKnight, tickArmy } from './army';
+import { nachtBeginntAt } from '../zeit';
 import type { ArmyEvent } from './army';
 import { nextStep } from '../units';
 import { bigRoundChangedAt } from '../season';
@@ -781,6 +782,9 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       // Fehde und ein Wanderer - nach dem Ziehen, damit ein frischer Raubzug
       // nicht im selben Moment schon pluendert.
       if (bigRoundChangedAt(s.turn)) beginBigRound(s, events);
+
+      // Mit der Nacht kommen die Goblins in Horden (core/zeit.ts).
+      if (nachtBeginntAt(s.turn)) beginNight(s, events);
 
       events.push({ t: 'turn', player: s.order[s.current]! });
       break;

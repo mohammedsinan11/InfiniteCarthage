@@ -6,7 +6,7 @@
  * alle 15 Sekunden neu geholt, solange die Seite offen ist.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../net/store';
 import { ROOM_CODE_LENGTH, isRoomCode, targetPointsLabel } from '../../core/protocol';
 import { VERFALL_TAGE, zuletztText } from '../../core/lobby';
@@ -39,6 +39,8 @@ export function Home() {
   });
   const [code, setCode] = useState('');
   const [oeffentlich, setOeffentlich] = useState(true);
+  const [nameFehlt, setNameFehlt] = useState(false);
+  const nameFeld = useRef<HTMLInputElement>(null);
   const [raeume, setRaeume] = useState<RaumEintrag[] | null>(null);
   const [listeFehlt, setListeFehlt] = useState(false);
   const [jetzt, setJetzt] = useState(() => Date.now());
@@ -80,10 +82,30 @@ export function Home() {
   const offen = (raeume ?? []).filter((r) => r.status === 'lobby');
   const laufend = (raeume ?? []).filter((r) => r.status !== 'lobby');
 
+  /**
+   * Beitreten per Klick auf den Raum. Fehlt der Name, springt der Cursor ins
+   * Namensfeld, statt dass der Klick stumm ins Leere geht.
+   */
+  const beitreten = (r: RaumEintrag) => {
+    if (r.status !== 'lobby' || r.spieler.length >= r.maxSpieler || verbindet) return;
+    if (name.trim().length === 0) {
+      setNameFehlt(true);
+      nameFeld.current?.focus();
+      return;
+    }
+    connect(r.code, name.trim(), false);
+  };
+
   const zeile = (r: RaumEintrag) => {
     const voll = r.spieler.length >= r.maxSpieler;
+    const offen = r.status === 'lobby' && !voll;
     return (
-      <li key={r.code} className="raum">
+      <li
+        key={r.code}
+        className={offen ? 'raum klickbar' : 'raum'}
+        title={offen ? `Raum ${r.code} beitreten` : undefined}
+        onClick={() => beitreten(r)}
+      >
         <div className="raum-kopf">
           <span className="raum-code">{r.code}</span>
           <span className={`raum-status ${r.status}`}>{STATUS_TEXT[r.status]}</span>
@@ -95,9 +117,12 @@ export function Home() {
         </div>
         {r.status === 'lobby' && (
           <button
-            disabled={!ready || voll || verbindet}
-            title={!ready ? 'Erst einen Namen eingeben' : voll ? 'Der Raum ist voll' : undefined}
-            onClick={() => connect(r.code, name.trim(), false)}
+            disabled={voll || verbindet || SERVER_MISSING}
+            title={voll ? 'Der Raum ist voll' : undefined}
+            onClick={(e) => {
+              e.stopPropagation();
+              beitreten(r);
+            }}
           >
             {voll ? 'Voll' : 'Beitreten'}
           </button>
@@ -110,10 +135,6 @@ export function Home() {
     <div className="home">
       <div className="home-card">
         <h1>InfiniteCarthage</h1>
-        <p className="sub">
-          Siedeln auf einer Karte ohne Rand. Sie waechst weiter, sobald jemand nach
-          aussen baut.
-        </p>
 
         {SERVER_MISSING && (
           <p className="warn">
@@ -128,12 +149,17 @@ export function Home() {
         <label>
           Dein Name
           <input
+            ref={nameFeld}
             value={name}
             maxLength={20}
             placeholder="z.B. Anna"
-            onChange={(e) => remember(e.target.value)}
+            onChange={(e) => {
+              remember(e.target.value);
+              setNameFehlt(false);
+            }}
           />
         </label>
+        {nameFehlt && <p className="note">Erst einen Namen eingeben, dann beitreten.</p>}
 
         <label className="home-schalter">
           <input
@@ -141,7 +167,7 @@ export function Home() {
             checked={oeffentlich}
             onChange={(e) => setOeffentlich(e.target.checked)}
           />
-          Oeffentlich - der neue Raum steht in der Raumliste
+          Öffentlich
         </label>
         <button
           className="primary"

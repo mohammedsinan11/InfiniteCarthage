@@ -208,6 +208,31 @@ Kaempfe zu mehreren zu schnell laufen, weil die Runde der Spielerzug ist.
 
 ---
 
+## Nacht, Wetter und Feuer
+
+Gebaut in `core/zeit.ts`, `core/rules/army.ts` und `client/board/WetterSchicht.tsx`.
+
+- **Tageszeit.** Jede grosse Runde ist ein Tag: Morgen, Tag, Tag, Abend, Nacht -
+  aus der Zugnummer abgeleitet wie die Jahreszeit.
+- **Nacht.** Die Sicht reicht ein Feld weniger weit. Mit Beginn der Nacht bricht
+  mit 60 % eine Goblin-Horde aus dem naechsten Goblinlager bis 12 Felder vor den
+  Siedlungen auf: drei Goblins und einer je Spieler, hoechstens sechs. Im
+  Weltprotokoll steht sie mit Ausrufezeichen.
+- **Wetter.** Wechselt alle zwei Runden, gewichtet nach Jahreszeit (Winter:
+  Schnee statt Regen, Sommer meist klar), aus dem oeffentlichen Seed. Bisher
+  reine Anschauung.
+- **Feuer.** Nach jeder Pluenderung wuerfelt der Pluenderer: 4-5 brennt eine
+  Strasse am Feld ab, 6 trifft ein Gebaeude - die Stadt brennt zum Dorf
+  herunter, das Dorf nieder. Das letzte Gebaeude eines Spielers bleibt stehen.
+- **Shader.** Licht, Nacht, Wolken, Regen, Schnee, Nebel, Blitze; Einheiten
+  tragen abends und nachts Fackeln, Doerfer und Lager leuchten. Zum Anschauen
+  ueber die Adresse vorgebbar: `?zeit=nacht&wetter=gewitter`.
+
+Offen: ob Wetter Regeln aendern soll (Regen bremst, Nebel verkuerzt die Sicht);
+ob Ritter nachts staerker verteidigen; Brand-Animation.
+
+---
+
 ## Der Held
 
 Deine Idee einer zweiten, parallel laufenden Ebene. Sie passt gut zur

@@ -310,6 +310,7 @@ export function Aktionsleiste({
   setMode,
   act,
   verhaeltnis,
+  onTafel,
 }: {
   state: PublicState;
   me: PublicPlayer | undefined;
@@ -319,6 +320,8 @@ export function Aktionsleiste({
   setMode: (m: BuildMode) => void;
   act: (a: Action) => void;
   verhaeltnis: (r: Resource) => number;
+  /** Meldet, ob gerade eine Tafel offen ist - solange wuerfelt niemand von selbst. */
+  onTafel?: (offen: boolean) => void;
 }) {
   const phase = state.phase;
   const bauen = isMine && phase.t === 'main';
@@ -328,6 +331,9 @@ export function Aktionsleiste({
   useEffect(() => {
     if (!isMine) setTafel(null);
   }, [isMine]);
+  useEffect(() => {
+    onTafel?.(tafel !== null);
+  }, [tafel, onTafel]);
 
   const offen = (me?.dev ?? []).filter((d) => !d.played);
   const anzahl = new Map<DevCardType, number>();

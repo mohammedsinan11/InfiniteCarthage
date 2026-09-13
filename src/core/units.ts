@@ -266,15 +266,19 @@ export function knightMusterHex(view: ArmyView, id: PlayerId): Hex | null {
 export function sightOf(
   view: Pick<GameState, 'buildings' | 'units'>,
   id: PlayerId,
+  /** Nachts reicht der Blick ein Feld weniger weit (core/zeit.ts). */
+  nacht = false,
 ): Set<string> {
   const out = new Set<string>();
   const dazu = (h: Hex, radius: number) => {
     for (const c of hexesInRange(h, radius)) out.add(hexKey(c.q, c.r));
   };
+  const siedlung = nacht ? SICHT_SIEDLUNG - 1 : SICHT_SIEDLUNG;
+  const einheit = nacht ? Math.max(1, SICHT_EINHEIT - 1) : SICHT_EINHEIT;
   for (const [vk, b] of Object.entries(view.buildings)) {
     if (b.owner !== id) continue;
-    for (const h of vertexAdjacentHexes(parseVertexKey(vk))) dazu(h, SICHT_SIEDLUNG);
+    for (const h of vertexAdjacentHexes(parseVertexKey(vk))) dazu(h, siedlung);
   }
-  for (const u of view.units) if (u.owner === id) dazu(u, SICHT_EINHEIT);
+  for (const u of view.units) if (u.owner === id) dazu(u, einheit);
   return out;
 }

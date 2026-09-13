@@ -63,7 +63,7 @@ export function Lobby() {
             disabled={!isHost}
             onChange={(e) => send({ t: 'setOptions', oeffentlich: e.target.checked })}
           />
-          Oeffentlich - steht in der Raumliste auf der Startseite
+          Öffentlich
         </label>
 
         {isHost ? (

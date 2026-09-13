@@ -43,6 +43,9 @@ import { fraktionById, istFraktion } from '../../core/factions';
 import { ruinAt } from '../../core/ruins';
 import { aufstellung, preloadUnitSprites, zeichneFigur, zeichneLeben, zeichneStrassen } from '../units';
 import { Schwerter } from './Schwerter';
+import { MAX_LICHTER, WetterSchicht } from './WetterSchicht';
+import type { Licht } from './WetterSchicht';
+import type { Tageszeit, Wetter } from '../../core/zeit';
 import {
   HEX_CX,
   HEX_CY,
@@ -202,6 +205,11 @@ type Props = {
   auswahl?: number | null;
   /** Kamera auf dieses Feld fahren. n wechselt bei jedem neuen Wunsch. */
   fokus?: { q: number; r: number; n: number } | null;
+  /** Tageszeit und Wetter - fuer Licht, Nacht und Fackeln (WetterSchicht). */
+  tageszeit?: Tageszeit;
+  wetter?: Wetter;
+  /** Was auf freien Bauplaetzen als Vorschau steht - statt einer Marke. */
+  geisterBau?: 'dorf' | 'stadt' | null;
   /**
    * Aufgesetzte Anzeigen - Handblatt, Wuerfelknopf, Overlays.
    *
@@ -274,6 +282,9 @@ export function Board({
   zielWahl = false,
   auswahl = null,
   fokus = null,
+  tageszeit = 'tag',
+  wetter = 'klar',
+  geisterBau = null,
   children,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
@@ -286,6 +297,8 @@ export function Board({
   const [hover, setHover] = useState<string | null>(null);
   /** Bauplatz-Ecke unter dem Zeiger - ihre drei Felder zeigen ihre Zahlen. */
   const [eckeHover, setEckeHover] = useState<string | null>(null);
+  /** Strassen-Kante unter dem Zeiger - dort steht die Strasse als Vorschau. */
+  const [kanteHover, setKanteHover] = useState<string | null>(null);
   /**
    * Finger auf dem Brett, fuer die Zwei-Finger-Geste auf Touchgeraeten.
    * kneifen haelt den Fingerabstand bei der letzten Zoomstufe.
@@ -444,6 +457,45 @@ export function Board({
     [state.players, state.worldSeed],
   );
 
+  /**
+   * Lichtquellen fuer Abend und Nacht (WetterSchicht): Fackeln der Einheiten,
+   * erleuchtete Fenster der Doerfer und Staedte, Feuer in den Lagern - in
+   * Geraetepixeln. Nur was im Bild ist, die naechsten zur Bildmitte zuerst.
+   */
+  const lichter = useMemo((): Licht[] => {
+    if (tageszeit !== 'nacht' && tageszeit !== 'abend') return [];
+    const f = Math.round(SCALE * scale * DPR);
+    const geraet = (x: number, y: number) => ({
+      x: (x - view.x) * scale * DPR,
+      y: (y - view.y) * scale * DPR,
+    });
+    const out: Licht[] = [];
+    for (const t of visible) {
+      const k = hexKey(t.q, t.r);
+      const nebel = sicht !== null && !sicht.has(k);
+      const c = hexToPixel(t.q, t.r, LAYOUT);
+      const p = geraet(c.x, c.y - liftHex(t.q, t.r));
+      if (isNestActive(state, t.q, t.r)) {
+        out.push({ x: p.x, y: p.y, r: 26 * f, waerme: 1 });
+        continue;
+      }
+      const leute = besatzung.get(k)?.filter((u) => !nebel || (du !== null && u.owner === du));
+      if (leute && leute.length > 0) out.push({ x: p.x, y: p.y - 4 * f, r: 22 * f, waerme: 1 });
+    }
+    for (const [vk, b] of Object.entries(state.buildings)) {
+      const ecke = parseVertexKey(vk);
+      const v = vertexToPixel(ecke, LAYOUT);
+      const p = geraet(v.x, v.y - liftVertex(ecke));
+      out.push({ x: p.x, y: p.y, r: (b.type === 'city' ? 34 : 24) * f, waerme: 0.8 });
+    }
+    const bw = size.w * DPR;
+    const bh = size.h * DPR;
+    return out
+      .filter((l) => l.x > -l.r && l.y > -l.r && l.x < bw + l.r && l.y < bh + l.r)
+      .sort((a, b) => Math.hypot(a.x - bw / 2, a.y - bh / 2) - Math.hypot(b.x - bw / 2, b.y - bh / 2))
+      .slice(0, MAX_LICHTER);
+  }, [tageszeit, scale, view, visible, sicht, liftHex, liftVertex, state, besatzung, du, size]);
+
   /** Wo gekaempft wird - dieselbe Frage, nach der die Regel kaempfen laesst. */
   const kampf = useMemo(() => kampfFelder(state), [state]);
 
@@ -524,6 +576,8 @@ export function Board({
 
     /** Geraetepixel je Kunstpixel - bei jeder Zoomstufe ganzzahlig. */
     const f = Math.round(SCALE * scale * DPR);
+    /** Abends und nachts tragen Einheiten Fackeln - das Licht dazu malt die WetterSchicht. */
+    const fackeln = tageszeit === 'nacht' || tageszeit === 'abend';
 
     /**
      * Was auf dem Feld steht: erst das Lager, dann die Figuren von hinten nach
@@ -569,6 +623,7 @@ export function Board({
         const fx = mx + ox * f;
         const fy = my + oy * f;
         zeichneFigur(ctx, u.kind, fx, fy, f, farbeSeite(seiteVon(u)));
+        if (fackeln && u.id >= 0) zeichneFigur(ctx, 'fackel', fx + 5 * f, fy - 2 * f, f);
         const max = WERTE[u.kind].leben;
         if (u.id >= 0 && u.leben < max) zeichneLeben(ctx, u.kind, fx, fy, f, u.leben, max);
       });
@@ -652,6 +707,36 @@ export function Board({
       );
 
     /*
+     * Vorschau statt Marke: auf freien Bauplaetzen steht das Gebaeude, wie es
+     * stuende - blass, unter dem Zeiger fast deckend. Ueber einer Kante steht
+     * die Strasse. Ohne Zeiger (Touch) sieht man so trotzdem alle Plaetze.
+     */
+    const eigeneFarbe = du ? spielerFarbe(du) : '#c9a46a';
+    if (geisterBau !== null) {
+      const plaetze = (targets.vertices ?? [])
+        .map((vk) => {
+          const ecke = parseVertexKey(vk);
+          const p = vertexToPixel(ecke, LAYOUT);
+          return { vk, ...geraet(p.x, p.y - liftVertex(ecke)) };
+        })
+        .sort((u, w) => u.y - w.y);
+      for (const pl of plaetze) {
+        ctx.globalAlpha = pl.vk === eckeHover ? 0.95 : 0.42;
+        zeichneFigur(ctx, geisterBau, pl.x, pl.y + 4 * f, f, eigeneFarbe);
+      }
+      ctx.globalAlpha = 1;
+    }
+    if (kanteHover !== null && (targets.edges ?? []).includes(kanteHover)) {
+      const [a, b] = edgeEndpoints(parseEdgeKey(kanteHover)).map((v) => {
+        const p = vertexToPixel(v, LAYOUT);
+        return geraet(p.x, p.y - liftVertex(v));
+      });
+      ctx.globalAlpha = 0.85;
+      zeichneStrassen(ctx, [{ a: a!, b: b!, farbe: eigeneFarbe }], f);
+      ctx.globalAlpha = 1;
+    }
+
+    /*
      * Jahreszeit als Schicht ueber dem Gelaende, nicht in den Kacheln.
      *
      * So bleibt jede Sorte erkennbar - eine Wiese sieht im Herbst warm aus,
@@ -671,7 +756,27 @@ export function Board({
       ctx.fillRect(0, 0, bw, bh);
       ctx.restore();
     }
-  }, [visible, view, scale, size, hover, world, state, tilesReady, liftHex, liftVertex, besatzung, sicht, du, farbeSeite]);
+  }, [
+    visible,
+    view,
+    scale,
+    size,
+    hover,
+    world,
+    state,
+    tilesReady,
+    liftHex,
+    liftVertex,
+    besatzung,
+    sicht,
+    du,
+    farbeSeite,
+    targets,
+    eckeHover,
+    kanteHover,
+    geisterBau,
+    tageszeit,
+  ]);
 
   /** Eine Stufe naeher (+1) oder weiter weg (-1); der Punkt unter x/y bleibt stehen. */
   const zoomUm = useCallback((richtung: number, mausX: number, mausY: number) => {
@@ -1030,6 +1135,16 @@ export function Board({
         className="board-canvas"
         style={{ width: size.w, height: size.h }}
       />
+      <WetterSchicht
+        breite={size.w}
+        hoehe={size.h}
+        dpr={DPR}
+        pixel={Math.round(SCALE * scale * DPR)}
+        kamera={{ x: view.x * scale * DPR, y: view.y * scale * DPR }}
+        tageszeit={tageszeit}
+        wetter={wetter}
+        lichter={lichter}
+      />
       <svg
         className="board-svg"
         viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
@@ -1134,6 +1249,8 @@ export function Board({
               x2={b!.x}
               y2={b!.y}
               onClick={pick('edge', ek)}
+              onPointerEnter={() => setKanteHover(ek)}
+              onPointerLeave={() => setKanteHover((alt) => (alt === ek ? null : alt))}
             />
           );
         })}
@@ -1158,14 +1275,6 @@ export function Board({
               onPointerLeave={() => setEckeHover((alt) => (alt === vk ? null : alt))}
             >
               <circle cx={p.x} cy={y} r={12} className="vertex-treffer" />
-              <rect
-                x={p.x - 3.5}
-                y={y - 3.5}
-                width={7}
-                height={7}
-                transform={`rotate(45 ${p.x} ${y})`}
-                className="vertex-raute"
-              />
             </g>
           );
         })}

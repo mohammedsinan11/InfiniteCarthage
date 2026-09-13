@@ -11,7 +11,19 @@
  * erneut geprueft.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
+import {
+  TAGESZEITEN,
+  TAGESZEIT_NAME,
+  WETTER_ARTEN,
+  WETTER_NAME,
+  istNacht,
+  tageszeitOf,
+  wetterOf,
+} from '../../core/zeit';
+import type { Tageszeit, Wetter } from '../../core/zeit';
+import { WetterSymbol } from '../ui/WetterSymbol';
 import { useStore } from '../net/store';
 import { Board } from '../board/Board';
 import type { Flight, Targets } from '../board/Board';
@@ -27,7 +39,30 @@ import { kampfFelder } from '../../core/combat';
 import { fraktionById } from '../../core/factions';
 import { fraktionColor } from '../theme';
 import { hexDistance, parseVertexKey, vertexAdjacentHexes } from '../../core/coords';
-import { initAudio, playBuild, playGain } from '../audio';
+import { initAudio, playBuild, playGain, playWurfStart } from '../audio';
+
+/** Nach so vielen Millisekunden wuerfelt der Knopf von selbst. */
+const AUTO_WURF_MS = 5000;
+const AUTO_WURF_KEY = 'infinitecarthage.autowurf';
+
+/**
+ * Tageszeit und Wetter zum Anschauen ueber die Adresse vorgeben:
+ * ?zeit=nacht&wetter=gewitter. Nur die Anzeige - die Regeln (Horde, Sicht)
+ * folgen weiter der echten Runde.
+ */
+function wetterVorschau(): { zeit: Tageszeit | null; wetter: Wetter | null } {
+  try {
+    const p = new URLSearchParams(window.location.search);
+    const z = p.get('zeit') ?? '';
+    const w = p.get('wetter') ?? '';
+    return {
+      zeit: (TAGESZEITEN as readonly string[]).includes(z) ? (z as Tageszeit) : null,
+      wetter: (WETTER_ARTEN as readonly string[]).includes(w) ? (w as Wetter) : null,
+    };
+  } catch {
+    return { zeit: null, wetter: null };
+  }
+}
 import {
   legalCityVertices,
   legalRoadEdges,
@@ -86,9 +121,14 @@ export function Game() {
    * Platz zu waehlen.
    */
   const sicht = useMemo(
-    () => (you && state.phase.t !== 'setup' ? sightOf(state, you) : null),
+    () => (you && state.phase.t !== 'setup' ? sightOf(state, you, istNacht(state.turn)) : null),
     [state, you],
   );
+
+  /** Tageszeit und Wetter (core/zeit.ts) - ueber die Adresse vorgebbar, siehe wetterVorschau. */
+  const vorschau = useMemo(() => wetterVorschau(), []);
+  const tageszeit = vorschau.zeit ?? tageszeitOf(state.turn);
+  const wetter = vorschau.wetter ?? wetterOf(state.worldSeed, state.turn);
 
   /** Meine Ritter - und welcher gerade auf sein Ziel wartet. */
   const meineRitter = useMemo(
@@ -225,6 +265,123 @@ export function Game() {
   };
   const befehleMoeglich = isMine && (phase.t === 'main' || phase.t === 'roll') && mode === null;
 
+  /** Was auf freien Bauplaetzen als Vorschau steht (Board). */
+  const geisterBau: 'dorf' | 'stadt' | null =
+    phase.t === 'setup' && phase.awaiting === 'settlement'
+      ? 'dorf'
+      : mode === 'settlement'
+        ? 'dorf'
+        : mode === 'city'
+          ? 'stadt'
+          : null;
+
+  /*
+   * Wuerfeln - von Hand oder nach AUTO_WURF_MS von selbst.
+   *
+   * Die Uhr laeuft nur, wenn nichts anderes ansteht: kein halb gewaehlter Bau,
+   * kein Ritterbefehl, keine offene Kartenwahl, kein Handel, keine offene Tafel.
+   * Jede Beruehrung, Taste und jedes Mausrad stellt sie zurueck - wer gerade
+   * etwas tut, wird nicht weggewuerfelt. Abschaltbar im Menue (TO, Spiel).
+   */
+  const [autoWurf, setAutoWurf] = useState(() => {
+    try {
+      return localStorage.getItem(AUTO_WURF_KEY) !== 'aus';
+    } catch {
+      return true;
+    }
+  });
+  const [tafelOffen, setTafelOffen] = useState(false);
+  const wurfMoeglich =
+    isMine &&
+    pendingRoll === null &&
+    !wurfUnterwegs &&
+    (phase.t === 'roll' || (phase.t === 'main' && state.order.length === 1));
+  const uhrLaeuft =
+    wurfMoeglich &&
+    autoWurf &&
+    mode === null &&
+    befehl === null &&
+    state.draft === null &&
+    state.trade === null &&
+    !tafelOffen;
+  const [uhrStart, setUhrStart] = useState({ zeit: 0, n: 0 });
+  const [rest, setRest] = useState(AUTO_WURF_MS / 1000);
+  /** Zaehlt jeden Wurf - der Schluessel startet Funken und Stoss neu. */
+  const [wurfStoss, setWurfStoss] = useState(0);
+
+  const wuerfeln = () => {
+    if (!wurfMoeglich) return;
+    setWurfUnterwegs(true);
+    setWurfStoss((n) => n + 1);
+    initAudio();
+    playWurfStart();
+    if (phase.t === 'main') act({ t: 'endTurn' });
+    act({ t: 'roll' });
+  };
+  const wuerfelnRef = useRef(wuerfeln);
+  wuerfelnRef.current = wuerfeln;
+
+  useEffect(() => {
+    if (!uhrLaeuft) return;
+    let timer = 0;
+    const neu = () => {
+      window.clearTimeout(timer);
+      setUhrStart((u) => ({ zeit: Date.now(), n: u.n + 1 }));
+      timer = window.setTimeout(() => wuerfelnRef.current(), AUTO_WURF_MS);
+    };
+    neu();
+    const leise = { passive: true } as AddEventListenerOptions;
+    window.addEventListener('pointerdown', neu, leise);
+    window.addEventListener('keydown', neu);
+    window.addEventListener('wheel', neu, leise);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('pointerdown', neu);
+      window.removeEventListener('keydown', neu);
+      window.removeEventListener('wheel', neu);
+    };
+  }, [uhrLaeuft]);
+
+  useEffect(() => {
+    if (!uhrLaeuft) return;
+    const zaehlen = () =>
+      setRest(Math.max(1, Math.ceil((uhrStart.zeit + AUTO_WURF_MS - Date.now()) / 1000)));
+    zaehlen();
+    const t = window.setInterval(zaehlen, 200);
+    return () => window.clearInterval(t);
+  }, [uhrLaeuft, uhrStart]);
+
+  /*
+   * Hand, Aktionsleiste und Wuerfelknopf muessen neben das Menue passen. Wie
+   * breit das ist, haengt von Fenster, Menue (auf oder zu) und Beute-Knopf ab -
+   * deshalb gemessen statt geschaetzt: der Block wird so weit verkleinert, dass
+   * er vor dem Menue endet.
+   */
+  const untenRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = untenRef.current;
+    if (!el) return;
+    const passen = () => {
+      const natur = el.scrollWidth;
+      if (natur === 0) return;
+      const links = el.getBoundingClientRect().left;
+      const menu = document.querySelector('.menu');
+      const rechts = menu ? menu.getBoundingClientRect().left - 12 : window.innerWidth - 36;
+      const skala = Math.min(1, Math.max(0.5, (rechts - links) / natur));
+      el.style.setProperty('--unten-skala', skala.toFixed(3));
+    };
+    passen();
+    const ro = new ResizeObserver(passen);
+    ro.observe(el);
+    ro.observe(document.body);
+    const mo = new MutationObserver(passen);
+    mo.observe(document.querySelector('.main') ?? document.body, { childList: true });
+    return () => {
+      ro.disconnect();
+      mo.disconnect();
+    };
+  }, []);
+
 
   /*
    * Welche Felder hat der Wurf getroffen, und was fliegt davon zu mir?
@@ -288,6 +445,13 @@ export function Game() {
         */}
         <div className="hud">
           <span className="hud-room">{useStore.getState().code}</span>
+          <span
+            className={`hud-wetter zeit-${tageszeit}`}
+            title={`${TAGESZEIT_NAME[tageszeit]} · ${WETTER_NAME[wetter]}`}
+          >
+            <WetterSymbol tageszeit={tageszeit} wetter={wetter} />
+            {TAGESZEIT_NAME[tageszeit]} · {WETTER_NAME[wetter]}
+          </span>
           {state.order.length > 1 && (
             <span className="hud-turn">
               {isMine
@@ -331,6 +495,17 @@ export function Game() {
           onBeute={() => act({ t: 'claimLoot' })}
           showNumbers={pinNumbers}
           onToggleNumbers={() => setPinNumbers((v) => !v)}
+          autoWurf={autoWurf}
+          onToggleAutoWurf={() =>
+            setAutoWurf((v) => {
+              try {
+                localStorage.setItem(AUTO_WURF_KEY, v ? 'aus' : 'an');
+              } catch {
+                // Privater Modus - dann gilt es nur diese Sitzung.
+              }
+              return !v;
+            })
+          }
         />
 
         {state.draft !== null && phase.t === 'draft' && (
@@ -364,12 +539,15 @@ export function Game() {
           zielWahl={befehl !== null}
           auswahl={befehl}
           fokus={fokus}
+          tageszeit={tageszeit}
+          wetter={wetter}
+          geisterBau={isMine ? geisterBau : null}
         >
           {/*
             Unten links Hand und Aktionsleiste als ein Block. Die Leiste steht
             immer da, ausgegraut, solange nichts geht (ui/Aktionsleiste.tsx).
           */}
-          <div className="unten">
+          <div className="unten" ref={untenRef}>
             {hand && <HandPanel hand={hand} />}
             {hand && (
               <Aktionsleiste
@@ -381,7 +559,51 @@ export function Game() {
                 setMode={setMode}
                 act={act}
                 verhaeltnis={(r) => (you ? tradeRatio(state, world, you, r) : 4)}
+                onTafel={setTafelOffen}
               />
+            )}
+            {/*
+              Der Wuerfelknopf rechts neben der Aktionsleiste. Allein erledigt er
+              Zug beenden und Wuerfeln in einem. Die Leiste am Fuss schrumpft
+              mit der Zeit, die bis zum Selbstwurf bleibt.
+            */}
+            {hand && (
+              <button
+                className={['wuerfel-knopf', uhrLaeuft ? 'zaehlt' : '', wurfUnterwegs ? 'rollt' : '']
+                  .filter(Boolean)
+                  .join(' ')}
+                disabled={!wurfMoeglich}
+                title={
+                  autoWurf
+                    ? 'Wuerfeln - geschieht nach 5 Sekunden von selbst (abschaltbar im Menue unter TO)'
+                    : 'Wuerfeln'
+                }
+                onClick={wuerfeln}
+              >
+                <span key={`s${wurfStoss}`} className="wuerfel-inhalt">
+                  <span className="wuerfel-symbol">
+                    <DieIcon />
+                  </span>
+                  <span className="wuerfel-text">Wuerfeln</span>
+                </span>
+                {uhrLaeuft && (
+                  <>
+                    <span
+                      key={`u${uhrStart.n}`}
+                      className="wuerfel-uhr"
+                      style={{ animationDuration: `${AUTO_WURF_MS}ms` }}
+                    />
+                    <span className="wuerfel-rest">{rest}</span>
+                  </>
+                )}
+                {wurfStoss > 0 && (
+                  <span key={`f${wurfStoss}`} className="wuerfel-funken" aria-hidden="true">
+                    {Array.from({ length: 12 }, (_, i) => (
+                      <i key={i} style={{ '--w': `${i * 30}deg` } as CSSProperties} />
+                    ))}
+                  </span>
+                )}
+              </button>
             )}
           </div>
 
@@ -401,40 +623,6 @@ export function Game() {
           {befehl !== null && (
             <div className="befehl-hinweis">Ziel fuer den Ritter waehlen · Esc bricht ab</div>
           )}
-
-          {/*
-            Wuerfeln ist der Taktgeber der Partie und gehoert nicht als
-            kleiner Knopf in eine Leiste. Solange gewuerfelt werden muss,
-            steht er mitten im Bild - er ist ohnehin der einzige moegliche Zug.
-          */}
-          {/*
-            Der Wuerfelknopf steht auch schon in der Bauphase bereit, wenn
-            man allein spielt.
-
-            Sonst kostet jede Runde zwei Klicks an derselben Stelle: erst Zug
-            beenden, dann wuerfeln - obwohl gar niemand anders am Zug ist.
-            Der Knopf erledigt beides. Allein gibt es "Zug beenden" deshalb
-            gar nicht mehr: gehandelt wird vor dem Wurf, und der Wurf beendet
-            den Zug. Zu mehreren bleibt er - dort wuerfelt der Naechste selbst.
-          */}
-          {isMine &&
-            pendingRoll === null &&
-            !wurfUnterwegs &&
-            (phase.t === 'roll' || (phase.t === 'main' && state.order.length === 1)) && (
-              <button
-                className="roll-button"
-                onClick={() => {
-                  if (wurfUnterwegs) return;
-                  setWurfUnterwegs(true);
-                  initAudio();
-                  if (phase.t === 'main') act({ t: 'endTurn' });
-                  act({ t: 'roll' });
-                }}
-              >
-                <DieIcon />
-                <span>Wuerfeln</span>
-              </button>
-            )}
 
           {pendingRoll !== null && (
             <DiceOverlay dice={pendingRoll} onDone={clearPendingRoll} />

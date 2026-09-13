@@ -65,12 +65,16 @@ spaetestens dann lohnt eine Zeichnung.
 Seit der Ueberarbeitung Pixelgrafik auf dem Canvas (`client/units.ts`), im
 Kunstpixel der Kacheln statt als glatte SVG-Formen:
 
-- **Dorf** (13 x 13): Giebeldach in Spielerfarbe, links im Licht, rechts im
-  Schatten; helle Mauer, zwei erleuchtete Fenster, Tuer.
-- **Stadt** (17 x 16): Steinturm mit Zinnen und Wimpel in Spielerfarbe neben
-  einem Haus.
-- **Strasse:** Pixelband entlang der Feldkante, dunkler Umriss, Belag in
-  Spielerfarbe, jeder vierte Stein heller wie Pflaster.
+Im Stil der Kacheln: weicher dunkelbrauner Umriss statt Schwarz, Licht von
+links oben. Mittelalterlich:
+
+- **Dorf** (15 x 15): Fachwerkhaus auf Steinsockel, Satteldach in Spielerfarbe
+  mit Ziegelreihen, Schornstein, erleuchtete Fenster, Tuer.
+- **Stadt** (21 x 19): Mauerring mit Zinnen und Tor, dahinter ein Steinturm mit
+  Wimpel in Spielerfarbe und ein Fachwerkhaus.
+- **Strasse:** Feldweg entlang der Feldkante - dunkler Rand, festgetretene Erde,
+  einzelne Steine. Wem sie gehoert, zeigt ein Wimpel in Spielerfarbe in der
+  Mitte (`wimpel`).
 
 *Was fehlt:* gezeichnete Gebaeude mit Charakter und eine Strasse, die nach Weg
 aussieht statt nach Band. `dorf.png` und `stadt.png` werden ohne
@@ -130,9 +134,33 @@ tragen - ein geliefertes Sprite waere derzeit einfarbig.
   Strasse, Dorf, Stadt, Karte, Ritter, Handel, Karten, Beute und Zugende aus
   wenigen SVG-Flaechen; Kosten als verkleinerte Rohstoffbilder. Handel und
   Entwicklungskarten klappen als Tafeln auf.
-- **Bauplaetze:** kleine helle Rauten mit dunklem Rand statt Ringen, unter dem
-  Zeiger goldgelb; die drei Nachbarfelder zeigen dann ihre Zahlen. Strassen-
-  plaetze als blasse Striche.
+- **Bauplaetze:** keine Marke mehr, sondern das Gebaeude selbst als Vorschau -
+  blass auf jedem freien Platz, unter dem Zeiger fast deckend; die drei
+  Nachbarfelder zeigen dann ihre Zahlen. Ueber einer Strassenkante steht die
+  Strasse als Vorschau, sonst ein blasser Strich.
+- **Wuerfelknopf** rechts neben der Leiste: Wuerfelsymbol, schrumpfender Balken
+  fuer die fuenf Sekunden bis zum Selbstwurf, pulsierender Schein, beim Wurf ein
+  Stoss und zwoelf Funken (CSS), dazu `playWurfStart`.
+
+### Wetter, Tageszeit und Licht — **Platzhalter (Shader)**
+
+`board/WetterSchicht.tsx`: ein WebGL-Fragment-Shader ueber dem Gelaende, in
+Kunstpixeln gerechnet und pixelig hochskaliert.
+
+- **Tageszeit:** Morgen und Abend warm getoent, Nacht dunkelblau mit Vignette.
+- **Licht bei Nacht:** Lichtkreise in vier Stufen um Einheiten (Fackeln),
+  Doerfer und Staedte (Fenster) und Lager (Feuer), flackernd, warm getoent.
+- **Wetter:** ziehende Wolkenschatten, Sonnenbahnen, treibender Nebel,
+  schraeger Pixelregen, pendelnde Schneeflocken, Blitz mit Aufhellen und
+  gezacktem Strahl, dazu `playDonner`.
+- **Fackel** (`fackel`, 3 x 6) neben jeder Figur bei Abend und Nacht.
+- **Wettersymbol** oben im Schild (`ui/WetterSymbol.tsx`): Sonne, Mond, Wolke,
+  Regen, Blitz, Schnee, Nebel aus Pixelkarten.
+- **Klaenge:** `playHorde` (Horn und Trommeln), `playBrand` (Knistern).
+
+*Was fehlt:* gezeichnete Regen- und Schneetexturen, Blitz-Einzelbilder,
+Lichtkegel mit Form statt Kreisen, weiche Nebelschwaden, animierte Fackel- und
+Feuerflammen, eine Brand-Animation an Strasse und Haus.
 
 ### Zahlenmarker und Haefen — **tragbar**
 
@@ -204,7 +232,12 @@ wuerden.
 | **Fraktionswappen** | 9 kleine Wappen oder Banner | Ersetzen die blossen Farbpunkte in Menue und Feldinfo; koennten auch am Lager haengen. |
 | **Kampf-Symbol** | `kampf.png`, etwa 12 x 12, gern 2 Einzelbilder | Ersetzt die Pixelschwerter ueber einem umkaempften Feld. |
 | **Aktionssymbole** | 9 Symbole, etwa 16 x 16 | Strasse, Dorf, Stadt, Karte, Ritter, Handel, Karten, Beute, Zugende in der Aktionsleiste. |
-| **Bauplatz-Marke** | 1 kleines Symbol, gern mit Hover-Variante | Ersetzt die Raute auf freien Ecken; eine Strassenmarke dazu. |
+| **Bauplatz-Marke** | entfaellt | Freie Plaetze zeigen jetzt das Gebaeude als Vorschau. |
+| **Wetter-Sprites** | Regen- und Schneetextur, 3-4 Blitzbilder, Wolkenschatten | Ersetzen die gerechneten Muster im Shader. |
+| **Fackel und Feuer** | `fackel.png` 2-3 Einzelbilder, Lagerfeuer | Die Fackel an Figuren bei Nacht; das Licht bleibt im Shader. |
+| **Brand** | kurze Einzelbildfolge Flammen und Rauch | Wenn Pluenderer eine Strasse oder ein Haus anzuenden. |
+| **Wettersymbole** | 7 Symbole, etwa 16 x 16 | Sonne, Mond, Wolke, Regen, Gewitter, Schnee, Nebel im Schild. |
+| **Wuerfelknopf** | Knopfgrafik, Funken-Einzelbilder | Ersetzt CSS-Stoss und -Funken. |
 | **Lebensanzeige** | kleine Herzen oder Balken | Ersetzt die roten Kunstpixel ueber Verwundeten. |
 | **Kartenrahmen je Seltenheit** | 5 Rahmen, dazu Glanz als Einzelbildfolge | Ersetzt die CSS-Glut, Funken und Strahlen. Legendaer darf animiert sein, der Rest eher nicht. |
 | **Kartenrueckseite** | 1 Motiv | Fuer das Austeilen - derzeit fliegen die Vorderseiten herein. |

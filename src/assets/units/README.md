@@ -13,8 +13,10 @@ bzw. den Dev-Server neu laden.
 | `lager.png` | Das Lager selbst - Zelt, Palisade, Wimpel |
 | `ruine.png` | Eine noch nicht erkundete Ruine |
 | `kampf.png` | Ueber einem umkaempften Feld, etwa 12 x 12, Mitte = Feldmitte |
-| `dorf.png` | Ein Dorf auf seiner Ecke, etwa 13 x 13; der Fuss steht knapp unter der Ecke |
-| `stadt.png` | Eine Stadt, etwa 17 x 16 - deutlich groesser als das Dorf |
+| `dorf.png` | Ein Dorf auf seiner Ecke, etwa 15 x 15; der Fuss steht knapp unter der Ecke |
+| `stadt.png` | Eine Stadt, etwa 21 x 19 - deutlich groesser als das Dorf |
+| `fackel.png` | Fackel, die Figuren bei Abend und Nacht tragen, etwa 3 x 6 |
+| `wimpel.png` | Wimpel in der Mitte jeder Strasse, etwa 4 x 6 (Spielerfarbe braucht Maske) |
 
 ## Format
 

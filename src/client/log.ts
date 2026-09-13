@@ -131,6 +131,14 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
       return `Ein Lager von ${fraktionName(state, e.fraktion)} faellt. Beute fuer ${e.players.map((p) => who(state, p)).join(', ') || 'niemanden'}.`;
     case 'nestCaptured':
       return `${fraktionName(state, e.an)} erobern ein Lager von ${fraktionName(state, e.von)}.`;
+    case 'horde':
+      return `Goblin-Horde greift an! ${fraktionName(state, e.fraktion)} schicken ${e.anzahl} Goblins.`;
+    case 'burn':
+      return e.art === 'strasse'
+        ? `${fraktionName(state, e.fraktion)} brennen eine Strasse von ${who(state, e.player)} ab.`
+        : e.art === 'dorf'
+          ? `${fraktionName(state, e.fraktion)} brennen ein Dorf von ${who(state, e.player)} nieder.`
+          : `${fraktionName(state, e.fraktion)} brennen eine Stadt von ${who(state, e.player)} zum Dorf herunter.`;
     case 'ruin':
       switch (e.result) {
         case 'schatz':

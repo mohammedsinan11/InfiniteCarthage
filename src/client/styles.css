@@ -2123,15 +2123,19 @@ em.off {
   overflow-y: auto;
 }
 
-/* Schmale Fenster: der Block als Ganzes kleiner. */
+/*
+ * Der Block passt sich dem Platz an: Game.tsx misst, wie viel Raum bis zum
+ * Menue bleibt, und setzt --unten-skala. Mit fester Groesse lag der
+ * Wuerfelknopf auf 1024 px Breite unter dem Menue.
+ */
+.unten {
+  transform: scale(var(--unten-skala, 1));
+  transform-origin: bottom left;
+}
+.unten .hand {
+  transform: none;
+}
 @media (max-width: 860px) {
-  .unten {
-    transform: scale(0.72);
-    transform-origin: bottom left;
-  }
-  .unten .hand {
-    transform: none;
-  }
   .handel-schwebe {
     max-width: calc(100% - 20px);
   }
@@ -2142,8 +2146,7 @@ em.off {
     flex-direction: column;
     align-items: flex-start;
     gap: 4px;
-    transform: scale(0.62);
-    width: calc((100vw - 20px) / 0.62);
+    max-width: calc(100vw - 20px);
   }
   .dock-reihe {
     flex-wrap: wrap;
@@ -2260,7 +2263,210 @@ em.off {
   color: var(--muted);
 }
 
+/* --- Wuerfelknopf neben der Aktionsleiste --- */
+
+.wuerfel-knopf {
+  position: relative;
+  align-self: stretch;
+  min-width: 98px;
+  padding: 8px 12px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #21170a;
+  background: var(--accent-dark);
+  border: 2px solid var(--accent);
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.25),
+    inset -2px -3px 0 rgba(0, 0, 0, 0.3),
+    0 0 0 2px rgba(18, 14, 9, 0.82);
+}
+.wuerfel-knopf:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: #ffe08a;
+}
+.wuerfel-knopf:active:not(:disabled) {
+  transform: translate(1px, 2px) scale(0.97);
+}
+.wuerfel-knopf:disabled {
+  opacity: 0.45;
+}
+.wuerfel-inhalt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  animation: wuerfel-stoss 0.45s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+@keyframes wuerfel-stoss {
+  0% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(0.8) rotate(-7deg);
+  }
+  60% {
+    transform: scale(1.2) rotate(5deg);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.wuerfel-symbol {
+  display: block;
+  transition: transform 0.15s;
+}
+.wuerfel-symbol svg {
+  display: block;
+  width: 30px;
+  height: 30px;
+}
+.wuerfel-knopf:hover:not(:disabled) .wuerfel-symbol {
+  transform: rotate(-14deg) scale(1.12);
+}
+.wuerfel-knopf.rollt .wuerfel-symbol {
+  animation: wuerfel-drehen 0.5s steps(4) infinite;
+}
+@keyframes wuerfel-drehen {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* Solange die Uhr laeuft, atmet der Knopf - man sieht, dass gleich etwas passiert. */
+.wuerfel-knopf.zaehlt:not(:disabled) {
+  animation: wuerfel-atmen 1s ease-in-out infinite;
+}
+@keyframes wuerfel-atmen {
+  50% {
+    box-shadow:
+      inset 2px 2px 0 rgba(255, 255, 255, 0.25),
+      inset -2px -3px 0 rgba(0, 0, 0, 0.3),
+      0 0 0 2px rgba(18, 14, 9, 0.82),
+      0 0 16px 3px rgba(255, 208, 102, 0.6);
+  }
+}
+/* Die Uhr: ein Balken am Fuss, der in fuenf Sekunden auf null schrumpft. */
+.wuerfel-uhr {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  height: 4px;
+  background: #21170a;
+  transform-origin: left center;
+  animation-name: wuerfel-uhr;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+@keyframes wuerfel-uhr {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+.wuerfel-rest {
+  position: absolute;
+  top: 3px;
+  right: 5px;
+  font-size: 9px;
+}
+/* Funken beim Wurf: zwoelf Kunstpixel fliegen im Kreis auseinander. */
+.wuerfel-funken {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.wuerfel-funken i {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  margin: -3px;
+  background: #ffe08a;
+  box-shadow: 0 0 0 2px #8a5a1a;
+  animation: wuerfel-funke 0.65s ease-out forwards;
+}
+.wuerfel-funken i:nth-child(even) {
+  width: 4px;
+  height: 4px;
+  margin: -2px;
+  background: #fff6c8;
+}
+@keyframes wuerfel-funke {
+  0% {
+    transform: rotate(var(--w)) translateY(0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(var(--w)) translateY(-64px) scale(0.3);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wuerfel-knopf.zaehlt:not(:disabled),
+  .wuerfel-inhalt,
+  .wuerfel-funken i,
+  .wuerfel-knopf.rollt .wuerfel-symbol {
+    animation: none;
+  }
+  .wuerfel-funken {
+    display: none;
+  }
+}
+
+/* --- Wetter und Tageszeit --- */
+
+/* Die Shader-Schicht (board/WetterSchicht.tsx): winzig gerechnet, pixelig gross. */
+.wetter-schicht {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+.hud-wetter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.hud-wetter svg {
+  display: block;
+}
+.hud-wetter.zeit-nacht {
+  color: #bcd6f0;
+}
+.hud-wetter.zeit-abend {
+  color: #f0b37a;
+}
+/* Die Goblin-Horde bekommt im Weltprotokoll ein Ausrufezeichen. */
+.menu-welt li.welt-horde {
+  border-left-color: var(--danger);
+  color: #ffb3a0;
+}
+.menu-welt li.welt-horde::before {
+  content: '!';
+  display: inline-block;
+  margin-right: 5px;
+  padding: 0 5px;
+  font-family: var(--pixel);
+  font-size: 10px;
+  color: #21170a;
+  background: var(--danger);
+}
+
 /* --- Raumliste auf der Startseite --- */
+
+.raum.klickbar {
+  cursor: pointer;
+}
+.raum.klickbar:hover {
+  border-color: var(--accent);
+  background: rgba(217, 164, 65, 0.08);
+}
 
 .home-schalter {
   flex-direction: row;

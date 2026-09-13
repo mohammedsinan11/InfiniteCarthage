@@ -116,6 +116,8 @@ export function SideMenu({
   onBeute,
   showNumbers,
   onToggleNumbers,
+  autoWurf,
+  onToggleAutoWurf,
 }: {
   turn: number;
   /** Die eigenen genommenen Karten, in der Reihenfolge der Wahl. */
@@ -144,6 +146,9 @@ export function SideMenu({
   onBeute: () => void;
   showNumbers: boolean;
   onToggleNumbers: () => void;
+  /** Wuerfelt der Knopf nach fuenf Sekunden von selbst? */
+  autoWurf: boolean;
+  onToggleAutoWurf: () => void;
 }) {
   // Auf schmalen Bildschirmen zu Beginn eingeklappt - auf dem Handy deckte das
   // Menue sonst ein gutes Drittel der Karte ab, bevor man sie gesehen hat.
@@ -462,6 +467,13 @@ export function SideMenu({
             <div className="menu-liste">
               <button className={showNumbers ? 'aktiv' : ''} onClick={onToggleNumbers}>
                 Zahlen dauerhaft
+              </button>
+            </div>
+
+            <h3>Spiel</h3>
+            <div className="menu-liste">
+              <button className={autoWurf ? 'aktiv' : ''} onClick={onToggleAutoWurf}>
+                Nach 5 s selbst wuerfeln
               </button>
             </div>
           </>
