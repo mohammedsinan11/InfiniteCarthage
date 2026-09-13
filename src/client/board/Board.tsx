@@ -65,6 +65,9 @@ import {
   HEX_W,
   IMG_H,
   IMG_W,
+  SCHRITT_X,
+  SCHRITT_Y,
+  kachelEcke,
   preloadTiles,
   tileImage,
   tileImageFog,
@@ -74,8 +77,14 @@ import {
 /** Wie stark die Kacheln vergroessert werden. */
 const SCALE = 2.0;
 
-/** Das Raster richtet sich nach dem SECHSECK, nicht nach dem Bild. */
-const LAYOUT: Layout = { w: HEX_W * SCALE, h: HEX_H * SCALE };
+/**
+ * Das Raster folgt dem Abstand, fuer den die Kacheln gezeichnet sind (tiles.ts,
+ * SCHRITT_X und SCHRITT_Y) - nicht der Groesse des Sechsecks. Der
+ * Zeilenschritt eines Sechsecklayouts ist drei Viertel seiner Hoehe.
+ */
+const LAYOUT: Layout = { w: SCHRITT_X * SCALE, h: (SCHRITT_Y / 0.75) * SCALE };
+void HEX_W;
+void HEX_H;
 
 /**
  * Das Bild ist groesser als das Sechseck und sitzt versetzt darueber. Diese
@@ -108,7 +117,7 @@ const leseDpr = (): number => (typeof window === 'undefined' ? 1 : window.device
 const DPR_START = leseDpr();
 
 /** Geraetepixel je Kunstpixel. Ganze Zahlen, sonst wird interpoliert. */
-const DEVICE_FACTORS = [1, 2, 3, 4, 6, 8] as const;
+const DEVICE_FACTORS = [1, 2, 3, 4, 6, 8, 12] as const;
 
 const zoomStufen = (dpr: number): number[] => DEVICE_FACTORS.map((f) => f / (SCALE * dpr));
 
@@ -355,6 +364,8 @@ export function Board({
    * aufsummiert und erst ab einer Schwelle eine Stufe geschaltet.
    */
   const radAcc = useRef(0);
+  /** Womit zuletzt gedrueckt wurde - Maus, Finger oder Stift. */
+  const letzterZeiger = useRef<string>('mouse');
   const letzterZoom = useRef(0);
   const [tilesReady, setTilesReady] = useState(false);
 
@@ -534,6 +545,21 @@ export function Board({
     return () => cancelAnimationFrame(id);
   }, [state.units]);
 
+  /**
+   * Felder an eigenen Doerfern und Staedten - ihre Zahlen stehen immer da.
+   * Auf dem Handy gibt es kein Darueberfahren; ohne das saehe man dort nie, was
+   * die eigenen Felder bringen.
+   */
+  const eigeneFelder = useMemo(() => {
+    const out = new Set<string>();
+    if (du === null) return out;
+    for (const [vk, b] of Object.entries(state.buildings)) {
+      if (b.owner !== du) continue;
+      for (const h of vertexAdjacentHexes(parseVertexKey(vk))) out.add(hexKey(h.q, h.r));
+    }
+    return out;
+  }, [state.buildings, du]);
+
   /** Die Farbe einer Seite: Spielerfarbe, Fraktionsfarbe oder Grau fuer Neutrale. */
   const farbeSeite = useCallback(
     (seite: Seite | undefined): string => {
@@ -670,6 +696,19 @@ export function Board({
     // Das eine, worum es hier geht.
     ctx.imageSmoothingEnabled = false;
 
+    /**
+     * Wo das Kachelbild eines Feldes beginnt, in Geraetepixeln - auf ganzen
+     * Kunstpixeln (tiles.ts, kachelEcke). Kacheln, Figuren und gleitende
+     * Einheiten rechnen alle von hier, damit sie im selben Raster sitzen.
+     */
+    const ursprung = (q: number, r: number, lift: number) => {
+      const k = kachelEcke(q, r);
+      return {
+        x: Math.round((k.x * SCALE - view.x) * scale * dpr),
+        y: Math.round((k.y * SCALE - lift - view.y) * scale * dpr),
+      };
+    };
+
     /** Liegt ein Feld im Nebel? Ohne Sichtangabe nie. */
     const imNebel = (q: number, r: number) => sicht !== null && !sicht.has(hexKey(q, r));
 
@@ -678,9 +717,7 @@ export function Board({
       if (url === null) return;
       const img = imNebel(t.q, t.r) ? tileImageFog(url) : tileImage(url);
       if (!img) return;
-      const c = hexToPixel(t.q, t.r, LAYOUT);
-      const x = Math.round((c.x - IMG.dx - view.x) * scale * dpr);
-      const y = Math.round((c.y - IMG.dy - lift - view.y) * scale * dpr);
+      const { x, y } = ursprung(t.q, t.r, lift);
       const w = Math.round(IMG.w * scale * dpr);
       const h = Math.round(IMG.h * scale * dpr);
       ctx.drawImage(img, x, y, w, h);
@@ -710,10 +747,8 @@ export function Board({
         .get(hexKey(t.q, t.r))
         ?.filter((u) => !nebel || u.id < 0 || (du !== null && u.owner === du));
       if (!lager && !ruine && (!leute || leute.length === 0)) return;
-      const c = hexToPixel(t.q, t.r, LAYOUT);
       // Ursprung wie in zeichne, damit Figuren im selben Pixelraster sitzen.
-      const x0 = Math.round((c.x - IMG.dx - view.x) * scale * dpr);
-      const y0 = Math.round((c.y - IMG.dy - lift - view.y) * scale * dpr);
+      const { x: x0, y: y0 } = ursprung(t.q, t.r, lift);
       const mx = x0 + Math.round(HEX_CX) * f;
       const my = y0 + Math.round(HEX_CY) * f;
       if (nebel) ctx.globalAlpha = 0.6;
@@ -795,10 +830,9 @@ export function Board({
       if (!b) continue;
       const p = Math.min(1, Math.max(0, (jetzt - b.start) / b.dauer));
       const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
-      const c0 = hexToPixel(b.von.q, b.von.r, LAYOUT);
-      const sx = Math.round((c0.x - IMG.dx - view.x) * scale * dpr) + Math.round(HEX_CX) * f;
-      const sy =
-        Math.round((c0.y - IMG.dy - liftHex(b.von.q, b.von.r) - view.y) * scale * dpr) + Math.round(HEX_CY) * f + 4 * f;
+      const von = ursprung(b.von.q, b.von.r, liftHex(b.von.q, b.von.r));
+      const sx = von.x + Math.round(HEX_CX) * f;
+      const sy = von.y + Math.round(HEX_CY) * f + 4 * f;
       const hops = Math.round(Math.abs(Math.sin(p * Math.PI * 2 * b.schritte)) * 2) * f;
       const x = Math.round(sx + (fx - sx) * e);
       const y = Math.round(sy + (fy - sy) * e) - hops;
@@ -1078,6 +1112,7 @@ export function Board({
      * ruhiger halten.
      */
     if (aufBedienelement(e.target)) return;
+    letzterZeiger.current = e.pointerType;
 
     /*
      * Zwei Finger: zoomen statt schieben. Das Brett setzt touch-action: none,
@@ -1097,9 +1132,14 @@ export function Board({
 
     moved.current = false;
     drag.current = { x: e.clientX, y: e.clientY, cx: cam.cx, cy: cam.cy };
-    // Auf dem Brett fangen, nicht auf der getroffenen Kachel: der Zug soll
-    // weiterlaufen, auch wenn der Zeiger die Kachel verlaesst.
-    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+    /*
+     * Den Zeiger erst einfangen, wenn wirklich gezogen wird (onPointerMove).
+     *
+     * Frueher geschah das hier, bei jedem Druck. Chrome schickt den Klick danach
+     * aber an das einfangende Element - an das Brett statt an den Bauplatz, die
+     * Kante oder die Flamme darunter. Deren onClick kam nie an: im Aufbau liess
+     * sich mit der Maus kein Dorf setzen, obwohl der Ring unter dem Zeiger lag.
+     */
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
@@ -1128,7 +1168,16 @@ export function Board({
     if (d) {
       const dx = e.clientX - d.x;
       const dy = e.clientY - d.y;
-      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved.current = true;
+      if (!moved.current && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+        moved.current = true;
+        // Jetzt wird gezogen: der Zug soll weiterlaufen, auch wenn der Zeiger
+        // das Brett verlaesst.
+        try {
+          ref.current?.setPointerCapture(e.pointerId);
+        } catch {
+          // Zeiger schon fort - dann eben ohne.
+        }
+      }
       setCam((c) => ({ ...c, cx: d.cx - dx / scale, cy: d.cy - dy / scale }));
       return;
     }
@@ -1197,14 +1246,74 @@ export function Board({
     }
     const warGedrueckt = drag.current !== null;
     drag.current = null;
-    if (!onHex || !warGedrueckt || moved.current || aufBedienelement(e.target)) return;
+    if (!warGedrueckt || moved.current || aufBedienelement(e.target)) return;
     const rect = ref.current?.getBoundingClientRect();
     if (!rect) return;
-    const h = hexUnter(
-      view.x + (e.clientX - rect.left) / scale,
-      view.y + (e.clientY - rect.top) / scale,
-    );
-    onHex(hexKey(h.q, h.r));
+    const wx = view.x + (e.clientX - rect.left) / scale;
+    const wy = view.y + (e.clientY - rect.top) / scale;
+    const fingerTipp = e.pointerType !== 'mouse';
+    // Finger: Bauplaetze, Kanten und Feuer wertet das Brett selbst aus.
+    if (fingerTipp && tippeZiel(wx, wy)) return;
+    const h = hexUnter(wx, wy);
+    const k = hexKey(h.q, h.r);
+    // Auf Touch gibt es kein Darueberfahren: ein Tipp zeigt das Feld wie der
+    // Zeiger - seine Zahl und die Feldinfo. Nochmal tippen blendet es aus.
+    if (fingerTipp) setHover((alt) => (alt === k ? null : k));
+    onHex?.(k);
+  };
+
+  /**
+   * Ein Fingertipp auf Bauplatz, Kante oder eigenes Feuer - nach Naehe, nicht
+   * nach Trefferflaeche, damit auch ein grober Finger trifft.
+   *
+   * Bauen geht in zwei Tipps: der erste zeigt das Gebaeude oder die Strasse als
+   * Vorschau und die Zahlen der Nachbarfelder, der zweite baut. Mit der Maus
+   * sieht man das vorher unter dem Zeiger - mit dem Finger sonst nie.
+   * true, wenn der Tipp etwas getroffen hat.
+   */
+  const tippeZiel = (wx: number, wy: number): boolean => {
+    const reichweite = 22 / scale;
+    let best: { art: 'vertex' | 'edge' | 'feuer'; key: string; d: number } | null = null;
+    const nimm = (art: 'vertex' | 'edge' | 'feuer', key: string, d: number, grenze: number) => {
+      if (d <= grenze && (!best || d < best.d)) best = { art, key, d };
+    };
+    for (const vk of targets.vertices ?? []) {
+      const ecke = parseVertexKey(vk);
+      const p = vertexToPixel(ecke, LAYOUT);
+      nimm('vertex', vk, Math.hypot(p.x - wx, p.y - liftVertex(ecke) - wy), reichweite);
+    }
+    for (const ek of targets.edges ?? []) {
+      const kante = parseEdgeKey(ek);
+      const hoch = liftEdge(kante);
+      const [a, b] = edgeEndpoints(kante).map((v) => vertexToPixel(v, LAYOUT));
+      const lx = b!.x - a!.x;
+      const ly = b!.y - a!.y;
+      const t = Math.max(0, Math.min(1, ((wx - a!.x) * lx + (wy + hoch - a!.y) * ly) / (lx * lx + ly * ly)));
+      nimm('edge', ek, Math.hypot(a!.x + lx * t - wx, a!.y - hoch + ly * t - wy), reichweite * 0.7);
+    }
+    if (onFeuer && du !== null) {
+      for (const b of state.braende) {
+        if (b.owner !== du) continue;
+        const p = brandPunkt(b);
+        nimm('feuer', b.key, Math.hypot(p.x - wx, p.y - 8 - wy), reichweite);
+      }
+    }
+    const treffer = best as { art: 'vertex' | 'edge' | 'feuer'; key: string; d: number } | null;
+    if (!treffer) return false;
+    if (treffer.art === 'feuer') {
+      onFeuer!(treffer.key);
+      return true;
+    }
+    const vorschau = treffer.art === 'vertex' ? eckeHover : kanteHover;
+    if (vorschau !== treffer.key) {
+      setEckeHover(treffer.art === 'vertex' ? treffer.key : null);
+      setKanteHover(treffer.art === 'edge' ? treffer.key : null);
+      return true;
+    }
+    setEckeHover(null);
+    setKanteHover(null);
+    onPick(treffer.art, treffer.key);
+    return true;
   };
 
   const onPointerLeave = (e: React.PointerEvent) => {
@@ -1214,11 +1323,19 @@ export function Board({
     setHover(null);
   };
 
-  /** Klicks nur werten, wenn nicht gerade geschoben wurde. */
+  /**
+   * Klicks nur werten, wenn nicht gerade geschoben wurde - und nur mit der Maus.
+   * Fingertipps wertet onPointerUp aus (tippeZiel), sonst zaehlte ein Tipp doppelt.
+   */
   const pick = (kind: 'vertex' | 'edge' | 'hex', key: string) => () => {
-    if (moved.current) return;
+    if (moved.current || letzterZeiger.current !== 'mouse') return;
     onPick(kind, key);
   };
+  /** Wartet auf einem Bauplatz eine Vorschau auf den zweiten Tipp? */
+  const tippVorschau =
+    letzterZeiger.current !== 'mouse' &&
+    ((eckeHover !== null && (targets.vertices ?? []).includes(eckeHover)) ||
+      (kanteHover !== null && (targets.edges ?? []).includes(kanteHover)));
 
   /**
    * Flugbahnen in Brettkoordinaten.
@@ -1315,7 +1432,8 @@ export function Board({
            * werden alle gezeigt. Und der Nutzer kann sie festpinnen.
            */
           const showNumber =
-            t.number !== null && (showAllNumbers || hover === hk || (eckeNachbarn?.has(hk) ?? false));
+            t.number !== null &&
+            (showAllNumbers || hover === hk || eigeneFelder.has(hk) || (eckeNachbarn?.has(hk) ?? false));
           // Was auf dem Feld steht, steht auf seiner Hoehe - sonst schwebt es.
           const lift = liftHex(t.q, t.r) + (hover === hk ? LIFT : 0);
           return (
@@ -1489,7 +1607,7 @@ export function Board({
               onLoeschen={
                 eigen && onFeuer
                   ? () => {
-                      if (!moved.current) onFeuer(b.key);
+                      if (!moved.current && letzterZeiger.current === 'mouse') onFeuer(b.key);
                     }
                   : undefined
               }
@@ -1577,6 +1695,7 @@ export function Board({
           })()}
       </svg>
 
+      {tippVorschau && <div className="befehl-hinweis">Nochmal tippen zum Bauen</div>}
       <div className="board-hint">Ziehen zum Verschieben · Mausrad oder Balken zum Zoomen · Klick auf deinen Ritter: Befehl</div>
       {/* Was auf dem Feld unter dem Zeiger steht. PLATZHALTER-Tafel (ASSETS.md). */}
       {feldInfo && (

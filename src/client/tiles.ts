@@ -73,6 +73,33 @@ export const HEX_CX = 13;
 export const HEX_CY = 19.5;
 
 /**
+ * Abstand der Kacheln auf der Karte, in Kunstpixeln: 23 Spalten, 17 Zeilen.
+ *
+ * Das ist der Abstand, fuer den die Kacheln gezeichnet sind (hexmap/map.py).
+ * Frueher legte das Brett sie mit 24 x 18,75 - nach der Groesse des Sechsecks
+ * gerechnet. Jede zweite Zeile landete damit zwischen den Kunstpixeln, und
+ * zwischen den Kacheln blieben dunkle, doppelte Fugen: die Karte wirkte
+ * unscharf, obwohl jede einzelne Kachel scharf gezeichnet war. Vergleich:
+ * labor.html?art=schaerfe.
+ */
+export const SCHRITT_X = 23;
+export const SCHRITT_Y = 17;
+
+/**
+ * Linke obere Ecke des Kachelbilds eines Feldes, in ganzen Kunstpixeln.
+ *
+ * Auf ganze Kunstpixel gerundet, damit alle Kacheln - und die Figuren darauf -
+ * im selben Pixelraster liegen. Die ungeraden Zeilen ruecken dafuer um einen
+ * halben Kunstpixel; das faellt nicht auf, ein Versatz zwischen den Zeilen schon.
+ */
+export function kachelEcke(q: number, r: number): { x: number; y: number } {
+  return {
+    x: SCHRITT_X * q + Math.ceil((SCHRITT_X / 2) * r) - HEX_CX,
+    y: SCHRITT_Y * r - Math.floor(HEX_CY),
+  };
+}
+
+/**
  * Ab welcher Hoehe eine Weide als Huegelland gezeichnet wird.
  *
  * Weiden liegen zwischen Seegrenze (0,02) und Huegelgrenze (0,67). Das

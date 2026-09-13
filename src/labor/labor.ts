@@ -40,13 +40,13 @@ import type { Hex, Layout } from '../core/coords';
 import { hash3i } from '../core/hash';
 import { nestAt } from '../core/raiders';
 import { ruinAt } from '../core/ruins';
-import { HEX_CX, HEX_CY, HEX_H, HEX_W, IMG_H, IMG_W, preloadTiles, tileImage, tileUrl } from '../client/tiles';
-import { preloadUnitSprites, zeichneFigur, zeichneStrassen } from '../client/units';
+import { HEX_CX, HEX_CY, IMG_H, IMG_W, SCHRITT_X, SCHRITT_Y, preloadTiles, tileImage, tileUrl } from '../client/tiles';
+import { preloadUnitSprites, zeichneFigur, zeichneGebaeude, zeichneStrassen } from '../client/units';
 import type { FigurArt } from '../client/units';
 
 /** Wie auf dem Brett: Welteinheiten je Kunstpixel. */
 const SCALE = 2;
-const LAYOUT: Layout = { w: HEX_W * SCALE, h: HEX_H * SCALE };
+const LAYOUT: Layout = { w: SCHRITT_X * SCALE, h: (SCHRITT_Y / 0.75) * SCALE };
 const IMG = { w: IMG_W * SCALE, h: IMG_H * SCALE, dx: HEX_CX * SCALE, dy: HEX_CY * SCALE };
 /** Wie auf dem Brett: der Deckel der Hoehe in Welteinheiten. */
 const RELIEF_MAX = 180;
@@ -537,7 +537,7 @@ async function schaerfe(root: HTMLElement, seed: number) {
   const reihe = kopf(
     root,
     'Schaerfe der Karte: der Abstand der Kacheln',
-    'Derselbe Ausschnitt in drei Kachelabstaenden. Links das Bild in Spielgroesse, rechts ein Ausschnitt dreifach vergroessert - dort sieht man, wie die Kanten zweier Kacheln aufeinandertreffen. Oben zwei Geraetepixel je Kunstpixel (Rechner beim Start), unten drei (Handy).',
+    'Derselbe Ausschnitt in drei Kachelabstaenden, mit zwei Doerfern, einer Stadt mit Wachturm, Strassen und dem Helden. Links das Bild in Spielgroesse, rechts ein Ausschnitt dreifach vergroessert - dort sieht man, wie Kacheln und Bauten aufeinandertreffen. Oben zwei Geraetepixel je Kunstpixel (Rechner beim Start), unten drei (Handy).',
   );
   const w = welt(seed, 8);
   const vielfalt = (h: { q: number; r: number }) =>
@@ -597,10 +597,55 @@ function abstandBild(
     const y = a.raster ? Math.round(e.y - Math.floor(minY)) * f : Math.round((e.y - minY) * f);
     ctx.drawImage(img, x, y, IMG_W * f, IMG_H * f);
   }
+  /*
+   * Bauten wie im Spiel: Ecken liegen im Mittel ihrer drei Felder - fuer jeden
+   * Abstand aus denselben Kachelpositionen gerechnet, mit denen gezeichnet wurde.
+   * So sieht man, wie Doerfer, Stadt, Strassen und der Held in jedem Abstand
+   * auf den Kacheln sitzen.
+   */
+  const geraetVon = (ax: number, ay: number) => ({
+    x: a.raster ? Math.round(ax - Math.floor(minX)) * f : Math.round((ax - minX) * f),
+    y: a.raster ? Math.round(ay - Math.floor(minY)) * f : Math.round((ay - minY) * f),
+  });
+  const mitteVon = (q: number, r: number) => {
+    const e = ecke(q, r);
+    return { x: e.x + HEX_CX, y: e.y + HEX_CY };
+  };
+  const eckePunkt = (v: Vertex) => {
+    const hs = vertexAdjacentHexes(v).map((h) => mitteVon(h.q, h.r));
+    const x = hs.reduce((n, p) => n + p.x, 0) / hs.length;
+    const y = hs.reduce((n, p) => n + p.y, 0) / hs.length;
+    return geraetVon(x, y);
+  };
+  const eckeAus = (q: number, r: number, d: 'N' | 'S') => parseVertexKey(vertexKey({ q, r, d }));
+  const blau = '#3a7ac2';
+  const bauten = [
+    { v: eckeAus(mitte.q, mitte.r, 'N'), art: 'dorf' as const, turm: false },
+    { v: eckeAus(mitte.q + 1, mitte.r, 'S'), art: 'stadt' as const, turm: true },
+    { v: eckeAus(mitte.q - 1, mitte.r + 1, 'S'), art: 'dorf' as const, turm: false },
+  ];
+  const strassen = hexEdges(mitte.q, mitte.r)
+    .filter((e) => {
+      const [p, o] = edgeEndpoints(e).map(vertexKey);
+      return bauten.some((b) => vertexKey(b.v) === p || vertexKey(b.v) === o);
+    })
+    .map((e) => {
+      const [p, o] = edgeEndpoints(e).map(eckePunkt);
+      return { a: p!, b: o!, farbe: blau };
+    });
+  zeichneStrassen(ctx, strassen, f);
+  for (const b of [...bauten].sort((x, y) => eckePunkt(x.v).y - eckePunkt(y.v).y)) {
+    const p = eckePunkt(b.v);
+    zeichneGebaeude(ctx, b.art, p.x, p.y, f, blau, b.turm);
+  }
+  const heldFeld = mitteVon(mitte.q + 1, mitte.r + 1);
+  const heldPunkt = geraetVon(heldFeld.x, heldFeld.y + 4);
+  zeichneFigur(ctx, 'held', heldPunkt.x, heldPunkt.y, f, blau);
+
   // Ausschnitt um die Mitte, dreifach vergroessert.
   const m = ecke(mitte.q, mitte.r);
   const ax = Math.max(0, Math.round((m.x - minX - 8) * f));
-  const ay = Math.max(0, Math.round((m.y - minY + 2) * f));
+  const ay = Math.max(0, Math.round((m.y - minY - 4) * f));
   const breite = 44 * f;
   const hoehe = 34 * f;
   const lupe = document.createElement('canvas');

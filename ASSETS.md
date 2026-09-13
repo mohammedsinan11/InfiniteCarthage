@@ -223,6 +223,11 @@ Kunstpixeln gerechnet und pixelig hochskaliert.
 Lichtkegel mit Form statt Kreisen, weiche Nebelschwaden, animierte Fackel- und
 Feuerflammen, eine Brand-Animation an Strasse und Haus.
 
+### Hinweis beim Bauen auf dem Handy — **Platzhalter**
+
+"Nochmal tippen zum Bauen" als Schild oben (CSS `.befehl-hinweis`), solange
+eine Vorschau auf den zweiten Tipp wartet.
+
 ### Zahlenmarker und Haefen — **tragbar**
 
 Kreis mit Zahl und Punktreihe; Hafen als Rechteck mit "2:1". Zweckmaessig und

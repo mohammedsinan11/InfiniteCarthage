@@ -288,6 +288,25 @@ anbieten oder brechen; ob Tribut mit der Groesse des Reichs steigen soll.
   das noch niemand gesehen hat -, um Lager herum. Ein eigener Befehl beendet
   das. Gibt es in Reichweite nichts mehr, bleiben sie stehen.
 
+## Karte, Zoom und Bedienung
+
+- **Kachelabstand 23 x 17 Kunstpixel** - der Abstand, fuer den die Kacheln aus
+  hexmap gezeichnet sind. Frueher 24 x 18,75: jede zweite Zeile lag zwischen den
+  Kunstpixeln, zwischen den Kacheln blieben dunkle Fugen, und die Karte wirkte
+  unscharf. Jede Kachel liegt jetzt auf ganzen Kunstpixeln (`tiles.ts`,
+  `kachelEcke`), Figuren darauf ebenso. Vergleich: `labor.html?art=schaerfe`.
+- **Eine Zoomstufe mehr:** 12 Geraetepixel je Kunstpixel - am Rechner 6
+  CSS-Pixel, am Handy mit dreifacher Skalierung 4.
+- **Klicks:** Das Brett faengt den Zeiger erst ein, wenn gezogen wird. Vorher
+  bei jedem Druck - Chrome schickte den Klick dann ans Brett statt an den
+  Bauplatz, und im Aufbau liess sich mit der Maus kein Dorf setzen.
+- **Handy:** Ein Tipp auf ein Feld zeigt dessen Zahl und Feldinfo, wie der
+  Zeiger am Rechner. Bauen geht in zwei Tipps - der erste zeigt Gebaeude oder
+  Strasse als Vorschau samt den Zahlen der Nachbarfelder, der zweite baut.
+  Bauplaetze, Kanten und Feuer werden nach Naehe getroffen, nicht nach
+  Trefferflaeche.
+- **Zahlen an eigenen Gebaeuden** stehen immer - auf jedem Geraet.
+
 ## Verbaende
 
 Alle eigenen Einheiten eines Feldes sind ein Verband. Ein Klick auf das Feld
