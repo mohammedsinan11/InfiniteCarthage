@@ -306,6 +306,15 @@ anbieten oder brechen; ob Tribut mit der Groesse des Reichs steigen soll.
   Bauplaetze, Kanten und Feuer werden nach Naehe getroffen, nicht nach
   Trefferflaeche.
 - **Zahlen an eigenen Gebaeuden** stehen immer - auf jedem Geraet.
+- **Verdecken, beschlossen (noch nicht gebaut):** Kacheln VOR einem Bauwerk
+  duerfen es verdecken - aber nur hohe: Wald, Taiga, Dschungel, Berge.
+  Flache Felder (Wiese, Feld, Lehm, Wueste, Schnee, Sumpf, Wasser) liegen
+  darunter. Verdecken alle vorderen Kacheln, schneidet eine flache Wiese die
+  Burg gerade ab - das sieht aus wie ein Fehler, genau wie bei den Kaempfern
+  (seit der Korrektur zeichnet das Brett Einheiten erst nach der Reihe davor).
+  Hohe Kacheln davor lassen ein Bauwerk dagegen im Gelaende stehen statt
+  aufgeklebt. Gedacht zuerst fuer die Hauptstadt; Doerfer, Staedte und
+  Einheiten koennten spaeter derselben Regel folgen.
 
 ## Verbaende
 
