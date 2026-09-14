@@ -793,12 +793,29 @@ export function Board({
      * Seit sie auf zwei Kunstpixel begrenzt ist (reliefLimitedAt), verdeckt
      * die gemalte Unterkante jeder Kachel die Stufe selbst.
      */
+    /*
+     * Die Besatzung einer Reihe kommt erst nach den Kacheln der NAECHSTEN Reihe.
+     * Frueher direkt nach der eigenen Kachel: dann malte die Reihe darunter
+     * ueber alles, was ueber den unteren Feldrand ragt - im Kampf stehen
+     * die Figuren weit unten, und die Kachel davor schnitt sie in der Mitte
+     * durch. Zwei Reihen weiter reicht keine Kachel mehr so hoch.
+     */
+    let vorige: { t: (typeof visible)[number]; hoch: number }[] = [];
+    let diese: typeof vorige = [];
+    let zeile = Number.NaN;
     for (const t of visible) {
+      if (t.r !== zeile) {
+        for (const b of vorige) zeichneBesatzung(b.t, b.hoch);
+        vorige = diese;
+        diese = [];
+        zeile = t.r;
+      }
       if (hexKey(t.q, t.r) === hover) continue; // kommt zuletzt, angehoben
       const hoch = liftHex(t.q, t.r);
       zeichne(t, hoch);
-      zeichneBesatzung(t, hoch);
+      diese.push({ t, hoch });
     }
+    for (const b of [...vorige, ...diese]) zeichneBesatzung(b.t, b.hoch);
 
     if (hover !== null) {
       const t = world.tiles.get(hover);
