@@ -78,6 +78,9 @@ export function CardDraft({
   return (
     <div className="draft-overlay">
       <h2 className="draft-titel">{TITEL[source ?? 'fund']}</h2>
+      {/* Ein Fund kommt nur von der 7 - das steht hier noch einmal, falls man
+          die Wuerfel weggeklickt hat. */}
+      {(source ?? 'fund') === 'fund' && <span className="draft-sieben">7 gewuerfelt</span>}
       <p className="draft-sub">
         {darfWaehlen
           ? 'Waehle eine Karte. Die anderen beiden verfallen.'

@@ -79,6 +79,9 @@ export type Announcement = {
 
 let naechsteId = 1;
 
+const gleicherWurf = (a: [number, number] | null, b: [number, number]): boolean =>
+  a !== null && a[0] === b[0] && a[1] === b[1];
+
 const TOKEN_KEY = 'infinitecarthage.token';
 const ROOM_KEY = 'infinitecarthage.room';
 const NAME_KEY = 'infinitecarthage.name';
@@ -580,7 +583,21 @@ export const useStore = create<Store>((set, get) => ({
                   zeit.push({ id: naechsteId++, runde: roundOf(jetzt), art: 'bigRound', text: `Grosse Runde ${bigRoundOf(jetzt)} beginnt` });
                 }
               }
+              /*
+               * Der Server schickt den Zustand VOR den Ereignissen. Bei einer
+               * 7 stuende die Kartenwahl damit schon da, bevor der Wurf in
+               * pendingRoll landet, und verdeckte ihn. Also die Wuerfel schon
+               * hier vormerken - die Wahl wartet in Game auf sie. Nicht beim
+               * ersten Zustand nach dem Verbinden: da laeuft die Wahl schon.
+               */
+              const siebenGefallen =
+                s.state !== null &&
+                s.state.phase.t !== 'draft' &&
+                msg.state.phase.t === 'draft' &&
+                msg.state.draft?.source === 'fund' &&
+                msg.state.lastRoll !== null;
               return {
+                ...(siebenGefallen ? { pendingRoll: msg.state.lastRoll } : {}),
                 state: msg.state,
                 world: buildWorld(s.world, msg.state),
                 status: 'playing' as const,
@@ -602,7 +619,11 @@ export const useStore = create<Store>((set, get) => ({
               ].slice(-120),
               welt: [...s.welt, ...weltNeu].slice(-WELT_MAX),
               announcements: [...s.announcements, ...neue].slice(-6),
-              ...(wurf && wurf.t === 'roll' ? { pendingRoll: wurf.dice } : {}),
+              // Schon beim Zustand vorgemerkt (7)? Dann dieselbe Referenz lassen,
+              // sonst finge die Animation von vorn an.
+              ...(wurf && wurf.t === 'roll' && !gleicherWurf(s.pendingRoll, wurf.dice)
+                ? { pendingRoll: wurf.dice }
+                : {}),
             }));
             break;
           }

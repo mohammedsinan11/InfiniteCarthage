@@ -60,6 +60,12 @@ spaetestens dann lohnt eine Zeichnung.
 
 *Aufwand:* 6 Augenzahlen je Wuerfelart, etwa 64 x 64 px.
 
+**Die 7** leuchtet violett statt golden, bleibt 1,6 s stehen und traegt die
+Zeile "Eine Sieben - ein Fund!"; ueber der Kartenwahl steht das Schildchen
+"7 gewuerfelt". Beides CSS (`.dice-sum.sieben`, `.dice-sieben`,
+`.draft-sieben`). *Was fehlt:* ein eigener Moment fuer die 7 - etwa eine
+aufbrechende Truhe oder ein Sternenfunke, der in die Kartenwahl uebergeht.
+
 ### Spielsteine: Dorf, Stadt, Strasse — **Platzhalter, Dorf und Stadt sprite-bereit**
 
 Seit der Ueberarbeitung Pixelgrafik auf dem Canvas (`client/units.ts`), im

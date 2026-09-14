@@ -26,6 +26,11 @@ import { playDiceLand, playDiceRoll } from '../audio';
 const ROLL_MS = 850;
 /** Wie lange das Ergebnis stehen bleibt, bevor es verschwindet. */
 const HOLD_MS = 750;
+/**
+ * Eine 7 bleibt laenger stehen: danach kommt die Kartenwahl und verdeckt das
+ * Brett. Ohne die Pause wusste man vor den drei Karten nicht, warum sie kommen.
+ */
+const HOLD_SIEBEN_MS = 1600;
 
 /** Augen als Punktmuster - Position in einem 3x3-Raster. */
 const PIPS: Record<number, ReadonlyArray<readonly [number, number]>> = {
@@ -117,7 +122,7 @@ export function DiceOverlay({ dice, onDone }: Props) {
     setSettled(true);
     playDiceLand();
     window.clearTimeout(z.schliessen);
-    z.schliessen = window.setTimeout(schliessen, HOLD_MS);
+    z.schliessen = window.setTimeout(schliessen, dice[0] + dice[1] === 7 ? HOLD_SIEBEN_MS : HOLD_MS);
   }, [dice, schliessen]);
 
   /** Rollt es noch, springt der Klick zum Ergebnis. Steht es, schliesst er. */
@@ -147,6 +152,7 @@ export function DiceOverlay({ dice, onDone }: Props) {
   }, [dice, landen]);
 
   const summe = shown[0] + shown[1];
+  const sieben = settled && summe === 7;
 
   return (
     <div className="dice-overlay" onClick={klick} role="presentation">
@@ -155,7 +161,10 @@ export function DiceOverlay({ dice, onDone }: Props) {
         <Die value={shown[1]} />
       </div>
       {/* Die Summe ist das, worauf es ankommt - sie springt heraus und leuchtet. */}
-      <div className={settled ? 'dice-sum steht' : 'dice-sum'}>{settled ? summe : ' '}</div>
+      <div className={['dice-sum', settled ? 'steht' : '', sieben ? 'sieben' : ''].filter(Boolean).join(' ')}>
+        {settled ? summe : ' '}
+      </div>
+      {sieben && <div className="dice-sieben">Eine Sieben - ein Fund!</div>}
       <div className="dice-hint">{settled ? 'Klicken zum Schliessen' : 'Klicken zum Ueberspringen'}</div>
     </div>
   );

@@ -675,7 +675,8 @@ export function Game() {
           }
         />
 
-        {state.draft !== null && phase.t === 'draft' && (
+        {/* Erst wenn die Wuerfel weg sind - sonst verdeckt die Wahl die 7, die sie ausgeloest hat. */}
+        {state.draft !== null && phase.t === 'draft' && pendingRoll === null && (
           <CardDraft
             options={state.draft.options}
             source={state.draft.source}
