@@ -24,6 +24,7 @@ import {
   COST_ROAD,
   COST_SETTLEMENT,
   COST_TOWER,
+  COST_CAPITAL,
   canAfford,
 } from '../../core/rules/costs';
 import { haefenZu } from '../../core/rules/trade';
@@ -35,6 +36,14 @@ import { devName, resourceName } from '../log';
 import { ResourceGlyph } from './ResourceIcon';
 
 export type BuildMode = null | 'road' | 'settlement' | 'city' | 'tower';
+
+/**
+ * Bauen als eigene Zeile (Entwurf V2): "Bauen" tauscht die Leiste gegen
+ * Strasse, Dorf, Stadt, Turm und - wenn moeglich - Hauptstadt; ein Pfeil fuehrt
+ * zurueck. Auf dem Handy passte die lange Leiste nicht mehr in eine Reihe.
+ * false stellt die alte Leiste mit allen Knoepfen nebeneinander wieder her.
+ */
+export const BAU_ZEILE = true;
 
 const kostenText = (c: Cost): string =>
   RESOURCES.filter((r) => (c[r] ?? 0) > 0)
@@ -50,7 +59,7 @@ function Mini({ r, groesse = 11 }: { r: Resource; groesse?: number }) {
   );
 }
 
-function Kosten({ c }: { c: Cost }) {
+export function Kosten({ c }: { c: Cost }) {
   return (
     <span className="dock-kosten">
       {RESOURCES.filter((r) => (c[r] ?? 0) > 0).map((r) => (
@@ -128,6 +137,20 @@ const SymBeute = () => (
 const SymZugEnde = () => (
   <Symbol>
     <path d="M4 4 L11 10 L4 16 Z M11 4 L18 10 L11 16 Z" fill="#c9a46a" stroke="#2a2016" strokeWidth={1.2} strokeLinejoin="round" />
+  </Symbol>
+);
+
+const SymBauen = () => (
+  <Symbol>
+    <path d="M4 17 L11 10" stroke="#2a2016" strokeWidth={4} strokeLinecap="round" />
+    <path d="M4 17 L11 10" stroke="#8a6a45" strokeWidth={2} strokeLinecap="round" />
+    <path d="M8 5 L13 2 L18 7 L15 12 Z" fill="#b9b3a6" stroke="#2a2016" strokeWidth={1.5} strokeLinejoin="round" />
+  </Symbol>
+);
+const SymHauptstadt = () => (
+  <Symbol>
+    <path d="M3 16 V7 L7 11 L10 4 L13 11 L17 7 V16 Z" fill="#f2c94c" stroke="#2a2016" strokeWidth={1.6} strokeLinejoin="round" />
+    <rect x={5} y={13} width={10} height={2} fill="#9c3226" />
   </Symbol>
 );
 
@@ -325,6 +348,8 @@ export function Aktionsleiste({
   act,
   verhaeltnis,
   onTafel,
+  hauptstadtBereit = false,
+  onHauptstadt,
 }: {
   state: PublicState;
   me: PublicPlayer | undefined;
@@ -336,14 +361,24 @@ export function Aktionsleiste({
   verhaeltnis: (r: Resource) => number;
   /** Meldet, ob gerade eine Tafel offen ist - solange wuerfelt niemand von selbst. */
   onTafel?: (offen: boolean) => void;
+  /** Ein Feld ist fuer die Hauptstadt geschlossen - der Knopf erscheint in der Bauzeile. */
+  hauptstadtBereit?: boolean;
+  /** Zur Hauptstadt fahren und ihre Tafel oeffnen. */
+  onHauptstadt?: () => void;
 }) {
   const phase = state.phase;
   const bauen = isMine && phase.t === 'main';
   const [tafel, setTafel] = useState<null | 'handel' | 'karten'>(null);
 
-  // Nicht am Zug: offene Tafeln zu, ein halb gewaehlter Bau verfaellt.
+  /** Steht die Bauzeile statt der Leiste? (BAU_ZEILE) */
+  const [bauOffen, setBauOffen] = useState(false);
+
+  // Nicht am Zug: offene Tafeln zu, die Bauzeile auch, ein halb gewaehlter Bau verfaellt.
   useEffect(() => {
-    if (!isMine) setTafel(null);
+    if (!isMine) {
+      setTafel(null);
+      setBauOffen(false);
+    }
   }, [isMine]);
   useEffect(() => {
     onTafel?.(tafel !== null);
@@ -398,6 +433,33 @@ export function Aktionsleiste({
       )}
 
       <div className="dock-reihe">
+        {BAU_ZEILE && !bauOffen && (
+          <>
+            <DockKnopf
+              titel="Bauen"
+              symbol={<SymBauen />}
+              darf
+              leuchtet={hauptstadtBereit}
+              tip={hauptstadtBereit ? 'Bauen - eine Hauptstadt ist moeglich' : 'Bauen: Strasse, Dorf, Stadt, Turm'}
+              onClick={() => setBauOffen(true)}
+            />
+            <span className="dock-trenner" />
+          </>
+        )}
+        {BAU_ZEILE && bauOffen && (
+          <button
+            className="dock-knopf dock-zurueck"
+            title="Zurueck zur Leiste"
+            onClick={() => {
+              setBauOffen(false);
+              setMode(null);
+            }}
+          >
+            &lsaquo;
+          </button>
+        )}
+        {(!BAU_ZEILE || bauOffen) && (
+          <>
         <DockKnopf
           titel="Strasse"
           symbol={<SymStrasse />}
@@ -418,7 +480,22 @@ export function Aktionsleiste({
           tip={`Wachturm an ein Dorf oder eine Stadt: sieht weiter, auch nachts, und laesst Brandstifter nicht an Haus und Strassen. ${kostenText(COST_TOWER)}`}
           onClick={bau('tower')}
         />
-        <span className="dock-trenner" />
+        {hauptstadtBereit && (
+          <DockKnopf
+            titel="Hauptstadt"
+            symbol={<SymHauptstadt />}
+            kosten={COST_CAPITAL}
+            leuchtet
+            darf={bauen && canAfford(hand, COST_CAPITAL)}
+            tip={`Hauptstadt auf dem umschlossenen Feld: ${kostenText(COST_CAPITAL)}`}
+            onClick={() => onHauptstadt?.()}
+          />
+        )}
+          </>
+        )}
+        {(!BAU_ZEILE || !bauOffen) && (
+          <>
+        {!BAU_ZEILE && <span className="dock-trenner" />}
         <DockKnopf titel="Karte" symbol={<SymKarte />} kosten={COST_DEV} darf={bauen && canAfford(hand, COST_DEV)} tip={`Entwicklungskarte kaufen (${state.deckLeft} im Stapel): ${kostenText(COST_DEV)}`} onClick={() => act({ t: 'buyDev' })} />
         <DockKnopf titel="Ritter" symbol={<SymRitter />} kosten={COST_KNIGHT} darf={bauen && canAfford(hand, COST_KNIGHT)} tip={`Ein Ritter tritt an einer deiner Siedlungen an: ${kostenText(COST_KNIGHT)}`} onClick={() => act({ t: 'recruitKnight' })} />
         <span className="dock-trenner" />
@@ -429,6 +506,8 @@ export function Aktionsleiste({
         )}
         {state.order.length > 1 && (
           <DockKnopf titel="Zug Ende" symbol={<SymZugEnde />} darf={bauen} tip="Zug beenden" onClick={() => act({ t: 'endTurn' })} />
+        )}
+          </>
         )}
       </div>
       {hinweis && <div className="dock-hinweis">{hinweis}</div>}

@@ -140,6 +140,12 @@ function baseName(
   }
 }
 
+/** Welche Kachelsorte ein Feld zeigt - fuer Bauwerke, die sich dem Gelaende anpassen. */
+export function kachelSorte(seed: number, terrain: Terrain, q: number, r: number): string {
+  const { temp, moist } = climateAt(seed, q, r);
+  return baseName(terrain, temp, moist, seed, q, r);
+}
+
 /**
  * Sumpf in drei Spielarten: offen, Schilf, Seerosen.
  *

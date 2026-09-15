@@ -17,7 +17,22 @@ const FARBEN: Record<string, string> = {
   k: '#2a1f16', // Umriss, Kohle
   g: '#d9a441', // Gold
   p: '#f2e7d0', // Pergament
+  s: '#c9ccd6', // Silber
+  S: '#8a8e9a', // Silber im Schatten
+  b: '#3a7ac2', // Saphir
 };
+
+/** Die Krone ueber einem Feld, das fuer eine Hauptstadt (fast) geschlossen ist. */
+const KRONE: Karte = [
+  '.k...k...k.',
+  'kgk.kgk.kgk',
+  'kgggggggggk',
+  'kgrgggggbgk',
+  'kgggggggggk',
+  'kkkkkkkkkkk',
+];
+/** Dieselbe Krone in Silber: fast geschlossen, noch nicht bereit. */
+const KRONE_FAST: Karte = KRONE.map((z) => z.replace(/g/g, 's').replace(/[rb]/g, 'S'));
 
 const FLAMME_A: Karte = [
   '...o.....',
@@ -119,6 +134,34 @@ export function Flammen({
       <g className="flammen-b">
         <Pixel karte={FLAMME_B} x0={x0} y0={y0} k={k} />
       </g>
+    </g>
+  );
+}
+
+/**
+ * Die Krone ueber einem Feld (rules/hauptstadt.ts): silbern, wenn es fast
+ * geschlossen ist, golden und wippend, wenn die Hauptstadt dort entstehen kann.
+ * Geklickt wird ueber das Brett (Naehe, fuer Maus und Finger gleich).
+ */
+export function KronenZeichen({
+  x,
+  y,
+  k,
+  bereit,
+  titel,
+}: {
+  x: number;
+  y: number;
+  k: number;
+  bereit: boolean;
+  titel: string;
+}) {
+  const karte = bereit ? KRONE : KRONE_FAST;
+  const breite = karte[0]!.length;
+  return (
+    <g className={bereit ? 'krone-zeichen bereit' : 'krone-zeichen fast'} shapeRendering="crispEdges">
+      <title>{titel}</title>
+      <Pixel karte={karte} x0={x - (breite / 2) * k} y0={y - karte.length * k} k={k} />
     </g>
   );
 }

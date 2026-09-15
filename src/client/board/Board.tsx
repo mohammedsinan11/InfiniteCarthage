@@ -47,11 +47,14 @@ import {
   preloadUnitSprites,
   zeichneFigur,
   zeichneGebaeude,
+  zeichneHauptstadt,
   zeichneLeben,
   zeichneStrassen,
 } from '../units';
 import { Schwerter } from './Schwerter';
-import { AuftragsZeichen, Flammen } from './Marken';
+import { AuftragsZeichen, Flammen, KronenZeichen } from './Marken';
+import { Kosten } from '../ui/Aktionsleiste';
+import type { Cost } from '../../core/rules/costs';
 import { loeschFelder } from '../../core/rules/feuer';
 import type { Brand } from '../../core/state';
 import { BRAND_WAS } from '../log';
@@ -68,6 +71,7 @@ import {
   SCHRITT_X,
   SCHRITT_Y,
   kachelEcke,
+  kachelSorte,
   preloadTiles,
   tileImage,
   tileImageFog,
@@ -208,6 +212,16 @@ export type Targets = {
   hexes?: string[];
 };
 
+/** Eine kleine Tafel am Gebaeude oder an der Krone: was sich dort ausbauen laesst. */
+export type AusbauTafel = {
+  ort: { art: 'ecke' | 'feld'; key: string };
+  titel: string;
+  optionen: { name: string; kosten?: Cost; darf: boolean; hinweis?: string; wahl: () => void }[];
+};
+
+/** Eine Krone ueber einem fast oder ganz geschlossenen Feld (rules/hauptstadt.ts). */
+export type Krone = { q: number; r: number; bereit: boolean; titel: string };
+
 type Props = {
   world: World;
   state: PublicState;
@@ -241,6 +255,16 @@ type Props = {
   geisterBau?: 'dorf' | 'stadt' | 'turm' | null;
   /** Klick auf ein eigenes Feuer: loeschen. Ohne diese Angabe sind Feuer nur zu sehen. */
   onFeuer?: (key: string) => void;
+  /** Kronen ueber Feldern, die fuer eine Hauptstadt (fast) geschlossen sind. */
+  kronen?: Krone[];
+  /** Klick auf eine Krone. */
+  onKrone?: (q: number, r: number) => void;
+  /** Klick auf ein eigenes Gebaeude - zeigt, was sich dort ausbauen laesst. */
+  onGebaeude?: (vertex: string) => void;
+  /** Klick ins Leere - schliesst die Ausbau-Tafel. */
+  onLeer?: () => void;
+  /** Die offene Ausbau-Tafel, oder null. */
+  ausbau?: AusbauTafel | null;
   /**
    * Aufgesetzte Anzeigen - Handblatt, Wuerfelknopf, Overlays.
    *
@@ -298,6 +322,11 @@ function einheitenText(state: PublicState, du: string | null, gruppe: readonly U
   return teile.join(' · ');
 }
 
+const KEINE_KRONEN: Krone[] = [];
+/** Groesste Breite der Ausbau-Tafel (styles.css) und ungefaehre Hoehe - fuers Klemmen am Rand. */
+const TAFEL_BREITE = 230;
+const TAFEL_HOEHE = 170;
+
 /** Augenzahl als Punkte: sagt schneller als die Ziffer, wie oft ein Feld trifft. */
 const pips = (n: number): string => '.'.repeat(6 - Math.abs(7 - n));
 
@@ -319,6 +348,11 @@ export function Board({
   wetter = 'klar',
   geisterBau = null,
   onFeuer,
+  kronen = KEINE_KRONEN,
+  onKrone,
+  onGebaeude,
+  onLeer,
+  ausbau = null,
   children,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
@@ -557,8 +591,10 @@ export function Board({
       if (b.owner !== du) continue;
       for (const h of vertexAdjacentHexes(parseVertexKey(vk))) out.add(hexKey(h.q, h.r));
     }
+    // Auf einer Hauptstadt laege die Marke mitten auf der Burg - dort nur unter dem Zeiger.
+    for (const hk of Object.keys(state.hauptstaedte ?? {})) out.delete(hk);
     return out;
-  }, [state.buildings, du]);
+  }, [state.buildings, state.hauptstaedte, du]);
 
   /** Die Farbe einer Seite: Spielerfarbe, Fraktionsfarbe oder Grau fuer Neutrale. */
   const farbeSeite = useCallback(
@@ -897,17 +933,25 @@ export function Board({
       }),
       f,
     );
-    Object.entries(state.buildings)
-      .map(([vk, b]) => {
-        const ecke = parseVertexKey(vk);
-        const p = vertexToPixel(ecke, LAYOUT);
-        return { ...geraet(p.x, p.y - liftVertex(ecke)), b };
-      })
-      // Von hinten nach vorn, damit das vordere Haus das hintere ueberdeckt.
-      .sort((u, w) => u.y - w.y)
-      .forEach(({ x, y, b }) =>
-        zeichneGebaeude(ctx, b.type === 'city' ? 'stadt' : 'dorf', x, y, f, spielerFarbe(b.owner), b.turm === true),
-      );
+    const gebaeude = Object.entries(state.buildings).map(([vk, b]) => {
+      const ecke = parseVertexKey(vk);
+      const v = vertexToPixel(ecke, LAYOUT);
+      const p = geraet(v.x, v.y - liftVertex(ecke));
+      return {
+        fuss: p.y + 3 * f,
+        male: () => zeichneGebaeude(ctx, b.type === 'city' ? 'stadt' : 'dorf', p.x, p.y, f, spielerFarbe(b.owner), b.turm === true),
+      };
+    });
+    // Hauptstaedte stehen in der Feldmitte, im Stein ihres Gelaendes (units.ts).
+    const hauptstaedte = Object.entries(state.hauptstaedte ?? {}).map(([hk, h]) => {
+      const [q, r] = hk.split(':').map(Number) as [number, number];
+      const c = hexToPixel(q, r, LAYOUT);
+      const p = geraet(c.x, c.y - liftHex(q, r));
+      const sorte = kachelSorte(state.worldSeed, world.tiles.get(hk)?.terrain ?? 'pasture', q, r);
+      return { fuss: p.y + 6 * f, male: () => zeichneHauptstadt(ctx, p.x, p.y, f, spielerFarbe(h.owner), sorte) };
+    });
+    // Von hinten nach vorn, nach dem Fuss: das vordere Bauwerk ueberdeckt das hintere.
+    for (const b of [...gebaeude, ...hauptstaedte].sort((u, w) => u.fuss - w.fuss)) b.male();
 
     /*
      * Vorschau unter dem Zeiger: auf dem Bauplatz, ueber dem der Zeiger steht,
@@ -1114,7 +1158,7 @@ export function Board({
    * blubbern damit bis hierher.
    */
   const aufBedienelement = (ziel: EventTarget | null): boolean =>
-    ziel instanceof Element && ziel.closest('button, input, select, textarea, a, label, .zoom') !== null;
+    ziel instanceof Element && ziel.closest('button, input, select, textarea, a, label, .zoom, .ausbau-tafel') !== null;
 
   const onPointerDown = (e: React.PointerEvent) => {
     /*
@@ -1271,6 +1315,9 @@ export function Board({
     const fingerTipp = e.pointerType !== 'mouse';
     // Finger: Bauplaetze, Kanten und Feuer wertet das Brett selbst aus.
     if (fingerTipp && tippeZiel(wx, wy)) return;
+    // Krone oder eigenes Gebaeude: die Ausbau-Tafel. Ein Klick daneben schliesst sie.
+    if (ausbauTreffer(wx, wy)) return;
+    onLeer?.();
     const h = hexUnter(wx, wy);
     const k = hexKey(h.q, h.r);
     // Auf Touch gibt es kein Darueberfahren: ein Tipp zeigt das Feld wie der
@@ -1331,6 +1378,45 @@ export function Board({
     setKanteHover(null);
     onPick(treffer.art, treffer.key);
     return true;
+  };
+
+  /** Wo die Krone ueber einem Feld sitzt, in Welteinheiten: ihr Fuss. */
+  const kronenFuss = (q: number, r: number) => {
+    const c = hexToPixel(q, r, LAYOUT);
+    return { x: c.x, y: c.y - liftHex(q, r) - LAYOUT.h * 0.18 };
+  };
+
+  /**
+   * Ein Klick auf eine Krone oder ein eigenes Gebaeude - nach Naehe, fuer Maus
+   * und Finger gleich. true, wenn etwas getroffen wurde.
+   */
+  const ausbauTreffer = (wx: number, wy: number): boolean => {
+    const reichweite = 18 / scale;
+    if (onKrone) {
+      for (const kr of kronen) {
+        const p = kronenFuss(kr.q, kr.r);
+        if (Math.hypot(p.x - wx, p.y - 3 * SCALE - wy) <= reichweite + 4 * SCALE) {
+          onKrone(kr.q, kr.r);
+          return true;
+        }
+      }
+    }
+    if (onGebaeude && du !== null) {
+      let beste: { vk: string; d: number } | null = null;
+      for (const [vk, b] of Object.entries(state.buildings)) {
+        if (b.owner !== du) continue;
+        const ecke = parseVertexKey(vk);
+        const p = vertexToPixel(ecke, LAYOUT);
+        // Das Haus steht ueber seiner Ecke - dort zeigt man hin.
+        const d = Math.hypot(p.x - wx, p.y - liftVertex(ecke) - 4 * SCALE - wy);
+        if (d <= reichweite && (!beste || d < beste.d)) beste = { vk, d };
+      }
+      if (beste) {
+        onGebaeude(beste.vk);
+        return true;
+      }
+    }
+    return false;
   };
 
   const onPointerLeave = (e: React.PointerEvent) => {
@@ -1679,6 +1765,24 @@ export function Board({
             );
           })}
 
+        {/* Hauptstadt: Krone ueber fast geschlossenen Feldern - golden, mit leuchtendem Feld, wenn sie bereit sind. */}
+        {kronen.map((kr) => {
+          const hoch = liftHex(kr.q, kr.r);
+          const fuss = kronenFuss(kr.q, kr.r);
+          const punkte = [0, 1, 2, 3, 4, 5]
+            .map((i) => {
+              const p = hexCornerPixel(kr.q, kr.r, i, LAYOUT);
+              return `${p.x.toFixed(1)},${(p.y - hoch).toFixed(1)}`;
+            })
+            .join(' ');
+          return (
+            <g key={'krone' + kr.q + ':' + kr.r}>
+              {kr.bereit && <polygon className="hex-krone" points={punkte} />}
+              <KronenZeichen x={fuss.x} y={fuss.y} k={SCALE} bereit={kr.bereit} titel={kr.titel} />
+            </g>
+          );
+        })}
+
         {/* Der ausgewaehlte Ritter bekommt einen Ring. */}
         {auswahl !== null &&
           (() => {
@@ -1725,6 +1829,63 @@ export function Board({
           ))}
         </div>
       )}
+      {/* Die Ausbau-Tafel: ueber dem Gebaeude oder der Krone, mit Kosten. PLATZHALTER (ASSETS.md). */}
+      {ausbau &&
+        (() => {
+          // Wo das Ding steht: ueber ihm die Tafel, darunter die Ausweichstelle.
+          let wx: number;
+          let wyOben: number;
+          let wyUnten: number;
+          if (ausbau.ort.art === 'ecke') {
+            const ecke = parseVertexKey(ausbau.ort.key);
+            const p = vertexToPixel(ecke, LAYOUT);
+            wx = p.x;
+            wyOben = p.y - liftVertex(ecke) - 14 * SCALE;
+            wyUnten = p.y - liftVertex(ecke) + 6 * SCALE;
+          } else {
+            const [q, r] = ausbau.ort.key.split(':').map(Number) as [number, number];
+            const p = kronenFuss(q, r);
+            wx = p.x;
+            wyOben = p.y - 7 * SCALE;
+            wyUnten = p.y + 3 * SCALE;
+          }
+          /*
+           * Am Rand nicht abschneiden: waagerecht in die Flaeche klemmen, und steht
+           * das Gebaeude zu weit oben, klappt die Tafel darunter. Der Zipfel zeigt
+           * trotzdem auf das Gebaeude (--zipfel).
+           */
+          const sx = (wx - view.x) * scale;
+          const halb = TAFEL_BREITE / 2;
+          const links = Math.min(Math.max(sx, halb + 8), size.w - halb - 8);
+          const unten = (wyOben - view.y) * scale < TAFEL_HOEHE;
+          return (
+            <div
+              className={unten ? 'ausbau-tafel unten' : 'ausbau-tafel'}
+              style={{
+                left: links,
+                top: ((unten ? wyUnten : wyOben) - view.y) * scale,
+                ['--zipfel' as string]: `${Math.round(sx - links)}px`,
+              }}
+            >
+              <div className="ausbau-titel">
+                <span>{ausbau.titel}</span>
+                <button className="dock-zu" title="Schliessen" onClick={() => onLeer?.()}>
+                  x
+                </button>
+              </div>
+              {ausbau.optionen.length === 0 && <div className="ausbau-hinweis">Hier gibt es nichts mehr auszubauen.</div>}
+              {ausbau.optionen.map((o) => (
+                <button key={o.name} className="ausbau-option" disabled={!o.darf} title={o.hinweis} onClick={o.wahl}>
+                  <span className="ausbau-zeile">
+                    <span className="ausbau-name">{o.name}</span>
+                    {o.kosten && <Kosten c={o.kosten} />}
+                  </span>
+                  {!o.darf && o.hinweis && <span className="ausbau-hinweis">{o.hinweis}</span>}
+                </button>
+              ))}
+            </div>
+          );
+        })()}
       {children}
 
       {/*

@@ -31,6 +31,13 @@ export const COST_KNIGHT: Cost = { ore: 2, grain: 1 };
 export const COST_TOWER: Cost = { lumber: 1, brick: 1, ore: 1 };
 
 /**
+ * Eine Hauptstadt auf einem Feld, das drei eigene Staedte und sechs eigene
+ * Strassen umschliessen (rules/hauptstadt.ts). Etwas mehr als zwei Staedte -
+ * den Ring hat man ohnehin schon bezahlt. PLATZHALTER fuers Balancing.
+ */
+export const COST_CAPITAL: Cost = { lumber: 2, brick: 2, grain: 2, ore: 3 };
+
+/**
  * Eine abgebrannte Strasse wieder aufbauen: nur Holz. Der Damm liegt noch, es
  * fehlen die Bohlen - und wer gebrannt wurde, soll nicht doppelt zahlen.
  */

@@ -309,7 +309,18 @@ export type GameState = {
   auftraege: WandererAuftrag[];
   /** Naechste freie Auftragsnummer. */
   nextAuftragId: number;
+  /**
+   * Hauptstaedte: Feldschluessel -> Besitzer und Ausbaustufe. Hoechstens eine je
+   * Spieler (rules/hauptstadt.ts).
+   */
+  hauptstaedte: Record<string, Hauptstadt>;
 };
+
+/** Eine Hauptstadt auf einem Feld. Die Stufe beginnt bei 1 - weitere folgen (DESIGN.md, Hauptstadt). */
+export type Hauptstadt = { owner: PlayerId; stufe: number; seit: number };
+
+/** Siegpunkte einer Hauptstadt - zusaetzlich zu den drei Staedten, die sie umschliessen. */
+export const HAUPTSTADT_PUNKTE = 2;
 
 /*
  * Eine Bank mit Bestand gibt es nicht mehr: sie ist unendlich. Frueher hielt sie
@@ -343,6 +354,9 @@ export function publicPoints(state: GameState, id: PlayerId): number {
     if (b.owner === id) pts += b.type === 'city' ? 2 : 1;
   }
   if (state.largestArmy === id) pts += 2;
+  for (const h of Object.values(state.hauptstaedte ?? {})) {
+    if (h.owner === id) pts += HAUPTSTADT_PUNKTE;
+  }
   return pts;
 }
 

@@ -419,6 +419,89 @@ export function zeichneGebaeude(
   zeichneFigur(ctx, art === 'stadt' ? 'stadtKlein' : 'dorfKlein', x, fy, f, farbe);
 }
 
+/*
+ * Die Hauptstadt, Stufe I: eine Burg in der Mitte des Feldes, das drei Staedte
+ * umschliessen. Bergfried, zwei Tuerme, Mauer mit Tor, Fahne in Spielerfarbe.
+ * Linke Haelfte samt Mittelspalte, gespiegelt - rechts im Schatten.
+ */
+const BURG_HAELFTE = [
+  '..........d', '..........d', '........ddd', '........dmd', '........dmm', '........dmy',
+  '...ddd..dmm', '...dpd..dmm', '..dmmmd.dmy', '..dmymd.dmm', '..dmmmd.dmm', '..dmmmddddd',
+  '..dmdmdmdmd', '..dmmmmmmmm', '..dmmmmmddd', '..dmmmmmdbb', '..dmmmmmdbb', '..ddddddddd',
+];
+const SCHATTEN_SEITE: Record<string, string> = { m: 'M', p: 'P', q: 'p' };
+const BURG = BURG_HAELFTE.map((z) => z + [...z.slice(0, -1)].reverse().map((c) => SCHATTEN_SEITE[c] ?? c).join(''));
+const BURG_FAHNE = ['dpp.', 'dPpp', 'dpp.'];
+
+/**
+ * Stein je Kachelsorte (tiles.ts, kachelSorte): die Hauptstadt nimmt die Farbe
+ * ihres Gelaendes an - Sandstein in der Wueste, Ziegel auf Lehm, Granit im
+ * Gebirge, bemooster Stein in Wald und Sumpf. Fehlt eine Sorte, bleibt es der
+ * graue Stein der Staedte. PLATZHALTER (ASSETS.md).
+ */
+export const STEIN_JE_SORTE: Record<string, { hell: string; dunkel: string }> = {
+  forest: { hell: '#a8aa8c', dunkel: '#6f7456' },
+  taiga: { hell: '#c4c8cc', dunkel: '#848c96' },
+  jungle: { hell: '#9aa06a', dunkel: '#5f6a3a' },
+  clay: { hell: '#c9825a', dunkel: '#9a5a3a' },
+  mountains: { hell: '#9a9aa4', dunkel: '#62626e' },
+  sand: { hell: '#e0b872', dunkel: '#b3874a' },
+  dunes: { hell: '#e0b872', dunkel: '#b3874a' },
+  snow: { hell: '#e8eef2', dunkel: '#a8b8c4' },
+  swamp: { hell: '#8a9468', dunkel: '#566040' },
+  swamp_reeds: { hell: '#8a9468', dunkel: '#566040' },
+  swamp_pads: { hell: '#8a9468', dunkel: '#566040' },
+};
+
+/**
+ * Die Hauptstadt auf ihrem Feld. (x, y) ist die Feldmitte in Geraetepixeln,
+ * f die Geraetepixel je Kunstpixel, sorte die Kachelsorte darunter.
+ */
+export function zeichneHauptstadt(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  f: number,
+  farbe: string,
+  sorte: string,
+): void {
+  const stein = STEIN_JE_SORTE[sorte] ?? { hell: PALETTE.m!, dunkel: PALETTE.M! };
+  const breite = BURG[0]!.length;
+  const schluessel = `burg|${farbe}|${stein.hell}|${f}`;
+  let bild = BILDER.get(schluessel);
+  if (!bild) {
+    bild = document.createElement('canvas');
+    bild.width = breite * f;
+    bild.height = (BURG.length + 3) * f;
+    const g = bild.getContext('2d')!;
+    const male = (karte: readonly string[], dx: number, dy: number) => {
+      karte.forEach((zeile, zy) => {
+        for (let zx = 0; zx < zeile.length; zx++) {
+          const ch = zeile[zx]!;
+          if (ch === '.') continue;
+          g.fillStyle =
+            ch === 'p' ? farbe
+            : ch === 'P' ? dunkler(farbe)
+            : ch === 'q' ? heller(farbe)
+            : ch === 'm' ? stein.hell
+            : ch === 'M' ? stein.dunkel
+            : (PALETTE[ch] ?? '#ff00ff');
+          g.fillRect((dx + zx) * f, (dy + zy) * f, f, f);
+        }
+      });
+    };
+    male(BURG, 0, 3);
+    male(BURG_FAHNE, 10, 0);
+    if (BILDER.size >= BILDER_MAX) BILDER.clear();
+    BILDER.set(schluessel, bild);
+  }
+  const fy = y + 6 * f;
+  const x0 = x - Math.floor(breite / 2) * f;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+  ctx.fillRect(x0 + 2 * f, fy + f, (breite - 4) * f, f);
+  ctx.drawImage(bild, x0, fy - (BURG.length - 1 + 3) * f);
+}
+
 export type Strassenstueck = {
   a: { x: number; y: number };
   b: { x: number; y: number };

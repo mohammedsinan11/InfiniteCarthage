@@ -316,6 +316,42 @@ anbieten oder brechen; ob Tribut mit der Groesse des Reichs steigen soll.
   aufgeklebt. Gedacht zuerst fuer die Hauptstadt; Doerfer, Staedte und
   Einheiten koennten spaeter derselben Regel folgen.
 
+## Hauptstadt
+
+### Gebaut
+
+- **Bedingung:** sechs eigene Strassen um ein Feld und drei eigene Staedte an
+  seinen Ecken im Wechsel. Mehr als drei Gebaeude passen wegen der
+  Abstandsregel ohnehin nicht. Doerfer zaehlen vorerst nicht. Eine Hauptstadt
+  je Spieler, nicht auf Wasser (`rules/hauptstadt.ts`, Aktion `foundCapital`).
+- **Werte, Platzhalter:** Kosten `COST_CAPITAL` (2 Holz, 2 Lehm, 2 Getreide,
+  3 Erz), +2 Siegpunkte (`HAUPTSTADT_PUNKTE`). Die drei Staedte behalten Ertrag
+  und Punkte - die Hauptstadt kommt obendrauf.
+- **Wie man davon erfaehrt:** eine Krone ueber dem Feld. Silbern, sobald
+  hoechstens zwei Teile fehlen (Strassen oder Staedte, `FAST_GESCHLOSSEN`),
+  golden und mit leuchtendem Feld, wenn der Ring geschlossen ist. Nur fuer den
+  eigenen Spieler, und nur solange er noch keine Hauptstadt hat. Der Knopf
+  "Bauen" leuchtet dann, und in der Bauzeile steht "Hauptstadt".
+- **Ausbauen per Klick:** ein Klick auf ein eigenes Gebaeude oder eine Krone
+  oeffnet eine kleine Tafel mit dem, was dort geht - Dorf zu Stadt, Wachturm,
+  Hauptstadt -, samt Kosten. Was gerade nicht geht, steht gesperrt da, mit dem
+  Grund ("Erst wuerfeln", "Es fehlen noch 1 Stadt").
+- **Bauzeile (Entwurf V2):** "Bauen" tauscht die Leiste gegen Strasse, Dorf,
+  Stadt, Turm und Hauptstadt, ein Pfeil fuehrt zurueck. Zurueck zur alten
+  Leiste mit einem Schalter: `BAU_ZEILE = false` in `ui/Aktionsleiste.tsx`.
+- **Aussehen, Stufe I:** eine Burg in der Mitte zwischen den drei Staedten.
+  Ihr Stein richtet sich nach der Kachelsorte - Sandstein, Ziegel, Granit,
+  Moos, Schnee (`units.ts`, `STEIN_JE_SORTE`). Die Zahl des Feldes steht nur
+  unter dem Zeiger, sonst laege sie auf der Burg.
+
+### Geplant
+
+- **Stufe II, Festungsring (Standard):** die Staedte werden Bastionen, die
+  Strassen Mauer, in der Mitte ein Palast - Material und Farbe nach Gelaende.
+- **Stufe III** und **Richtungen** (Hexenturm, Burgfeste, Handelskontor, ...).
+- **Verdecken:** nur hohe Kacheln davor duerfen sie verdecken (siehe oben).
+- Offen: Doerfer im Ring, was die Hauptstadt ueber die Punkte hinaus bringt.
+
 ## Verbaende
 
 Alle eigenen Einheiten eines Feldes sind ein Verband. Ein Klick auf das Feld

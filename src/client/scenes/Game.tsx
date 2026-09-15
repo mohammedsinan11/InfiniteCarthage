@@ -29,7 +29,7 @@ import type { Tageszeit, Wetter } from '../../core/zeit';
 import { WetterSymbol } from '../ui/WetterSymbol';
 import { useStore } from '../net/store';
 import { Board } from '../board/Board';
-import type { Flight, Targets } from '../board/Board';
+import type { AusbauTafel, Flight, Krone, Targets } from '../board/Board';
 import { HandPanel } from '../ui/HandPanel';
 import { TradePanel } from '../ui/TradePanel';
 import { DiceOverlay } from '../ui/DiceOverlay';
@@ -41,15 +41,18 @@ import { isNestActive, nestFraktionOf, sightOf } from '../../core/units';
 import { abkommenVon, kampfFelder } from '../../core/combat';
 import { fraktionById } from '../../core/factions';
 import { fraktionColor } from '../theme';
-import { hexDistance, parseVertexKey, vertexAdjacentHexes } from '../../core/coords';
+import { hexDistance, hexKey, hexVertices, parseVertexKey, vertexAdjacentHexes, vertexKey } from '../../core/coords';
 import { beiStumm, initAudio, istStumm, playBuild, playGain, playTurm, playWurfStart, setStumm } from '../audio';
 import { setAmbiente } from '../ambiente';
 import { seasonOf } from '../../core/season';
 import { RESOURCES } from '../../core/types';
 import type { Resource } from '../../core/types';
-import { COST_ROAD, canAfford } from '../../core/rules/costs';
+import { COST_CAPITAL, COST_CITY, COST_ROAD, COST_TOWER, canAfford } from '../../core/rules/costs';
 import { FRIEDEN_PREIS, TRIBUT_KARTEN, nimmtFrieden } from '../../core/rules/diplomatie';
 import { brennt } from '../../core/rules/feuer';
+import { FAST_GESCHLOSSEN, hatHauptstadt, hauptstadtFelder, hauptstadtHindernis } from '../../core/rules/hauptstadt';
+import type { Umland } from '../../core/rules/hauptstadt';
+import type { Cost } from '../../core/rules/costs';
 import { Diagnose, diagnoseAn } from '../ui/Diagnose';
 
 /** Nach so vielen Millisekunden wuerfelt der Knopf von selbst. Erst fuenf, dann acht - beides zu knapp, um sich umzusehen und zu planen. */
@@ -100,6 +103,8 @@ export function Game() {
   const clearProduceEffect = useStore((s) => s.clearProduceEffect);
 
   const [mode, setMode] = useState<BuildMode>(null);
+  /** Wo die Ausbau-Tafel offen ist: an einem eigenen Gebaeude oder an einer Krone. */
+  const [ausbauOrt, setAusbauOrt] = useState<{ art: 'ecke' | 'feld'; key: string } | null>(null);
   /** Zahlen festpinnen - fuer alle, die sie lieber dauerhaft sehen. */
   const [pinNumbers, setPinNumbers] = useState(false);
 
@@ -358,6 +363,118 @@ export function Game() {
   };
   const befehleMoeglich = isMine && (phase.t === 'main' || phase.t === 'roll') && mode === null;
 
+  /*
+   * Hauptstadt (rules/hauptstadt.ts): Kronen ueber Feldern, die fast oder ganz
+   * geschlossen sind, und die Ausbau-Tafel an Gebaeude oder Krone - wer etwas
+   * ausbauen will, klickt einfach darauf.
+   */
+  const umland = useMemo(
+    () => (you && phase.t !== 'setup' ? hauptstadtFelder(state, you) : []),
+    [state, you, phase.t],
+  );
+  const eigeneHauptstadt = you ? hatHauptstadt(state, you) : false;
+  const kronen: Krone[] = useMemo(
+    () =>
+      eigeneHauptstadt
+        ? []
+        : umland
+            .filter((u) => u.fehlt <= FAST_GESCHLOSSEN)
+            .map((u) => ({
+              q: u.q,
+              r: u.r,
+              bereit: u.bereit,
+              titel: u.bereit
+                ? 'Umschlossen - hier kann deine Hauptstadt entstehen. Klicken.'
+                : `Fast umschlossen: ${u.strassen}/6 Strassen, ${u.staedte}/3 Staedte. Klicken.`,
+            })),
+    [umland, eigeneHauptstadt],
+  );
+  const bereiteFelder = kronen.filter((k) => k.bereit);
+  // Eine Bau- oder Befehlswahl schliesst die Tafel.
+  useEffect(() => {
+    if (mode !== null || befehl !== null) setAusbauOrt(null);
+  }, [mode, befehl]);
+  useEffect(() => {
+    if (ausbauOrt === null) return;
+    const taste = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setAusbauOrt(null);
+    };
+    window.addEventListener('keydown', taste);
+    return () => window.removeEventListener('keydown', taste);
+  }, [ausbauOrt]);
+
+  const ausbau: AusbauTafel | null = useMemo(() => {
+    if (!ausbauOrt || !you) return null;
+    const jetzt = isMine && phase.t === 'main';
+    const warum = !isMine ? 'Nicht dein Zug' : phase.t === 'roll' ? 'Erst wuerfeln' : phase.t !== 'main' ? 'Jetzt nicht' : undefined;
+    const bezahlbar = (k: Cost) => !!hand && canAfford(hand, k);
+    const armut = (k: Cost) => (bezahlbar(k) ? undefined : 'Zu wenig Rohstoffe');
+    const dann = (f: () => void) => () => {
+      f();
+      setAusbauOrt(null);
+    };
+    const mehrzahl = (n: number, eins: string, viele: string) => `${n} ${n === 1 ? eins : viele}`;
+    const hauptstadtOption = (u: Umland) => {
+      const hindernis = hauptstadtHindernis(state, you, u.q, u.r);
+      const fehlt = [
+        u.strassen < 6 ? mehrzahl(6 - u.strassen, 'Strasse', 'Strassen') : '',
+        u.staedte < 3 ? mehrzahl(3 - u.staedte, 'Stadt', 'Staedte') : '',
+      ]
+        .filter(Boolean)
+        .join(' und ');
+      return {
+        name: 'Hauptstadt',
+        kosten: COST_CAPITAL,
+        darf: jetzt && hindernis === null && bezahlbar(COST_CAPITAL),
+        hinweis: !u.bereit ? `Es fehlen noch ${fehlt}` : (hindernis ?? warum ?? armut(COST_CAPITAL)),
+        wahl: dann(() => {
+          act({ t: 'foundCapital', q: u.q, r: u.r });
+          playBuild();
+        }),
+      };
+    };
+    if (ausbauOrt.art === 'feld') {
+      const u = umland.find((x) => hexKey(x.q, x.r) === ausbauOrt.key);
+      if (!u) return null;
+      return { ort: ausbauOrt, titel: u.bereit ? 'Umschlossenes Feld' : 'Fast umschlossen', optionen: [hauptstadtOption(u)] };
+    }
+    const b = state.buildings[ausbauOrt.key];
+    if (!b || b.owner !== you) return null;
+    const feuer = brennt(state, ausbauOrt.key) ? 'Hier brennt es' : undefined;
+    const optionen: AusbauTafel['optionen'] = [];
+    if (b.type === 'settlement') {
+      optionen.push({
+        name: 'Stadt',
+        kosten: COST_CITY,
+        darf: jetzt && !feuer && bezahlbar(COST_CITY),
+        hinweis: warum ?? feuer ?? armut(COST_CITY),
+        wahl: dann(() => {
+          act({ t: 'buildCity', vertex: ausbauOrt.key });
+          playBuild();
+        }),
+      });
+    }
+    if (!b.turm) {
+      optionen.push({
+        name: 'Wachturm',
+        kosten: COST_TOWER,
+        darf: jetzt && !feuer && bezahlbar(COST_TOWER),
+        hinweis: warum ?? feuer ?? armut(COST_TOWER),
+        wahl: dann(() => {
+          act({ t: 'buildTower', vertex: ausbauOrt.key });
+          playTurm();
+        }),
+      });
+    }
+    if (!eigeneHauptstadt) {
+      const u = umland.find(
+        (x) => x.fehlt <= FAST_GESCHLOSSEN && hexVertices(x.q, x.r).some((v) => vertexKey(v) === ausbauOrt.key),
+      );
+      if (u) optionen.push(hauptstadtOption(u));
+    }
+    return { ort: ausbauOrt, titel: b.type === 'city' ? 'Stadt' : 'Dorf', optionen };
+  }, [ausbauOrt, you, isMine, phase.t, hand, state, umland, eigeneHauptstadt, act]);
+
   /** Was auf freien Bauplaetzen als Vorschau steht (Board). */
   const geisterBau: 'dorf' | 'stadt' | 'turm' | null =
     phase.t === 'setup' && phase.awaiting === 'settlement'
@@ -411,6 +528,7 @@ export function Game() {
     autoWurf &&
     mode === null &&
     befehl === null &&
+    ausbauOrt === null &&
     state.draft === null &&
     state.trade === null &&
     !tafelOffen;
@@ -711,6 +829,15 @@ export function Game() {
           tageszeit={tageszeit}
           wetter={wetter}
           geisterBau={isMine ? geisterBau : null}
+          kronen={kronen}
+          onKrone={(q, r) => setAusbauOrt({ art: 'feld', key: hexKey(q, r) })}
+          onGebaeude={
+            you && mode === null && befehl === null && phase.t !== 'setup'
+              ? (vk) => setAusbauOrt({ art: 'ecke', key: vk })
+              : undefined
+          }
+          onLeer={() => setAusbauOrt(null)}
+          ausbau={ausbau}
         >
           {/*
             Unten links Hand und Aktionsleiste als ein Block. Die Leiste steht
@@ -729,6 +856,13 @@ export function Game() {
                 act={act}
                 verhaeltnis={(r) => (you ? tradeRatio(state, world, you, r) : 4)}
                 onTafel={setTafelOffen}
+                hauptstadtBereit={bereiteFelder.length > 0}
+                onHauptstadt={() => {
+                  const k = bereiteFelder[0];
+                  if (!k) return;
+                  zeigeFeld(k.q, k.r);
+                  setAusbauOrt({ art: 'feld', key: hexKey(k.q, k.r) });
+                }}
               />
             )}
             {/*

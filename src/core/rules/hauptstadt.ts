@@ -1,0 +1,111 @@
+/**
+ * Die Hauptstadt.
+ *
+ * Ein Feld wird zur Hauptstadt, wenn es ringsum geschlossen ist: alle sechs
+ * Kanten tragen eigene Strassen, und an drei Ecken im Wechsel stehen eigene
+ * Staedte. Mehr als drei Gebaeude passen wegen der Abstandsregel ohnehin nicht
+ * an ein Feld. Doerfer zaehlen vorerst nicht - erst drei Staedte schliessen den
+ * Ring (DESIGN.md, Hauptstadt).
+ *
+ * Eine je Spieler. Die Ecken bleiben, was sie sind: Ertrag und Punkte der
+ * Staedte aendern sich nicht, die Hauptstadt kommt obendrauf.
+ */
+
+import { edgeKey, hexEdges, hexKey, hexVertices, parseVertexKey, vertexAdjacentHexes, vertexKey } from '../coords';
+import type { GameState, PlayerId } from '../state';
+import { terrainAt } from '../worldgen';
+
+/** Was die Regel sehen muss - der redigierte Stand im Client genuegt. */
+export type HauptstadtSicht = Pick<GameState, 'buildings' | 'roads' | 'worldSeed'> & {
+  hauptstaedte?: GameState['hauptstaedte'];
+};
+
+/** Wie weit ein Feld geschlossen ist. */
+export type Umland = {
+  q: number;
+  r: number;
+  /** Eigene Strassen an den sechs Kanten. */
+  strassen: number;
+  /** Eigene Staedte an den drei Ecken des besten Wechsels. */
+  staedte: number;
+  /** Eigene Doerfer an diesen Ecken - sie muessen noch Stadt werden. */
+  doerfer: number;
+  /** Was noch fehlt: jede fehlende Strasse und jede fehlende Stadt zaehlt eins. */
+  fehlt: number;
+  bereit: boolean;
+};
+
+/** Ab so wenig Fehlendem gilt ein Feld als fast geschlossen - dann zeigt der Client die Krone. */
+export const FAST_GESCHLOSSEN = 2;
+
+/** Die beiden Eckensaetze, die die Abstandsregel an einem Feld erlaubt. */
+const WECHSEL = [
+  [0, 2, 4],
+  [1, 3, 5],
+] as const;
+
+/**
+ * Das Umland eines Feldes fuer einen Spieler, oder null, wenn eine fremde
+ * Siedlung an beiden Eckensaetzen den Ring fuer immer verhindert.
+ */
+export function umlandVon(view: HauptstadtSicht, player: PlayerId, q: number, r: number): Umland | null {
+  const strassen = hexEdges(q, r).filter((e) => view.roads[edgeKey(e)] === player).length;
+  const ecken = hexVertices(q, r).map(vertexKey);
+  let beste: Umland | null = null;
+  for (const satz of WECHSEL) {
+    let staedte = 0;
+    let doerfer = 0;
+    let fremd = false;
+    for (const i of satz) {
+      const b = view.buildings[ecken[i]!];
+      if (!b) continue;
+      if (b.owner !== player) {
+        fremd = true;
+        break;
+      }
+      if (b.type === 'city') staedte += 1;
+      else doerfer += 1;
+    }
+    if (fremd) continue;
+    const fehlt = 6 - strassen + (3 - staedte);
+    if (!beste || fehlt < beste.fehlt) {
+      beste = { q, r, strassen, staedte, doerfer, fehlt, bereit: fehlt === 0 };
+    }
+  }
+  return beste;
+}
+
+export const hatHauptstadt = (view: HauptstadtSicht, player: PlayerId): boolean =>
+  Object.values(view.hauptstaedte ?? {}).some((h) => h.owner === player);
+
+/**
+ * Alle Felder an eigenen Gebaeuden, sortiert nach dem, was fehlt. Wasser und
+ * Felder, auf denen schon eine Hauptstadt steht, fallen weg.
+ */
+export function hauptstadtFelder(view: HauptstadtSicht, player: PlayerId): Umland[] {
+  const gesehen = new Set<string>();
+  const out: Umland[] = [];
+  for (const [vk, b] of Object.entries(view.buildings)) {
+    if (b.owner !== player) continue;
+    for (const h of vertexAdjacentHexes(parseVertexKey(vk))) {
+      const k = hexKey(h.q, h.r);
+      if (gesehen.has(k)) continue;
+      gesehen.add(k);
+      if (view.hauptstaedte?.[k]) continue;
+      if (terrainAt(view.worldSeed, h.q, h.r) === 'water') continue;
+      const u = umlandVon(view, player, h.q, h.r);
+      if (u) out.push(u);
+    }
+  }
+  return out.sort((a, b) => a.fehlt - b.fehlt);
+}
+
+/** Warum hier (noch) keine Hauptstadt entstehen kann - oder null. */
+export function hauptstadtHindernis(view: HauptstadtSicht, player: PlayerId, q: number, r: number): string | null {
+  if (hatHauptstadt(view, player)) return 'Du hast schon eine Hauptstadt.';
+  if (view.hauptstaedte?.[hexKey(q, r)]) return 'Hier steht schon eine Hauptstadt.';
+  if (terrainAt(view.worldSeed, q, r) === 'water') return 'Auf Wasser entsteht keine Hauptstadt.';
+  const u = umlandVon(view, player, q, r);
+  if (!u || !u.bereit) return 'Das Feld braucht ringsum sechs eigene Strassen und drei eigene Staedte.';
+  return null;
+}

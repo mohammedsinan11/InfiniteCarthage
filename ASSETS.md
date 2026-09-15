@@ -66,6 +66,27 @@ Zeile "Eine Sieben - ein Fund!"; ueber der Kartenwahl steht das Schildchen
 `.draft-sieben`). *Was fehlt:* ein eigener Moment fuer die 7 - etwa eine
 aufbrechende Truhe oder ein Sternenfunke, der in die Kartenwahl uebergeht.
 
+### Hauptstadt — **Platzhalter**
+
+- **Burg (Stufe I):** `client/units.ts`, `zeichneHauptstadt` - Pixelgrafik
+  21 x 21 (Bergfried, zwei Tuerme, Mauer, Fahne in Spielerfarbe), gespiegelt
+  aus einer Haelfte. Der Stein wird je Kachelsorte umgefaerbt
+  (`STEIN_JE_SORTE`).
+- **Krone:** `client/board/Marken.tsx`, `KronenZeichen` - 11 x 6, golden
+  (bereit, wippt per CSS) oder silbern (fast umschlossen). Das leuchtende
+  Feld darunter ist ein SVG-Sechseck mit CSS-Puls (`.hex-krone`).
+- **Ausbau-Tafel:** reines CSS (`.ausbau-tafel`) mit Zipfel.
+- **Knoepfe der Bauzeile:** `SymBauen` (Hammer) und `SymHauptstadt` (Krone)
+  in `ui/Aktionsleiste.tsx`, aus wenigen SVG-Flaechen.
+
+*Was fehlt:* eine gezeichnete Burg je Gelaende statt umgefaerbtem Stein - neun
+Sorten (Wiese, Wald, Taiga, Dschungel, Lehm, Gebirge, Wueste, Schnee, Sumpf).
+Spaeter Stufe II (Palast, Bastionen, Mauerstuecke) je Gelaende. Eine Krone mit
+Glanz, ein Rahmen fuer die Tafel, Symbole fuer Bauen und Hauptstadt.
+
+*Aufwand:* Burg etwa 24 x 24 px je Sorte; Krone 16 x 10 px mit zwei
+Bildern fuers Wippen.
+
 ### Spielsteine: Dorf, Stadt, Strasse — **Platzhalter, Dorf und Stadt sprite-bereit**
 
 Seit der Ueberarbeitung Pixelgrafik auf dem Canvas (`client/units.ts`), im

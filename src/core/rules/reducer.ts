@@ -49,6 +49,7 @@ import {
   COST_ROAD,
   COST_SETTLEMENT,
   COST_TOWER,
+  COST_CAPITAL,
   canAfford,
   pay,
 } from './costs';
@@ -61,6 +62,7 @@ import {
 import { computeProduction } from './production';
 import { beginBigRound, beginNight, heldenRunde, spawnHeld, spawnKnight, tickArmy } from './army';
 import { brandRunde, brennt, mitKarteLoeschen } from './feuer';
+import { hauptstadtHindernis } from './hauptstadt';
 import { abkommenRunde, tributRunde, verhandeln } from './diplomatie';
 import type { DiplomatieEvent, Verhandlung } from './diplomatie';
 import { auftraegePruefen, aufAuftragAntworten, auftragLiefern, wandererBieten } from './auftraege';
@@ -128,12 +130,15 @@ export type Action =
   | { t: 'answerQuest'; id: number; accept: boolean }
   /** Die Rohstoffe fuer einen Lieferauftrag abgeben. Auch ausserhalb des Zugs. */
   | { t: 'deliverQuest'; id: number }
+  /** Auf einem Feld, das drei eigene Staedte und sechs eigene Strassen umschliessen, die Hauptstadt gruenden. */
+  | { t: 'foundCapital'; q: number; r: number }
   | { t: 'endTurn' };
 
 export type GameEvent =
   | { t: 'roll'; player: PlayerId; dice: [number, number] }
   | { t: 'production'; payout: Record<PlayerId, Hand> }
   | { t: 'build'; player: PlayerId; kind: 'road' | 'settlement' | 'city' | 'tower'; at: string }
+  | { t: 'capital'; player: PlayerId; q: number; r: number }
   | { t: 'buyDev'; player: PlayerId }
   | { t: 'playDev'; player: PlayerId; card: DevCardType }
   | { t: 'yearOfPlenty'; player: PlayerId; a: Resource; b: Resource }
@@ -244,6 +249,7 @@ export function createGame(
     abkommen: [],
     auftraege: [],
     nextAuftragId: 1,
+    hauptstaedte: {},
   };
 
   return { state, world };
@@ -815,6 +821,18 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       pay(actorPlayer.hand, COST_TOWER);
       b.turm = true;
       events.push({ t: 'build', player: actor, kind: 'tower', at: action.vertex });
+      break;
+    }
+
+    case 'foundCapital': {
+      if (phase.t !== 'main') return fail('Jetzt kann nicht gebaut werden.');
+      const why = hauptstadtHindernis(s, actor, action.q, action.r);
+      if (why) return fail(why);
+      if (!canAfford(actorPlayer.hand, COST_CAPITAL)) return fail('Zu wenig Rohstoffe fuer eine Hauptstadt.');
+      pay(actorPlayer.hand, COST_CAPITAL);
+      s.hauptstaedte[hexKey(action.q, action.r)] = { owner: actor, stufe: 1, seit: s.turn };
+      events.push({ t: 'capital', player: actor, q: action.q, r: action.r });
+      checkWin(s, events);
       break;
     }
 
