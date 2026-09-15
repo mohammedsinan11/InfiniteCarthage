@@ -274,6 +274,12 @@ Das Seitenmenue und die Meldungen haben Charakter.
 *Was fehlt:* echte Rahmengrafik statt CSS-Kanten - Ecken, Beschlaege, eine
 Zierleiste am Menuekopf. Derzeit ist das Zierzeichen ein Schriftzeichen.
 
+Im Menue ausserdem als CSS-Platzhalter: der Stapelzaehler an gleichen Karten
+(`.menu-karte-anzahl`, "×3" auf goldenem Grund), die Lebensbalken der Ritter
+(`.menu-ritter-leben`, ein Strich je Leben) und der Aufklapp-Pfeil der
+Ritterzeilen (▸/▾ als Schriftzeichen). *Was fehlt:* kleine Herzen oder Schilde
+fuer das Leben, ein gezeichneter Pfeil.
+
 ### Hintergrund — **Platzhalter**
 
 Einfarbig dunkel mit feinem Gewebemuster hinter der Karte. Ausserhalb des

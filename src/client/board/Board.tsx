@@ -331,6 +331,25 @@ function einheitenText(state: PublicState, du: string | null, gruppe: readonly U
 }
 
 const KEINE_KRONEN: Krone[] = [];
+
+/**
+ * Wie hohe Kacheln eine Hauptstadt verdecken - zum Vergleichen umschaltbar:
+ * ?verdecken=kasten|ueberhang|wald|halb|fuss|aus, im Browser auch window.__verdecken.
+ * Ohne Angabe: kasten.
+ */
+type VerdeckenModus = 'kasten' | 'ueberhang' | 'wald' | 'halb' | 'fuss' | 'aus';
+const VERDECKEN_MODI: readonly string[] = ['kasten', 'ueberhang', 'wald', 'halb', 'fuss', 'aus'];
+function verdeckenModus(): VerdeckenModus {
+  try {
+    const gesetzt =
+      (window as unknown as { __verdecken?: string }).__verdecken ??
+      new URLSearchParams(window.location.search).get('verdecken') ??
+      'kasten';
+    return (VERDECKEN_MODI.includes(gesetzt) ? gesetzt : 'kasten') as VerdeckenModus;
+  } catch {
+    return 'kasten';
+  }
+}
 /** Groesste Breite der Ausbau-Tafel (styles.css) und ungefaehre Hoehe - fuers Klemmen am Rand. */
 const TAFEL_BREITE = 230;
 const TAFEL_HOEHE = 170;
@@ -1011,29 +1030,49 @@ export function Board({
      * wieder obendrauf. Flache Kacheln bleiben darunter - eine Wiese davor
      * schnitte die Burg nur gerade ab, und das saehe aus wie ein Fehler.
      */
-    for (const [hk, h] of Object.entries(state.hauptstaedte ?? {})) {
+    const modus = verdeckenModus();
+    for (const [hk, h] of modus === 'aus' ? [] : Object.entries(state.hauptstaedte ?? {})) {
       const [q, r] = hk.split(':').map(Number) as [number, number];
       const c = hexToPixel(q, r, LAYOUT);
       const p = geraet(c.x, c.y - liftHex(q, r));
       const festung = h.stufe >= 2;
       // Burg 21 Kunstpixel breit, der Festungsring mit Bastionen und Wehrtuermen deutlich breiter.
       const halb = (festung ? 26 : 13) * f;
-      const oben = p.y - (festung ? 24 : 18) * f;
       const unten = p.y + (festung ? 14 : 12) * f;
+      // fuss: nur die untersten Kunstpixel - Sockel und Tor, nie Bergfried und Daecher.
+      const oben = modus === 'fuss' ? p.y + (festung ? 3 : 1) * f : p.y - (festung ? 24 : 18) * f;
       for (const [vq, vr] of [
         [q - 1, r + 1],
         [q, r + 1],
       ] as const) {
         const vorn = hexKey(vq, vr);
         const t = world.tiles.get(vorn);
-        if (!t || (t.terrain !== 'forest' && t.terrain !== 'mountain')) continue;
+        if (!t) continue;
+        const hohe = modus === 'wald' ? t.terrain === 'forest' : t.terrain === 'forest' || t.terrain === 'mountain';
+        if (!hohe) continue;
         const hoch = liftHex(vq, vr) + (vorn === hover ? LIFT : 0);
         ctx.save();
         ctx.beginPath();
         ctx.rect(p.x - halb, oben, 2 * halb, unten - oben);
         ctx.clip();
+        if (modus === 'ueberhang') {
+          // Nur was ueber die Oberkante der vorderen Kachel hinausragt: Kronen und
+          // Gipfel. Ihr Boden deckt nichts ab - Kasten minus Sechseck.
+          ctx.beginPath();
+          ctx.rect(0, 0, bw, bh);
+          [0, 1, 2, 3, 4, 5].forEach((i) => {
+            const e = hexCornerPixel(vq, vr, i, LAYOUT);
+            const g = geraet(e.x, e.y - hoch);
+            if (i === 0) ctx.moveTo(g.x, g.y);
+            else ctx.lineTo(g.x, g.y);
+          });
+          ctx.closePath();
+          ctx.clip('evenodd');
+        }
+        if (modus === 'halb') ctx.globalAlpha = 0.55;
         zeichne(t, hoch);
-        zeichneBesatzung(t, hoch);
+        ctx.globalAlpha = 1;
+        if (modus !== 'ueberhang') zeichneBesatzung(t, hoch);
         ctx.restore();
       }
     }

@@ -30,6 +30,7 @@ import {
 } from '../../core/season';
 import { cardById } from '../../core/cards/catalog';
 import { modifiersOf } from '../../core/cards/effects';
+import { RARITY_ORDER } from '../../core/cards/types';
 import type { Resource, Terrain } from '../../core/types';
 import type { Abkommen, Brand, UnitState, WandererAuftrag } from '../../core/state';
 import { hexDistance } from '../../core/coords';
@@ -103,6 +104,37 @@ function wirkungen(cardIds: readonly string[]): string[] {
   if (m.tradeDiscount > 0) zeilen.push(`Bankhandel: ${m.tradeDiscount} guenstiger`);
   if (m.handLimitBonus > 0) zeilen.push(`Handkarten: ${m.handLimitBonus} mehr erlaubt`);
   return zeilen;
+}
+
+/**
+ * Gleiche Karten als Stapel: eine Zeile je Karte mit ihrer Anzahl. Die
+ * Reihenfolge, in der sie genommen wurden, sagt nichts - sortiert wird nach
+ * Seltenheit, die seltensten oben, dann nach Namen.
+ */
+function kartenStapel(cardIds: readonly string[]) {
+  const anzahl = new Map<string, number>();
+  for (const id of cardIds) anzahl.set(id, (anzahl.get(id) ?? 0) + 1);
+  return [...anzahl]
+    .map(([id, n]) => ({ karte: cardById(id), anzahl: n }))
+    .filter((s): s is { karte: NonNullable<ReturnType<typeof cardById>>; anzahl: number } => s.karte !== undefined)
+    .sort(
+      (a, b) =>
+        RARITY_ORDER.indexOf(b.karte.rarity) - RARITY_ORDER.indexOf(a.karte.rarity) ||
+        a.karte.name.localeCompare(b.karte.name),
+    );
+}
+
+/** Die Ritter in einer Zeile: wie viele, und was sie gerade tun. */
+function ritterSumme(ritter: readonly UnitState[]): string {
+  const zaehle = (f: (u: UnitState) => boolean) => ritter.filter(f).length;
+  const teile = [
+    [zaehle((u) => u.auftrag !== 'erkunden' && u.folgt === null && u.ziel !== null), 'zieht', 'ziehen'],
+    [zaehle((u) => u.auftrag === 'erkunden'), 'erkundet', 'erkunden'],
+    [zaehle((u) => u.auftrag !== 'erkunden' && u.folgt !== null), 'folgt', 'folgen'],
+    [zaehle((u) => u.auftrag !== 'erkunden' && u.folgt === null && u.ziel === null), 'steht', 'stehen'],
+  ] as const;
+  const text = teile.filter(([n]) => n > 0).map(([n, eins, viele]) => `${n} ${n === 1 ? eins : viele}`);
+  return `${ritter.length} ${ritter.length === 1 ? 'Ritter' : 'Ritter'} · ${text.join(' · ')}`;
 }
 
 /** Was es noch nicht gibt, sagt das auch. */
@@ -234,6 +266,8 @@ export function SideMenu({
     () => typeof window === 'undefined' || !window.matchMedia('(max-width: 700px)').matches,
   );
   const [reiter, setReiter] = useState<Reiter>('reich');
+  /** Welcher Ritter in der Liste aufgeklappt ist - hoechstens einer. */
+  const [offenerRitter, setOffenerRitter] = useState<number | null>(null);
   const [ton, setTon] = useState(getVolume);
   const [musik, setMusik] = useState<MusicMode>(getMusicMode);
   const [musikPegel, setMusikPegel] = useState(getMusicVolume);
@@ -452,7 +486,7 @@ export function SideMenu({
 
         {reiter === 'karten' && (
           <>
-            <h3>Karten</h3>
+            <h3>Karten{cards.length > 0 ? ` (${cards.length})` : ''}</h3>
             {cards.length === 0 ? (
               <p className="menu-leer">
                 Noch keine. Bei einer Sieben findest du welche.
@@ -460,19 +494,16 @@ export function SideMenu({
             ) : (
               <>
                 <ul className="menu-karten">
-                  {cards.map((id, i) => {
-                    const karte = cardById(id);
-                    if (!karte) return null;
-                    return (
-                      // Dieselbe Karte kann mehrfach vorkommen - der Index
-                      // gehoert dazu, sonst kollidieren die Schluessel.
-                      <li key={`${id}-${i}`} className={`menu-karte selt-${karte.rarity}`}>
-                        <KartenBild karte={karte} klein />
+                  {kartenStapel(cards).map(({ karte, anzahl }) => (
+                    <li key={karte.id} className={`menu-karte selt-${karte.rarity}`}>
+                      <KartenBild karte={karte} klein />
+                      <span className="menu-karte-kopf">
                         <span className="menu-karte-name">{karte.name}</span>
-                        <span className="menu-karte-text">{karte.text}</span>
-                      </li>
-                    );
-                  })}
+                        {anzahl > 1 && <span className="menu-karte-anzahl">×{anzahl}</span>}
+                      </span>
+                      <span className="menu-karte-text">{karte.text}</span>
+                    </li>
+                  ))}
                 </ul>
 
                 {wirkungen(cards).length > 0 && (
@@ -657,56 +688,83 @@ export function SideMenu({
                 Noch keine. Anwerben in der Leiste unten oder eine Ritterkarte ausspielen.
               </p>
             ) : (
-              <ul className="menu-ritter">
-                {ritter.map((u, i) => {
-                  const weit = u.ziel ? hexDistance(u, u.ziel) : 0;
-                  return (
-                    <li key={u.id} className={befehl === u.id ? 'aktiv' : undefined}>
-                      <div className="menu-ritter-kopf">
-                        <span className="menu-ritter-name">Ritter {i + 1}</span>
-                        <span className="menu-ritter-ort">
-                          {u.auftrag === 'erkunden'
-                            ? 'erkundet von selbst'
-                            : u.folgt !== null
-                            ? 'im Gefolge des Helden'
-                            : u.ziel
-                              ? `zieht, noch ${weit} ${weit === 1 ? 'Feld' : 'Felder'}`
-                              : 'steht'}
-                        </span>
-                      </div>
-                      <div className="menu-ritter-knoepfe">
-                        <button onClick={() => onZeigen(u.id)}>Zeigen</button>
+              <>
+                {/*
+                  Uebersicht statt fuenf Knoepfe je Ritter: eine Zeile mit Status
+                  und Leben, ein Klick klappt die Befehle auf. Der Ritter, der
+                  gerade sein Ziel sucht, steht immer offen.
+                */}
+                <p className="menu-ritter-summe">{ritterSumme(ritter)}</p>
+                <ul className="menu-ritter">
+                  {ritter.map((u, i) => {
+                    const weit = u.ziel ? hexDistance(u, u.ziel) : 0;
+                    const status =
+                      u.auftrag === 'erkunden'
+                        ? { art: 'erkundet', text: 'erkundet' }
+                        : u.folgt !== null
+                          ? { art: 'folgt', text: 'folgt dem Helden' }
+                          : u.ziel
+                            ? { art: 'zieht', text: `zieht · noch ${weit} ${weit === 1 ? 'Feld' : 'Felder'}` }
+                            : { art: 'steht', text: 'steht' };
+                    const offen = offenerRitter === u.id || befehl === u.id;
+                    const max = WERTE.ritter.leben;
+                    return (
+                      <li
+                        key={u.id}
+                        className={[offen ? 'offen' : '', befehl === u.id ? 'aktiv' : ''].filter(Boolean).join(' ') || undefined}
+                      >
                         <button
-                          disabled={!befehleMoeglich}
-                          className={befehl === u.id ? 'aktiv' : ''}
-                          onClick={() => onBefehl(u.id)}
+                          className="menu-ritter-zeile"
+                          aria-expanded={offen}
+                          onClick={() => setOffenerRitter(offen ? null : u.id)}
                         >
-                          {befehl === u.id ? 'Waehle Ziel' : u.folgt !== null ? 'Ziel' : 'Ziel'}
+                          <span className="menu-ritter-name">Ritter {i + 1}</span>
+                          <span className={`menu-ritter-status ${status.art}`}>{status.text}</span>
+                          <span className="menu-ritter-leben" title={`Leben ${u.leben} von ${max}`}>
+                            {Array.from({ length: max }, (_, n) => (
+                              <i key={n} className={n < u.leben ? 'voll' : undefined} />
+                            ))}
+                          </span>
+                          <span className="menu-ritter-pfeil">{offen ? '▾' : '▸'}</span>
                         </button>
-                        <button disabled={!befehleMoeglich || !u.ziel} onClick={() => onHalt(u.id)}>
-                          Halt
-                        </button>
-                        <button
-                          disabled={!befehleMoeglich || (!held && u.folgt === null)}
-                          className={u.folgt !== null ? 'aktiv' : ''}
-                          title="Dem Helden folgen - so schnell wie er"
-                          onClick={() => onFolgen(u.id, u.folgt === null)}
-                        >
-                          {u.folgt !== null ? 'Folgt' : 'Folgen'}
-                        </button>
-                        <button
-                          disabled={!befehleMoeglich}
-                          className={u.auftrag === 'erkunden' ? 'aktiv' : ''}
-                          title="Von selbst erkunden: zur naechsten Ruine oder ins Unbekannte"
-                          onClick={() => onErkunden(u.id, u.auftrag !== 'erkunden')}
-                        >
-                          {u.auftrag === 'erkunden' ? 'Erkundet' : 'Erkunden'}
-                        </button>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
+                        {offen && (
+                          <div className="menu-ritter-knoepfe">
+                            <button onClick={() => onZeigen(u.id)}>Zeigen</button>
+                            <button
+                              disabled={!befehleMoeglich}
+                              className={befehl === u.id ? 'aktiv' : ''}
+                              onClick={() => onBefehl(u.id)}
+                            >
+                              {befehl === u.id ? 'Waehle Ziel' : 'Ziel'}
+                            </button>
+                            {u.ziel && (
+                              <button disabled={!befehleMoeglich} onClick={() => onHalt(u.id)}>
+                                Halt
+                              </button>
+                            )}
+                            <button
+                              disabled={!befehleMoeglich || (!held && u.folgt === null)}
+                              className={u.folgt !== null ? 'aktiv' : ''}
+                              title="Dem Helden folgen - so schnell wie er"
+                              onClick={() => onFolgen(u.id, u.folgt === null)}
+                            >
+                              {u.folgt !== null ? 'Folgt' : 'Folgen'}
+                            </button>
+                            <button
+                              disabled={!befehleMoeglich}
+                              className={u.auftrag === 'erkunden' ? 'aktiv' : ''}
+                              title="Von selbst erkunden: zur naechsten Ruine oder ins Unbekannte"
+                              onClick={() => onErkunden(u.id, u.auftrag !== 'erkunden')}
+                            >
+                              {u.auftrag === 'erkunden' ? 'Erkundet' : 'Erkunden'}
+                            </button>
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
             )}
 
             <h3>Beute</h3>
