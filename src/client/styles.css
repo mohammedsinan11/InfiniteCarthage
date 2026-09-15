@@ -2714,6 +2714,65 @@ em.off {
 
 /* --- Raumliste auf der Startseite --- */
 
+/* Deine Partien: Weiterspielen und Vergessen unter der Zeile (Home.tsx). */
+.deine-partien {
+  border-top: none;
+  margin-top: 0;
+  padding-top: 0;
+}
+.raum .raum-knoepfe {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 6px;
+}
+.raum .raum-knoepfe button {
+  grid-column: auto;
+  grid-row: auto;
+  flex: 1 0 auto;
+}
+.raum .raum-knoepfe button.klein {
+  flex: 0 0 auto;
+}
+.raum-status.dein {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+/* Platzwahl in einer laufenden Partie: Platz waehlen, PIN eingeben. */
+.platzwahl {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.platzwahl h2 {
+  margin: 0;
+  font-family: var(--pixel);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--accent);
+}
+.platzwahl ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.platzwahl label.platz {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.platzwahl label.platz input {
+  width: auto;
+  margin: 0;
+}
+.platzwahl em {
+  font-size: 10px;
+  color: var(--muted);
+}
+
 .raum.klickbar {
   cursor: pointer;
 }

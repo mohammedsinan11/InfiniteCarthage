@@ -212,6 +212,8 @@ export function SideMenu({
   log,
   welt,
   einheiten,
+  raumcode,
+  pin,
   lage,
   fraktionen,
   befehl,
@@ -261,6 +263,9 @@ export function SideMenu({
   welt: readonly WeltEintrag[];
   /** Die eigenen Einheiten: Held, Ritter, Bogenschuetzen. */
   einheiten: readonly UnitState[];
+  /** Raumcode und Platz-PIN - fuer den Wiedereinstieg auf einem anderen Geraet. */
+  raumcode: string;
+  pin: string | null;
   /** Raubzuege unterwegs, wie nah der naechste den eigenen Siedlungen ist, Kaempfe in Sicht. */
   lage: { unterwegs: number; naechster: number | null; kaempfe: number };
   /** Bekannte Fraktionen, die naechsten zuerst. */
@@ -463,6 +468,19 @@ export function SideMenu({
           <>
             <h3>Reich</h3>
             <NochNicht was="Bevoelkerung und Beliebtheit" />
+
+            {/* Wiedereinstieg auf einem anderen Geraet (protocol.ts, Platz-PIN). */}
+            <h3>Weiterspielen</h3>
+            <div className="menu-wache">
+              <span>Raumcode</span>
+              <b>{raumcode}</b>
+              <span>Deine PIN</span>
+              <b>{pin ?? '-'}</b>
+              <span className="menu-wache-hinweis">
+                Auf einem anderen Geraet: Raumcode eingeben, deinen Platz waehlen, PIN nennen. Hier im Browser steht
+                die Partie auf der Startseite unter "Deine Partien".
+              </span>
+            </div>
 
             {/*
               Die Lage draussen: wie viele Raubzuege unterwegs sind, wie nah der

@@ -25,8 +25,11 @@ import {
   DEFAULT_TARGET_POINTS,
   MAX_PLAYERS,
   MIN_PLAYERS,
+  PIN_LENGTH,
   TARGET_POINTS_CHOICES,
+  normalizePin,
   parseClientMsg,
+  randomPin,
 } from '../core/protocol';
 import type { ClientMsg, Member, RoomInfo, ServerMsg } from '../core/protocol';
 import { MELDEN_ALLE_MS, VERZEICHNIS_NAME } from '../core/lobby';
@@ -48,6 +51,11 @@ type RoomData = {
   started: boolean;
   /** token -> playerId. Holt nach einem Verbindungsabbruch den Platz zurueck. */
   tokens: Record<string, PlayerId>;
+  /**
+   * playerId -> Platz-PIN (protocol.ts). Fehlt bei Raeumen von vorher; ein
+   * Spieler bekommt seine beim naechsten Beitritt.
+   */
+  pins?: Record<PlayerId, string>;
   /**
    * In der Raumliste sichtbar? Fehlt bei Raeumen von vor der Liste - die gelten
    * als oeffentlich, wie jeder neue Raum ohne ausdrueckliche Wahl.
@@ -87,6 +95,20 @@ function randomId(bytes = 16): string {
   return [...a].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+function neuePin(): string {
+  const a = new Uint8Array(PIN_LENGTH);
+  crypto.getRandomValues(a);
+  return randomPin(a);
+}
+
+/**
+ * Falsche PINs je Raum: nach so vielen innerhalb von PIN_SPERRE_MS keine
+ * weiteren Versuche. Nur im Speicher - schlaeft der Raum ein, beginnt es neu,
+ * aber zum Durchprobieren von einer Million PINs reicht das nicht.
+ */
+const PIN_VERSUCHE = 8;
+const PIN_SPERRE_MS = 10 * 60 * 1000;
+
 function randomSeed(): number {
   const a = new Uint32Array(1);
   crypto.getRandomValues(a);
@@ -108,6 +130,8 @@ export class GameRoom implements DurableObject {
   private game: Game | null = null;
   /** Wann sich der Raum zuletzt beim Verzeichnis gemeldet hat. */
   private letzteMeldung = 0;
+  /** Falsche PINs im laufenden Zeitfenster (PIN_VERSUCHE, PIN_SPERRE_MS). */
+  private pinFehler = { anzahl: 0, seit: 0 };
 
   constructor(
     private readonly ctx: DurableObjectState,
@@ -338,8 +362,28 @@ export class GameRoom implements DurableObject {
     // Rueckkehr mit gueltigem Token: derselbe Platz, dieselben Karten.
     if (token !== undefined && room.tokens[token] !== undefined) {
       playerId = room.tokens[token];
+    } else if (msg.seat !== undefined) {
+      // Anderes Geraet: Raumcode, Platz und dessen PIN. Das neue Geraet
+      // bekommt ein eigenes Token - das alte bleibt gueltig.
+      const jetzt = Date.now();
+      if (jetzt - this.pinFehler.seit > PIN_SPERRE_MS) this.pinFehler = { anzahl: 0, seit: jetzt };
+      if (this.pinFehler.anzahl >= PIN_VERSUCHE) {
+        this.send(ws, { t: 'error', message: 'Zu viele falsche PINs - in ein paar Minuten nochmal.' });
+        return;
+      }
+      const platz = room.members.find((m) => m.id === msg.seat);
+      const pin = platz ? room.pins?.[platz.id] : undefined;
+      if (!platz || pin === undefined || pin !== normalizePin(msg.pin ?? '')) {
+        this.pinFehler.anzahl += 1;
+        this.send(ws, { t: 'error', message: 'Die PIN passt nicht zu diesem Platz.' });
+        return;
+      }
+      playerId = platz.id;
+      token = randomId(16);
+      room.tokens[token] = playerId;
     } else if (room.started) {
-      this.send(ws, { t: 'error', message: 'Die Partie laeuft bereits.' });
+      // Kein Platz ohne Token: die Plaetze zeigen, der Client fragt nach der PIN.
+      this.send(ws, { t: 'seats', room: this.info(room) });
       return;
     } else if (room.members.length >= MAX_PLAYERS) {
       this.send(ws, { t: 'error', message: 'Der Raum ist voll.' });
@@ -358,6 +402,27 @@ export class GameRoom implements DurableObject {
       return;
     }
     member.connected = true;
+    room.pins ??= {};
+    const pin = (room.pins[playerId] ??= neuePin());
+
+    /*
+     * Neuer Tab oder anderes Geraet: wer vorher mit diesem Platz verbunden war,
+     * gibt ihn ab. Sonst spielten zwei Fenster denselben Platz. Die alte
+     * Verbindung verliert zuerst ihren Platz - so meldet ihr close-Ereignis den
+     * Spieler nicht als getrennt.
+     */
+    for (const alt of this.ctx.getWebSockets()) {
+      if (alt === ws) continue;
+      const a = alt.deserializeAttachment() as Attachment | null;
+      if (a?.playerId !== playerId) continue;
+      alt.serializeAttachment({ playerId: null } satisfies Attachment);
+      this.send(alt, { t: 'replaced' });
+      try {
+        alt.close(4000, 'replaced');
+      } catch {
+        // schon zu
+      }
+    }
     ws.serializeAttachment({ playerId } satisfies Attachment);
 
     const game = await this.loadGame();
@@ -367,7 +432,7 @@ export class GameRoom implements DurableObject {
     }
 
     await this.save();
-    this.send(ws, { t: 'welcome', you: playerId, token, room: this.info(room) });
+    this.send(ws, { t: 'welcome', you: playerId, token, pin, room: this.info(room) });
     this.broadcastRoom();
     if (game) this.sendState(ws, game.state, playerId);
     await this.melden();

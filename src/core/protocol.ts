@@ -53,16 +53,26 @@ export const targetPointsLabel = (n: number): string =>
   n === NO_TARGET ? 'unendlich' : String(n);
 
 export type ClientMsg =
-  /** token stammt aus einer frueheren Sitzung und holt den Platz zurueck. */
-  | { t: 'join'; name: string; token?: string }
+  /**
+   * token stammt aus einer frueheren Sitzung und holt den Platz zurueck. Auf
+   * einem anderen Geraet gibt es kein Token: dann seat (der Platz) und pin.
+   */
+  | { t: 'join'; name: string; token?: string; seat?: PlayerId; pin?: string }
   /** Nur der Gastgeber, nur vor dem Start. Was fehlt, bleibt, wie es ist. */
   | { t: 'setOptions'; targetPoints?: number; oeffentlich?: boolean }
   | { t: 'start' }
   | { t: 'action'; action: Action };
 
 export type ServerMsg =
-  /** Nur an den frisch Verbundenen: wer er ist und womit er wiederkommt. */
-  | { t: 'welcome'; you: PlayerId; token: string; room: RoomInfo }
+  /**
+   * Nur an den frisch Verbundenen: wer er ist und womit er wiederkommt - das
+   * Token fuer diesen Browser, die PIN fuer ein anderes Geraet.
+   */
+  | { t: 'welcome'; you: PlayerId; token: string; pin: string; room: RoomInfo }
+  /** Die Partie laeuft, und ohne Token hat man keinen Platz: waehlen und PIN nennen. */
+  | { t: 'seats'; room: RoomInfo }
+  /** Derselbe Platz wurde anderswo geoeffnet - diese Verbindung gibt ihn ab. */
+  | { t: 'replaced' }
   | { t: 'room'; room: RoomInfo }
   | { t: 'state'; state: PublicState }
   | { t: 'events'; events: GameEvent[] }
@@ -95,5 +105,29 @@ export function randomRoomCode(bytes: Uint8Array): string {
   for (let i = 0; i < ROOM_CODE_LENGTH; i++) {
     out += CODE_ALPHABET[bytes[i]! % CODE_ALPHABET.length];
   }
+  return out;
+}
+
+/**
+ * Die Platz-PIN: wer auf einem anderen Geraet weiterspielt, nennt den Raumcode,
+ * waehlt seinen Platz und gibt diese PIN ein. Der Raumcode allein genuegt
+ * nicht - oeffentliche Raeume stehen mit Code in der Liste. Die PIN gilt nur
+ * innerhalb ihres Raums, also braucht es keinen zweiten, weltweit eindeutigen
+ * Code. Dasselbe Alphabet wie der Raumcode: nichts zum Verwechseln.
+ */
+export const PIN_LENGTH = 4;
+
+/** Eingabe aufraeumen: Leerzeichen und Kleinschreibung verzeihen. */
+export const normalizePin = (s: string): string => s.toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+export function isPin(s: string): boolean {
+  if (s.length !== PIN_LENGTH) return false;
+  for (const c of s) if (!CODE_ALPHABET.includes(c)) return false;
+  return true;
+}
+
+export function randomPin(bytes: Uint8Array): string {
+  let out = '';
+  for (let i = 0; i < PIN_LENGTH; i++) out += CODE_ALPHABET[bytes[i]! % CODE_ALPHABET.length];
   return out;
 }

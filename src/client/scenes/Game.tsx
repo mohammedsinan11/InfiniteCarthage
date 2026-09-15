@@ -742,6 +742,8 @@ export function Game() {
           log={log}
           welt={welt}
           einheiten={meineEinheiten}
+          raumcode={useStore.getState().code}
+          pin={useStore.getState().pin}
           lage={lage}
           fraktionen={fraktionen}
           befehl={befehl}

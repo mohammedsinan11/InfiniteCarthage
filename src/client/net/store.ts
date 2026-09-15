@@ -9,6 +9,8 @@
 
 import { create } from 'zustand';
 import { openSocket, sendMsg } from './socket';
+import { lokalerSpeicher, merkePartie } from './partien';
+import { normalizePin } from '../../core/protocol';
 import type { ClientMsg, RoomInfo, ServerMsg } from '../../core/protocol';
 import type { PublicState } from '../../core/redact';
 import type { Action, GameEvent } from '../../core/rules/reducer';
@@ -96,7 +98,11 @@ const NAME_KEY = 'infinitecarthage.name';
  * Spieler, und ein Neuladen behaelt den Platz trotzdem.
  */
 
-type Status = 'idle' | 'connecting' | 'lobby' | 'playing' | 'closed';
+/** platzwahl: die Partie laeuft, dieser Browser hat keinen Platz - welcher bist du (Home)? */
+type Status = 'idle' | 'connecting' | 'platzwahl' | 'lobby' | 'playing' | 'closed';
+
+/** Unter welchem Namen zuletzt beigetreten wurde - fuer die Platzwahl auf derselben Verbindung. */
+let beitrittsName = '';
 
 export type Store = {
   status: Status;
@@ -109,6 +115,10 @@ export type Store = {
   log: string[];
   welt: WeltEintrag[];
   ws: WebSocket | null;
+  /** Die Platz-PIN fuer ein anderes Geraet (protocol.ts) - kommt mit welcome. */
+  pin: string | null;
+  /** Die laufende Partie, in der dieser Browser einen Platz waehlen soll. */
+  platzWahl: RoomInfo | null;
   /**
    * Ein Wurf, der noch gezeigt werden will.
    *
@@ -131,8 +141,13 @@ export type Store = {
    */
   produceEffect: { id: number; roll: number } | null;
 
-  /** oeffentlich gilt nur beim Eroeffnen: erscheint der Raum in der Raumliste? */
-  connect: (code: string, name: string, create: boolean, oeffentlich?: boolean) => void;
+  /**
+   * oeffentlich gilt nur beim Eroeffnen: erscheint der Raum in der Raumliste?
+   * token: aus "Deine Partien" (net/partien.ts) - sonst nur das Token dieses Tabs.
+   */
+  connect: (code: string, name: string, create: boolean, oeffentlich?: boolean, token?: string) => void;
+  /** In einer laufenden Partie ohne Token: diesen Platz nehmen, mit seiner PIN. */
+  waehlePlatz: (seat: PlayerId, pin: string) => void;
   /** Nach einem Neuladen zurueck in die laufende Partie, falls moeglich. */
   resume: () => void;
   disconnect: () => void;
@@ -509,11 +524,14 @@ export const useStore = create<Store>((set, get) => ({
   world: null,
   log: [], welt: [],
   ws: null,
+  pin: null,
+  platzWahl: null,
   pendingRoll: null,
   announcements: [],
   produceEffect: null,
 
-  connect: (code, name, create, oeffentlich = true) => {
+  connect: (code, name, create, oeffentlich = true, token) => {
+    beitrittsName = name;
     const alt = get().ws;
     if (alt) {
       /*
@@ -530,11 +548,11 @@ export const useStore = create<Store>((set, get) => ({
       alt.onmessage = null;
       alt.close();
     }
-    set({ status: 'connecting', error: null, code, log: [], welt: [], state: null, world: null });
+    set({ status: 'connecting', error: null, code, log: [], welt: [], state: null, world: null, pin: null, platzWahl: null });
 
     const ws = openSocket(code, create, oeffentlich, {
       onOpen: () => {
-        sendMsg(ws, { t: 'join', name, token: loadToken(code) });
+        sendMsg(ws, { t: 'join', name, token: token ?? loadToken(code) });
       },
       onClose: () => {
         // Nur die AKTUELLE Verbindung darf den Zustand aendern.
@@ -546,7 +564,46 @@ export const useStore = create<Store>((set, get) => ({
         switch (msg.t) {
           case 'welcome':
             saveToken(code, msg.token);
-            set({ you: msg.you, room: msg.room, status: msg.room.started ? 'playing' : 'lobby' });
+            // Fuer "Deine Partien": auch nach dem Schliessen des Browsers weiterspielen.
+            merkePartie(
+              lokalerSpeicher(),
+              {
+                code,
+                token: msg.token,
+                name: msg.room.members.find((m) => m.id === msg.you)?.name ?? name,
+                zuletzt: Date.now(),
+              },
+              Date.now(),
+            );
+            set({
+              you: msg.you,
+              room: msg.room,
+              pin: msg.pin ?? null,
+              platzWahl: null,
+              status: msg.room.started ? 'playing' : 'lobby',
+            });
+            break;
+          case 'seats':
+            set({ platzWahl: msg.room, room: msg.room, status: 'platzwahl' });
+            break;
+          case 'replaced':
+            // Derselbe Platz ist jetzt anderswo offen. Nicht still zurueckholen:
+            // der Tab vergisst die Partie, ein Neuladen fuehrt auf die Startseite.
+            try {
+              sessionStorage.removeItem(ROOM_KEY);
+            } catch {
+              // nichts zu tun
+            }
+            set({
+              ws: null,
+              status: 'idle',
+              room: null,
+              state: null,
+              world: null,
+              you: null,
+              pin: null,
+              error: 'Diese Partie ist jetzt in einem anderen Tab oder auf einem anderen Geraet offen.',
+            });
             break;
           case 'room':
             /*
@@ -661,7 +718,13 @@ export const useStore = create<Store>((set, get) => ({
       you: null,
       log: [], welt: [],
       pendingRoll: null,
+      pin: null,
+      platzWahl: null,
     });
+  },
+
+  waehlePlatz: (seat, pin) => {
+    sendMsg(get().ws, { t: 'join', name: beitrittsName, seat, pin: normalizePin(pin) });
   },
 
   /**

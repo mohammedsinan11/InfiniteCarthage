@@ -414,6 +414,25 @@ beschiessen, Schuetzen als Aufgabe fuer Tuerme an der Hauptstadt.
 
 Offen: Verbaende ueber mehrere Felder (Banner), Formationen im Kampf.
 
+## Wiedereinstieg
+
+- **Deine Partien** (`client/net/partien.ts`): jeder Beitritt merkt Raumcode,
+  Token und Namen im localStorage, 30 Tage, hoechstens 20. Die Startseite
+  listet sie mit "Weiterspielen" - auch nach dem Schliessen des Browsers. Das
+  Token daraus wird nur auf diesen Klick benutzt; wer in einem zweiten Tab mit
+  dem Raumcode beitritt, bekommt weiter einen eigenen Platz.
+- **Neuer Tab gewinnt:** Verbindet sich derselbe Platz ein zweites Mal, gibt
+  die alte Verbindung ihn ab (`replaced`) und landet mit Hinweis auf der
+  Startseite.
+- **Anderes Geraet, derselbe Raumcode:** Eine laufende Partie ohne Token zeigt
+  ihre Plaetze (`seats`); man waehlt seinen und nennt die Platz-PIN (4
+  Zeichen, steht im Menue unter Reich). Der Raumcode allein genuegt nicht -
+  oeffentliche Raeume stehen mit Code in der Liste. Die PIN gilt nur im Raum,
+  also gibt es keinen zweiten Code, der weltweit eindeutig sein muesste. Nach
+  8 falschen PINs in 10 Minuten sperrt der Raum weitere Versuche.
+- **Laufende Partien in der Raumliste** oeffnen sich per Klick: mit gemerktem
+  Platz direkt, sonst mit der Platzwahl.
+
 ## Kartenwert
 
 Die Balance der Karten folgt einem ausdruecklichen Modell (`core/cards/wert.ts`),
