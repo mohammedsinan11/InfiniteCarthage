@@ -68,7 +68,7 @@ export type FeuerEvent =
   | ({
       t: 'extinguished';
       /** verschont: das letzte Gebaeude eines Spielers brennt nicht nieder. */
-      durch: 'karte' | 'ritter' | 'held' | 'regen' | 'verschont';
+      durch: 'karte' | 'ritter' | 'bogen' | 'held' | 'regen' | 'verschont';
     } & Basis)
   | ({ t: 'burnedDown'; fraktion: string } & Basis);
 
@@ -200,13 +200,13 @@ export function brandRunde(s: GameState, ender: PlayerId, beendet: number, event
       .filter(
         (u) =>
           u.owner === b.owner &&
-          (u.kind === 'ritter' || u.kind === 'held') &&
+          (u.kind === 'ritter' || u.kind === 'bogen' || u.kind === 'held') &&
           felder.some((h) => h.q === u.q && h.r === u.r) &&
           !imKampf(s, u),
       )
       .sort((x, y) => x.id - y.id)[0];
     if (helfer) {
-      events.push({ t: 'extinguished', ...basis(b), durch: helfer.kind === 'held' ? 'held' : 'ritter' });
+      events.push({ t: 'extinguished', ...basis(b), durch: helfer.kind === 'held' ? 'held' : helfer.kind === 'bogen' ? 'bogen' : 'ritter' });
       continue;
     }
     if (b.owner === ender && b.seit <= beendet) {

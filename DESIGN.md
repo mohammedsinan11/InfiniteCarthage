@@ -386,10 +386,31 @@ anbieten oder brechen; ob Tribut mit der Groesse des Reichs steigen soll.
 ## Verbaende
 
 Alle eigenen Einheiten eines Feldes sind ein Verband. Ein Klick auf das Feld
-waehlt sie zusammen (im Menue: Verbaende, Ziel), und ein Ziel schickt alle.
+waehlt sie zusammen, und ein Ziel schickt alle.
 Sie ziehen im Tempo des Langsamsten - mit einem Ritter dabei also auch der Held
 nur ein Feld - und warten, solange einer von ihnen kaempft. Am Ziel loest sich
 der Verband. Wer einer einzelnen Einheit ein Ziel gibt, loest sie heraus.
+
+**Im Menue** (Reiter "Heer & Auftraege", Abschnitt Einheiten) stehen alle
+eigenen Einheiten je Feld: eine einzelne als Zeile, mehrere als Verband mit
+Zusammensetzung ("Held, 2 Ritter, 1 Bogenschuetze") und Status. Ein Klick
+klappt den Verband auf - darin jede Einheit mit Leben, Status und eigenen
+Befehlen, oben "Ziel fuer alle". Frueher standen Verbaende und Ritter in zwei
+getrennten Listen, und man sah nicht, wer zu welchem Verband gehoert.
+
+## Bogenschuetzen
+
+Gebaut (`rules/army.ts`, `beschuss`): angeworben fuer 2 Holz und 1 Wolle
+(`COST_ARCHER`), Angriff 2, Leben 2. Sie stuermen nicht vor, sondern schiessen
+jede Runde vor dem Kampf einmal auf das naechste Feld mit Feinden - ein Feld
+weit, neben einem eigenen Wachturm oder auf der eigenen Hauptstadt zwei
+(`bogenErhoeht`). Getroffene verlieren ein Leben und schlagen nicht zurueck;
+wer faellt, laesst seine Beute beim Schuetzen, und die Jagd der Wanderer zaehlt
+ihn. Die Besatzung eines Lagers trifft kein Pfeil. Im Nahkampf treffen sie um
+eins schlechter (`BOGEN_NAHKAMPF`), und aus dem Nahkampf schiessen sie nicht.
+
+Offen: ein sichtbarer Pfeil auf der Karte (heute nur Protokoll), Besatzungen
+beschiessen, Schuetzen als Aufgabe fuer Tuerme an der Hauptstadt.
 
 Offen: Verbaende ueber mehrere Felder (Banner), Formationen im Kampf.
 

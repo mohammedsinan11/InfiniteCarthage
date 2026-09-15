@@ -130,7 +130,7 @@ Codeaenderung gezeichnet; fuer die Spielerfarbe braeuchte es eine Farbmaske
 *Aufwand:* 2 Gebaeude, gern je 2 Varianten, dazu ein Strassenstueck in drei
 Richtungen; Farbe ueber Maske oder 6 eingefaerbte Fassungen.
 
-### Figuren: Lager, Ruinen, Raeuber, Goblins, Ritter, Wanderer — **Platzhalter, sprite-bereit**
+### Figuren: Lager, Ruinen, Raeuber, Goblins, Ritter, Bogenschuetzen, Wanderer — **Platzhalter, sprite-bereit**
 
 `src/client/units.ts`: kleine Pixelkarten aus Zeichen, gezeichnet im Kunstpixel
 der Kacheln auf dem Canvas - also im selben Raster wie die Karte und von den
@@ -140,8 +140,11 @@ Zu sehen: Lager (Zelt, Palisade, Wimpel in Fraktionsfarbe) mit ihrer Besatzung
 davor, noch nicht erkundete Ruinen (zwei Saeulen auf einem Sockel), Raubzuege
 und Fehden, Wanderer (grauer Kapuzenmantel mit Stab) und die Ritter der
 Spieler. Raeuber tragen die Fraktionsfarbe am Halstuch, Goblins am Guertel,
-Ritter die Spielerfarbe am Waffenrock. Alle Figuren blicken nach vorn und haben
-keine Laufanimation - sie springen je Runde ein Feld weiter.
+Ritter die Spielerfarbe am Waffenrock. Bogenschuetzen (`bogen`, 9 x 12):
+Lederkapuze, Wams in Spielerfarbe, rechts ein Holzbogen. Alle Figuren blicken
+nach vorn und haben keine Laufanimation - sie springen je Runde ein Feld weiter.
+*Was fehlt:* ein Pfeil, der beim Beschuss sichtbar von Feld zu Feld fliegt -
+heute steht der Beschuss nur im Protokoll.
 
 **Sprites ohne Codeaenderung:** `raeuber.png`, `goblin.png`, `ritter.png`,
 `wanderer.png`, `lager.png`, `ruine.png` nach `src/assets/units/` legen. Format
@@ -225,7 +228,7 @@ Pixelkarten). In der Kartenwahl gross, im Menue klein.
 ### Aktionsleiste und Bauplaetze — **Platzhalter**
 
 - **Aktionsleiste** rechts neben der Hand (`ui/Aktionsleiste.tsx`): Symbole fuer
-  Strasse, Dorf, Stadt, Karte, Ritter, Handel, Karten, Beute und Zugende aus
+  Strasse, Dorf, Stadt, Karte, Ritter, Bogen (Bogen mit Sehne und Pfeil), Handel, Karten, Beute und Zugende aus
   wenigen SVG-Flaechen; Kosten als verkleinerte Rohstoffbilder. Handel und
   Entwicklungskarten klappen als Tafeln auf.
 - **Bauplaetze:** ein goldener Ring je freiem Platz (CSS `.vertex-ring`), unter
@@ -336,10 +339,10 @@ wuerden.
 | **Technologien** | Symbole | Fuer den Reiter im Menue. |
 | **Auftraege und Ereignisse** | Symbole, evtl. kleine Bilder | Ereignisse koennten ein Bild vertragen, Auftraege genuegt ein Symbol. |
 | **Lager-Sprite** | 1 bis 3 Varianten (`lager.png`) | Ersetzt das Pixel-Zelt. Raeuber- und Goblinlager duerfen verschieden aussehen - dafuer braeuchte es zwei Dateien. |
-| **Einheiten-Sprites** | `raeuber.png`, `goblin.png`, `ritter.png`, `wanderer.png`, spaeter je Einheit | Werden ohne Codeaenderung gezeichnet (README in `src/assets/units`). Fuer Bewegung spaeter zwei Blickrichtungen. |
+| **Einheiten-Sprites** | `raeuber.png`, `goblin.png`, `ritter.png`, `bogen.png`, `wanderer.png`, spaeter je Einheit | Werden ohne Codeaenderung gezeichnet (README in `src/assets/units`). Fuer Bewegung spaeter zwei Blickrichtungen. |
 | **Fraktionswappen** | 9 kleine Wappen oder Banner | Ersetzen die blossen Farbpunkte in Menue und Feldinfo; koennten auch am Lager haengen. |
 | **Kampf-Symbol** | `kampf.png`, etwa 12 x 12, gern 2 Einzelbilder | Ersetzt die Pixelschwerter ueber einem umkaempften Feld. |
-| **Aktionssymbole** | 9 Symbole, etwa 16 x 16 | Strasse, Dorf, Stadt, Karte, Ritter, Handel, Karten, Beute, Zugende in der Aktionsleiste. |
+| **Aktionssymbole** | 10 Symbole, etwa 16 x 16 | Strasse, Dorf, Stadt, Karte, Ritter, Bogen, Handel, Karten, Beute, Zugende in der Aktionsleiste. |
 | **Bauplatz-Marke** | Ring oder Fundament, etwa 12 x 8 | Ersetzt den gezeichneten Ring auf freien Bauplaetzen. |
 | **Wetter-Sprites** | Regen- und Schneetextur, 3-4 Blitzbilder, Wolkenschatten | Ersetzen die gerechneten Muster im Shader. |
 | **Fackel und Feuer** | `fackel.png` 2-3 Einzelbilder, Lagerfeuer | Die Fackel an Figuren bei Nacht; das Licht bleibt im Shader. |

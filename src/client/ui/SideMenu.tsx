@@ -73,7 +73,7 @@ const REITER: ReadonlyArray<{ id: Reiter; kurz: string; titel: string }> = [
   { id: 'reich', kurz: 'RE', titel: 'Reich' },
   { id: 'karten', kurz: 'KA', titel: 'Karten' },
   { id: 'technik', kurz: 'TE', titel: 'Technik' },
-  { id: 'auftraege', kurz: 'HA', titel: 'Helden & Auftraege' },
+  { id: 'auftraege', kurz: 'HE', titel: 'Heer & Auftraege' },
   { id: 'ton', kurz: 'TO', titel: 'Ton' },
 ];
 
@@ -124,17 +124,81 @@ function kartenStapel(cardIds: readonly string[]) {
     );
 }
 
-/** Die Ritter in einer Zeile: wie viele, und was sie gerade tun. */
-function ritterSumme(ritter: readonly UnitState[]): string {
-  const zaehle = (f: (u: UnitState) => boolean) => ritter.filter(f).length;
-  const teile = [
-    [zaehle((u) => u.auftrag !== 'erkunden' && u.folgt === null && u.ziel !== null), 'zieht', 'ziehen'],
-    [zaehle((u) => u.auftrag === 'erkunden'), 'erkundet', 'erkunden'],
-    [zaehle((u) => u.auftrag !== 'erkunden' && u.folgt !== null), 'folgt', 'folgen'],
-    [zaehle((u) => u.auftrag !== 'erkunden' && u.folgt === null && u.ziel === null), 'steht', 'stehen'],
+/** Wie eine Einheit heisst - je Art nach Nummer gezaehlt: "Ritter 2", "Bogenschuetze 1". */
+function einheitNamen(einheiten: readonly UnitState[]): Map<number, string> {
+  const zaehler = new Map<string, number>();
+  const out = new Map<number, string>();
+  for (const u of [...einheiten].sort((a, b) => a.id - b.id)) {
+    if (u.kind === 'held') {
+      out.set(u.id, 'Held');
+      continue;
+    }
+    const n = (zaehler.get(u.kind) ?? 0) + 1;
+    zaehler.set(u.kind, n);
+    out.set(u.id, `${u.kind === 'bogen' ? 'Bogenschuetze' : 'Ritter'} ${n}`);
+  }
+  return out;
+}
+
+/** Wer in einem Verband steht, kurz: "Held, 2 Ritter, 1 Bogenschuetze". */
+function zusammensetzung(einheiten: readonly UnitState[]): string {
+  const ritter = einheiten.filter((u) => u.kind === 'ritter').length;
+  const bogen = einheiten.filter((u) => u.kind === 'bogen').length;
+  return [
+    einheiten.some((u) => u.kind === 'held') ? 'Held' : '',
+    ritter > 0 ? `${ritter} Ritter` : '',
+    bogen > 0 ? `${bogen} ${bogen === 1 ? 'Bogenschuetze' : 'Bogenschuetzen'}` : '',
+  ]
+    .filter(Boolean)
+    .join(', ');
+}
+
+/**
+ * Die eigenen Einheiten je Feld. Mehrere auf einem Feld sind ein Verband: sie
+ * lassen sich zusammen schicken und ziehen gemeinsam (rules/army.ts). Groessere
+ * Verbaende zuerst, dann nach Nummer.
+ */
+function nachFeld(einheiten: readonly UnitState[]) {
+  const m = new Map<string, { key: string; q: number; r: number; einheiten: UnitState[] }>();
+  for (const u of [...einheiten].sort((a, b) => a.id - b.id)) {
+    const key = `${u.q}:${u.r}`;
+    const g = m.get(key);
+    if (g) g.einheiten.push(u);
+    else m.set(key, { key, q: u.q, r: u.r, einheiten: [u] });
+  }
+  return [...m.values()].sort(
+    (a, b) => b.einheiten.length - a.einheiten.length || a.einheiten[0]!.id - b.einheiten[0]!.id,
+  );
+}
+
+/** Was eine Einheit gerade tut. */
+function statusVon(u: UnitState): { art: 'erkundet' | 'folgt' | 'zieht' | 'steht'; text: string } {
+  if (u.auftrag === 'erkunden') return { art: 'erkundet', text: 'erkundet von selbst' };
+  if (u.folgt !== null) return { art: 'folgt', text: 'folgt dem Helden' };
+  if (u.ziel) {
+    const weit = hexDistance(u, u.ziel);
+    return { art: 'zieht', text: `zieht · noch ${weit} ${weit === 1 ? 'Feld' : 'Felder'}` };
+  }
+  return { art: 'steht', text: 'steht' };
+}
+
+/** Alle Einheiten in einer Zeile: wie viele, wie viele Verbaende, was sie tun. */
+function einheitenSumme(einheiten: readonly UnitState[]): string {
+  const verbaende = nachFeld(einheiten).filter((g) => g.einheiten.length > 1).length;
+  const arten = [
+    ['zieht', 'zieht', 'ziehen'],
+    ['erkundet', 'erkundet', 'erkunden'],
+    ['folgt', 'folgt', 'folgen'],
+    ['steht', 'steht', 'stehen'],
   ] as const;
-  const text = teile.filter(([n]) => n > 0).map(([n, eins, viele]) => `${n} ${n === 1 ? eins : viele}`);
-  return `${ritter.length} ${ritter.length === 1 ? 'Ritter' : 'Ritter'} · ${text.join(' · ')}`;
+  const teile = [
+    verbaende > 0 ? `${verbaende} ${verbaende === 1 ? 'Verband' : 'Verbaende'}` : '',
+    ...arten.map(([art, eins, viele]) => {
+      const n = einheiten.filter((u) => statusVon(u).art === art).length;
+      return n > 0 ? `${n} ${n === 1 ? eins : viele}` : '';
+    }),
+  ].filter(Boolean);
+  return `${einheiten.length} ${einheiten.length === 1 ? 'Einheit' : 'Einheiten'} · ${teile.join(' · ')}`;
 }
 
 /** Was es noch nicht gibt, sagt das auch. */
@@ -147,7 +211,7 @@ export function SideMenu({
   cards,
   log,
   welt,
-  ritter,
+  einheiten,
   lage,
   fraktionen,
   befehl,
@@ -182,7 +246,6 @@ export function SideMenu({
   onErkunden,
   stumm,
   onStumm,
-  verbaende,
   verbandFeld,
   onVerbandZiel,
   onZeigenAuftrag,
@@ -196,8 +259,8 @@ export function SideMenu({
   log: string[];
   /** Was der Welt geschehen ist - Pluenderungen, Zeitenwechsel. */
   welt: readonly WeltEintrag[];
-  /** Die eigenen Ritter. */
-  ritter: readonly UnitState[];
+  /** Die eigenen Einheiten: Held, Ritter, Bogenschuetzen. */
+  einheiten: readonly UnitState[];
   /** Raubzuege unterwegs, wie nah der naechste den eigenen Siedlungen ist, Kaempfe in Sicht. */
   lage: { unterwegs: number; naechster: number | null; kaempfe: number };
   /** Bekannte Fraktionen, die naechsten zuerst. */
@@ -250,8 +313,6 @@ export function SideMenu({
   stumm: boolean;
   /** Ton an oder aus - schaltet um. */
   onStumm: () => void;
-  /** Felder, auf denen mehrere eigene Einheiten stehen - sie ziehen gemeinsam. */
-  verbaende: ReadonlyArray<{ q: number; r: number; einheiten: readonly UnitState[] }>;
   /** Der Verband, der gerade auf sein Ziel wartet (Feldschluessel), oder null. */
   verbandFeld: string | null;
   onVerbandZiel: (q: number, r: number) => void;
@@ -268,6 +329,8 @@ export function SideMenu({
   const [reiter, setReiter] = useState<Reiter>('reich');
   /** Welcher Ritter in der Liste aufgeklappt ist - hoechstens einer. */
   const [offenerRitter, setOffenerRitter] = useState<number | null>(null);
+  /** Welche Verbaende (Feldschluessel) aufgeklappt sind. */
+  const [offeneVerbaende, setOffeneVerbaende] = useState<ReadonlySet<string>>(() => new Set());
   const [ton, setTon] = useState(getVolume);
   const [musik, setMusik] = useState<MusicMode>(getMusicMode);
   const [musikPegel, setMusikPegel] = useState(getMusicVolume);
@@ -276,6 +339,75 @@ export function SideMenu({
   const saison = seasonOf(turn);
   // Raubzuege brechen zum Beginn jeder grossen Runde auf (rules/army.ts, sendRaiders).
   const bisPluenderung = ROUNDS_PER_BIG_ROUND - ((Math.max(1, turn) - 1) % ROUNDS_PER_BIG_ROUND);
+
+  const namen = einheitNamen(einheiten);
+  const umschaltenVerband = (key: string) =>
+    setOffeneVerbaende((alt) => {
+      const neu = new Set(alt);
+      if (neu.has(key)) neu.delete(key);
+      else neu.add(key);
+      return neu;
+    });
+  /** Eine Einheit als Zeile: Name, Leben, Status - ein Klick klappt ihre Befehle auf. */
+  const einheitZeile = (u: UnitState) => {
+    const status = statusVon(u);
+    const auf = offenerRitter === u.id || befehl === u.id;
+    const max = WERTE[u.kind].leben;
+    return (
+      <li
+        key={u.id}
+        className={[auf ? 'offen' : '', befehl === u.id ? 'aktiv' : '', u.kind === 'held' ? 'held' : '']
+          .filter(Boolean)
+          .join(' ') || undefined}
+      >
+        <button className="menu-ritter-zeile" aria-expanded={auf} onClick={() => setOffenerRitter(auf ? null : u.id)}>
+          <span className="menu-ritter-name">{namen.get(u.id)}</span>
+          <span className="menu-ritter-leben" title={`Leben ${u.leben} von ${max}`}>
+            {Array.from({ length: max }, (_, n) => (
+              <i key={n} className={n < u.leben ? 'voll' : undefined} />
+            ))}
+          </span>
+          <span className="menu-ritter-pfeil">{auf ? '▾' : '▸'}</span>
+          <span className={`menu-ritter-status ${status.art}`}>{status.text}</span>
+        </button>
+        {auf && (
+          <div className="menu-ritter-knoepfe">
+            <button onClick={() => onZeigen(u.id)}>Zeigen</button>
+            <button
+              disabled={!befehleMoeglich}
+              className={befehl === u.id ? 'aktiv' : ''}
+              onClick={() => onBefehl(u.id)}
+            >
+              {befehl === u.id ? 'Waehle Ziel' : 'Ziel'}
+            </button>
+            {u.ziel && (
+              <button disabled={!befehleMoeglich} onClick={() => onHalt(u.id)}>
+                Halt
+              </button>
+            )}
+            {u.kind !== 'held' && (
+              <button
+                disabled={!befehleMoeglich || (!held && u.folgt === null)}
+                className={u.folgt !== null ? 'aktiv' : ''}
+                title="Dem Helden folgen - so schnell wie er"
+                onClick={() => onFolgen(u.id, u.folgt === null)}
+              >
+                {u.folgt !== null ? 'Folgt' : 'Folgen'}
+              </button>
+            )}
+            <button
+              disabled={!befehleMoeglich}
+              className={u.auftrag === 'erkunden' ? 'aktiv' : ''}
+              title="Von selbst erkunden: zur naechsten Ruine oder ins Unbekannte"
+              onClick={() => onErkunden(u.id, u.auftrag !== 'erkunden')}
+            >
+              {u.auftrag === 'erkunden' ? 'Erkundet' : 'Erkunden'}
+            </button>
+          </div>
+        )}
+      </li>
+    );
+  };
 
   if (!offen) {
     return (
@@ -345,8 +477,8 @@ export function SideMenu({
               <b className={lage.naechster !== null && lage.naechster <= 3 ? 'gefahr' : undefined}>
                 {lage.naechster === null ? '-' : `${lage.naechster} Felder`}
               </b>
-              <span>Deine Ritter</span>
-              <b>{ritter.length}</b>
+              <span>Deine Einheiten</span>
+              <b>{einheiten.length}</b>
               <span>Kaempfe in Sicht</span>
               <b className={lage.kaempfe > 0 ? 'gefahr' : undefined}>{lage.kaempfe}</b>
               <span>Naechster Aufbruch</span>
@@ -531,102 +663,82 @@ export function SideMenu({
         {reiter === 'auftraege' && (
           <>
             {/*
-              Der Held: eine Figur, die schneller zieht, Ruinen ohne Hinterhalt
-              erkundet und Ritter anfuehrt (rules/army.ts).
+              Die eigenen Einheiten je Feld. Mehrere auf einem Feld sind ein
+              Verband: eine Zeile fuer alle, aufgeklappt stehen die Einheiten
+              darin, jede mit ihren eigenen Befehlen. Ein Ziel fuer eine einzelne
+              Einheit loest sie aus dem Verband (rules/army.ts).
             */}
-            <h3>Held</h3>
-            {held ? (
-              <ul className="menu-ritter">
-                <li className={befehl === held.id ? 'aktiv held' : 'held'}>
-                  <div className="menu-ritter-kopf">
-                    <span className="menu-ritter-name">Dein Held</span>
-                    <span className="menu-ritter-ort">
-                      Leben {held.leben}/{WERTE.held.leben} ·{' '}
-                      {held.auftrag === 'erkunden'
-                        ? 'erkundet von selbst'
-                        : held.ziel
-                          ? `zieht, noch ${hexDistance(held, held.ziel)} Felder`
-                          : 'steht'}
-                    </span>
-                  </div>
-                  <div className="menu-ritter-knoepfe">
-                    <button onClick={() => onZeigen(held.id)}>Zeigen</button>
-                    <button
-                      disabled={!befehleMoeglich}
-                      className={befehl === held.id ? 'aktiv' : ''}
-                      onClick={() => onBefehl(held.id)}
-                    >
-                      {befehl === held.id ? 'Waehle Ziel' : 'Ziel'}
-                    </button>
-                    <button disabled={!befehleMoeglich || !held.ziel} onClick={() => onHalt(held.id)}>
-                      Halt
-                    </button>
-                    <button
-                      disabled={!befehleMoeglich}
-                      className={held.auftrag === 'erkunden' ? 'aktiv' : ''}
-                      title="Von selbst erkunden: zur naechsten Ruine oder ins Unbekannte"
-                      onClick={() => onErkunden(held.id, held.auftrag !== 'erkunden')}
-                    >
-                      {held.auftrag === 'erkunden' ? 'Erkundet' : 'Erkunden'}
-                    </button>
-                  </div>
-                </li>
-              </ul>
-            ) : (
+            <h3>Einheiten</h3>
+            {einheiten.length === 0 ? (
               <p className="menu-leer">
-                {heldZurueck !== null ? `Gefallen - er kehrt in Runde ${heldZurueck} zurueck.` : 'Er tritt nach dem Aufbau an.'}
+                Noch keine. Ritter und Bogenschuetzen wirbst du in der Leiste unten an, der Held tritt nach dem
+                Aufbau an.
               </p>
+            ) : (
+              <>
+                <p className="menu-ritter-summe">{einheitenSumme(einheiten)}</p>
+                <ul className="menu-ritter">
+                  {nachFeld(einheiten).map((g) => {
+                    if (g.einheiten.length === 1) return einheitZeile(g.einheiten[0]!);
+                    const auf =
+                      offeneVerbaende.has(g.key) || verbandFeld === g.key || g.einheiten.some((u) => u.id === befehl);
+                    const status = statusVon(g.einheiten.find((u) => u.ziel) ?? g.einheiten[0]!);
+                    return (
+                      <li
+                        key={g.key}
+                        className={['menu-verband', auf ? 'offen' : '', verbandFeld === g.key ? 'aktiv' : '']
+                          .filter(Boolean)
+                          .join(' ')}
+                      >
+                        <button className="menu-ritter-zeile" aria-expanded={auf} onClick={() => umschaltenVerband(g.key)}>
+                          <span className="menu-ritter-name">Verband · {g.einheiten.length}</span>
+                          <span className="menu-ritter-pfeil">{auf ? '▾' : '▸'}</span>
+                          {/* Wer drin ist, in der zweiten Zeile - oben neben dem Namen war zu wenig Platz. */}
+                          <span className={`menu-ritter-status ${status.art}`}>
+                            {zusammensetzung(g.einheiten)} · {status.text}
+                          </span>
+                        </button>
+                        {auf && (
+                          <>
+                            <div className="menu-ritter-knoepfe">
+                              <button onClick={() => onZeigenFeld(g.q, g.r)}>Zeigen</button>
+                              <button
+                                disabled={!befehleMoeglich}
+                                className={verbandFeld === g.key ? 'aktiv' : ''}
+                                onClick={() => onVerbandZiel(g.q, g.r)}
+                              >
+                                {verbandFeld === g.key ? 'Waehle Ziel' : 'Ziel fuer alle'}
+                              </button>
+                            </div>
+                            <ul className="menu-ritter menu-verband-glieder">{g.einheiten.map(einheitZeile)}</ul>
+                          </>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
             )}
             <p className="menu-leer">
-              Zieht zwei Felder je Runde, geraet in Ruinen nie in einen Hinterhalt. Ritter bei ihm treffen leichter,
-              Ritter im Gefolge ziehen so schnell wie er. Nachts traegt er das hellste Licht.
+              Bogenschuetzen schiessen jede Runde auf Feinde nebenan und stuermen nicht vor. Neben einem eigenen
+              Wachturm oder auf der eigenen Hauptstadt reichen sie zwei Felder weit. Im Nahkampf sind sie schwach.
             </p>
 
             {/*
-              Verbaende: alle eigenen Einheiten eines Feldes. Ein Klick auf das
-              Feld waehlt sie zusammen, und sie ziehen gemeinsam (rules/army.ts).
+              Der Held: eine Figur, die schneller zieht, Ruinen ohne Hinterhalt
+              erkundet und Ritter anfuehrt (rules/army.ts). Seine Befehle stehen
+              oben bei den Einheiten.
             */}
-            <h3>Verbaende</h3>
-            {verbaende.length === 0 ? (
-              <p className="menu-leer">
-                Stehen mehrere deiner Einheiten auf einem Feld, bilden sie einen Verband: ein Klick auf das Feld
-                waehlt alle, und sie ziehen gemeinsam im Tempo des Langsamsten. Ein Ziel fuer eine einzelne
-                Einheit - unten bei den Rittern - loest sie heraus.
-              </p>
-            ) : (
-              <ul className="menu-ritter">
-                {verbaende.map((v) => {
-                  const key = `${v.q}:${v.r}`;
-                  const held = v.einheiten.some((u) => u.kind === 'held');
-                  const ritter = v.einheiten.filter((u) => u.kind === 'ritter').length;
-                  const unterwegs = v.einheiten.find((u) => u.verband !== null && u.ziel);
-                  return (
-                    <li key={key} className={verbandFeld === key ? 'aktiv' : undefined}>
-                      <div className="menu-ritter-kopf">
-                        <span className="menu-ritter-name">
-                          {[held ? 'Held' : '', ritter > 0 ? `${ritter} ${ritter === 1 ? 'Ritter' : 'Ritter'}` : '']
-                            .filter(Boolean)
-                            .join(' + ')}
-                        </span>
-                        <span className="menu-ritter-ort">
-                          {unterwegs?.ziel ? `zieht, noch ${hexDistance(unterwegs, unterwegs.ziel)} Felder` : 'steht'}
-                        </span>
-                      </div>
-                      <div className="menu-ritter-knoepfe">
-                        <button onClick={() => onZeigenFeld(v.q, v.r)}>Zeigen</button>
-                        <button
-                          disabled={!befehleMoeglich}
-                          className={verbandFeld === key ? 'aktiv' : ''}
-                          onClick={() => onVerbandZiel(v.q, v.r)}
-                        >
-                          {verbandFeld === key ? 'Waehle Ziel' : 'Ziel'}
-                        </button>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+            <h3>Held</h3>
+            <p className="menu-leer">
+              {held
+                ? `Leben ${held.leben}/${WERTE.held.leben} · ${statusVon(held).text}. `
+                : heldZurueck !== null
+                  ? `Gefallen - er kehrt in Runde ${heldZurueck} zurueck. `
+                  : 'Er tritt nach dem Aufbau an. '}
+              Zieht zwei Felder je Runde, geraet in Ruinen nie in einen Hinterhalt. Ritter bei ihm treffen leichter,
+              Ritter im Gefolge ziehen so schnell wie er. Nachts traegt er das hellste Licht.
+            </p>
 
             {/*
               Auftraege der Wanderer: annehmen, zeigen, liefern, und was sie
@@ -675,96 +787,6 @@ export function SideMenu({
                   </li>
                 ))}
               </ul>
-            )}
-
-            {/*
-              Die Ritter: wo sie stehen, wohin sie ziehen. Von hier bekommen sie
-              ihre Befehle. Auf der Karte waehlt ein Klick auf den eigenen Ritter
-              ihn ebenso aus.
-            */}
-            <h3>Ritter</h3>
-            {ritter.length === 0 ? (
-              <p className="menu-leer">
-                Noch keine. Anwerben in der Leiste unten oder eine Ritterkarte ausspielen.
-              </p>
-            ) : (
-              <>
-                {/*
-                  Uebersicht statt fuenf Knoepfe je Ritter: eine Zeile mit Status
-                  und Leben, ein Klick klappt die Befehle auf. Der Ritter, der
-                  gerade sein Ziel sucht, steht immer offen.
-                */}
-                <p className="menu-ritter-summe">{ritterSumme(ritter)}</p>
-                <ul className="menu-ritter">
-                  {ritter.map((u, i) => {
-                    const weit = u.ziel ? hexDistance(u, u.ziel) : 0;
-                    const status =
-                      u.auftrag === 'erkunden'
-                        ? { art: 'erkundet', text: 'erkundet' }
-                        : u.folgt !== null
-                          ? { art: 'folgt', text: 'folgt dem Helden' }
-                          : u.ziel
-                            ? { art: 'zieht', text: `zieht · noch ${weit} ${weit === 1 ? 'Feld' : 'Felder'}` }
-                            : { art: 'steht', text: 'steht' };
-                    const offen = offenerRitter === u.id || befehl === u.id;
-                    const max = WERTE.ritter.leben;
-                    return (
-                      <li
-                        key={u.id}
-                        className={[offen ? 'offen' : '', befehl === u.id ? 'aktiv' : ''].filter(Boolean).join(' ') || undefined}
-                      >
-                        <button
-                          className="menu-ritter-zeile"
-                          aria-expanded={offen}
-                          onClick={() => setOffenerRitter(offen ? null : u.id)}
-                        >
-                          <span className="menu-ritter-name">Ritter {i + 1}</span>
-                          <span className={`menu-ritter-status ${status.art}`}>{status.text}</span>
-                          <span className="menu-ritter-leben" title={`Leben ${u.leben} von ${max}`}>
-                            {Array.from({ length: max }, (_, n) => (
-                              <i key={n} className={n < u.leben ? 'voll' : undefined} />
-                            ))}
-                          </span>
-                          <span className="menu-ritter-pfeil">{offen ? '▾' : '▸'}</span>
-                        </button>
-                        {offen && (
-                          <div className="menu-ritter-knoepfe">
-                            <button onClick={() => onZeigen(u.id)}>Zeigen</button>
-                            <button
-                              disabled={!befehleMoeglich}
-                              className={befehl === u.id ? 'aktiv' : ''}
-                              onClick={() => onBefehl(u.id)}
-                            >
-                              {befehl === u.id ? 'Waehle Ziel' : 'Ziel'}
-                            </button>
-                            {u.ziel && (
-                              <button disabled={!befehleMoeglich} onClick={() => onHalt(u.id)}>
-                                Halt
-                              </button>
-                            )}
-                            <button
-                              disabled={!befehleMoeglich || (!held && u.folgt === null)}
-                              className={u.folgt !== null ? 'aktiv' : ''}
-                              title="Dem Helden folgen - so schnell wie er"
-                              onClick={() => onFolgen(u.id, u.folgt === null)}
-                            >
-                              {u.folgt !== null ? 'Folgt' : 'Folgen'}
-                            </button>
-                            <button
-                              disabled={!befehleMoeglich}
-                              className={u.auftrag === 'erkunden' ? 'aktiv' : ''}
-                              title="Von selbst erkunden: zur naechsten Ruine oder ins Unbekannte"
-                              onClick={() => onErkunden(u.id, u.auftrag !== 'erkunden')}
-                            >
-                              {u.auftrag === 'erkunden' ? 'Erkundet' : 'Erkunden'}
-                            </button>
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </>
             )}
 
             <h3>Beute</h3>

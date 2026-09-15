@@ -12,9 +12,11 @@ import {
   hexDistance,
   hexKey,
   hexesInRange,
+  hexVertices,
   neighbors,
   parseVertexKey,
   vertexAdjacentHexes,
+  vertexKey,
 } from './coords';
 import { nestAt } from './raiders';
 import { terrainAt, tileAtCoord } from './worldgen';
@@ -59,10 +61,32 @@ export const WERTE: Record<UnitKind, { angriff: number; leben: number }> = {
   // Der Held haelt mehr aus als ein Ritter und trifft wie er - stark ist er
   // durch das, was er fuer andere tut (ANFUEHRUNG, Sicht, Licht).
   held: { angriff: 3, leben: 5 },
+  // Trifft ab 4 wie ein Raeuber, aber aus der Ferne (rules/army.ts, beschuss);
+  // im Nahkampf eins schlechter (combat.ts, BOGEN_NAHKAMPF).
+  bogen: { angriff: 2, leben: 2 },
 };
 
 /** Mehr Besatzung hat kein Lager - auch nicht, wenn Trupps heimkehren. */
 export const BESATZUNG_MAX = 3;
+
+/** Einheiten, die ein Spieler befehligt: Ritter, Bogenschuetzen, der Held. */
+export const befehlbar = (kind: UnitKind): boolean => kind === 'ritter' || kind === 'bogen' || kind === 'held';
+
+/**
+ * Steht ein Bogenschuetze erhoeht - auf der eigenen Hauptstadt oder neben einem
+ * eigenen Wachturm? Dann schiesst er weiter (combat.ts, BOGEN_REICHWEITE_ERHOEHT).
+ */
+export function bogenErhoeht(
+  view: Pick<GameState, 'buildings'> & { hauptstaedte?: GameState['hauptstaedte'] },
+  u: Pick<UnitState, 'q' | 'r' | 'owner'>,
+): boolean {
+  if (u.owner === null) return false;
+  if (view.hauptstaedte?.[hexKey(u.q, u.r)]?.owner === u.owner) return true;
+  return hexVertices(u.q, u.r).some((v) => {
+    const b = view.buildings[vertexKey(v)];
+    return b !== undefined && b.owner === u.owner && b.turm === true;
+  });
+}
 
 /** Eine neue Einheit mit vollen Leben und leeren Taschen. Die Nummer vergibt der Aufrufer. */
 export function einheitVorlage(
@@ -79,7 +103,7 @@ export function einheitVorlage(
     r,
     ziel: null,
     heimat: null,
-    auftrag: kind === 'ritter' || kind === 'held' ? 'befehl' : kind === 'wanderer' ? 'wandern' : 'raub',
+    auftrag: befehlbar(kind) ? 'befehl' : kind === 'wanderer' ? 'wandern' : 'raub',
     leben: WERTE[kind].leben,
     fracht: null,
     traegt: 0,

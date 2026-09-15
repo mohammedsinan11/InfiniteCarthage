@@ -295,6 +295,7 @@ const ART_NAME = {
   goblin: ['Goblin', 'Goblins'],
   wanderer: ['Wanderer', 'Wanderer'],
   held: ['Held', 'Helden'],
+  bogen: ['Bogenschuetze', 'Bogenschuetzen'],
 } as const;
 
 const VORHABEN = {
@@ -1874,7 +1875,7 @@ export function Board({
 
         {/* Befehle: Weg und Ziel eigener Ritter und des Helden. Frueher nur der Ritter - der Held zog, aber man sah es nicht. */}
         {state.units
-          .filter((u) => (u.kind === 'ritter' || u.kind === 'held') && du !== null && u.owner === du && u.ziel !== null)
+          .filter((u) => (u.kind === 'ritter' || u.kind === 'bogen' || u.kind === 'held') && du !== null && u.owner === du && u.ziel !== null)
           .map((u) => {
             const a = hexToPixel(u.q, u.r, LAYOUT);
             const b = hexToPixel(u.ziel!.q, u.ziel!.r, LAYOUT);

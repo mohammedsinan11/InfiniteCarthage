@@ -103,6 +103,21 @@ const ART: Record<FigurArt, readonly string[]> = {
     '.kMkMk..',
     '.kk.kk..',
   ],
+  // Bogenschuetze: Lederkapuze, Wams in Spielerfarbe, rechts der Bogen. PLATZHALTER (ASSETS.md).
+  bogen: [
+    '..kkk....',
+    '.kbbbk.k.',
+    '.kbssk..t',
+    '..kssk..t',
+    '.kppppk.t',
+    'kpppppskt',
+    'kpppppk.t',
+    '.kpppk..t',
+    '.kbbbk.k.',
+    '.kBkBk...',
+    '.kBkBk...',
+    '.kk.kk...',
+  ],
   wanderer: [
     '..kkk....',
     '.kaaak..k',

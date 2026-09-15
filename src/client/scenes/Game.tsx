@@ -178,7 +178,7 @@ export function Game() {
 
   /** Meine Ritter - und welcher gerade auf sein Ziel wartet. */
   const meineRitter = useMemo(
-    () => state.units.filter((u) => u.kind === 'ritter' && u.owner === you),
+    () => state.units.filter((u) => (u.kind === 'ritter' || u.kind === 'bogen') && u.owner === you),
     [state.units, you],
   );
   const meinHeld = useMemo(
@@ -201,17 +201,6 @@ export function Game() {
     if (befehl === null) setMitVerband(false);
   }, [befehl, meineEinheiten]);
 
-  /** Felder mit mehreren eigenen Einheiten - Verbaende (rules/army.ts). */
-  const verbaende = useMemo(() => {
-    const m = new Map<string, { q: number; r: number; einheiten: typeof meineEinheiten }>();
-    for (const u of meineEinheiten) {
-      const k = `${u.q}:${u.r}`;
-      const v = m.get(k);
-      if (v) v.einheiten.push(u);
-      else m.set(k, { q: u.q, r: u.r, einheiten: [u] });
-    }
-    return [...m.values()].filter((v) => v.einheiten.length > 1);
-  }, [meineEinheiten]);
   const befehlsEinheit = meineEinheiten.find((u) => u.id === befehl);
   const verbandGroesse =
     befehlsEinheit && mitVerband
@@ -752,7 +741,7 @@ export function Game() {
           cards={me?.cards ?? []}
           log={log}
           welt={welt}
-          ritter={meineRitter}
+          einheiten={meineEinheiten}
           lage={lage}
           fraktionen={fraktionen}
           befehl={befehl}
@@ -798,7 +787,6 @@ export function Game() {
           loeschenMoeglich={loeschenMoeglich}
           onLoeschen={loeschen}
           onErkunden={(id, an) => act({ t: 'explore', unit: id, explore: an })}
-          verbaende={verbaende}
           verbandFeld={mitVerband && befehlsEinheit ? `${befehlsEinheit.q}:${befehlsEinheit.r}` : null}
           onVerbandZiel={(q, r) => {
             const erste = meineEinheiten.find((u) => u.q === q && u.r === r);

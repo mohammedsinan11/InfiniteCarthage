@@ -20,6 +20,7 @@ import {
   COST_CITY,
   COST_DEV,
   COST_KNIGHT,
+  COST_ARCHER,
   COST_REBUILD_ROAD,
   COST_ROAD,
   COST_SETTLEMENT,
@@ -116,6 +117,14 @@ const SymRitter = () => (
   <Symbol>
     <path d="M5 17 V8 Q10 1 15 8 V17 Z" fill="#c9ccd6" stroke="#2a2016" strokeWidth={1.6} />
     <rect x={7} y={9} width={6} height={2} fill="#2a2016" />
+  </Symbol>
+);
+/** Bogen mit Sehne und Pfeil. PLATZHALTER (ASSETS.md). */
+const SymBogen = () => (
+  <Symbol>
+    <path d="M6 3 Q16 10 6 17" fill="none" stroke="#8a6a45" strokeWidth={2.2} strokeLinecap="round" />
+    <path d="M6 3 V17" stroke="#e2d2ab" strokeWidth={1} />
+    <path d="M3 10 H16 M13 7.5 L16 10 L13 12.5" fill="none" stroke="#c9ccd6" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
   </Symbol>
 );
 const SymHandel = () => (
@@ -503,6 +512,7 @@ export function Aktionsleiste({
         {!BAU_ZEILE && <span className="dock-trenner" />}
         <DockKnopf titel="Karte" symbol={<SymKarte />} kosten={COST_DEV} darf={bauen && canAfford(hand, COST_DEV)} tip={`Entwicklungskarte kaufen (${state.deckLeft} im Stapel): ${kostenText(COST_DEV)}`} onClick={() => act({ t: 'buyDev' })} />
         <DockKnopf titel="Ritter" symbol={<SymRitter />} kosten={COST_KNIGHT} darf={bauen && canAfford(hand, COST_KNIGHT)} tip={`Ein Ritter tritt an einer deiner Siedlungen an: ${kostenText(COST_KNIGHT)}`} onClick={() => act({ t: 'recruitKnight' })} />
+        <DockKnopf titel="Bogen" symbol={<SymBogen />} kosten={COST_ARCHER} darf={bauen && canAfford(hand, COST_ARCHER)} tip={`Ein Bogenschuetze tritt an einer deiner Siedlungen an. Schiesst auf Feinde nebenan, neben einem Wachturm zwei Felder weit: ${kostenText(COST_ARCHER)}`} onClick={() => act({ t: 'recruitArcher' })} />
         <span className="dock-trenner" />
         <DockKnopf titel="Handel" symbol={<SymHandel />} gewaehlt={tafel === 'handel'} darf={bauen} tip="Bankhandel" onClick={umschalten('handel')} />
         <DockKnopf titel="Karten" symbol={<SymKarten />} zahl={offen.length} gewaehlt={tafel === 'karten'} darf={offen.length > 0} tip="Deine Entwicklungskarten" onClick={umschalten('karten')} />

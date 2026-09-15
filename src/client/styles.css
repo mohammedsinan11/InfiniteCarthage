@@ -1981,6 +1981,19 @@ em.off {
 .menu-ritter li.offen {
   border-left-color: var(--accent);
 }
+/* Verband: eine Zeile fuer alle auf einem Feld, aufgeklappt die Einheiten darin. */
+.menu-ritter li.menu-verband {
+  border-left-color: #8ab8e8;
+}
+.menu-ritter li.menu-verband.offen {
+  border-left-color: var(--accent);
+}
+.menu-ritter.menu-verband-glieder {
+  margin-left: 6px;
+}
+.menu-ritter.menu-verband-glieder li {
+  background: rgba(0, 0, 0, 0.18);
+}
 .menu-welt li.welt-march,
 .menu-welt li.welt-plunder {
   border-left-color: var(--danger);

@@ -81,10 +81,11 @@ type Ziel = Pick<WandererAuftrag, 'art' | 'q' | 'r' | 'fraktion' | 'rohstoff' | 
 
 const offen = (a: WandererAuftrag) => a.status !== 'abgelehnt';
 
-/** Steht ein eigener Ritter oder der Held auf diesem Feld? */
+/** Steht eine eigene Einheit - Ritter, Bogenschuetze oder der Held - auf diesem Feld? */
 const eigeneEinheitAuf = (s: GameState, player: PlayerId, q: number, r: number): boolean =>
   s.units.some(
-    (u) => u.owner === player && (u.kind === 'ritter' || u.kind === 'held') && u.q === q && u.r === r,
+    (u) =>
+      u.owner === player && (u.kind === 'ritter' || u.kind === 'bogen' || u.kind === 'held') && u.q === q && u.r === r,
   );
 
 /** Ein fernes, erreichbares Landfeld fuer die Kundschaft. */
@@ -255,6 +256,7 @@ export function auftragLiefern(s: GameState, actor: PlayerId, id: number, events
 type Nest = Extract<ArmyEvent, { t: 'nestDestroyed' }>;
 type Ruine = Extract<ArmyEvent, { t: 'ruin' }>;
 type Kampf = Extract<ArmyEvent, { t: 'fight' }>;
+type Salve = Extract<ArmyEvent, { t: 'volley' }>;
 
 /**
  * Nach jeder Runde: Fortschritt der Jagd, erfuellte, verlorene und abgelaufene
@@ -277,6 +279,13 @@ export function auftraegePruefen(
     const seite = spielerSeite(a.player);
     let neu = 0;
     for (const e of geschehen) {
+      // Wen die eigenen Bogenschuetzen niederstrecken, zaehlt ebenso.
+      if (e.t === 'volley') {
+        const salve = e as unknown as Salve;
+        if (salve.player !== a.player) continue;
+        for (const v of salve.verluste) if (istFraktion(v.seite)) neu += v.anzahl;
+        continue;
+      }
       if (e.t !== 'fight') continue;
       const k = e as unknown as Kampf;
       if (!k.seiten.includes(seite)) continue;

@@ -447,7 +447,7 @@ function meldungenAus(
     } else if (e.t === 'knightReady') {
       if (e.player === you) {
         playGuard();
-        out.push({ id: naechsteId++, text: 'Ein Ritter tritt an', kind: 'info' });
+        out.push({ id: naechsteId++, text: e.kind === 'bogen' ? 'Ein Bogenschuetze tritt an' : 'Ein Ritter tritt an', kind: 'info' });
       }
     } else if (e.t === 'draftOffered') {
       out.push({

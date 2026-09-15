@@ -21,6 +21,7 @@
  *   3. Angriff: wer diese Runde nicht gezogen ist, stuermt auf ein Nachbarfeld
  *      mit Feinden. So stellen Ritter, wer an ihnen vorbeiwill. Heimkehrer und
  *      Wanderer greifen nicht an.
+ *   3b. Beschuss: Bogenschuetzen schiessen auf Feinde in Reichweite (beschuss).
  *   4. Kampf: eine Runde auf jedem Feld, auf dem Feinde stehen.
  *   5. Pluenderung: wer auf Raubzug an einer Siedlung steht und nicht kaempft,
  *      nimmt und kehrt um.
@@ -67,6 +68,8 @@ import type { GameState, Hand, PlayerId, UnitKind, UnitState } from '../state';
 import {
   BESATZUNG_MAX,
   WERTE,
+  befehlbar,
+  bogenErhoeht,
   einheitVorlage,
   garrisonOf,
   isLandAt,
@@ -90,7 +93,7 @@ import {
   trifft,
 } from '../combat';
 import type { Seite } from '../combat';
-import { ANFUEHRUNG, spielerSeite } from '../combat';
+import { ANFUEHRUNG, BOGEN_NAHKAMPF, BOGEN_REICHWEITE, BOGEN_REICHWEITE_ERHOEHT, spielerSeite } from '../combat';
 import { fraktionById } from '../factions';
 import type { FraktionArt } from '../factions';
 import { raidLoss, takeFromLargest } from './raid';
@@ -161,7 +164,22 @@ type Feind = FraktionArt;
 export type Verlust = { seite: Seite; kind: UnitKind | 'besatzung'; anzahl: number };
 
 export type ArmyEvent =
-  | { t: 'knightReady'; player: PlayerId; unit: number; q: number; r: number }
+  /** Ein Ritter oder Bogenschuetze tritt an (kind fehlt bei alten Staenden: Ritter). */
+  | { t: 'knightReady'; player: PlayerId; unit: number; q: number; r: number; kind?: 'ritter' | 'bogen' }
+  | {
+      /** Bogenschuetzen eines Spielers haben diese Runde auf ein Feld geschossen (beschuss). */
+      t: 'volley';
+      player: PlayerId;
+      /** Wo die Schuetzen stehen - der erste von ihnen. */
+      q: number;
+      r: number;
+      /** Das beschossene Feld. */
+      zq: number;
+      zr: number;
+      schuesse: number;
+      treffer: number;
+      verluste: Verlust[];
+    }
   | {
       t: 'march';
       round: number;
@@ -368,12 +386,17 @@ function heldFaellt(s: GameState, u: UnitState, events: Ereignisse): void {
 const imKriegMit = (s: GameState, fraktion: string | null) => (id: PlayerId): boolean =>
   fraktion === null || feindlich(spielerSeite(id), fraktion, s);
 
-/** Einen Ritter fuer diesen Spieler antreten lassen. null ohne Siedlung. */
-export function spawnKnight(s: GameState, id: PlayerId, events: Ereignisse): UnitState | null {
+/** Einen Ritter - oder Bogenschuetzen - fuer diesen Spieler antreten lassen. null ohne Siedlung. */
+export function spawnKnight(
+  s: GameState,
+  id: PlayerId,
+  events: Ereignisse,
+  kind: 'ritter' | 'bogen' = 'ritter',
+): UnitState | null {
   const feldAn = knightMusterHex(s, id);
   if (!feldAn) return null;
-  const unit = aufstellen(s, einheitVorlage('ritter', feldAn.q, feldAn.r, { owner: id }));
-  events.push({ t: 'knightReady', player: id, unit: unit.id, q: unit.q, r: unit.r });
+  const unit = aufstellen(s, einheitVorlage(kind, feldAn.q, feldAn.r, { owner: id }));
+  events.push({ t: 'knightReady', player: id, unit: unit.id, q: unit.q, r: unit.r, kind });
   return unit;
 }
 
@@ -918,7 +941,9 @@ function schlacht(
     const seite = seiteVon(u);
     const angefuehrt =
       u.kind === 'ritter' && kaempfer.some((x) => x.kind === 'held' && x.owner === u.owner) ? ANFUEHRUNG : 0;
-    schlage(seite, WERTE[u.kind].angriff + angefuehrt, lagerSeite !== null && seite !== lagerSeite ? -PALISADE : 0);
+    // Bogenschuetzen im Nahkampf treffen schlechter (combat.ts, BOGEN_NAHKAMPF).
+    const nahkampf = u.kind === 'bogen' ? -BOGEN_NAHKAMPF : 0;
+    schlage(seite, WERTE[u.kind].angriff + angefuehrt, (lagerSeite !== null && seite !== lagerSeite ? -PALISADE : 0) + nahkampf);
   }
   if (lagerSeite !== null && besatzungArt !== null) {
     for (let i = 0; i < besatzungVorher; i++) {
@@ -967,7 +992,7 @@ function schlacht(
       s.nestGarrison[k] = rest;
     } else {
       const eigene = stehen.filter((x) => seiteVon(x) === lagerSeite);
-      const ritter = stehen.filter((x) => x.kind === 'ritter' || x.kind === 'held');
+      const ritter = stehen.filter((x) => befehlbar(x.kind));
       const fremde = new Map<Seite, UnitState[]>();
       for (const x of stehen) {
         const seite = seiteVon(x);
@@ -1010,6 +1035,61 @@ function schlacht(
     ? null
     : (nachher[0] ?? (isNestActive(s, q, r) ? nestFraktionOf(s, q, r) : null));
   events.push({ t: 'fight', q, r, seiten, neu, ende, sieger, verluste: [...verluste.values()] });
+}
+
+/**
+ * Beschuss: jeder Bogenschuetze eines Spielers, der nicht selbst im Nahkampf
+ * steht, schiesst einmal - auf das naechste Feld mit Feinden in Reichweite,
+ * ein Feld weit, erhoeht zwei (units.ts, bogenErhoeht). Ein Treffer kostet
+ * einen zufaelligen Feind dort ein Leben; zurueckschlagen kann er nicht. Wer
+ * faellt, laesst seine Beute beim Schuetzen. Die Besatzung eines Lagers sitzt
+ * hinter der Palisade - sie trifft kein Pfeil.
+ *
+ * Gemeldet wird je Spieler und Zielfeld eine Salve, nicht jeder Pfeil.
+ */
+export function beschuss(s: GameState, rng: Rng, events: Ereignisse): void {
+  type Salve = Extract<ArmyEvent, { t: 'volley' }>;
+  const salven = new Map<string, Salve>();
+  const schuetzen = s.units.filter((x) => x.kind === 'bogen' && x.owner !== null).sort(nachNummer);
+  for (const u of schuetzen) {
+    if (!s.units.includes(u) || imKampf(s, u)) continue;
+    const eigene = seiteVon(u);
+    const weite = bogenErhoeht(s, u) ? BOGEN_REICHWEITE_ERHOEHT : BOGEN_REICHWEITE;
+    const ziel = hexesInRange(u, weite)
+      .filter((h) => h.q !== u.q || h.r !== u.r)
+      .map((h) => ({
+        h,
+        feinde: s.units
+          .filter((x) => x.q === h.q && x.r === h.r && feindlich(eigene, seiteVon(x), s))
+          .sort(nachNummer),
+      }))
+      .filter((z) => z.feinde.length > 0)
+      .sort(
+        (a, b) =>
+          hexDistance(u, a.h) - hexDistance(u, b.h) ||
+          nachSchluessel(hexKey(a.h.q, a.h.r), hexKey(b.h.q, b.h.r)),
+      )[0];
+    if (!ziel) continue;
+    const key = `${u.owner}|${hexKey(ziel.h.q, ziel.h.r)}`;
+    let salve = salven.get(key);
+    if (!salve) {
+      salve = { t: 'volley', player: u.owner!, q: u.q, r: u.r, zq: ziel.h.q, zr: ziel.h.r, schuesse: 0, treffer: 0, verluste: [] };
+      salven.set(key, salve);
+    }
+    salve.schuesse += 1;
+    if (!trifft(wurf(rng), WERTE.bogen.angriff)) continue;
+    salve.treffer += 1;
+    const opfer = ziel.feinde[rng.int(ziel.feinde.length)]!;
+    opfer.leben -= 1;
+    if (opfer.leben > 0) continue;
+    const seite = seiteVon(opfer);
+    const v = salve.verluste.find((x) => x.seite === seite && x.kind === opfer.kind);
+    if (v) v.anzahl += 1;
+    else salve.verluste.push({ seite, kind: opfer.kind, anzahl: 1 });
+    if (opfer.traegt > 0 || opfer.fracht) uebergib(s, opfer, u, events);
+    entfernen(s, [opfer]);
+  }
+  events.push(...salven.values());
 }
 
 /** Eine Runde des Heeres. Aendert Einheiten, Haende, Bank, Lager und Welt. */
@@ -1058,7 +1138,7 @@ export function tickArmy(s: GameState, world: World, events: Ereignisse): void {
   }
   // Wer auf einer Ruine steht, erkundet sie - auch wer dort erst antrat.
   for (const u of [...s.units].sort(nachNummer)) {
-    if (u.owner === null || (u.kind !== 'ritter' && u.kind !== 'held')) continue;
+    if (u.owner === null || !befehlbar(u.kind)) continue;
     if (!ruinAt(seed, u.q, u.r) || s.exploredRuins.includes(hexKey(u.q, u.r))) continue;
     erkunde(s, world, rng, u, events);
   }
@@ -1080,6 +1160,8 @@ export function tickArmy(s: GameState, world: World, events: Ereignisse): void {
   for (const u of rast ? [] : [...s.units].sort(nachNummer)) {
     if (!s.units.includes(u) || gezogen.has(u.id)) continue;
     if (u.auftrag === 'heimkehr' || u.auftrag === 'wandern') continue;
+    // Bogenschuetzen stuermen nicht - sie schiessen (3b).
+    if (u.kind === 'bogen') continue;
     const eigene = seiteVon(u);
     if (eigene === NEUTRAL || imKampf(s, u)) continue;
     const nebenan = neighbors(u.q, u.r).find((n) =>
@@ -1090,6 +1172,9 @@ export function tickArmy(s: GameState, world: World, events: Ereignisse): void {
     u.r = nebenan.r;
     gezogen.add(u.id);
   }
+
+  // 3b. Beschuss: Bogenschuetzen schiessen, bevor gekaempft wird. Im Schnee nicht.
+  if (!rast) beschuss(s, rng, events);
 
   // 4. Kampf.
   const gekaempft = new Set<string>();
@@ -1127,7 +1212,7 @@ export function tickArmy(s: GameState, world: World, events: Ereignisse): void {
 
   // 6. Erholung an eigenen Siedlungen.
   for (const u of s.units) {
-    if ((u.kind !== 'ritter' && u.kind !== 'held') || u.leben >= WERTE[u.kind].leben) continue;
+    if (!befehlbar(u.kind) || u.leben >= WERTE[u.kind].leben) continue;
     const k = hexKey(u.q, u.r);
     if (gekaempft.has(k) || siedlungen.get(k) !== u.owner) continue;
     u.leben += 1;

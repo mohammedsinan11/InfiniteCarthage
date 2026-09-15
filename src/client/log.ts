@@ -37,6 +37,7 @@ const ART_NAME = {
   goblin: 'Goblin',
   wanderer: 'Wanderer',
   held: 'Held',
+  bogen: 'Bogenschuetze',
   besatzung: 'Verteidiger',
 } as const;
 
@@ -46,6 +47,7 @@ export const BRAND_WAS = { strasse: 'eine Strasse', dorf: 'ein Dorf', stadt: 'ei
 const LOESCHER = {
   karte: 'mit einer Karte',
   ritter: 'von einem Ritter',
+  bogen: 'von einem Bogenschuetzen',
   held: 'vom Helden',
   regen: 'vom Regen',
   verschont: 'knapp - das letzte Gebaeude bleibt stehen',
@@ -133,7 +135,13 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
     case 'capitalUpgrade':
       return `${who(state, e.player)} baut die Hauptstadt zum Festungsring aus.`;
     case 'knightReady':
-      return `${who(state, e.player)} stellt einen Ritter auf.`;
+      return `${who(state, e.player)} stellt ${e.kind === 'bogen' ? 'einen Bogenschuetzen' : 'einen Ritter'} auf.`;
+    case 'volley': {
+      const wer = `Bogenschuetzen von ${who(state, e.player)}`;
+      if (e.treffer === 0) return `${wer} schiessen daneben.`;
+      const tote = verlusteText(state, e.verluste);
+      return `${wer} treffen ${e.treffer} von ${e.schuesse}.${tote ? ` Gefallen: ${tote}.` : ''}`;
+    }
     case 'march':
       return e.parties.length === 1
         ? `Raubzug bricht auf: ${fraktionName(state, e.parties[0]!.fraktion)}.`

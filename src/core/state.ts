@@ -77,7 +77,7 @@ export type Player = {
 export type Building = { owner: PlayerId; type: 'settlement' | 'city'; turm?: boolean };
 
 /** Was auf der Karte laufen kann. */
-export type UnitKind = 'ritter' | 'raeuber' | 'goblin' | 'wanderer' | 'held';
+export type UnitKind = 'ritter' | 'raeuber' | 'goblin' | 'wanderer' | 'held' | 'bogen';
 
 /**
  * Was eine Einheit gerade vorhat.

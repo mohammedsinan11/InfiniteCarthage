@@ -25,6 +25,12 @@ export const COST_DEV: Cost = { ore: 1, wool: 1, grain: 1 };
 export const COST_KNIGHT: Cost = { ore: 2, grain: 1 };
 
 /**
+ * Ein Bogenschuetze (rules/army.ts, beschuss). Holz fuer Bogen und Pfeile,
+ * Wolle fuer Sehne und Wams - billiger als ein Ritter, und ohne Erz.
+ */
+export const COST_ARCHER: Cost = { lumber: 2, wool: 1 };
+
+/**
  * Ein Wachturm an einem eigenen Dorf oder einer Stadt. Holz fuer das Geruest,
  * Lehm fuer den Sockel, Erz fuer die Feuerschale oben.
  */

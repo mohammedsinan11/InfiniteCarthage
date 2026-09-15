@@ -47,6 +47,7 @@ import {
   COST_CITY,
   COST_DEV,
   COST_KNIGHT,
+  COST_ARCHER,
   COST_REBUILD_ROAD,
   COST_ROAD,
   COST_SETTLEMENT,
@@ -112,6 +113,7 @@ export type Action =
   | { t: 'chooseCard'; card: string }
   /** Einen Ritter anwerben - er tritt an einer eigenen Siedlung an. */
   | { t: 'recruitKnight' }
+  | { t: 'recruitArcher' }
   /**
    * Einem eigenen Ritter oder dem Helden ein Ziel geben. Sein eigenes Feld als
    * Ziel heisst: halt. verband: alle eigenen Einheiten seines Feldes ziehen mit.
@@ -759,21 +761,33 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       break;
     }
 
+    case 'recruitArcher': {
+      if (phase.t !== 'main') return fail('Jetzt kann niemand angeworben werden.');
+      if (!canAfford(actorPlayer.hand, COST_ARCHER)) {
+        return fail('Zu wenig Rohstoffe fuer einen Bogenschuetzen.');
+      }
+      pay(actorPlayer.hand, COST_ARCHER);
+      if (!spawnKnight(s, actor, events, 'bogen')) {
+        return fail('Keine Siedlung, an der ein Bogenschuetze antreten koennte.');
+      }
+      break;
+    }
+
     case 'orderUnit': {
       if (phase.t !== 'main' && phase.t !== 'roll') {
         return fail('Jetzt koennen keine Befehle gegeben werden.');
       }
       const einheit = s.units.find((u) => u.id === action.unit);
       if (!einheit) return fail('Diese Einheit gibt es nicht.');
-      if (einheit.owner !== actor || (einheit.kind !== 'ritter' && einheit.kind !== 'held')) {
-        return fail('Das ist nicht dein Ritter.');
+      if (einheit.owner !== actor || (einheit.kind !== 'ritter' && einheit.kind !== 'bogen' && einheit.kind !== 'held')) {
+        return fail('Das ist nicht deine Einheit.');
       }
       // Mit Verband: alle eigenen Ritter und der Held auf diesem Feld.
       const mitglieder = action.verband
         ? s.units.filter(
             (u) =>
               u.owner === actor &&
-              (u.kind === 'ritter' || u.kind === 'held') &&
+              (u.kind === 'ritter' || u.kind === 'bogen' || u.kind === 'held') &&
               u.q === einheit.q &&
               u.r === einheit.r,
           )
@@ -871,7 +885,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         return fail('Jetzt koennen keine Befehle gegeben werden.');
       }
       const einheit = s.units.find((u) => u.id === action.unit);
-      if (!einheit || einheit.owner !== actor || (einheit.kind !== 'ritter' && einheit.kind !== 'held')) {
+      if (!einheit || einheit.owner !== actor || (einheit.kind !== 'ritter' && einheit.kind !== 'bogen' && einheit.kind !== 'held')) {
         return fail('Das ist nicht deine Einheit.');
       }
       einheit.folgt = null;
@@ -886,7 +900,9 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         return fail('Jetzt koennen keine Befehle gegeben werden.');
       }
       const ritter = s.units.find((u) => u.id === action.unit);
-      if (!ritter || ritter.owner !== actor || ritter.kind !== 'ritter') return fail('Das ist nicht dein Ritter.');
+      if (!ritter || ritter.owner !== actor || (ritter.kind !== 'ritter' && ritter.kind !== 'bogen')) {
+        return fail('Nur Ritter und Bogenschuetzen folgen dem Helden.');
+      }
       if (!action.follow) {
         ritter.folgt = null;
         ritter.ziel = null;

@@ -82,6 +82,15 @@ export const PALISADE = 1;
  */
 export const BESATZUNG_UNGEORDNET = 2;
 
+/**
+ * Bogenschuetzen (rules/army.ts, beschuss) schiessen ein Feld weit, von der
+ * eigenen Hauptstadt oder neben einem eigenen Wachturm zwei. Im Nahkampf
+ * treffen sie um eins schlechter - wer sie erreicht, hat sie.
+ */
+export const BOGEN_REICHWEITE = 1;
+export const BOGEN_REICHWEITE_ERHOEHT = 2;
+export const BOGEN_NAHKAMPF = 1;
+
 /** Trifft dieser Wurf? Eine Sechs trifft immer, eine Eins nie. */
 export function trifft(wurf: number, angriff: number, aufschlag = 0): boolean {
   if (wurf >= 6) return true;
