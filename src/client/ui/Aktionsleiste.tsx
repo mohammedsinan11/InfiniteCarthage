@@ -435,13 +435,6 @@ export function Aktionsleiste({
       )}
 
       <div className="dock-reihe">
-        {/*
-          Beute zuerst: auf dem Handy scrollt die Reihe, und am Ende rutschte der
-          Knopf aus dem Bild - gerade der, der leuchtet, weil etwas wartet.
-        */}
-        {(me?.loot ?? 0) > 0 && (
-          <DockKnopf titel="Beute" symbol={<SymBeute />} zahl={me?.loot} leuchtet darf={bauen} tip="Beute einloesen: eine Kartenwahl" onClick={() => act({ t: 'claimLoot' })} />
-        )}
         {BAU_ZEILE && !bauOffen && (
           <>
             <DockKnopf
@@ -510,6 +503,10 @@ export function Aktionsleiste({
         <span className="dock-trenner" />
         <DockKnopf titel="Handel" symbol={<SymHandel />} gewaehlt={tafel === 'handel'} darf={bauen} tip="Bankhandel" onClick={umschalten('handel')} />
         <DockKnopf titel="Karten" symbol={<SymKarten />} zahl={offen.length} gewaehlt={tafel === 'karten'} darf={offen.length > 0} tip="Deine Entwicklungskarten" onClick={umschalten('karten')} />
+        {/* Beute rechts neben Handel und Karten - dort, wo Karten ohnehin hingehen. */}
+        {(me?.loot ?? 0) > 0 && (
+          <DockKnopf titel="Beute" symbol={<SymBeute />} zahl={me?.loot} leuchtet darf={bauen} tip="Beute einloesen: eine Kartenwahl" onClick={() => act({ t: 'claimLoot' })} />
+        )}
         {state.order.length > 1 && (
           <DockKnopf titel="Zug Ende" symbol={<SymZugEnde />} darf={bauen} tip="Zug beenden" onClick={() => act({ t: 'endTurn' })} />
         )}

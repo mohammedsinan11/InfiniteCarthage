@@ -68,6 +68,7 @@ import type { Tageszeit, Wetter } from '../../core/zeit';
 import {
   HEX_CX,
   HEX_CY,
+  ueberhangBild,
   HEX_H,
   HEX_W,
   IMG_H,
@@ -417,6 +418,8 @@ export function Board({
   const finger = useRef(new Map<number, { x: number; y: number }>());
   const kneifen = useRef<{ abstand: number } | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  /** Schicht fuer die Gipfel vor den Strassen - einmal angelegt, je Bild geleert. */
+  const ueberhangRef = useRef<HTMLCanvasElement | null>(null);
   /**
    * Aufgelaufene Raddrehung.
    *
@@ -799,8 +802,9 @@ export function Board({
      * Was auf dem Feld steht: erst das Lager, dann die Figuren von hinten nach
      * vorn. Direkt nach der eigenen Kachel gezeichnet, damit die Kacheln davor
      * die Fuesse verdecken - wer hinter einem Wald steht, steht dahinter.
+     * g: wohin - die Gipfel-Schicht nutzt das, um Figuren auszustanzen.
      */
-    const zeichneBesatzung = (t: (typeof visible)[number], lift: number) => {
+    const zeichneBesatzung = (t: (typeof visible)[number], lift: number, g: CanvasRenderingContext2D = ctx) => {
       const lager = isNestActive(state, t.q, t.r);
       const ruine =
         ruinAt(state.worldSeed, t.q, t.r) && !state.exploredRuins.includes(hexKey(t.q, t.r));
@@ -815,13 +819,13 @@ export function Board({
       const { x: x0, y: y0 } = ursprung(t.q, t.r, lift);
       const mx = x0 + Math.round(HEX_CX) * f;
       const my = y0 + Math.round(HEX_CY) * f;
-      if (nebel) ctx.globalAlpha = 0.6;
+      if (nebel) g.globalAlpha = 0.6;
       if (lager) {
-        zeichneFigur(ctx, 'lager', mx, my + f, f, farbeSeite(nestFraktionOf(state, t.q, t.r)));
+        zeichneFigur(g, 'lager', mx, my + f, f, farbeSeite(nestFraktionOf(state, t.q, t.r)));
       }
-      if (ruine) zeichneFigur(ctx, 'ruine', mx, my + 2 * f, f);
+      if (ruine) zeichneFigur(g, 'ruine', mx, my + 2 * f, f);
       if (!leute || leute.length === 0) {
-        ctx.globalAlpha = 1;
+        g.globalAlpha = 1;
         return;
       }
       // Nach Seite sortiert: wer zusammengehoert, steht beieinander - im Kampf
@@ -837,15 +841,15 @@ export function Board({
         const fx = mx + ox * f;
         const fy = my + oy * f;
         if (u.id >= 0 && bewegung.current.has(u.id)) {
-          unterwegs.push({ u, fx, fy });
+          if (g === ctx) unterwegs.push({ u, fx, fy });
           return;
         }
-        zeichneFigur(ctx, u.kind, fx, fy, f, farbeSeite(seiteVon(u)));
-        if (fackeln && u.id >= 0) zeichneFigur(ctx, 'fackel', fx + 5 * f, fy - 2 * f, f);
+        zeichneFigur(g, u.kind, fx, fy, f, farbeSeite(seiteVon(u)));
+        if (fackeln && u.id >= 0) zeichneFigur(g, 'fackel', fx + 5 * f, fy - 2 * f, f);
         const max = WERTE[u.kind].leben;
-        if (u.id >= 0 && u.leben < max) zeichneLeben(ctx, u.kind, fx, fy, f, u.leben, max);
+        if (u.id >= 0 && u.leben < max) zeichneLeben(g, u.kind, fx, fy, f, u.leben, max);
       });
-      ctx.globalAlpha = 1;
+      g.globalAlpha = 1;
     };
 
     /*
@@ -1044,10 +1048,55 @@ export function Board({
     for (const b of [...gebaeude, ...hauptstaedte].sort((u, w) => u.fuss - w.fuss)) b.male();
 
     /*
+     * Gipfel davor (DESIGN.md, Karte): was ein Berg ueber sein Sechseck hinaus
+     * deckt, kommt noch einmal ueber alles dahinter - Strassen, Doerfer,
+     * Staedte, Burg und Mauern. Die Grenze ist der Umriss der Gipfel, kein
+     * Kasten: eine Stadt verschwindet links wie rechts gleich. Die Gipfel gehen
+     * erst in eine eigene Schicht, aus der sich die Figuren daneben ausstanzen -
+     * sie standen schon vorher obenauf und bleiben es.
+     */
+    // ?verdecken=aus schaltet auch das ab - zum Vergleich.
+    const berge = verdeckenModus() === 'aus' ? [] : visible.filter((t) => t.terrain === 'mountain');
+    if (berge.length > 0) {
+      const schicht = (ueberhangRef.current ??= document.createElement('canvas'));
+      if (schicht.width !== bw || schicht.height !== bh) {
+        schicht.width = bw;
+        schicht.height = bh;
+      }
+      const g = schicht.getContext('2d');
+      if (g) {
+        g.clearRect(0, 0, bw, bh);
+        g.imageSmoothingEnabled = false;
+        const w = Math.round(IMG.w * scale * dpr);
+        const h = Math.round(IMG.h * scale * dpr);
+        const nachbarn = new Set<string>();
+        for (const t of berge) {
+          const url = tileUrl(state.worldSeed, t.terrain, t.q, t.r);
+          const bild = url === null ? undefined : imNebel(t.q, t.r) ? tileImageFog(url) : tileImage(url);
+          const gipfel = bild ? ueberhangBild(bild) : null;
+          if (!gipfel) continue;
+          const k = hexKey(t.q, t.r);
+          const { x, y } = ursprung(t.q, t.r, liftHex(t.q, t.r) + (k === hover ? LIFT : 0));
+          g.drawImage(gipfel, x, y, w, h);
+          for (const [dq, dr] of [[0, 0], [0, -1], [1, -1], [-1, 0], [1, 0]] as const) {
+            nachbarn.add(hexKey(t.q + dq, t.r + dr));
+          }
+        }
+        g.globalCompositeOperation = 'destination-out';
+        for (const t of visible) {
+          const k = hexKey(t.q, t.r);
+          if (nachbarn.has(k)) zeichneBesatzung(t, liftHex(t.q, t.r) + (k === hover ? LIFT : 0), g);
+        }
+        g.globalCompositeOperation = 'source-over';
+        ctx.drawImage(schicht, 0, 0);
+      }
+    }
+
+    /*
      * Verdecken durch hohe Kacheln (DESIGN.md, Karte): liegt vor einer
-     * Hauptstadt Wald oder Gebirge, kommt diese Kachel noch einmal darueber -
-     * Baumkronen und Gipfel schieben sich vor Mauer und Burg, sie steht im
-     * Gelaende statt aufgeklebt. Beschnitten auf den Kasten des Bauwerks, damit
+     * Hauptstadt Wald, kommt diese Kachel noch einmal darueber - Baumkronen
+     * schieben sich vor Mauer und Burg, sie steht im Gelaende statt
+     * aufgeklebt. Gebirge macht die Gipfel-Schicht oben. Beschnitten auf den Kasten des Bauwerks, damit
      * sonst nichts auf der Kachel verschwindet; ihre Einheiten kommen im Kasten
      * wieder obendrauf. Flache Kacheln bleiben darunter - eine Wiese davor
      * schnitte die Burg nur gerade ab, und das saehe aus wie ein Fehler.
@@ -1070,7 +1119,8 @@ export function Board({
         const vorn = hexKey(vq, vr);
         const t = world.tiles.get(vorn);
         if (!t) continue;
-        const hohe = modus === 'wald' ? t.terrain === 'forest' : t.terrain === 'forest' || t.terrain === 'mountain';
+        // Gebirge deckt schon die Gipfel-Schicht, ohne Kasten - hier bleibt der Wald.
+        const hohe = t.terrain === 'forest';
         if (!hohe) continue;
         const hoch = liftHex(vq, vr) + (vorn === hover ? LIFT : 0);
         ctx.save();

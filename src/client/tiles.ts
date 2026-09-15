@@ -305,3 +305,34 @@ export function tileImageFog(url: string): CanvasImageSource | undefined {
   NEBEL.set(url, c);
   return c;
 }
+
+/**
+ * Was ein Kachelbild ueber sein Sechseck hinaus deckt - Gipfel, Baumkronen:
+ * das Bild, abzueglich allem, was eine Graskachel deckt (Gras beginnt erst bei
+ * y=7, Berge bei y=4, siehe oben). So bleiben Boden, Rand und Klippe draussen,
+ * ohne dass ein Sechseck auf das Pixelraster passen muss. Einmal je Bild
+ * gemerkt (Board: Gipfel davor).
+ *
+ * Die Graskachel kommt aus kachelFuer, nicht aus tileUrl - tileUrl merkt sich
+ * die Wahl je Feld, fuer ein Bergfeld also wieder den Berg.
+ */
+const UEBERHANG = new WeakMap<object, HTMLCanvasElement>();
+
+export function ueberhangBild(bild: CanvasImageSource): HTMLCanvasElement | null {
+  const da = UEBERHANG.get(bild);
+  if (da) return da;
+  const flachUrl = kachelFuer('pasture');
+  const flach = flachUrl === null ? undefined : IMAGES.get(flachUrl);
+  if (!flach) return null;
+  const c = document.createElement('canvas');
+  c.width = flach.naturalWidth || IMG_W;
+  c.height = flach.naturalHeight || IMG_H;
+  const ctx = c.getContext('2d');
+  if (!ctx) return null;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(bild, 0, 0, c.width, c.height);
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.drawImage(flach, 0, 0, c.width, c.height);
+  UEBERHANG.set(bild, c);
+  return c;
+}

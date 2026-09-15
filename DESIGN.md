@@ -318,6 +318,13 @@ anbieten oder brechen; ob Tribut mit der Groesse des Reichs steigen soll.
   Hohe Kacheln davor lassen ein Bauwerk dagegen im Gelaende stehen statt
   aufgeklebt. Gedacht zuerst fuer die Hauptstadt; Doerfer, Staedte und
   Einheiten koennten spaeter derselben Regel folgen.
+- **Gipfel davor:** was ein Berg ueber sein Sechseck hinaus deckt, liegt ueber
+  allem dahinter - Strassen, Doerfer, Staedte, Burg, Mauern (`tiles.ts`,
+  `ueberhangBild`: das Bergbild minus die Deckung einer flachen Kachel). Kein
+  Kasten mehr, der eine Stadt links verdeckt und rechts nicht: die Grenze ist
+  der Umriss der Gipfel. Figuren bleiben obenauf. Wald vor einer Hauptstadt
+  folgt noch dem Kasten; Wald vor Strassen bleibt darunter - Kronen
+  verschluckten sonst ganze Wege.
 
 ## Hauptstadt
 
@@ -345,8 +352,9 @@ anbieten oder brechen; ob Tribut mit der Groesse des Reichs steigen soll.
   tauscht die Leiste, ein Pfeil fuehrt zurueck) liegt als Schalter bereit:
   `BAU_ZEILE = true` in `ui/Aktionsleiste.tsx`. Sie war wieder aus, weil die
   Leiste noch nicht so breit ist - und weil Beute, Handel und Zug Ende fehlten,
-  solange die Bauzeile offen stand. Beute steht jetzt vorn in der Leiste: auf
-  dem Handy scrollt die Reihe, und am Ende rutschte der Knopf aus dem Bild.
+  solange die Bauzeile offen stand. Beute steht rechts neben Handel und
+  Karten, vor Zug Ende. Eine Zeit lang stand sie vorn, weil sie am Handy am
+  Ende der scrollenden Reihe aus dem Bild rutschte.
 - **Aussehen, Stufe I:** eine Burg in der Mitte zwischen den drei Staedten.
   Ihr Stein richtet sich nach der Kachelsorte - Sandstein, Ziegel, Granit,
   Moos, Schnee (`units.ts`, `STEIN_JE_SORTE`). Die Zahl des Feldes steht nur
