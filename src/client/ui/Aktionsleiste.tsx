@@ -28,6 +28,7 @@ import {
   canAfford,
 } from '../../core/rules/costs';
 import { haefenZu } from '../../core/rules/trade';
+import { anHauptstadt } from '../../core/rules/hauptstadt';
 import type { Cost } from '../../core/rules/costs';
 import type { Action } from '../../core/rules/reducer';
 import type { PublicPlayer, PublicState } from '../../core/redact';
@@ -415,7 +416,9 @@ export function Aktionsleiste({
   // Auf eigener Asche kostet eine Strasse nur Holz (rules/feuer.ts).
   const eigeneAsche = Object.values(state.asche).some((id) => id === me?.id);
   const strasseGeht = canAfford(hand, COST_ROAD) || (eigeneAsche && canAfford(hand, COST_REBUILD_ROAD));
-  const turmPlatz = Object.values(state.buildings).some((b) => b.owner === me?.id && !b.turm);
+  const turmPlatz = Object.entries(state.buildings).some(
+    ([vk, b]) => b.owner === me?.id && !b.turm && !anHauptstadt(state, vk),
+  );
   const umschalten = (t: 'handel' | 'karten') => () => setTafel((alt) => (alt === t ? null : t));
 
   return (

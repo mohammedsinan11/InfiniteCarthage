@@ -369,8 +369,15 @@ anbieten oder brechen; ob Tribut mit der Groesse des Reichs steigen soll.
   brennt nicht, die Bastionen fangen kein Feuer, und der Ausbau loescht, was im
   Ring gerade brennt.
 
+- **Keine Wachtuerme am Ring:** neben Burg und Mauer brachte ein Turm nichts
+  Eigenes. Wer dort einen hat, bekommt ihn beim Gruenden erstattet
+  (`COST_TOWER`); neue lassen sich an Hauptstadt-Ecken nicht bauen
+  (`anHauptstadt`).
+
 ### Geplant
 
+- **Eine eigene Aufgabe fuer Tuerme an der Hauptstadt** - etwa Bogenschuetzen
+  darauf, die weiter schiessen.
 - **Stufe III** und **Richtungen** (Hexenturm, Burgfeste, Handelskontor, ...).
 - **Verdecken fuer Doerfer, Staedte und Einheiten:** fuer die Hauptstadt
   gebaut (siehe Karte, Zoom und Bedienung); die uebrigen folgen vielleicht.

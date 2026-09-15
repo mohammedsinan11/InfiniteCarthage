@@ -650,9 +650,9 @@ export type Strassenstueck = {
 /**
  * Strassen als Feldweg entlang der Feldkante, in Geraetepixeln.
  *
- * Wie ein Pfad auf den Kacheln, schmal wie in den Hauptstadt-Entwuerfen: ein
- * Kunstpixel festgetretene Erde, jeder vierte Stein heller, ringsum ein
- * Kunstpixel dunkler Rand. Schritt fuer Schritt ein Kunstpixel weit, auf das
+ * Wie ein Pfad auf den Kacheln, schmal: zwei Kunstpixel festgetretene Erde,
+ * jeder vierte Stein heller, ringsum ein Kunstpixel dunkler Rand (die
+ * Hauptstadt-Entwuerfe hatten einen, das war etwas zu duenn). Schritt fuer Schritt ein Kunstpixel weit, auf das
  * Kunstpixelraster gerundet, so bekommt die schraege Kante dieselben
  * Treppenstufen wie die Kacheln. Wem die Strasse gehoert, zeigt ein Wimpel in
  * Spielerfarbe in ihrer Mitte - der Weg selbst bleibt Weg.
@@ -680,15 +680,18 @@ export function zeichneStrassen(
 
   for (const { s, p } of alle) {
     ctx.fillStyle = s.verbrannt ? '#1f1813' : '#3a2a1e';
-    for (const q of p) ctx.fillRect(q.x - f, q.y - f, 3 * f, 3 * f);
+    for (const q of p) ctx.fillRect(q.x - f, q.y - f, 4 * f, 4 * f);
+  }
+  for (const { s, p } of alle) {
+    ctx.fillStyle = s.verbrannt ? '#3d342d' : '#9a7b52';
+    for (const q of p) ctx.fillRect(q.x, q.y, 2 * f, 2 * f);
   }
   for (const { s, p } of alle) {
     p.forEach((q, i) => {
-      // Asche: verkohlte Erde, hier und da Glut.
-      ctx.fillStyle = s.verbrannt
-        ? i % 6 === 3 ? '#b8481f' : '#3d342d'
-        : i % 4 === 0 ? '#c8ad7f' : '#9a7b52';
-      ctx.fillRect(q.x, q.y, f, f);
+      // Asche: hier und da Glut. Sonst jeder vierte Stein heller.
+      if (s.verbrannt ? i % 6 !== 3 : i % 4 !== 0) return;
+      ctx.fillStyle = s.verbrannt ? '#b8481f' : '#c8ad7f';
+      ctx.fillRect(q.x + (i % 8 === 0 ? f : 0), q.y, f, f);
     });
   }
   for (const { s, p } of alle) {

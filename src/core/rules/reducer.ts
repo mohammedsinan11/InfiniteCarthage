@@ -18,6 +18,8 @@ import {
   parseEdgeKey,
   parseVertexKey,
   vertexAdjacentHexes,
+  hexVertices,
+  vertexKey,
 } from '../coords';
 import {
   createWorld,
@@ -63,7 +65,7 @@ import {
 import { computeProduction } from './production';
 import { beginBigRound, beginNight, heldenRunde, spawnHeld, spawnKnight, tickArmy } from './army';
 import { brandRunde, brennt, mitKarteLoeschen } from './feuer';
-import { festungHindernis, festungsSchutz, hauptstadtHindernis } from './hauptstadt';
+import { anHauptstadt, festungHindernis, festungsSchutz, hauptstadtHindernis } from './hauptstadt';
 import { abkommenRunde, tributRunde, verhandeln } from './diplomatie';
 import type { DiplomatieEvent, Verhandlung } from './diplomatie';
 import { auftraegePruefen, aufAuftragAntworten, auftragLiefern, wandererBieten } from './auftraege';
@@ -820,6 +822,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       const b = s.buildings[action.vertex];
       if (!b || b.owner !== actor) return fail('Ein Wachturm braucht ein eigenes Dorf oder eine Stadt.');
       if (b.turm) return fail('Dort steht schon ein Wachturm.');
+      if (anHauptstadt(s, action.vertex)) return fail('An einer Hauptstadt steht vorerst kein Wachturm.');
       if (brennt(s, action.vertex)) return fail('Dort brennt es gerade.');
       if (!canAfford(actorPlayer.hand, COST_TOWER)) return fail('Zu wenig Rohstoffe fuer einen Wachturm.');
       pay(actorPlayer.hand, COST_TOWER);
@@ -834,6 +837,13 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (why) return fail(why);
       if (!canAfford(actorPlayer.hand, COST_CAPITAL)) return fail('Zu wenig Rohstoffe fuer eine Hauptstadt.');
       pay(actorPlayer.hand, COST_CAPITAL);
+      // Wachtuerme am Ring gehen zurueck in die Hand - an der Hauptstadt stehen vorerst keine.
+      for (const v of hexVertices(action.q, action.r)) {
+        const b = s.buildings[vertexKey(v)];
+        if (!b || b.owner !== actor || !b.turm) continue;
+        b.turm = false;
+        for (const r of RESOURCES) actorPlayer.hand[r] += COST_TOWER[r] ?? 0;
+      }
       s.hauptstaedte[hexKey(action.q, action.r)] = { owner: actor, stufe: 1, seit: s.turn };
       events.push({ t: 'capital', player: actor, q: action.q, r: action.r });
       checkWin(s, events);

@@ -77,6 +77,16 @@ export function umlandVon(view: HauptstadtSicht, player: PlayerId, q: number, r:
 }
 
 /**
+ * Liegt diese Ecke am Ring einer Hauptstadt? Dort steht vorerst kein Wachturm:
+ * neben Burg und Mauer brachte er nichts Eigenes - eine neue Aufgabe fuer ihn
+ * kommt spaeter (DESIGN.md, Hauptstadt).
+ */
+export function anHauptstadt(view: Pick<HauptstadtSicht, 'hauptstaedte'>, vk: string): boolean {
+  if (!view.hauptstaedte) return false;
+  return vertexAdjacentHexes(parseVertexKey(vk)).some((h) => view.hauptstaedte![hexKey(h.q, h.r)] !== undefined);
+}
+
+/**
  * Alle Felder an eigenen Gebaeuden, sortiert nach dem, was fehlt. Wasser und
  * Felder, auf denen schon eine Hauptstadt steht, fallen weg.
  */

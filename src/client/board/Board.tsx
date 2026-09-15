@@ -60,6 +60,7 @@ import { AuftragsZeichen, Flammen, KronenZeichen } from './Marken';
 import { Kosten } from '../ui/Aktionsleiste';
 import type { Cost } from '../../core/rules/costs';
 import { loeschFelder } from '../../core/rules/feuer';
+import { anHauptstadt } from '../../core/rules/hauptstadt';
 import type { Brand } from '../../core/state';
 import { BRAND_WAS } from '../log';
 import { MAX_LICHTER, WetterSchicht } from './WetterSchicht';
@@ -964,6 +965,16 @@ export function Board({
     const bastionen = new Map<string, string>();
     // Im Ring einer Residenz (Stufe I) tragen die Strassen keine Wimpel - Burg und Staedte zeigen die Farbe.
     const ringOhneWimpel = new Set<string>();
+    /*
+     * Sonst auch nicht jeder Abschnitt: etwa jeder dritte, fest nach der Kante
+     * gewaehlt, damit der Wimpel beim Weiterbauen nicht springt. Genug, um zu
+     * sehen, wem ein Weg gehoert, ohne dass jede Kante flattert.
+     */
+    const wimpelKante = (ek: string) => {
+      let h = 0;
+      for (let i = 0; i < ek.length; i++) h = (Math.imul(h, 31) + ek.charCodeAt(i)) | 0;
+      return (h >>> 0) % 3 === 0;
+    };
     for (const [hk, h] of Object.entries(state.hauptstaedte ?? {})) {
       const [q, r] = hk.split(':').map(Number) as [number, number];
       if (h.stufe < 2) {
@@ -991,7 +1002,7 @@ export function Board({
         .filter(([ek]) => !mauerKanten.has(ek))
         .map(([ek, owner]) => {
           const [a, b] = kantePixel(ek);
-          return { a: a!, b: b!, farbe: spielerFarbe(owner), ohneWimpel: ringOhneWimpel.has(ek) };
+          return { a: a!, b: b!, farbe: spielerFarbe(owner), ohneWimpel: ringOhneWimpel.has(ek) || !wimpelKante(ek) };
         }),
       f,
     );
@@ -1025,12 +1036,14 @@ export function Board({
       const v = vertexToPixel(ecke, LAYOUT);
       const p = geraet(v.x, v.y - liftVertex(ecke));
       const bastion = bastionen.get(vk);
+      // Am Ring einer Hauptstadt kein Wachturm (rules/hauptstadt.ts, anHauptstadt) - auch nicht aus alten Staenden.
+      const turm = b.turm === true && !anHauptstadt(state, vk);
       return {
         fuss: Math.max(p.y + 3 * f, nachDerBurg.get(vk) ?? -Infinity),
         male: () =>
           bastion !== undefined
-            ? zeichneBastion(ctx, p.x, p.y, f, spielerFarbe(b.owner), bastion, b.turm === true)
-            : zeichneGebaeude(ctx, b.type === 'city' ? 'stadt' : 'dorf', p.x, p.y, f, spielerFarbe(b.owner), b.turm === true),
+            ? zeichneBastion(ctx, p.x, p.y, f, spielerFarbe(b.owner), bastion, turm)
+            : zeichneGebaeude(ctx, b.type === 'city' ? 'stadt' : 'dorf', p.x, p.y, f, spielerFarbe(b.owner), turm),
       };
     });
     // Hauptstaedte stehen in der Feldmitte, im Stein ihres Gelaendes (units.ts).

@@ -104,11 +104,12 @@ links oben. Mittelalterlich:
   mit Ziegelreihen, Schornstein, erleuchtete Fenster, Tuer.
 - **Stadt** (21 x 19): Mauerring mit Zinnen und Tor, dahinter ein Steinturm mit
   Wimpel in Spielerfarbe und ein Fachwerkhaus.
-- **Strasse:** schmaler Feldweg entlang der Feldkante wie in den
-  Hauptstadt-Entwuerfen - ein Kunstpixel Erde, jeder vierte Stein heller,
-  ringsum ein Kunstpixel dunkler Rand (vorher 3 Pixel Weg in 5 Pixel Rand). Wem
-  sie gehoert, zeigt ein Wimpel in Spielerfarbe in der Mitte (`wimpel`) - nicht
-  im Ring einer Residenz, dort zeigen Burg und Staedte die Farbe (`ohneWimpel`).
+- **Strasse:** schmaler Feldweg entlang der Feldkante - zwei Kunstpixel Erde,
+  jeder vierte Stein heller, ringsum ein Kunstpixel dunkler Rand (anfangs 3 in
+  5, dann kurz 1 in 3 wie in den Hauptstadt-Entwuerfen - zu duenn). Wem sie
+  gehoert, zeigt ein Wimpel in Spielerfarbe in der Mitte (`wimpel`), aber nur
+  auf etwa jedem dritten Abschnitt und nie im Ring einer Residenz
+  (`ohneWimpel`, Board `wimpelKante`).
 
 Seit der dritten Fassung stehen im Spiel **kompakte** Fassungen (`dorfKlein`
 11 x 10, `stadtKlein` 15 x 14) ueber der Ecke, damit das Haus nicht ueber die

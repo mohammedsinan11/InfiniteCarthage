@@ -55,6 +55,7 @@ import {
   STUFE_NAME,
   festungHindernis,
   hauptstadtFelder,
+  anHauptstadt,
   hauptstadtHindernis,
 } from '../../core/rules/hauptstadt';
 import type { Umland } from '../../core/rules/hauptstadt';
@@ -481,7 +482,8 @@ export function Game() {
         }),
       });
     }
-    if (!b.turm) {
+    // An einer Hauptstadt vorerst kein Wachturm (rules/hauptstadt.ts, anHauptstadt).
+    if (!b.turm && !anHauptstadt(state, ausbauOrt.key)) {
       optionen.push({
         name: 'Wachturm',
         kosten: COST_TOWER,
