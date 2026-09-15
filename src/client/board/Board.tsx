@@ -1003,6 +1003,42 @@ export function Board({
     for (const b of [...gebaeude, ...hauptstaedte].sort((u, w) => u.fuss - w.fuss)) b.male();
 
     /*
+     * Verdecken durch hohe Kacheln (DESIGN.md, Karte): liegt vor einer
+     * Hauptstadt Wald oder Gebirge, kommt diese Kachel noch einmal darueber -
+     * Baumkronen und Gipfel schieben sich vor Mauer und Burg, sie steht im
+     * Gelaende statt aufgeklebt. Beschnitten auf den Kasten des Bauwerks, damit
+     * sonst nichts auf der Kachel verschwindet; ihre Einheiten kommen im Kasten
+     * wieder obendrauf. Flache Kacheln bleiben darunter - eine Wiese davor
+     * schnitte die Burg nur gerade ab, und das saehe aus wie ein Fehler.
+     */
+    for (const [hk, h] of Object.entries(state.hauptstaedte ?? {})) {
+      const [q, r] = hk.split(':').map(Number) as [number, number];
+      const c = hexToPixel(q, r, LAYOUT);
+      const p = geraet(c.x, c.y - liftHex(q, r));
+      const festung = h.stufe >= 2;
+      // Burg 21 Kunstpixel breit, der Festungsring mit Bastionen und Wehrtuermen deutlich breiter.
+      const halb = (festung ? 26 : 13) * f;
+      const oben = p.y - (festung ? 24 : 18) * f;
+      const unten = p.y + (festung ? 14 : 12) * f;
+      for (const [vq, vr] of [
+        [q - 1, r + 1],
+        [q, r + 1],
+      ] as const) {
+        const vorn = hexKey(vq, vr);
+        const t = world.tiles.get(vorn);
+        if (!t || (t.terrain !== 'forest' && t.terrain !== 'mountain')) continue;
+        const hoch = liftHex(vq, vr) + (vorn === hover ? LIFT : 0);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(p.x - halb, oben, 2 * halb, unten - oben);
+        ctx.clip();
+        zeichne(t, hoch);
+        zeichneBesatzung(t, hoch);
+        ctx.restore();
+      }
+    }
+
+    /*
      * Vorschau unter dem Zeiger: auf dem Bauplatz, ueber dem der Zeiger steht,
      * steht das Gebaeude, wie es stuende; ueber einer Kante die Strasse. Die
      * Plaetze selbst zeigen Ringe (SVG). Eine blasse Vorschau auf JEDEM Platz

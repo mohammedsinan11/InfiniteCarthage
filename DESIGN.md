@@ -306,8 +306,11 @@ anbieten oder brechen; ob Tribut mit der Groesse des Reichs steigen soll.
   Bauplaetze, Kanten und Feuer werden nach Naehe getroffen, nicht nach
   Trefferflaeche.
 - **Zahlen an eigenen Gebaeuden** stehen immer - auf jedem Geraet.
-- **Verdecken, beschlossen (noch nicht gebaut):** Kacheln VOR einem Bauwerk
-  duerfen es verdecken - aber nur hohe: Wald, Taiga, Dschungel, Berge.
+- **Verdecken, gebaut fuer die Hauptstadt:** Kacheln VOR einem Bauwerk
+  duerfen es verdecken - aber nur hohe: Wald, Taiga, Dschungel, Berge. Das
+  Brett zeichnet die beiden vorderen Nachbarn einer Hauptstadt, wenn sie Wald
+  oder Gebirge sind, nach ihr noch einmal - beschnitten auf den Kasten des
+  Bauwerks, damit sonst nichts auf der Kachel verschwindet.
   Flache Felder (Wiese, Feld, Lehm, Wueste, Schnee, Sumpf, Wasser) liegen
   darunter. Verdecken alle vorderen Kacheln, schneidet eine flache Wiese die
   Burg gerade ab - das sieht aus wie ein Fehler, genau wie bei den Kaempfern
@@ -360,7 +363,8 @@ anbieten oder brechen; ob Tribut mit der Groesse des Reichs steigen soll.
 ### Geplant
 
 - **Stufe III** und **Richtungen** (Hexenturm, Burgfeste, Handelskontor, ...).
-- **Verdecken:** nur hohe Kacheln davor duerfen sie verdecken (siehe oben).
+- **Verdecken fuer Doerfer, Staedte und Einheiten:** fuer die Hauptstadt
+  gebaut (siehe Karte, Zoom und Bedienung); die uebrigen folgen vielleicht.
 - Offen: Doerfer im Ring, was die Hauptstadt ueber die Punkte hinaus bringt.
 
 ## Verbaende
