@@ -104,9 +104,11 @@ links oben. Mittelalterlich:
   mit Ziegelreihen, Schornstein, erleuchtete Fenster, Tuer.
 - **Stadt** (21 x 19): Mauerring mit Zinnen und Tor, dahinter ein Steinturm mit
   Wimpel in Spielerfarbe und ein Fachwerkhaus.
-- **Strasse:** Feldweg entlang der Feldkante - dunkler Rand, festgetretene Erde,
-  einzelne Steine. Wem sie gehoert, zeigt ein Wimpel in Spielerfarbe in der
-  Mitte (`wimpel`).
+- **Strasse:** schmaler Feldweg entlang der Feldkante wie in den
+  Hauptstadt-Entwuerfen - ein Kunstpixel Erde, jeder vierte Stein heller,
+  ringsum ein Kunstpixel dunkler Rand (vorher 3 Pixel Weg in 5 Pixel Rand). Wem
+  sie gehoert, zeigt ein Wimpel in Spielerfarbe in der Mitte (`wimpel`) - nicht
+  im Ring einer Residenz, dort zeigen Burg und Staedte die Farbe (`ohneWimpel`).
 
 Seit der dritten Fassung stehen im Spiel **kompakte** Fassungen (`dorfKlein`
 11 x 10, `stadtKlein` 15 x 14) ueber der Ecke, damit das Haus nicht ueber die
@@ -263,7 +265,8 @@ eine Vorschau auf den zweiten Tipp wartet.
 ### Zahlenmarker und Haefen — **tragbar**
 
 Kreis mit Zahl und Punktreihe; Hafen als Rechteck mit "2:1". Zweckmaessig und
-gut lesbar. Ein gezeichneter Holzmarker waere schoener, aber hier ist
+gut lesbar. Stehen Figuren auf dem Feld, sitzt der Marker auf 55 % verkleinert
+im oberen Teil des Feldes, die Figuren etwas tiefer - sonst verdeckte er sie. Ein gezeichneter Holzmarker waere schoener, aber hier ist
 Lesbarkeit wichtiger als Schoenheit - der Posten hat niedrige Prioritaet.
 
 ### Oberflaeche — **tragbar**

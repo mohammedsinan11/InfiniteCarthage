@@ -142,14 +142,14 @@ und veroeffentlicht bei jedem Push auf `main` nach GitHub Pages. Vorher unter
 ## Regelumfang
 
 **Allein spielen** geht ohne Mitspieler; in der Lobby laesst sich als Ziel
-"ohne Ziel" waehlen, dann endet die Partie nie und man siedelt einfach vor
+"unendlich" waehlen, dann endet die Partie nie und man siedelt einfach vor
 sich hin. Die Aufbau-Schlange laeuft dabei zweimal ueber denselben Spieler,
 der Zug kehrt zu ihm zurueck, und Raeuber wie Monopol finden schlicht
 niemanden - dafuer braucht es keinen Sonderfall im Ablauf.
 
 Enthalten: Aufbau als Schlange, Wuerfeln und Ertrag, Strasse/Siedlung/Stadt,
 Raeuber mit Abwerfen und Klauen, Bank- und Hafenhandel, Handel zwischen
-Spielern, alle Entwicklungskarten, Groesste Rittermacht, 10/12/15 Siegpunkte,
+Spielern, alle Entwicklungskarten, Groesste Rittermacht, 30/60/unendlich Siegpunkte,
 2 bis 6 Spieler.
 
 Noch nicht enthalten: Laengste Handelsstrasse, Accounts und Statistiken,

@@ -17,7 +17,7 @@ import {
   vertexAdjacentHexes,
 } from './coords';
 import { nestAt } from './raiders';
-import { terrainAt } from './worldgen';
+import { terrainAt, tileAtCoord } from './worldgen';
 import { fraktionAt, fraktionById } from './factions';
 import type { FraktionArt } from './factions';
 import type { Hex } from './coords';
@@ -248,8 +248,11 @@ const AUSSCHAU = 8;
 /**
  * Wo ein neuer Ritter antritt: an einer eigenen Siedlung, auf der Seite, von
  * der das naechste aktive Lager droht. null ohne Siedlung.
+ *
+ * ohneZahl (der Held): ein anliegendes Feld ohne Wuerfelzahl geht vor - dort
+ * steht er nicht unter einem Zahlenmarker. Erst danach zaehlt die Gefahr.
  */
-export function knightMusterHex(view: ArmyView, id: PlayerId): Hex | null {
+export function knightMusterHex(view: ArmyView, id: PlayerId, ohneZahl = false): Hex | null {
   const felder = [...settlementApproaches(view, id).keys()]
     .map((k) => {
       const [q, r] = k.split(':').map(Number);
@@ -264,9 +267,10 @@ export function knightMusterHex(view: ArmyView, id: PlayerId): Hex | null {
     }
     return best;
   };
+  const zahl = (h: Hex): number => (ohneZahl && tileAtCoord(view.worldSeed, h.q, h.r).number !== null ? 1 : 0);
   return felder
-    .map((h) => ({ h, d: gefahr(h) }))
-    .sort((a, b) => a.d - b.d || a.h.q - b.h.q || a.h.r - b.h.r)[0]!.h;
+    .map((h) => ({ h, z: zahl(h), d: gefahr(h) }))
+    .sort((a, b) => a.z - b.z || a.d - b.d || a.h.q - b.h.q || a.h.r - b.h.r)[0]!.h;
 }
 
 /**

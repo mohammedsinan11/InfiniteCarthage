@@ -643,13 +643,16 @@ export type Strassenstueck = {
   farbe: string;
   /** Abgebrannt: nur noch Asche und Glut, kein Wimpel. */
   verbrannt?: boolean;
+  /** Ohne Wimpel - etwa im Ring einer Residenz, wo Burg und Staedte schon Farbe zeigen. */
+  ohneWimpel?: boolean;
 };
 
 /**
  * Strassen als Feldweg entlang der Feldkante, in Geraetepixeln.
  *
- * Wie ein Pfad auf den Kacheln: dunkler, weicher Rand, festgetretene Erde,
- * einzelne Steine. Schritt fuer Schritt ein Kunstpixel weit, auf das
+ * Wie ein Pfad auf den Kacheln, schmal wie in den Hauptstadt-Entwuerfen: ein
+ * Kunstpixel festgetretene Erde, jeder vierte Stein heller, ringsum ein
+ * Kunstpixel dunkler Rand. Schritt fuer Schritt ein Kunstpixel weit, auf das
  * Kunstpixelraster gerundet, so bekommt die schraege Kante dieselben
  * Treppenstufen wie die Kacheln. Wem die Strasse gehoert, zeigt ein Wimpel in
  * Spielerfarbe in ihrer Mitte - der Weg selbst bleibt Weg.
@@ -677,23 +680,19 @@ export function zeichneStrassen(
 
   for (const { s, p } of alle) {
     ctx.fillStyle = s.verbrannt ? '#1f1813' : '#3a2a1e';
-    for (const q of p) ctx.fillRect(q.x - 2 * f, q.y - 2 * f, 5 * f, 5 * f);
-  }
-  for (const { s, p } of alle) {
-    ctx.fillStyle = s.verbrannt ? '#3d342d' : '#9a7b52';
     for (const q of p) ctx.fillRect(q.x - f, q.y - f, 3 * f, 3 * f);
   }
   for (const { s, p } of alle) {
     p.forEach((q, i) => {
-      if (i % 3 !== 1) return;
-      const hell = i % 2 === 1;
-      // Asche: verkohlte Bohlen und hier und da Glut.
-      ctx.fillStyle = s.verbrannt ? (hell ? '#b8481f' : '#141010') : hell ? '#c8ad7f' : '#6f5638';
-      ctx.fillRect(q.x + (hell ? 0 : -f), q.y + (hell ? -f : f), f, f);
+      // Asche: verkohlte Erde, hier und da Glut.
+      ctx.fillStyle = s.verbrannt
+        ? i % 6 === 3 ? '#b8481f' : '#3d342d'
+        : i % 4 === 0 ? '#c8ad7f' : '#9a7b52';
+      ctx.fillRect(q.x, q.y, f, f);
     });
   }
   for (const { s, p } of alle) {
-    if (s.verbrannt) continue;
+    if (s.verbrannt || s.ohneWimpel) continue;
     const m = p[Math.floor(p.length / 2)]!;
     zeichneFigur(ctx, 'wimpel', m.x + 3 * f, m.y + f, f, s.farbe);
   }
@@ -742,8 +741,9 @@ export function aufstellung(anzahl: number, lager: boolean): ReadonlyArray<reado
     if (anzahl === 3) return [[-7, 5], [7, 5], [0, 8]];
     return [[-9, 4], [-6, 9], [9, 4], [6, 9], [0, 11]];
   }
-  if (anzahl <= 1) return [[0, 4]];
-  if (anzahl === 2) return [[-4, 3], [4, 5]];
-  if (anzahl === 3) return [[-5, 2], [5, 2], [0, 6]];
-  return [[-7, 1], [-5, 6], [7, 1], [5, 6], [0, 9]];
+  // Etwas unter der Mitte: darueber sitzt die Zahl, klein (Board, Zahlenmarker).
+  if (anzahl <= 1) return [[0, 7]];
+  if (anzahl === 2) return [[-4, 6], [4, 8]];
+  if (anzahl === 3) return [[-5, 5], [5, 5], [0, 9]];
+  return [[-7, 3], [-5, 8], [7, 3], [5, 8], [0, 11]];
 }

@@ -958,9 +958,14 @@ export function Board({
       kachelSorte(state.worldSeed, world.tiles.get(hk)?.terrain ?? 'pasture', q, r);
     const mauerKanten = new Map<string, string>();
     const bastionen = new Map<string, string>();
+    // Im Ring einer Residenz (Stufe I) tragen die Strassen keine Wimpel - Burg und Staedte zeigen die Farbe.
+    const ringOhneWimpel = new Set<string>();
     for (const [hk, h] of Object.entries(state.hauptstaedte ?? {})) {
-      if (h.stufe < 2) continue;
       const [q, r] = hk.split(':').map(Number) as [number, number];
+      if (h.stufe < 2) {
+        for (const e of hexEdges(q, r)) if (state.roads[edgeKey(e)] === h.owner) ringOhneWimpel.add(edgeKey(e));
+        continue;
+      }
       const sorte = sorteVon(hk, q, r);
       for (const e of hexEdges(q, r)) {
         const ek = edgeKey(e);
@@ -982,7 +987,7 @@ export function Board({
         .filter(([ek]) => !mauerKanten.has(ek))
         .map(([ek, owner]) => {
           const [a, b] = kantePixel(ek);
-          return { a: a!, b: b!, farbe: spielerFarbe(owner) };
+          return { a: a!, b: b!, farbe: spielerFarbe(owner), ohneWimpel: ringOhneWimpel.has(ek) };
         }),
       f,
     );
@@ -994,13 +999,30 @@ export function Board({
       }),
       f,
     );
+    /*
+     * Residenz (Stufe I): Staedte an den hinteren Ecken ihres Feldes kommen erst
+     * nach der Burg - nach dem Fuss sortiert schnitte deren Bergfried sie unten
+     * ab. Der Palast ab Stufe II bleibt davor, dort verschmilzt die Bastion mit ihm.
+     */
+    const nachDerBurg = new Map<string, number>();
+    for (const [hk, h] of Object.entries(state.hauptstaedte ?? {})) {
+      if (h.stufe >= 2) continue;
+      const [q, r] = hk.split(':').map(Number) as [number, number];
+      const c = hexToPixel(q, r, LAYOUT);
+      const burgFuss = geraet(c.x, c.y - liftHex(q, r)).y + 6 * f;
+      for (const v of hexVertices(q, r)) {
+        if (vertexToPixel(v, LAYOUT).y >= c.y) continue;
+        const vk = vertexKey(v);
+        nachDerBurg.set(vk, Math.max(nachDerBurg.get(vk) ?? -Infinity, burgFuss + 1));
+      }
+    }
     const gebaeude = Object.entries(state.buildings).map(([vk, b]) => {
       const ecke = parseVertexKey(vk);
       const v = vertexToPixel(ecke, LAYOUT);
       const p = geraet(v.x, v.y - liftVertex(ecke));
       const bastion = bastionen.get(vk);
       return {
-        fuss: p.y + 3 * f,
+        fuss: Math.max(p.y + 3 * f, nachDerBurg.get(vk) ?? -Infinity),
         male: () =>
           bastion !== undefined
             ? zeichneBastion(ctx, p.x, p.y, f, spielerFarbe(b.owner), bastion, b.turm === true)
@@ -1674,23 +1696,25 @@ export function Board({
             (showAllNumbers || hover === hk || eigeneFelder.has(hk) || (eckeNachbarn?.has(hk) ?? false));
           // Was auf dem Feld steht, steht auf seiner Hoehe - sonst schwebt es.
           const lift = liftHex(t.q, t.r) + (hover === hk ? LIFT : 0);
+          /*
+           * Stehen Figuren auf dem Feld, rueckt die Zahl klein nach oben ueber
+           * ihre Koepfe - die Figuren stehen dafuer etwas tiefer (aufstellung).
+           * Sonst verdeckt der Marker genau die Einheit, die man sucht.
+           */
+          const besetzt = besatzung.has(hk);
+          const marke = besetzt ? `translate(${c.x} ${c.y - 16}) scale(0.55)` : `translate(${c.x} ${c.y})`;
           return (
             <g key={'n' + hk} pointerEvents="none" transform={`translate(0 ${-lift})`}>
               {showNumber && (
-                <>
-                  <circle cx={c.x} cy={c.y} r={9} className="token" />
-                  <text
-                    x={c.x}
-                    y={c.y + 1}
-                    textAnchor="middle"
-                    className={red ? 'token-num red' : 'token-num'}
-                  >
+                <g transform={marke}>
+                  <circle cx={0} cy={0} r={9} className="token" />
+                  <text x={0} y={1} textAnchor="middle" className={red ? 'token-num red' : 'token-num'}>
                     {t.number}
                   </text>
-                  <text x={c.x} y={c.y + 8} textAnchor="middle" className="token-pips">
+                  <text x={0} y={8} textAnchor="middle" className="token-pips">
                     {pips(t.number!)}
                   </text>
-                </>
+                </g>
               )}
             </g>
           );

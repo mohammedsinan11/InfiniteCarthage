@@ -328,11 +328,12 @@ function uebergib(s: GameState, tot: UnitState, erbe: UnitState, events: Ereigni
 
 /**
  * Den Helden eines Spielers antreten lassen - an einer eigenen Siedlung, auf der
- * Seite der naechsten Gefahr. null ohne Siedlung oder wenn er schon steht.
+ * Seite der naechsten Gefahr, lieber auf einem Feld ohne Zahl (Wueste), wenn
+ * eines anliegt. null ohne Siedlung oder wenn er schon steht.
  */
 export function spawnHeld(s: GameState, id: PlayerId, events: Ereignisse): UnitState | null {
   if (s.units.some((u) => u.kind === 'held' && u.owner === id)) return null;
-  const feldAn = knightMusterHex(s, id);
+  const feldAn = knightMusterHex(s, id, true);
   if (!feldAn) return null;
   const p = playerById(s, id);
   const zurueck = p?.heldZurueck !== null && p?.heldZurueck !== undefined;
