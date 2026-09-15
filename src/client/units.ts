@@ -429,9 +429,25 @@ const BURG_HAELFTE = [
   '...ddd..dmm', '...dpd..dmm', '..dmmmd.dmy', '..dmymd.dmm', '..dmmmd.dmm', '..dmmmddddd',
   '..dmdmdmdmd', '..dmmmmmmmm', '..dmmmmmddd', '..dmmmmmdbb', '..dmmmmmdbb', '..ddddddddd',
 ];
-const SCHATTEN_SEITE: Record<string, string> = { m: 'M', p: 'P', q: 'p' };
-const BURG = BURG_HAELFTE.map((z) => z + [...z.slice(0, -1)].reverse().map((c) => SCHATTEN_SEITE[c] ?? c).join(''));
+const SCHATTEN_SEITE: Record<string, string> = { m: 'M', p: 'P', q: 'p', x: 'X' };
+const spiegeln = (haelfte: readonly string[]) =>
+  haelfte.map((z) => z + [...z.slice(0, -1)].reverse().map((c) => SCHATTEN_SEITE[c] ?? c).join(''));
+const BURG = spiegeln(BURG_HAELFTE);
 const BURG_FAHNE = ['dpp.', 'dPpp', 'dpp.'];
+
+/*
+ * Stufe II, Festungsring: in der Mitte ein Palast, der das Feld fuellt - hoher
+ * Bergfried mit Turmdach (x, Farbe nach Gelaende), zwei Seitentuerme mit
+ * Daechern in Spielerfarbe, Fluegel mit Tor. An den Ecken Bastionen statt der
+ * Staedte, auf den Kanten Mauer (zeichneMauern).
+ */
+const PALAST = spiegeln([
+  '..........d', '..........d', '.........dx', '.........dx', '........dxx', '........dxx', '.......dxxx',
+  '........ddd', '........dmd', '........dmm', '........dmy', '....d...dmm', '...dqd..dmm', '..dqppd.dmy',
+  '..ddddd.dmm', '..dmymd.dmm', '..dmmmddddd', 'ddddddmdmdm', 'dmmmmdmmmmm', 'dmymmdmyymm', 'dmmmmdmmmmm',
+  'dmmmmdmmddd', 'dmMmmdmmdbb', 'dmmmmdmmdbb', 'ddddddddddd',
+]);
+const BASTION = spiegeln(['d.d.d', 'ddddd', 'dmmmm', 'dmmym', 'dmmmm', 'dpppp', 'dmmmm', 'dmMmm', 'dmmmm', 'ddddd']);
 
 /**
  * Stein je Kachelsorte (tiles.ts, kachelSorte): die Hauptstadt nimmt die Farbe
@@ -454,8 +470,79 @@ export const STEIN_JE_SORTE: Record<string, { hell: string; dunkel: string }> = 
 };
 
 /**
+ * Turmdaecher je Kachelsorte: Schiefer als Standard, Holzschindeln im Wald,
+ * Schnee in Taiga, Stroh im Dschungel, Ziegel auf Lehm, Tuerkis in der Wueste,
+ * Eis im Schnee, Moos im Sumpf. PLATZHALTER (ASSETS.md).
+ */
+export const DACH_JE_SORTE: Record<string, { hell: string; dunkel: string }> = {
+  forest: { hell: '#8a5a32', dunkel: '#5e3d25' },
+  taiga: { hell: '#eef3f7', dunkel: '#b9c9d6' },
+  jungle: { hell: '#d9b44a', dunkel: '#a8832e' },
+  clay: { hell: '#b8402e', dunkel: '#842a1e' },
+  mountains: { hell: '#5a5a68', dunkel: '#3c3c48' },
+  sand: { hell: '#3fa39a', dunkel: '#2c6b63' },
+  dunes: { hell: '#3fa39a', dunkel: '#2c6b63' },
+  snow: { hell: '#bfe4f7', dunkel: '#7fb0d8' },
+  swamp: { hell: '#6f7f44', dunkel: '#4a5a2a' },
+  swamp_reeds: { hell: '#6f7f44', dunkel: '#4a5a2a' },
+  swamp_pads: { hell: '#6f7f44', dunkel: '#4a5a2a' },
+};
+
+/** Stein und Dach, die ein Bauwerk der Hauptstadt auf dieser Kachelsorte bekommt. */
+export function steinFuer(sorte: string): { hell: string; dunkel: string } {
+  return STEIN_JE_SORTE[sorte] ?? { hell: PALETTE.m!, dunkel: PALETTE.M! };
+}
+const dachFuer = (sorte: string) => DACH_JE_SORTE[sorte] ?? { hell: '#6a7a98', dunkel: '#46546e' };
+
+/**
+ * Ein Bild aus Pixelkarten, umgefaerbt: p/P/q Spielerfarbe, m/M Stein, x/X Dach.
+ * Gemerkt wie die Figuren - eine Hauptstadt ist danach ein einziges drawImage.
+ */
+function bauwerkBild(
+  name: string,
+  teile: readonly { karte: readonly string[]; dx: number; dy: number }[],
+  breite: number,
+  hoehe: number,
+  f: number,
+  farbe: string,
+  sorte: string,
+): HTMLCanvasElement {
+  const stein = steinFuer(sorte);
+  const dach = dachFuer(sorte);
+  const schluessel = `${name}|${farbe}|${stein.hell}|${dach.hell}|${f}`;
+  const da = BILDER.get(schluessel);
+  if (da) return da;
+  const bild = document.createElement('canvas');
+  bild.width = breite * f;
+  bild.height = hoehe * f;
+  const g = bild.getContext('2d')!;
+  for (const { karte, dx, dy } of teile) {
+    karte.forEach((zeile, zy) => {
+      for (let zx = 0; zx < zeile.length; zx++) {
+        const ch = zeile[zx]!;
+        if (ch === '.') continue;
+        g.fillStyle =
+          ch === 'p' ? farbe
+          : ch === 'P' ? dunkler(farbe)
+          : ch === 'q' ? heller(farbe)
+          : ch === 'm' ? stein.hell
+          : ch === 'M' ? stein.dunkel
+          : ch === 'x' ? dach.hell
+          : ch === 'X' ? dach.dunkel
+          : (PALETTE[ch] ?? '#ff00ff');
+        g.fillRect((dx + zx) * f, (dy + zy) * f, f, f);
+      }
+    });
+  }
+  if (BILDER.size >= BILDER_MAX) BILDER.clear();
+  BILDER.set(schluessel, bild);
+  return bild;
+}
+
+/**
  * Die Hauptstadt auf ihrem Feld. (x, y) ist die Feldmitte in Geraetepixeln,
- * f die Geraetepixel je Kunstpixel, sorte die Kachelsorte darunter.
+ * f die Geraetepixel je Kunstpixel, sorte die Kachelsorte darunter. Stufe I
+ * ist die Burg, ab Stufe II der Palast, der das Feld fuellt.
  */
 export function zeichneHauptstadt(
   ctx: CanvasRenderingContext2D,
@@ -464,42 +551,90 @@ export function zeichneHauptstadt(
   f: number,
   farbe: string,
   sorte: string,
+  stufe = 1,
 ): void {
-  const stein = STEIN_JE_SORTE[sorte] ?? { hell: PALETTE.m!, dunkel: PALETTE.M! };
-  const breite = BURG[0]!.length;
-  const schluessel = `burg|${farbe}|${stein.hell}|${f}`;
-  let bild = BILDER.get(schluessel);
-  if (!bild) {
-    bild = document.createElement('canvas');
-    bild.width = breite * f;
-    bild.height = (BURG.length + 3) * f;
-    const g = bild.getContext('2d')!;
-    const male = (karte: readonly string[], dx: number, dy: number) => {
-      karte.forEach((zeile, zy) => {
-        for (let zx = 0; zx < zeile.length; zx++) {
-          const ch = zeile[zx]!;
-          if (ch === '.') continue;
-          g.fillStyle =
-            ch === 'p' ? farbe
-            : ch === 'P' ? dunkler(farbe)
-            : ch === 'q' ? heller(farbe)
-            : ch === 'm' ? stein.hell
-            : ch === 'M' ? stein.dunkel
-            : (PALETTE[ch] ?? '#ff00ff');
-          g.fillRect((dx + zx) * f, (dy + zy) * f, f, f);
-        }
-      });
-    };
-    male(BURG, 0, 3);
-    male(BURG_FAHNE, 10, 0);
-    if (BILDER.size >= BILDER_MAX) BILDER.clear();
-    BILDER.set(schluessel, bild);
-  }
-  const fy = y + 6 * f;
+  const karte = stufe >= 2 ? PALAST : BURG;
+  const breite = karte[0]!.length;
+  const hoehe = karte.length + 3;
+  const bild = bauwerkBild(
+    stufe >= 2 ? 'palast' : 'burg',
+    [
+      { karte, dx: 0, dy: 3 },
+      { karte: BURG_FAHNE, dx: 10, dy: 0 },
+    ],
+    breite,
+    hoehe,
+    f,
+    farbe,
+    sorte,
+  );
+  const fy = y + (stufe >= 2 ? 9 : 6) * f;
   const x0 = x - Math.floor(breite / 2) * f;
   ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
   ctx.fillRect(x0 + 2 * f, fy + f, (breite - 4) * f, f);
-  ctx.drawImage(bild, x0, fy - (BURG.length - 1 + 3) * f);
+  ctx.drawImage(bild, x0, fy - (hoehe - 1) * f);
+}
+
+/**
+ * Eine Bastion des Festungsrings - an der Ecke, an der vorher die Stadt stand.
+ * (x, y) ist die Ecke in Geraetepixeln, wie bei zeichneGebaeude; ein Wachturm
+ * bleibt als Wehrturm daneben stehen.
+ */
+export function zeichneBastion(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  f: number,
+  farbe: string,
+  sorte: string,
+  turm = false,
+): void {
+  const fy = y + 3 * f;
+  if (turm) zeichneFigur(ctx, 'turm', x + 8 * f, fy - 2 * f, f, farbe);
+  const breite = BASTION[0]!.length;
+  const hoehe = BASTION.length + 3;
+  const bild = bauwerkBild('bastion', [{ karte: BASTION, dx: 0, dy: 3 }, { karte: BURG_FAHNE, dx: 4, dy: 0 }], breite, hoehe, f, farbe, sorte);
+  const x0 = x - Math.floor(breite / 2) * f;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+  ctx.fillRect(x0 + f, fy + f, (breite - 2) * f, f);
+  ctx.drawImage(bild, x0, fy - (hoehe - 1) * f);
+}
+
+export type Mauerstueck = {
+  a: { x: number; y: number };
+  b: { x: number; y: number };
+  stein: { hell: string; dunkel: string };
+};
+
+/**
+ * Die Mauer eines Festungsrings entlang der Feldkante, in Geraetepixeln - wie
+ * eine Strasse Schritt fuer Schritt ein Kunstpixel weit, aber hoch: dunkler
+ * Rand, heller Stein, unten Schatten, oben Zinnen. PLATZHALTER (ASSETS.md).
+ */
+export function zeichneMauern(ctx: CanvasRenderingContext2D, stuecke: readonly Mauerstueck[], f: number): void {
+  const alle = stuecke.map((s) => {
+    const n = Math.max(1, Math.ceil(Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y) / f));
+    const p: { x: number; y: number }[] = [];
+    for (let i = 0; i <= n; i++) {
+      p.push({
+        x: Math.round((s.a.x + ((s.b.x - s.a.x) * i) / n) / f) * f,
+        y: Math.round((s.a.y + ((s.b.y - s.a.y) * i) / n) / f) * f,
+      });
+    }
+    return { s, p };
+  });
+  ctx.fillStyle = '#3a2a1e';
+  for (const { p } of alle) for (const q of p) ctx.fillRect(q.x - 2 * f, q.y - 5 * f, 5 * f, 7 * f);
+  for (const { s, p } of alle) {
+    for (const q of p) {
+      ctx.fillStyle = s.stein.hell;
+      ctx.fillRect(q.x - f, q.y - 4 * f, 3 * f, 3 * f);
+      ctx.fillStyle = s.stein.dunkel;
+      ctx.fillRect(q.x - f, q.y - f, 3 * f, 2 * f);
+    }
+  }
+  ctx.fillStyle = '#3a2a1e';
+  for (const { p } of alle) p.forEach((q, i) => i % 2 === 0 && ctx.fillRect(q.x, q.y - 4 * f, f, f));
 }
 
 export type Strassenstueck = {

@@ -2127,11 +2127,12 @@ em.off {
   border-top-color: var(--line-bright);
   border-bottom: none;
 }
-/* Zu weit oben: die Tafel klappt unter das Gebaeude, der Zipfel zeigt nach oben. */
-.ausbau-tafel.unten {
+/* Zu weit oben: die Tafel klappt unter das Gebaeude, der Zipfel zeigt nach oben.
+   Nicht "unten" nennen - so heisst schon der Block mit Hand und Leiste. */
+.ausbau-tafel.nach-unten {
   transform: translate(-50%, 0);
 }
-.ausbau-tafel.unten::after {
+.ausbau-tafel.nach-unten::after {
   top: -8px;
   bottom: auto;
   border-top: none;

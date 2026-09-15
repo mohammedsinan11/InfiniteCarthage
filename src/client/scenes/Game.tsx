@@ -47,10 +47,17 @@ import { setAmbiente } from '../ambiente';
 import { seasonOf } from '../../core/season';
 import { RESOURCES } from '../../core/types';
 import type { Resource } from '../../core/types';
-import { COST_CAPITAL, COST_CITY, COST_ROAD, COST_TOWER, canAfford } from '../../core/rules/costs';
+import { COST_CAPITAL, COST_CITY, COST_FESTUNG, COST_ROAD, COST_TOWER, canAfford } from '../../core/rules/costs';
 import { FRIEDEN_PREIS, TRIBUT_KARTEN, nimmtFrieden } from '../../core/rules/diplomatie';
 import { brennt } from '../../core/rules/feuer';
-import { FAST_GESCHLOSSEN, hatHauptstadt, hauptstadtFelder, hauptstadtHindernis } from '../../core/rules/hauptstadt';
+import {
+  FAST_GESCHLOSSEN,
+  STUFE_NAME,
+  festungHindernis,
+  hatHauptstadt,
+  hauptstadtFelder,
+  hauptstadtHindernis,
+} from '../../core/rules/hauptstadt';
 import type { Umland } from '../../core/rules/hauptstadt';
 import type { Cost } from '../../core/rules/costs';
 import { Diagnose, diagnoseAn } from '../ui/Diagnose';
@@ -433,7 +440,30 @@ export function Game() {
         }),
       };
     };
+    const festungOption = (q: number, r: number) => {
+      const hindernis = festungHindernis(state, you, q, r);
+      return {
+        name: 'Festungsring',
+        kosten: COST_FESTUNG,
+        darf: jetzt && hindernis === null && bezahlbar(COST_FESTUNG),
+        hinweis: hindernis ?? warum ?? armut(COST_FESTUNG),
+        wahl: dann(() => {
+          act({ t: 'upgradeCapital', q, r });
+          playBuild();
+        }),
+      };
+    };
     if (ausbauOrt.art === 'feld') {
+      const hauptstadt = state.hauptstaedte?.[ausbauOrt.key];
+      if (hauptstadt && hauptstadt.owner === you) {
+        const [q, r] = ausbauOrt.key.split(':').map(Number) as [number, number];
+        return {
+          ort: ausbauOrt,
+          titel: `Hauptstadt · ${STUFE_NAME[hauptstadt.stufe] ?? `Stufe ${hauptstadt.stufe}`}`,
+          optionen: hauptstadt.stufe < 2 ? [festungOption(q, r)] : [],
+          leer: 'Weitere Stufen folgen.',
+        };
+      }
       const u = umland.find((x) => hexKey(x.q, x.r) === ausbauOrt.key);
       if (!u) return null;
       return { ort: ausbauOrt, titel: u.bereit ? 'Umschlossenes Feld' : 'Fast umschlossen', optionen: [hauptstadtOption(u)] };
@@ -471,6 +501,12 @@ export function Game() {
         (x) => x.fehlt <= FAST_GESCHLOSSEN && hexVertices(x.q, x.r).some((v) => vertexKey(v) === ausbauOrt.key),
       );
       if (u) optionen.push(hauptstadtOption(u));
+    }
+    // An einer Ecke der eigenen Residenz: der Festungsring laesst sich auch von hier ausbauen.
+    for (const [hk, h] of Object.entries(state.hauptstaedte ?? {})) {
+      if (h.owner !== you || h.stufe >= 2) continue;
+      const [q, r] = hk.split(':').map(Number) as [number, number];
+      if (hexVertices(q, r).some((v) => vertexKey(v) === ausbauOrt.key)) optionen.push(festungOption(q, r));
     }
     return { ort: ausbauOrt, titel: b.type === 'city' ? 'Stadt' : 'Dorf', optionen };
   }, [ausbauOrt, you, isMine, phase.t, hand, state, umland, eigeneHauptstadt, act]);
@@ -835,6 +871,9 @@ export function Game() {
             you && mode === null && befehl === null && phase.t !== 'setup'
               ? (vk) => setAusbauOrt({ art: 'ecke', key: vk })
               : undefined
+          }
+          onHauptstadtKlick={
+            you && mode === null && befehl === null ? (hk) => setAusbauOrt({ art: 'feld', key: hk }) : undefined
           }
           onLeer={() => setAusbauOrt(null)}
           ausbau={ausbau}

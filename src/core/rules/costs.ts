@@ -38,6 +38,13 @@ export const COST_TOWER: Cost = { lumber: 1, brick: 1, ore: 1 };
 export const COST_CAPITAL: Cost = { lumber: 2, brick: 2, grain: 2, ore: 3 };
 
 /**
+ * Die Hauptstadt zum Festungsring ausbauen: aus den Strassen des Rings wird
+ * Mauer, aus den Staedten werden Bastionen. Vor allem Lehm und Erz fuer den
+ * Stein. PLATZHALTER fuers Balancing.
+ */
+export const COST_FESTUNG: Cost = { lumber: 1, brick: 3, grain: 1, ore: 3 };
+
+/**
  * Eine abgebrannte Strasse wieder aufbauen: nur Holz. Der Damm liegt noch, es
  * fehlen die Bohlen - und wer gebrannt wurde, soll nicht doppelt zahlen.
  */

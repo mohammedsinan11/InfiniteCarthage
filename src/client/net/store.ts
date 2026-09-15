@@ -290,6 +290,10 @@ function meldungenAus(
       meldung(e.player === you ? 'Deine Hauptstadt ist gegruendet' : `${wer(e.player)} gruendet eine Hauptstadt`, e.player === you ? 'gain' : 'info');
       continue;
     }
+    if (e.t === 'capitalUpgrade') {
+      meldung(e.player === you ? 'Der Festungsring steht' : `${wer(e.player)} baut einen Festungsring`, e.player === you ? 'gain' : 'info');
+      continue;
+    }
     if (e.t === 'plunder') {
       const karten = `${e.count} ${e.count === 1 ? 'Karte' : 'Karten'}`;
       if (e.player === you) {

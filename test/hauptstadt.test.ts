@@ -6,11 +6,19 @@
 import { describe, it, expect } from 'vitest';
 import { applyAction, createGame } from '../src/core/rules/reducer';
 import type { Game } from '../src/core/rules/reducer';
-import { FAST_GESCHLOSSEN, hauptstadtFelder, hauptstadtHindernis, umlandVon } from '../src/core/rules/hauptstadt';
-import { COST_CAPITAL } from '../src/core/rules/costs';
+import {
+  FAST_GESCHLOSSEN,
+  festungHindernis,
+  festungsSchutz,
+  hauptstadtFelder,
+  hauptstadtHindernis,
+  umlandVon,
+} from '../src/core/rules/hauptstadt';
+import { COST_CAPITAL, COST_FESTUNG } from '../src/core/rules/costs';
+import { strasseGeschuetzt } from '../src/core/rules/feuer';
 import { edgeKey, hexEdges, hexKey, hexVertices, hexesInRange, vertexKey } from '../src/core/coords';
 import { terrainAt } from '../src/core/worldgen';
-import { HAUPTSTADT_PUNKTE, publicPoints } from '../src/core/state';
+import { HAUPTSTADT_PUNKTE, STUFE_PUNKTE, publicPoints } from '../src/core/state';
 import { redactStateFor } from '../src/core/redact';
 import { RESOURCES } from '../src/core/types';
 
@@ -137,5 +145,56 @@ describe('Hauptstadt gruenden', () => {
     expect(applyAction(game, { t: 'foundCapital', q: a.q, r: a.r }, 'p0').ok).toBe(true);
     expect(hauptstadtHindernis(game.state, 'p0', b.q, b.r)).toBe('Du hast schon eine Hauptstadt.');
     expect(applyAction(game, { t: 'foundCapital', q: b.q, r: b.r }, 'p0').ok).toBe(false);
+  });
+});
+
+describe('Festungsring', () => {
+  function mitHauptstadt() {
+    const game = spiel();
+    const h = landFeld(game);
+    ring(game, h, ['city', 'city', 'city']);
+    geben(game, 'p0');
+    expect(applyAction(game, { t: 'foundCapital', q: h.q, r: h.r }, 'p0').ok).toBe(true);
+    const p = game.state.players[0]!;
+    for (const r of RESOURCES) p.hand[r] += COST_FESTUNG[r] ?? 0;
+    return { game, h };
+  }
+
+  it('baut die Hauptstadt aus: Stufe 2, ein Punkt mehr, kostet', () => {
+    const { game, h } = mitHauptstadt();
+    const vorher = publicPoints(game.state, 'p0');
+    const res = applyAction(game, { t: 'upgradeCapital', q: h.q, r: h.r }, 'p0');
+    expect(res.ok).toBe(true);
+    expect(game.state.hauptstaedte[hexKey(h.q, h.r)]?.stufe).toBe(2);
+    expect(publicPoints(game.state, 'p0')).toBe(vorher + STUFE_PUNKTE);
+    expect(RESOURCES.every((r) => game.state.players[0]!.hand[r] === 0)).toBe(true);
+    if (res.ok) expect(res.events).toContainEqual({ t: 'capitalUpgrade', player: 'p0', q: h.q, r: h.r, stufe: 2 });
+    expect(festungHindernis(game.state, 'p0', h.q, h.r)).toBe('Der Festungsring steht schon.');
+  });
+
+  it('nicht bei offenem Ring, nicht fremd, nicht ausser der Bauphase', () => {
+    const { game, h } = mitHauptstadt();
+    expect(festungHindernis(game.state, 'p1', h.q, h.r)).toBe('Das ist nicht deine Hauptstadt.');
+    const kante = edgeKey(hexEdges(h.q, h.r)[0]!);
+    delete game.state.roads[kante];
+    expect(applyAction(game, { t: 'upgradeCapital', q: h.q, r: h.r }, 'p0').ok).toBe(false);
+    game.state.roads[kante] = 'p0';
+    game.state.phase = { t: 'roll' };
+    expect(applyAction(game, { t: 'upgradeCapital', q: h.q, r: h.r }, 'p0').ok).toBe(false);
+    game.state.phase = { t: 'main' };
+    expect(applyAction(game, { t: 'upgradeCapital', q: h.q, r: h.r }, 'p0').ok).toBe(true);
+  });
+
+  it('die Mauer brennt nicht, die Bastionen auch nicht, und der Ausbau loescht Feuer im Ring', () => {
+    const { game, h } = mitHauptstadt();
+    const kante = edgeKey(hexEdges(h.q, h.r)[2]!);
+    const stadt = vertexKey(hexVertices(h.q, h.r)[0]!);
+    expect(strasseGeschuetzt(game.state, 'p0', kante)).toBe(false);
+    game.state.braende.push({ key: kante, art: 'strasse', owner: 'p0', fraktion: 'f:1:1', q: h.q, r: h.r, seit: 3 });
+    expect(applyAction(game, { t: 'upgradeCapital', q: h.q, r: h.r }, 'p0').ok).toBe(true);
+    expect(game.state.braende).toEqual([]);
+    expect(strasseGeschuetzt(game.state, 'p0', kante)).toBe(true);
+    expect(festungsSchutz(game.state, 'p0').ecken.has(stadt)).toBe(true);
+    expect(festungsSchutz(game.state, 'p1').kanten.size).toBe(0);
   });
 });

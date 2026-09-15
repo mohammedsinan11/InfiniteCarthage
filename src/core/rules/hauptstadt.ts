@@ -11,7 +11,7 @@
  * Staedte aendern sich nicht, die Hauptstadt kommt obendrauf.
  */
 
-import { edgeKey, hexEdges, hexKey, hexVertices, parseVertexKey, vertexAdjacentHexes, vertexKey } from '../coords';
+import { edgeKey, hexEdges, hexKey, hexVertices, parseHexKey, parseVertexKey, vertexAdjacentHexes, vertexKey } from '../coords';
 import type { GameState, PlayerId } from '../state';
 import { terrainAt } from '../worldgen';
 
@@ -108,4 +108,46 @@ export function hauptstadtHindernis(view: HauptstadtSicht, player: PlayerId, q: 
   const u = umlandVon(view, player, q, r);
   if (!u || !u.bereit) return 'Das Feld braucht ringsum sechs eigene Strassen und drei eigene Staedte.';
   return null;
+}
+
+// --- Ausbaustufen -----------------------------------------------------------
+
+/** Namen der Ausbaustufen. */
+export const STUFE_NAME: Record<number, string> = { 1: 'Residenz', 2: 'Festungsring' };
+
+/**
+ * Warum diese Hauptstadt (noch) nicht zum Festungsring ausgebaut werden kann -
+ * oder null. Der Ring muss dafuer noch geschlossen sein: eine abgebrannte
+ * Strasse will erst wieder aufgebaut werden.
+ */
+export function festungHindernis(view: HauptstadtSicht, player: PlayerId, q: number, r: number): string | null {
+  const h = view.hauptstaedte?.[hexKey(q, r)];
+  if (!h || h.owner !== player) return 'Das ist nicht deine Hauptstadt.';
+  if (h.stufe >= 2) return 'Der Festungsring steht schon.';
+  const u = umlandVon(view, player, q, r);
+  if (!u || !u.bereit) return 'Der Ring ist nicht mehr geschlossen - Strassen oder Staedte fehlen.';
+  return null;
+}
+
+/**
+ * Was ein Festungsring schuetzt: die sechs Kanten und die eigenen Gebaeude an
+ * den Ecken jeder eigenen Hauptstadt ab Stufe II. Die Mauer brennt nicht, die
+ * Bastionen fangen kein Feuer (rules/feuer.ts).
+ */
+export function festungsSchutz(
+  view: Pick<GameState, 'buildings'> & { hauptstaedte?: GameState['hauptstaedte'] },
+  owner: PlayerId,
+): { kanten: Set<string>; ecken: Set<string> } {
+  const kanten = new Set<string>();
+  const ecken = new Set<string>();
+  for (const [hk, h] of Object.entries(view.hauptstaedte ?? {})) {
+    if (h.owner !== owner || h.stufe < 2) continue;
+    const { q, r } = parseHexKey(hk);
+    for (const e of hexEdges(q, r)) kanten.add(edgeKey(e));
+    for (const v of hexVertices(q, r)) {
+      const vk = vertexKey(v);
+      if (view.buildings[vk]?.owner === owner) ecken.add(vk);
+    }
+  }
+  return { kanten, ecken };
 }

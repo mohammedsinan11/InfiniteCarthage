@@ -321,6 +321,8 @@ export type Hauptstadt = { owner: PlayerId; stufe: number; seit: number };
 
 /** Siegpunkte einer Hauptstadt - zusaetzlich zu den drei Staedten, die sie umschliessen. */
 export const HAUPTSTADT_PUNKTE = 2;
+/** Ein weiterer Siegpunkt je Ausbaustufe ueber der ersten. */
+export const STUFE_PUNKTE = 1;
 
 /*
  * Eine Bank mit Bestand gibt es nicht mehr: sie ist unendlich. Frueher hielt sie
@@ -355,7 +357,7 @@ export function publicPoints(state: GameState, id: PlayerId): number {
   }
   if (state.largestArmy === id) pts += 2;
   for (const h of Object.values(state.hauptstaedte ?? {})) {
-    if (h.owner === id) pts += HAUPTSTADT_PUNKTE;
+    if (h.owner === id) pts += HAUPTSTADT_PUNKTE + (h.stufe - 1) * STUFE_PUNKTE;
   }
   return pts;
 }

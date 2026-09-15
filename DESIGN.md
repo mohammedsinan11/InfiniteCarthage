@@ -336,18 +336,29 @@ anbieten oder brechen; ob Tribut mit der Groesse des Reichs steigen soll.
   oeffnet eine kleine Tafel mit dem, was dort geht - Dorf zu Stadt, Wachturm,
   Hauptstadt -, samt Kosten. Was gerade nicht geht, steht gesperrt da, mit dem
   Grund ("Erst wuerfeln", "Es fehlen noch 1 Stadt").
-- **Bauzeile (Entwurf V2):** "Bauen" tauscht die Leiste gegen Strasse, Dorf,
-  Stadt, Turm und Hauptstadt, ein Pfeil fuehrt zurueck. Zurueck zur alten
-  Leiste mit einem Schalter: `BAU_ZEILE = false` in `ui/Aktionsleiste.tsx`.
+- **Leiste:** wie vorher alle Knoepfe in einer Reihe; "Hauptstadt" erscheint
+  darin, sobald ein Feld geschlossen ist. Die Bauzeile nach Entwurf V2 (Bauen
+  tauscht die Leiste, ein Pfeil fuehrt zurueck) liegt als Schalter bereit:
+  `BAU_ZEILE = true` in `ui/Aktionsleiste.tsx`. Sie war wieder aus, weil die
+  Leiste noch nicht so breit ist - und weil Beute, Handel und Zug Ende fehlten,
+  solange die Bauzeile offen stand. Beute steht jetzt vorn in der Leiste: auf
+  dem Handy scrollt die Reihe, und am Ende rutschte der Knopf aus dem Bild.
 - **Aussehen, Stufe I:** eine Burg in der Mitte zwischen den drei Staedten.
   Ihr Stein richtet sich nach der Kachelsorte - Sandstein, Ziegel, Granit,
   Moos, Schnee (`units.ts`, `STEIN_JE_SORTE`). Die Zahl des Feldes steht nur
   unter dem Zeiger, sonst laege sie auf der Burg.
 
+- **Stufe II, Festungsring:** ueber die Ausbau-Tafel - Klick auf die Burg oder
+  eine Stadt an ihrem Ring (Aktion `upgradeCapital`, Kosten `COST_FESTUNG`,
+  +1 Siegpunkt, beides Platzhalter). Der Ring muss dafuer noch geschlossen
+  sein. Aus den Strassen wird Mauer, aus den Staedten Bastionen - Ertrag und
+  Punkte bleiben -, in der Mitte ein Palast. Stein und Turmdach nach Gelaende
+  (`STEIN_JE_SORTE`, `DACH_JE_SORTE`), Fahnen in Spielerfarbe. Die Mauer
+  brennt nicht, die Bastionen fangen kein Feuer, und der Ausbau loescht, was im
+  Ring gerade brennt.
+
 ### Geplant
 
-- **Stufe II, Festungsring (Standard):** die Staedte werden Bastionen, die
-  Strassen Mauer, in der Mitte ein Palast - Material und Farbe nach Gelaende.
 - **Stufe III** und **Richtungen** (Hexenturm, Burgfeste, Handelskontor, ...).
 - **Verdecken:** nur hohe Kacheln davor duerfen sie verdecken (siehe oben).
 - Offen: Doerfer im Ring, was die Hauptstadt ueber die Punkte hinaus bringt.

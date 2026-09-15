@@ -75,6 +75,11 @@ aufbrechende Truhe oder ein Sternenfunke, der in die Kartenwahl uebergeht.
 - **Krone:** `client/board/Marken.tsx`, `KronenZeichen` - 11 x 6, golden
   (bereit, wippt per CSS) oder silbern (fast umschlossen). Das leuchtende
   Feld darunter ist ein SVG-Sechseck mit CSS-Puls (`.hex-krone`).
+- **Festungsring (Stufe II):** `client/units.ts` - Palast 21 x 28 in der
+  Feldmitte (`zeichneHauptstadt`, Stufe 2), Bastion 9 x 13 an den Ecken
+  (`zeichneBastion`), Mauer als hoher Weg mit Zinnen entlang der Kanten
+  (`zeichneMauern`). Stein nach `STEIN_JE_SORTE`, Turmdach nach
+  `DACH_JE_SORTE`, Fahnen in Spielerfarbe.
 - **Ausbau-Tafel:** reines CSS (`.ausbau-tafel`) mit Zipfel.
 - **Knoepfe der Bauzeile:** `SymBauen` (Hammer) und `SymHauptstadt` (Krone)
   in `ui/Aktionsleiste.tsx`, aus wenigen SVG-Flaechen.

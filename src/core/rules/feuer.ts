@@ -25,6 +25,10 @@
  * die Strassen, die an dieser Ecke enden. Die Waechter sehen die Brandstifter
  * kommen. Findet ein Pluenderer nur Geschuetztes, meldet das burnPrevented.
  *
+ * FESTUNGSRING. Ab Stufe II ist der Ring einer Hauptstadt Mauer: seine sechs
+ * Strassen brennen nicht, und die Bastionen an seinen Ecken fangen kein Feuer
+ * (rules/hauptstadt.ts, festungsSchutz).
+ *
  * Das letzte Gebaeude eines Spielers brennt nie nieder: ohne Siedlung kann kein
  * Ritter mehr antreten und nichts mehr wachsen - ein Ueberfall soll schmerzen,
  * nicht die Partie beenden.
@@ -46,6 +50,7 @@ import type { Hex } from '../coords';
 import { imKampf } from '../combat';
 import { regnet, wetterOf } from '../zeit';
 import { playerById } from '../state';
+import { festungsSchutz } from './hauptstadt';
 import type { Brand, GameState, PlayerId, UnitState } from '../state';
 import { RESOURCES } from '../types';
 import type { Resource } from '../types';
@@ -79,8 +84,13 @@ const turmAn = (s: Pick<GameState, 'buildings'>, owner: PlayerId, vk: string): b
   return b !== undefined && b.owner === owner && b.turm === true;
 };
 
-/** Schuetzt ein Wachturm diese Strasse - endet sie an seiner Ecke? */
-export function strasseGeschuetzt(s: Pick<GameState, 'buildings'>, owner: PlayerId, ek: string): boolean {
+/** Schuetzt ein Wachturm diese Strasse - endet sie an seiner Ecke? Oder ist sie Mauer eines Festungsrings? */
+export function strasseGeschuetzt(
+  s: Pick<GameState, 'buildings'> & { hauptstaedte?: GameState['hauptstaedte'] },
+  owner: PlayerId,
+  ek: string,
+): boolean {
+  if (festungsSchutz(s, owner).kanten.has(ek)) return true;
   return edgeEndpoints(parseEdgeKey(ek)).some((v) => turmAn(s, owner, vertexKey(v)));
 }
 
@@ -117,7 +127,8 @@ export function feuerLegen(
         return b !== undefined && b.owner === owner && !brennt(s, vk) && (b.type === 'city' || gebaeude > 1);
       })
       .sort();
-    const offen = ecken.filter((vk) => !s.buildings[vk]!.turm);
+    const bastionen = festungsSchutz(s, owner).ecken;
+    const offen = ecken.filter((vk) => !s.buildings[vk]!.turm && !bastionen.has(vk));
     if (offen.length > 0) {
       const vk = offen[rng.int(offen.length)]!;
       legen(vk, s.buildings[vk]!.type === 'city' ? 'stadt' : 'dorf');

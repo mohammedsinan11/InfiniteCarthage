@@ -36,6 +36,7 @@ import { ResourceCard } from '../ui/ResourceIcon';
 import { hexCornerPixel } from '../../core/coords';
 import { reliefLimitedAt } from '../../core/relief';
 import { edgeAdjacentHexes, vertexAdjacentHexes } from '../../core/coords';
+import { edgeKey, hexEdges, hexVertices, vertexKey } from '../../core/coords';
 import { WERTE, garrisonOf, garrisonUnits, isNestActive, nestFraktionOf } from '../../core/units';
 import type { Unit } from '../../core/units';
 import { istSpielerSeite, istKampf, kampfFelder, seiteVon, spielerAus } from '../../core/combat';
@@ -48,6 +49,9 @@ import {
   zeichneFigur,
   zeichneGebaeude,
   zeichneHauptstadt,
+  zeichneBastion,
+  zeichneMauern,
+  steinFuer,
   zeichneLeben,
   zeichneStrassen,
 } from '../units';
@@ -217,6 +221,8 @@ export type AusbauTafel = {
   ort: { art: 'ecke' | 'feld'; key: string };
   titel: string;
   optionen: { name: string; kosten?: Cost; darf: boolean; hinweis?: string; wahl: () => void }[];
+  /** Text, wenn es keine Optionen gibt. */
+  leer?: string;
 };
 
 /** Eine Krone ueber einem fast oder ganz geschlossenen Feld (rules/hauptstadt.ts). */
@@ -261,6 +267,8 @@ type Props = {
   onKrone?: (q: number, r: number) => void;
   /** Klick auf ein eigenes Gebaeude - zeigt, was sich dort ausbauen laesst. */
   onGebaeude?: (vertex: string) => void;
+  /** Klick auf die eigene Hauptstadt - zeigt ihre Ausbaustufen. */
+  onHauptstadtKlick?: (hexKey: string) => void;
   /** Klick ins Leere - schliesst die Ausbau-Tafel. */
   onLeer?: () => void;
   /** Die offene Ausbau-Tafel, oder null. */
@@ -351,6 +359,7 @@ export function Board({
   kronen = KEINE_KRONEN,
   onKrone,
   onGebaeude,
+  onHauptstadtKlick,
   onLeer,
   ausbau = null,
   children,
@@ -922,14 +931,47 @@ export function Board({
         }),
       f,
     );
+    /*
+     * Festungsring (Hauptstadt ab Stufe II): die Strassen des Rings werden Mauer,
+     * die Staedte an seinen Ecken Bastionen - im Stein ihres Gelaendes.
+     */
+    const sorteVon = (hk: string, q: number, r: number) =>
+      kachelSorte(state.worldSeed, world.tiles.get(hk)?.terrain ?? 'pasture', q, r);
+    const mauerKanten = new Map<string, string>();
+    const bastionen = new Map<string, string>();
+    for (const [hk, h] of Object.entries(state.hauptstaedte ?? {})) {
+      if (h.stufe < 2) continue;
+      const [q, r] = hk.split(':').map(Number) as [number, number];
+      const sorte = sorteVon(hk, q, r);
+      for (const e of hexEdges(q, r)) {
+        const ek = edgeKey(e);
+        if (state.roads[ek] === h.owner) mauerKanten.set(ek, sorte);
+      }
+      for (const v of hexVertices(q, r)) {
+        const vk = vertexKey(v);
+        if (state.buildings[vk]?.owner === h.owner) bastionen.set(vk, sorte);
+      }
+    }
+    const kantePixel = (ek: string) =>
+      edgeEndpoints(parseEdgeKey(ek)).map((v) => {
+        const p = vertexToPixel(v, LAYOUT);
+        return geraet(p.x, p.y - liftVertex(v));
+      });
     zeichneStrassen(
       ctx,
-      Object.entries(state.roads).map(([ek, owner]) => {
-        const [a, b] = edgeEndpoints(parseEdgeKey(ek)).map((v) => {
-          const p = vertexToPixel(v, LAYOUT);
-          return geraet(p.x, p.y - liftVertex(v));
-        });
-        return { a: a!, b: b!, farbe: spielerFarbe(owner) };
+      Object.entries(state.roads)
+        .filter(([ek]) => !mauerKanten.has(ek))
+        .map(([ek, owner]) => {
+          const [a, b] = kantePixel(ek);
+          return { a: a!, b: b!, farbe: spielerFarbe(owner) };
+        }),
+      f,
+    );
+    zeichneMauern(
+      ctx,
+      [...mauerKanten].map(([ek, sorte]) => {
+        const [a, b] = kantePixel(ek);
+        return { a: a!, b: b!, stein: steinFuer(sorte) };
       }),
       f,
     );
@@ -937,9 +979,13 @@ export function Board({
       const ecke = parseVertexKey(vk);
       const v = vertexToPixel(ecke, LAYOUT);
       const p = geraet(v.x, v.y - liftVertex(ecke));
+      const bastion = bastionen.get(vk);
       return {
         fuss: p.y + 3 * f,
-        male: () => zeichneGebaeude(ctx, b.type === 'city' ? 'stadt' : 'dorf', p.x, p.y, f, spielerFarbe(b.owner), b.turm === true),
+        male: () =>
+          bastion !== undefined
+            ? zeichneBastion(ctx, p.x, p.y, f, spielerFarbe(b.owner), bastion, b.turm === true)
+            : zeichneGebaeude(ctx, b.type === 'city' ? 'stadt' : 'dorf', p.x, p.y, f, spielerFarbe(b.owner), b.turm === true),
       };
     });
     // Hauptstaedte stehen in der Feldmitte, im Stein ihres Gelaendes (units.ts).
@@ -947,8 +993,11 @@ export function Board({
       const [q, r] = hk.split(':').map(Number) as [number, number];
       const c = hexToPixel(q, r, LAYOUT);
       const p = geraet(c.x, c.y - liftHex(q, r));
-      const sorte = kachelSorte(state.worldSeed, world.tiles.get(hk)?.terrain ?? 'pasture', q, r);
-      return { fuss: p.y + 6 * f, male: () => zeichneHauptstadt(ctx, p.x, p.y, f, spielerFarbe(h.owner), sorte) };
+      const sorte = sorteVon(hk, q, r);
+      return {
+        fuss: p.y + (h.stufe >= 2 ? 9 : 6) * f,
+        male: () => zeichneHauptstadt(ctx, p.x, p.y, f, spielerFarbe(h.owner), sorte, h.stufe),
+      };
     });
     // Von hinten nach vorn, nach dem Fuss: das vordere Bauwerk ueberdeckt das hintere.
     for (const b of [...gebaeude, ...hauptstaedte].sort((u, w) => u.fuss - w.fuss)) b.male();
@@ -1401,22 +1450,33 @@ export function Board({
         }
       }
     }
-    if (onGebaeude && du !== null) {
-      let beste: { vk: string; d: number } | null = null;
+    if (du === null) return false;
+    // Gebaeude an den Ecken und die eigene Hauptstadt in der Mitte: das naechste gewinnt.
+    let beste: { d: number; waehle: () => void } | null = null;
+    if (onGebaeude) {
       for (const [vk, b] of Object.entries(state.buildings)) {
         if (b.owner !== du) continue;
         const ecke = parseVertexKey(vk);
         const p = vertexToPixel(ecke, LAYOUT);
         // Das Haus steht ueber seiner Ecke - dort zeigt man hin.
         const d = Math.hypot(p.x - wx, p.y - liftVertex(ecke) - 4 * SCALE - wy);
-        if (d <= reichweite && (!beste || d < beste.d)) beste = { vk, d };
-      }
-      if (beste) {
-        onGebaeude(beste.vk);
-        return true;
+        if (d <= reichweite && (!beste || d < beste.d)) beste = { d, waehle: () => onGebaeude(vk) };
       }
     }
-    return false;
+    if (onHauptstadtKlick) {
+      for (const [hk, h] of Object.entries(state.hauptstaedte ?? {})) {
+        if (h.owner !== du) continue;
+        const [q, r] = hk.split(':').map(Number) as [number, number];
+        const c = hexToPixel(q, r, LAYOUT);
+        // Burg und Palast ragen weit ueber die Feldmitte hinaus - der Palast noch hoeher.
+        const hoch = h.stufe >= 2 ? 8 : 5;
+        const d = Math.hypot(c.x - wx, c.y - liftHex(q, r) - hoch * SCALE - wy);
+        if (d <= reichweite + (hoch + 4) * SCALE && (!beste || d < beste.d)) beste = { d, waehle: () => onHauptstadtKlick(hk) };
+      }
+    }
+    if (!beste) return false;
+    beste.waehle();
+    return true;
   };
 
   const onPointerLeave = (e: React.PointerEvent) => {
@@ -1844,10 +1904,12 @@ export function Board({
             wyUnten = p.y - liftVertex(ecke) + 6 * SCALE;
           } else {
             const [q, r] = ausbau.ort.key.split(':').map(Number) as [number, number];
+            const h = state.hauptstaedte?.[ausbau.ort.key];
             const p = kronenFuss(q, r);
             wx = p.x;
-            wyOben = p.y - 7 * SCALE;
-            wyUnten = p.y + 3 * SCALE;
+            // Ueber einer Hauptstadt hoeher ansetzen - Burg und Palast ragen weit hinauf.
+            wyOben = p.y - (h ? (h.stufe >= 2 ? 18 : 13) : 7) * SCALE;
+            wyUnten = p.y + (h ? 13 : 3) * SCALE;
           }
           /*
            * Am Rand nicht abschneiden: waagerecht in die Flaeche klemmen, und steht
@@ -1860,7 +1922,7 @@ export function Board({
           const unten = (wyOben - view.y) * scale < TAFEL_HOEHE;
           return (
             <div
-              className={unten ? 'ausbau-tafel unten' : 'ausbau-tafel'}
+              className={unten ? 'ausbau-tafel nach-unten' : 'ausbau-tafel'}
               style={{
                 left: links,
                 top: ((unten ? wyUnten : wyOben) - view.y) * scale,
@@ -1873,7 +1935,9 @@ export function Board({
                   x
                 </button>
               </div>
-              {ausbau.optionen.length === 0 && <div className="ausbau-hinweis">Hier gibt es nichts mehr auszubauen.</div>}
+              {ausbau.optionen.length === 0 && (
+                <div className="ausbau-hinweis">{ausbau.leer ?? 'Hier gibt es nichts mehr auszubauen.'}</div>
+              )}
               {ausbau.optionen.map((o) => (
                 <button key={o.name} className="ausbau-option" disabled={!o.darf} title={o.hinweis} onClick={o.wahl}>
                   <span className="ausbau-zeile">

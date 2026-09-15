@@ -130,6 +130,8 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
       return `${who(state, e.player)} baut ${BUILD_NAME[e.kind]}.`;
     case 'capital':
       return `${who(state, e.player)} gruendet eine Hauptstadt.`;
+    case 'capitalUpgrade':
+      return `${who(state, e.player)} baut die Hauptstadt zum Festungsring aus.`;
     case 'knightReady':
       return `${who(state, e.player)} stellt einen Ritter auf.`;
     case 'march':

@@ -41,9 +41,11 @@ export type BuildMode = null | 'road' | 'settlement' | 'city' | 'tower';
  * Bauen als eigene Zeile (Entwurf V2): "Bauen" tauscht die Leiste gegen
  * Strasse, Dorf, Stadt, Turm und - wenn moeglich - Hauptstadt; ein Pfeil fuehrt
  * zurueck. Auf dem Handy passte die lange Leiste nicht mehr in eine Reihe.
- * false stellt die alte Leiste mit allen Knoepfen nebeneinander wieder her.
+ * Vorerst aus: die Leiste war noch nicht so breit, dass es sich lohnte - und in
+ * der Bauzeile fehlten Beute, Handel und Zug Ende, solange sie offen stand.
+ * true schaltet die Bauzeile wieder ein.
  */
-export const BAU_ZEILE = true;
+export const BAU_ZEILE = false;
 
 const kostenText = (c: Cost): string =>
   RESOURCES.filter((r) => (c[r] ?? 0) > 0)
@@ -433,6 +435,13 @@ export function Aktionsleiste({
       )}
 
       <div className="dock-reihe">
+        {/*
+          Beute zuerst: auf dem Handy scrollt die Reihe, und am Ende rutschte der
+          Knopf aus dem Bild - gerade der, der leuchtet, weil etwas wartet.
+        */}
+        {(me?.loot ?? 0) > 0 && (
+          <DockKnopf titel="Beute" symbol={<SymBeute />} zahl={me?.loot} leuchtet darf={bauen} tip="Beute einloesen: eine Kartenwahl" onClick={() => act({ t: 'claimLoot' })} />
+        )}
         {BAU_ZEILE && !bauOffen && (
           <>
             <DockKnopf
@@ -501,9 +510,6 @@ export function Aktionsleiste({
         <span className="dock-trenner" />
         <DockKnopf titel="Handel" symbol={<SymHandel />} gewaehlt={tafel === 'handel'} darf={bauen} tip="Bankhandel" onClick={umschalten('handel')} />
         <DockKnopf titel="Karten" symbol={<SymKarten />} zahl={offen.length} gewaehlt={tafel === 'karten'} darf={offen.length > 0} tip="Deine Entwicklungskarten" onClick={umschalten('karten')} />
-        {(me?.loot ?? 0) > 0 && (
-          <DockKnopf titel="Beute" symbol={<SymBeute />} zahl={me?.loot} leuchtet darf={bauen} tip="Beute einloesen: eine Kartenwahl" onClick={() => act({ t: 'claimLoot' })} />
-        )}
         {state.order.length > 1 && (
           <DockKnopf titel="Zug Ende" symbol={<SymZugEnde />} darf={bauen} tip="Zug beenden" onClick={() => act({ t: 'endTurn' })} />
         )}
