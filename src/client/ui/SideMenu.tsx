@@ -47,6 +47,7 @@ import { TRACKS, getMusicMode, getMusicVolume, setMusicMode, setMusicVolume } fr
 import type { MusicMode } from '../music';
 import { getUmgebungVolume, setUmgebungVolume } from '../ambiente';
 import { BRAND_WAS, auftragText, bundleText, resourceName } from '../log';
+import { einheitNamen } from '../heer';
 
 type Reiter = 'reich' | 'karten' | 'technik' | 'auftraege' | 'ton';
 
@@ -124,21 +125,6 @@ function kartenStapel(cardIds: readonly string[]) {
     );
 }
 
-/** Wie eine Einheit heisst - je Art nach Nummer gezaehlt: "Ritter 2", "Bogenschuetze 1". */
-function einheitNamen(einheiten: readonly UnitState[]): Map<number, string> {
-  const zaehler = new Map<string, number>();
-  const out = new Map<number, string>();
-  for (const u of [...einheiten].sort((a, b) => a.id - b.id)) {
-    if (u.kind === 'held') {
-      out.set(u.id, 'Held');
-      continue;
-    }
-    const n = (zaehler.get(u.kind) ?? 0) + 1;
-    zaehler.set(u.kind, n);
-    out.set(u.id, `${u.kind === 'bogen' ? 'Bogenschuetze' : 'Ritter'} ${n}`);
-  }
-  return out;
-}
 
 /** Wer in einem Verband steht, kurz: "Held, 2 Ritter, 1 Bogenschuetze". */
 function zusammensetzung(einheiten: readonly UnitState[]): string {

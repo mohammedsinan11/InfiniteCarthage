@@ -50,6 +50,11 @@ import type { Resource } from '../../core/types';
 import { COST_CAPITAL, COST_CITY, COST_FESTUNG, COST_ROAD, COST_TOWER, canAfford } from '../../core/rules/costs';
 import { FRIEDEN_PREIS, TRIBUT_KARTEN, nimmtFrieden } from '../../core/rules/diplomatie';
 import { brennt } from '../../core/rules/feuer';
+import { WERTE as EINHEIT_WERTE } from '../../core/units';
+import { kampfFelder as kampfFelderVon } from '../../core/combat';
+import type { UnitState as HeerEinheit } from '../../core/state';
+import { einheitNamen, gruppenStatus, heerGruppen, untaetig } from '../heer';
+import { Heerleiste } from '../ui/Heerleiste';
 import {
   FAST_GESCHLOSSEN,
   STUFE_NAME,
@@ -198,31 +203,55 @@ export function Game() {
     () => (meinHeld ? [meinHeld, ...meineRitter] : meineRitter),
     [meinHeld, meineRitter],
   );
-  const [befehl, setBefehl] = useState<number | null>(null);
-  /** Gilt der wartende Befehl dem ganzen Verband auf dem Feld der Einheit? */
-  const [mitVerband, setMitVerband] = useState(false);
+  /*
+   * Befehlstafel (Truppen, DESIGN.md): kandidaten sind die Einheiten der
+   * gewaehlten Gruppe, auswahl die davon angehakten, die mitgehen. zielWahl:
+   * der naechste Klick auf ein Feld schickt die Auswahl dorthin.
+   */
+  const [kandidaten, setKandidaten] = useState<number[]>([]);
+  const [auswahl, setAuswahl] = useState<number[]>([]);
+  const [zielWahl, setZielWahl] = useState(false);
   const [fokus, setFokus] = useState<{ q: number; r: number; n: number } | null>(null);
   const zeigeFeld = (q: number, r: number) => setFokus((alt) => ({ q, r, n: (alt?.n ?? 0) + 1 }));
-  // Faellt die Einheit, verfaellt auch der Befehl.
+  const waehleGruppe = (ids: number[], ziel = false) => {
+    setKandidaten(ids);
+    setAuswahl(ids);
+    setZielWahl(ziel && ids.length > 0);
+  };
+  const auswahlSchliessen = () => {
+    setKandidaten([]);
+    setAuswahl([]);
+    setZielWahl(false);
+  };
+  // Faellt eine Einheit, verschwindet sie aus Tafel und Auswahl.
   useEffect(() => {
-    if (befehl !== null && !meineEinheiten.some((u) => u.id === befehl)) setBefehl(null);
-    if (befehl === null) setMitVerband(false);
-  }, [befehl, meineEinheiten]);
-
-  const befehlsEinheit = meineEinheiten.find((u) => u.id === befehl);
-  const verbandGroesse =
-    befehlsEinheit && mitVerband
-      ? meineEinheiten.filter((u) => u.q === befehlsEinheit.q && u.r === befehlsEinheit.r).length
-      : 1;
-  // Esc bricht die Zielwahl ab.
+    const da = new Set(meineEinheiten.map((u) => u.id));
+    if (kandidaten.some((id) => !da.has(id))) setKandidaten((k) => k.filter((id) => da.has(id)));
+    if (auswahl.some((id) => !da.has(id))) setAuswahl((a) => a.filter((id) => da.has(id)));
+  }, [meineEinheiten, kandidaten, auswahl]);
   useEffect(() => {
-    if (befehl === null) return;
+    if (auswahl.length === 0) setZielWahl(false);
+  }, [auswahl]);
+  // Esc: erst die Zielwahl, dann die Tafel.
+  useEffect(() => {
+    if (kandidaten.length === 0) return;
     const taste = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setBefehl(null);
+      if (e.key !== 'Escape') return;
+      if (zielWahl) setZielWahl(false);
+      else auswahlSchliessen();
     };
     window.addEventListener('keydown', taste);
     return () => window.removeEventListener('keydown', taste);
-  }, [befehl]);
+  }, [kandidaten, zielWahl]);
+  /** Die eine Einheit, die gerade auf ihr Ziel wartet - fuers Menue. */
+  const befehl = zielWahl && auswahl.length === 1 ? auswahl[0]! : null;
+
+  /** Das Heer in Gruppen (client/heer.ts): Scharen und Felder. */
+  const heer = useMemo(() => heerGruppen(meineEinheiten), [meineEinheiten]);
+  const kampfOrte = useMemo(() => new Set(kampfFelderVon(state).keys()), [state]);
+  const heerNamen = useMemo(() => einheitNamen(meineEinheiten), [meineEinheiten]);
+  const untaetige = meineEinheiten.filter(untaetig);
+  const naechsteUntaetige = useRef(0);
 
   /** Die Felder an meinen Siedlungen - von hier aus wird gemessen. */
   const meineFelder = useMemo(
@@ -353,19 +382,123 @@ export function Game() {
    */
   const onHex = (key: string) => {
     const [q, r] = key.split(':').map(Number);
-    if (befehl !== null) {
-      act({ t: 'orderUnit', unit: befehl, q: q!, r: r!, verband: mitVerband });
-      setBefehl(null);
+    if (zielWahl && auswahl.length > 0) {
+      act({ t: 'orderUnits', units: auswahl, q: q!, r: r! });
+      auswahlSchliessen();
       return;
     }
-    // Ein Klick auf ein eigenes Feld waehlt alle Einheiten darauf - den Verband.
+    // Ein Klick auf eigene Einheiten oeffnet ihre Tafel: die ganze Schar, wenn
+    // alle auf dem Feld zu ihr gehoeren, sonst alle Einheiten des Feldes.
     const aufFeld = meineEinheiten.filter((u) => u.q === q && u.r === r);
-    if (aufFeld.length > 0) {
-      setBefehl(aufFeld[0]!.id);
-      setMitVerband(aufFeld.length > 1);
+    if (aufFeld.length === 0) {
+      auswahlSchliessen();
+      return;
     }
+    const schar = heer.find((g) => g.schar !== null && aufFeld.every((u) => g.einheiten.includes(u)));
+    waehleGruppe((schar ? schar.einheiten : aufFeld).map((u) => u.id));
   };
   const befehleMoeglich = isMine && (phase.t === 'main' || phase.t === 'roll') && mode === null;
+
+  /*
+   * Die Befehlstafel an den gewaehlten Einheiten (Board): jede Einheit als Chip
+   * zum An- und Abwaehlen - wer angehakt ist, geht mit. Ziel, Halt, Erkunden,
+   * Folgen, und fuer eine Schar "Banner aufloesen". PLATZHALTER (ASSETS.md).
+   */
+  const tafelEinheiten = kandidaten
+    .map((id) => meineEinheiten.find((u) => u.id === id))
+    .filter((u): u is HeerEinheit => u !== undefined);
+  const gewaehlte = tafelEinheiten.filter((u) => auswahl.includes(u.id));
+  const tafelSchar = heer.find(
+    (g) => g.schar !== null && tafelEinheiten.length > 0 && tafelEinheiten.every((u) => g.einheiten.includes(u)),
+  );
+  const befehlsTafel =
+    tafelEinheiten.length === 0
+      ? null
+      : {
+          q: tafelEinheiten[0]!.q,
+          r: tafelEinheiten[0]!.r,
+          inhalt: (
+            <>
+              <div className="ausbau-titel">
+                <span>
+                  {tafelSchar ? `Schar ${tafelSchar.schar}` : tafelEinheiten.length > 1 ? 'Verband' : heerNamen.get(tafelEinheiten[0]!.id)}
+                  {tafelEinheiten.length > 1 ? ` · ${tafelEinheiten.length}` : ''}
+                </span>
+                <button className="dock-zu" title="Schliessen" onClick={auswahlSchliessen}>
+                  x
+                </button>
+              </div>
+              {tafelEinheiten.length > 1 && (
+                <div className="befehl-chips">
+                  {tafelEinheiten.map((u) => {
+                    const an = auswahl.includes(u.id);
+                    return (
+                      <button
+                        key={u.id}
+                        className={an ? 'befehl-chip an' : 'befehl-chip'}
+                        title={an ? 'Geht mit - klicken, damit sie bleibt' : 'Bleibt - klicken, damit sie mitgeht'}
+                        onClick={() => setAuswahl((a) => (an ? a.filter((x) => x !== u.id) : [...a, u.id]))}
+                      >
+                        {heerNamen.get(u.id)} <span className="befehl-chip-leben">{u.leben}/{EINHEIT_WERTE[u.kind].leben}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <button
+                className={zielWahl ? 'ausbau-option aktiv' : 'ausbau-option'}
+                disabled={!befehleMoeglich || gewaehlte.length === 0}
+                title={befehleMoeglich ? undefined : 'Befehle gibt es in deinem Zug'}
+                onClick={() => setZielWahl((z) => !z)}
+              >
+                {zielWahl
+                  ? 'Jetzt ein Feld auf der Karte waehlen'
+                  : gewaehlte.length > 1
+                    ? `Ziel fuer ${gewaehlte.length} waehlen`
+                    : 'Ziel waehlen'}
+              </button>
+              <div className="befehl-knoepfe">
+                <button
+                  disabled={!befehleMoeglich || !gewaehlte.some((u) => u.ziel !== null || u.folgt !== null || u.auftrag === 'erkunden')}
+                  onClick={() => act({ t: 'orderUnits', units: gewaehlte.map((u) => u.id), q: 0, r: 0, halt: true })}
+                >
+                  Halt
+                </button>
+                <button
+                  disabled={!befehleMoeglich || gewaehlte.length === 0}
+                  title="Von selbst erkunden: zur naechsten Ruine oder ins Unbekannte"
+                  onClick={() => {
+                    for (const u of gewaehlte) act({ t: 'explore', unit: u.id, explore: true });
+                    auswahlSchliessen();
+                  }}
+                >
+                  Erkunden
+                </button>
+                {meinHeld && (
+                  <button
+                    disabled={!befehleMoeglich || !gewaehlte.some((u) => u.kind !== 'held')}
+                    title="Dem Helden folgen - so schnell wie er"
+                    onClick={() => {
+                      for (const u of gewaehlte) if (u.kind !== 'held') act({ t: 'follow', unit: u.id, follow: true });
+                      auswahlSchliessen();
+                    }}
+                  >
+                    Folgen
+                  </button>
+                )}
+                {tafelSchar && (
+                  <button
+                    disabled={!befehleMoeglich}
+                    title="Das Banner einholen - die Einheiten stehen wieder fuer sich"
+                    onClick={() => act({ t: 'disbandGroup', verband: tafelSchar.verband! })}
+                  >
+                    Banner aufloesen
+                  </button>
+                )}
+              </div>
+            </>
+          ),
+        };
 
   /*
    * Hauptstadt (rules/hauptstadt.ts): Kronen ueber Feldern, die fast oder ganz
@@ -394,8 +527,8 @@ export function Game() {
   const bereiteFelder = kronen.filter((k) => k.bereit);
   // Eine Bau- oder Befehlswahl schliesst die Tafel.
   useEffect(() => {
-    if (mode !== null || befehl !== null) setAusbauOrt(null);
-  }, [mode, befehl]);
+    if (mode !== null || kandidaten.length > 0) setAusbauOrt(null);
+  }, [mode, kandidaten]);
   useEffect(() => {
     if (ausbauOrt === null) return;
     const taste = (e: KeyboardEvent) => {
@@ -558,7 +691,7 @@ export function Game() {
     wurfMoeglich &&
     autoWurf &&
     mode === null &&
-    befehl === null &&
+    kandidaten.length === 0 &&
     ausbauOrt === null &&
     state.draft === null &&
     state.trade === null &&
@@ -769,10 +902,7 @@ export function Game() {
           beute={me?.loot ?? 0}
           befehleMoeglich={befehleMoeglich}
           beuteMoeglich={isMine && phase.t === 'main'}
-          onBefehl={(id) => {
-            setMitVerband(false);
-            setBefehl((alt) => (alt === id && !mitVerband ? null : id));
-          }}
+          onBefehl={(id) => (befehl === id ? auswahlSchliessen() : waehleGruppe([id], true))}
           onHalt={(id) => {
             const u = meineEinheiten.find((x) => x.id === id);
             if (u) act({ t: 'orderUnit', unit: id, q: u.q, r: u.r });
@@ -808,13 +938,22 @@ export function Game() {
           loeschenMoeglich={loeschenMoeglich}
           onLoeschen={loeschen}
           onErkunden={(id, an) => act({ t: 'explore', unit: id, explore: an })}
-          verbandFeld={mitVerband && befehlsEinheit ? `${befehlsEinheit.q}:${befehlsEinheit.r}` : null}
-          onVerbandZiel={(q, r) => {
-            const erste = meineEinheiten.find((u) => u.q === q && u.r === r);
-            if (!erste) return;
-            setBefehl(erste.id);
-            setMitVerband(true);
-          }}
+          verbandFeld={(() => {
+            if (!zielWahl || auswahl.length < 2) return null;
+            const orte = new Set(
+              auswahl.map((id) => {
+                const u = meineEinheiten.find((x) => x.id === id);
+                return u ? `${u.q}:${u.r}` : '';
+              }),
+            );
+            return orte.size === 1 ? [...orte][0]! : null;
+          })()}
+          onVerbandZiel={(q, r) =>
+            waehleGruppe(
+              meineEinheiten.filter((u) => u.q === q && u.r === r).map((u) => u.id),
+              true,
+            )
+          }
           onZeigenAuftrag={(a) => {
             const w = a.art === 'geleit' ? state.units.find((u) => u.id === a.wanderer) : undefined;
             zeigeFeld(w ? w.q : a.q, w ? w.r : a.r);
@@ -867,8 +1006,9 @@ export function Game() {
           du={you}
           onHex={befehleMoeglich && meineEinheiten.length > 0 ? onHex : undefined}
           onFeuer={loeschenMoeglich && loeschKarte ? loeschen : undefined}
-          zielWahl={befehl !== null}
-          auswahl={befehl}
+          zielWahl={zielWahl}
+          auswahl={kandidaten.length > 0 ? auswahl : []}
+          befehlsTafel={befehlsTafel}
           fokus={fokus}
           tageszeit={tageszeit}
           wetter={wetter}
@@ -876,12 +1016,12 @@ export function Game() {
           kronen={kronen}
           onKrone={(q, r) => setAusbauOrt({ art: 'feld', key: hexKey(q, r) })}
           onGebaeude={
-            you && mode === null && befehl === null && phase.t !== 'setup'
+            you && mode === null && kandidaten.length === 0 && phase.t !== 'setup'
               ? (vk) => setAusbauOrt({ art: 'ecke', key: vk })
               : undefined
           }
           onHauptstadtKlick={
-            you && mode === null && befehl === null ? (hk) => setAusbauOrt({ art: 'feld', key: hk }) : undefined
+            you && mode === null && kandidaten.length === 0 ? (hk) => setAusbauOrt({ art: 'feld', key: hk }) : undefined
           }
           onLeer={() => setAusbauOrt(null)}
           ausbau={ausbau}
@@ -970,17 +1110,36 @@ export function Game() {
               </div>
             )}
 
-          {befehl !== null && (
+          {zielWahl && auswahl.length > 0 && (
             <div className="befehl-hinweis">
-              Ziel fuer{' '}
-              {verbandGroesse > 1
-                ? `den Verband (${verbandGroesse} Einheiten)`
-                : befehl === meinHeld?.id
-                  ? 'den Helden'
-                  : 'den Ritter'}{' '}
+              Ziel fuer {auswahl.length > 1 ? `${auswahl.length} Einheiten` : heerNamen.get(auswahl[0]!) ?? 'die Einheit'}{' '}
               waehlen · Esc bricht ab
             </div>
           )}
+
+          {/* Heerleiste: je Schar oder Feld ein Kaertchen, dazu "untaetig" (ui/Heerleiste.tsx). */}
+          <Heerleiste
+            gruppen={heer}
+            status={(g) => gruppenStatus(g, kampfOrte)}
+            aktiv={
+              heer.find(
+                (g) => g.einheiten.length === kandidaten.length && g.einheiten.every((u) => kandidaten.includes(u.id)),
+              )?.key ?? null
+            }
+            onWahl={(g) => {
+              waehleGruppe(g.einheiten.map((u) => u.id));
+              zeigeFeld(g.q, g.r);
+            }}
+            untaetig={untaetige.length}
+            onUntaetig={() => {
+              const u = untaetige[naechsteUntaetige.current % untaetige.length];
+              naechsteUntaetige.current += 1;
+              if (!u) return;
+              const g = heer.find((x) => x.einheiten.some((y) => y.id === u.id));
+              waehleGruppe((g ? g.einheiten : [u]).map((x) => x.id));
+              zeigeFeld(u.q, u.r);
+            }}
+          />
           {diagnoseAn() && <Diagnose />}
 
           {pendingRoll !== null && (

@@ -764,6 +764,123 @@ em.off {
   white-space: nowrap;
 }
 
+/* Heerleiste (ui/Heerleiste.tsx): je Schar oder Feld ein Kaertchen oben links. PLATZHALTER. */
+.heerleiste {
+  position: absolute;
+  top: 52px;
+  left: 10px;
+  right: 190px;
+  z-index: 5;
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.heer-karte,
+.heer-untaetig {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 42px;
+  padding: 4px 6px;
+  font-family: var(--pixel);
+  font-size: 9px;
+  background: rgba(23, 18, 12, 0.9);
+  border: 2px solid var(--line);
+  color: var(--text);
+}
+.heer-karte.aktiv {
+  border-color: var(--accent);
+}
+.heer-karte.heer-kaempft {
+  border-color: var(--danger);
+}
+.heer-kopf {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+}
+.heer-name {
+  color: var(--accent);
+}
+.heer-arten {
+  display: flex;
+  gap: 4px;
+}
+.heer-arten i {
+  font-style: normal;
+}
+.art-held {
+  color: #f2c94c;
+}
+.art-ritter {
+  color: #c9ccd6;
+}
+.art-bogen {
+  color: #d9a066;
+}
+.heer-leben {
+  display: block;
+  height: 3px;
+  background: #4a3a30;
+}
+.heer-leben span {
+  display: block;
+  height: 100%;
+  background: #e0473a;
+}
+.heer-untaetig {
+  justify-content: center;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+@media (max-width: 700px) {
+  .heerleiste {
+    top: 96px;
+    right: 10px;
+  }
+}
+
+/* Befehlstafel an den gewaehlten Einheiten (Game, Board befehlsTafel). PLATZHALTER. */
+.befehl-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.befehl-chip {
+  font-size: 8px;
+  padding: 3px 5px;
+  opacity: 0.5;
+}
+.befehl-chip.an {
+  opacity: 1;
+  border-color: var(--accent);
+}
+.befehl-chip-leben {
+  color: var(--muted);
+}
+.befehl-knoepfe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.befehl-knoepfe button {
+  flex: 1 0 auto;
+  font-size: 8px;
+  padding: 4px 3px;
+}
+.ausbau-option.aktiv {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.schar-nr {
+  font-family: var(--pixel);
+  font-size: 6px;
+  fill: #fff;
+  text-anchor: middle;
+}
+
 /* Pfeile der Bogenschuetzen (Board): fliegen im Bogen vom Schuetzen zum Ziel. */
 .pfeil-flug {
   animation: pfeil-flug 0.55s linear both;

@@ -391,6 +391,21 @@ Sie ziehen im Tempo des Langsamsten - mit einem Ritter dabei also auch der Held
 nur ein Feld - und warten, solange einer von ihnen kaempft. Am Ziel loest sich
 der Verband. Wer einer einzelnen Einheit ein Ziel gibt, loest sie heraus.
 
+**Scharen, Heerleiste, Befehlstafel** (Truppen A-C):
+- **Schar mit Banner:** Wer zusammen einen Befehl bekommt, bildet eine Schar
+  (`orderUnits`) und bleibt es auch am Ziel. Ein Wimpel mit Nummer steht ueber
+  ihr auf der Karte. Ein Einzelbefehl loest eine Einheit heraus, "Banner
+  aufloesen" (`disbandGroup`) die ganze Schar; "Halt" laesst sie beisammen.
+- **Heerleiste** oben links (`ui/Heerleiste.tsx`): je Schar oder Feld ein
+  Kaertchen mit Arten (H, R, B), Status (steht, zieht, erkundet, folgt,
+  kaempft) und Lebensbalken - immer sichtbar. Ein Klick waehlt die Gruppe und
+  zeigt sie. Daneben "N untaetig": springt reihum zur naechsten Einheit ohne
+  Auftrag.
+- **Befehlstafel** an den Einheiten: Klick auf eigene Einheiten oder ein
+  Kaertchen oeffnet sie. Jede Einheit ist ein Chip zum An- und Abwaehlen - wer
+  angehakt ist, geht mit. Ziel waehlen, Halt, Erkunden, Folgen, Banner
+  aufloesen. Keine Wegvorschau, kein Rechtsklick, keine Kampfvorschau (bewusst).
+
 **Im Menue** (Reiter "Heer & Auftraege", Abschnitt Einheiten) stehen alle
 eigenen Einheiten je Feld: eine einzelne als Zeile, mehrere als Verband mit
 Zusammensetzung ("Held, 2 Ritter, 1 Bogenschuetze") und Status. Ein Klick

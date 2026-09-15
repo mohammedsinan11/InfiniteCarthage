@@ -61,6 +61,7 @@ import { Kosten } from '../ui/Aktionsleiste';
 import type { Cost } from '../../core/rules/costs';
 import { loeschFelder } from '../../core/rules/feuer';
 import type { Pfeil } from '../net/store';
+import { scharNummern } from '../heer';
 import { anHauptstadt } from '../../core/rules/hauptstadt';
 import type { Brand } from '../../core/state';
 import { BRAND_WAS } from '../log';
@@ -256,8 +257,10 @@ type Props = {
   onHex?: (key: string) => void;
   /** Ein Befehl wartet auf sein Ziel: das Feld unter dem Zeiger wird markiert. */
   zielWahl?: boolean;
-  /** Ausgewaehlte Einheit - bekommt einen Ring. */
-  auswahl?: number | null;
+  /** Ausgewaehlte Einheiten - ihre Felder bekommen einen Ring. */
+  auswahl?: readonly number[];
+  /** Die Befehlstafel an den gewaehlten Einheiten (Game), oder null. */
+  befehlsTafel?: { q: number; r: number; inhalt: React.ReactNode } | null;
   /** Kamera auf dieses Feld fahren. n wechselt bei jedem neuen Wunsch. */
   fokus?: { q: number; r: number; n: number } | null;
   /** Tageszeit und Wetter - fuer Licht, Nacht und Fackeln (WetterSchicht). */
@@ -377,7 +380,8 @@ export function Board({
   du = null,
   onHex,
   zielWahl = false,
-  auswahl = null,
+  auswahl = [],
+  befehlsTafel = null,
   fokus = null,
   tageszeit = 'tag',
   wetter = 'klar',
@@ -2135,22 +2139,55 @@ export function Board({
           );
         })}
 
-        {/* Der ausgewaehlte Ritter bekommt einen Ring. */}
-        {auswahl !== null &&
-          (() => {
-            const u = state.units.find((x) => x.id === auswahl);
-            if (!u) return null;
+        {/* Die Felder der ausgewaehlten Einheiten bekommen einen Ring. */}
+        {[
+          ...new Map(
+            auswahl
+              .map((id) => state.units.find((x) => x.id === id))
+              .filter((u): u is Unit => u !== undefined)
+              .map((u) => [hexKey(u.q, u.r), u] as const),
+          ).values(),
+        ].map((u) => {
+          const c = hexToPixel(u.q, u.r, LAYOUT);
+          return (
+            <circle
+              key={'auswahl' + u.q + ':' + u.r}
+              cx={c.x}
+              cy={c.y - liftHex(u.q, u.r) + 8}
+              r={LAYOUT.w * 0.36}
+              className="auswahl-ring"
+              pointerEvents="none"
+            />
+          );
+        })}
+
+        {/*
+          Banner der eigenen Scharen: ein Wimpel mit ihrer Nummer neben der ersten
+          Einheit (client/heer.ts, scharNummern). PLATZHALTER (ASSETS.md).
+        */}
+        {(() => {
+          if (du === null) return null;
+          const eigene = state.units.filter((u) => u.owner === du && u.verband !== null).sort((a, b) => a.id - b.id);
+          const nummern = scharNummern(eigene);
+          const gezeigt = new Set<number>();
+          return eigene.map((u) => {
+            const nr = nummern.get(u.verband!);
+            if (nr === undefined || gezeigt.has(u.verband!)) return null;
+            gezeigt.add(u.verband!);
             const c = hexToPixel(u.q, u.r, LAYOUT);
+            const x = c.x + LAYOUT.w * 0.24;
+            const y = c.y - liftHex(u.q, u.r) - 12;
             return (
-              <circle
-                cx={c.x}
-                cy={c.y - liftHex(u.q, u.r) + 8}
-                r={LAYOUT.w * 0.36}
-                className="auswahl-ring"
-                pointerEvents="none"
-              />
+              <g key={'banner' + u.verband} pointerEvents="none">
+                <line x1={x} y1={y + 20} x2={x} y2={y - 10} stroke="#3a2a1e" strokeWidth={2} />
+                <path d={`M ${x} ${y - 10} L ${x + 17} ${y - 4} L ${x} ${y + 2} Z`} fill={colorOf(du)} stroke="#1b130d" strokeWidth={1} />
+                <text x={x + 6} y={y - 1.5} className="schar-nr">
+                  {nr}
+                </text>
+              </g>
             );
-          })()}
+          });
+        })()}
 
         {/* Waehrend ein Befehl sein Ziel sucht: das Feld unter dem Zeiger. */}
         {zielWahl &&
@@ -2239,6 +2276,30 @@ export function Board({
                   {!o.darf && o.hinweis && <span className="ausbau-hinweis">{o.hinweis}</span>}
                 </button>
               ))}
+            </div>
+          );
+        })()}
+      {/* Die Befehlstafel an den gewaehlten Einheiten - wie die Ausbau-Tafel ueber ihrem Feld. */}
+      {befehlsTafel &&
+        (() => {
+          const c = hexToPixel(befehlsTafel.q, befehlsTafel.r, LAYOUT);
+          const hoch = liftHex(befehlsTafel.q, befehlsTafel.r);
+          const wyOben = c.y - hoch - 8 * SCALE;
+          const wyUnten = c.y - hoch + 12 * SCALE;
+          const sx = (c.x - view.x) * scale;
+          const halb = TAFEL_BREITE / 2;
+          const links = Math.min(Math.max(sx, halb + 8), size.w - halb - 8);
+          const unten = (wyOben - view.y) * scale < TAFEL_HOEHE + 40;
+          return (
+            <div
+              className={unten ? 'ausbau-tafel befehls-tafel nach-unten' : 'ausbau-tafel befehls-tafel'}
+              style={{
+                left: links,
+                top: ((unten ? wyUnten : wyOben) - view.y) * scale,
+                ['--zipfel' as string]: `${Math.round(sx - links)}px`,
+              }}
+            >
+              {befehlsTafel.inhalt}
             </div>
           );
         })()}

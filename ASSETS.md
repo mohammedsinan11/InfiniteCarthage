@@ -202,6 +202,17 @@ Pixelkarten). In der Kartenwahl gross, im Menue klein.
 
 ### Nebel und Befehle — **Platzhalter**
 
+- **Heerleiste** (`ui/Heerleiste.tsx`): Kaertchen mit Buchstaben H/R/B statt
+  kleiner Figuren, Statuszeichen als Schriftzeichen (⚔ ➜ ? ↪ ·), Lebensbalken
+  als roter Streifen. *Was fehlt:* Mini-Portraets je Einheitenart.
+- **Befehlstafel:** Chips je Einheit in der Tafel-Optik der Ausbau-Tafel.
+- **Schar-Banner:** SVG-Wimpel in Spielerfarbe mit Nummer neben der Schar.
+- **Pfeile der Bogenschuetzen:** SVG-Pfeil (Schaft, Spitze, Befiederung), fliegt
+  im Bogen, roter Doppelring bei Treffer (`.pfeil-*` in styles.css).
+- **Hoehenmaske (Probe):** automatisch aus den Kachelfarben geschaetzt
+  (`tiles.ts`, `hoehenMaske`). *Was fehlt:* von Hand gezeichnete Masken je
+  Wald- und Bergkachel (`forest_0_mask.png`), falls die Probe bleibt.
+
 - **Nebel:** Kacheln ausserhalb der Sicht werden blaeulich eingetruebt
   (`tiles.ts`, `tileImageFog`). Harte Kanten je Feld, keine Bewegung.
 - **Befehle:** gestrichelte Linie vom Ritter zum Ziel, eine Dreiecksfahne in
