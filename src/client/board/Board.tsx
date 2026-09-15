@@ -340,8 +340,8 @@ const KEINE_KRONEN: Krone[] = [];
  * ?verdecken=kasten|ueberhang|wald|halb|fuss|aus, im Browser auch window.__verdecken.
  * Ohne Angabe: kasten.
  */
-type VerdeckenModus = 'kasten' | 'ueberhang' | 'wald' | 'halb' | 'fuss' | 'aus';
-const VERDECKEN_MODI: readonly string[] = ['kasten', 'ueberhang', 'wald', 'halb', 'fuss', 'aus'];
+type VerdeckenModus = 'kasten' | 'ueberhang' | 'wald' | 'halb' | 'fuss' | 'aus' | 'voll';
+const VERDECKEN_MODI: readonly string[] = ['kasten', 'ueberhang', 'wald', 'halb', 'fuss', 'aus', 'voll'];
 function verdeckenModus(): VerdeckenModus {
   try {
     const gesetzt =
@@ -422,6 +422,8 @@ export function Board({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   /** Schicht fuer die Gipfel vor den Strassen - einmal angelegt, je Bild geleert. */
   const ueberhangRef = useRef<HTMLCanvasElement | null>(null);
+  /** Schicht fuer die Probe "voll" - Bauten Reihe fuer Reihe, ausgestanzt von Wald und Bergen. */
+  const vollRef = useRef<HTMLCanvasElement | null>(null);
   /**
    * Aufgelaufene Raddrehung.
    *
@@ -942,20 +944,15 @@ export function Board({
     });
     const spielerFarbe = (id: string) =>
       playerColor(state.players.find((pl) => pl.id === id)?.color ?? 0);
+    /*
+     * Vor welcher Kachelreihe etwas steht (Probe "voll", unten): eine Ecke N ist
+     * die obere Ecke ihres Feldes und gehoert zu dessen Reihe, eine Ecke S zur
+     * Reihe darunter. Eine Kante steht vor der tieferen ihrer beiden Ecken.
+     */
+    const eckTiefe = (v: Vertex) => (v.d === 'N' ? v.r : v.r + 1);
+    const kantenTiefe = (ek: string) => Math.max(...edgeEndpoints(parseEdgeKey(ek)).map(eckTiefe));
     // Asche abgebrannter Strassen zuerst - was darauf neu gebaut ist, liegt obenauf.
-    zeichneStrassen(
-      ctx,
-      Object.entries(state.asche)
-        .filter(([ek]) => state.roads[ek] === undefined)
-        .map(([ek, owner]) => {
-          const [a, b] = edgeEndpoints(parseEdgeKey(ek)).map((v) => {
-            const p = vertexToPixel(v, LAYOUT);
-            return geraet(p.x, p.y - liftVertex(v));
-          });
-          return { a: a!, b: b!, farbe: spielerFarbe(owner), verbrannt: true };
-        }),
-      f,
-    );
+    const asche = Object.entries(state.asche).filter(([ek]) => state.roads[ek] === undefined);
     /*
      * Festungsring (Hauptstadt ab Stufe II): die Strassen des Rings werden Mauer,
      * die Staedte an seinen Ecken Bastionen - im Stein ihres Gelaendes.
@@ -997,24 +994,6 @@ export function Board({
         const p = vertexToPixel(v, LAYOUT);
         return geraet(p.x, p.y - liftVertex(v));
       });
-    zeichneStrassen(
-      ctx,
-      Object.entries(state.roads)
-        .filter(([ek]) => !mauerKanten.has(ek))
-        .map(([ek, owner]) => {
-          const [a, b] = kantePixel(ek);
-          return { a: a!, b: b!, farbe: spielerFarbe(owner), ohneWimpel: ringOhneWimpel.has(ek) || !wimpelKante(ek) };
-        }),
-      f,
-    );
-    zeichneMauern(
-      ctx,
-      [...mauerKanten].map(([ek, sorte]) => {
-        const [a, b] = kantePixel(ek);
-        return { a: a!, b: b!, stein: steinFuer(sorte) };
-      }),
-      f,
-    );
     /*
      * Residenz (Stufe I): Staedte an den hinteren Ecken ihres Feldes kommen erst
      * nach der Burg - nach dem Fuss sortiert schnitte deren Bergfried sie unten
@@ -1032,34 +1011,137 @@ export function Board({
         nachDerBurg.set(vk, Math.max(nachDerBurg.get(vk) ?? -Infinity, burgFuss + 1));
       }
     }
-    const gebaeude = Object.entries(state.buildings).map(([vk, b]) => {
-      const ecke = parseVertexKey(vk);
-      const v = vertexToPixel(ecke, LAYOUT);
-      const p = geraet(v.x, v.y - liftVertex(ecke));
-      const bastion = bastionen.get(vk);
-      // Am Ring einer Hauptstadt kein Wachturm (rules/hauptstadt.ts, anHauptstadt) - auch nicht aus alten Staenden.
-      const turm = b.turm === true && !anHauptstadt(state, vk);
-      return {
-        fuss: Math.max(p.y + 3 * f, nachDerBurg.get(vk) ?? -Infinity),
-        male: () =>
-          bastion !== undefined
-            ? zeichneBastion(ctx, p.x, p.y, f, spielerFarbe(b.owner), bastion, turm)
-            : zeichneGebaeude(ctx, b.type === 'city' ? 'stadt' : 'dorf', p.x, p.y, f, spielerFarbe(b.owner), turm),
-      };
-    });
-    // Hauptstaedte stehen in der Feldmitte, im Stein ihres Gelaendes (units.ts).
-    const hauptstaedte = Object.entries(state.hauptstaedte ?? {}).map(([hk, h]) => {
+    // Die Hauptstadt steht vor der Reihe ihrer vorderen Nachbarn - die Staedte an ihren hinteren Ecken mit ihr.
+    const hauptstadtTiefe = (hk: string) => Number(hk.split(':')[1]) + 1;
+    const burgTiefe = new Map<string, number>();
+    for (const [hk, h] of Object.entries(state.hauptstaedte ?? {})) {
+      if (h.stufe >= 2) continue;
       const [q, r] = hk.split(':').map(Number) as [number, number];
       const c = hexToPixel(q, r, LAYOUT);
-      const p = geraet(c.x, c.y - liftHex(q, r));
-      const sorte = sorteVon(hk, q, r);
-      return {
-        fuss: p.y + (h.stufe >= 2 ? 9 : 6) * f,
-        male: () => zeichneHauptstadt(ctx, p.x, p.y, f, spielerFarbe(h.owner), sorte, h.stufe),
-      };
-    });
-    // Von hinten nach vorn, nach dem Fuss: das vordere Bauwerk ueberdeckt das hintere.
-    for (const b of [...gebaeude, ...hauptstaedte].sort((u, w) => u.fuss - w.fuss)) b.male();
+      for (const v of hexVertices(q, r)) if (vertexToPixel(v, LAYOUT).y < c.y) burgTiefe.set(vertexKey(v), hauptstadtTiefe(hk));
+    }
+    const gebaeudeTiefe = (vk: string) => burgTiefe.get(vk) ?? eckTiefe(parseVertexKey(vk));
+
+    /**
+     * Strassen, Mauern, Gebaeude und Hauptstaedte auf g. nur: welche Reihen -
+     * die Probe "voll" zeichnet Reihe fuer Reihe, sonst kommt alles auf einmal.
+     */
+    const zeichneBauten = (g: CanvasRenderingContext2D, nur: (tiefe: number) => boolean = () => true) => {
+      zeichneStrassen(
+        g,
+        asche
+          .filter(([ek]) => nur(kantenTiefe(ek)))
+          .map(([ek, owner]) => {
+            const [a, b] = kantePixel(ek);
+            return { a: a!, b: b!, farbe: spielerFarbe(owner), verbrannt: true };
+          }),
+        f,
+      );
+      zeichneStrassen(
+        g,
+        Object.entries(state.roads)
+          .filter(([ek]) => !mauerKanten.has(ek) && nur(kantenTiefe(ek)))
+          .map(([ek, owner]) => {
+            const [a, b] = kantePixel(ek);
+            return { a: a!, b: b!, farbe: spielerFarbe(owner), ohneWimpel: ringOhneWimpel.has(ek) || !wimpelKante(ek) };
+          }),
+        f,
+      );
+      zeichneMauern(
+        g,
+        [...mauerKanten]
+          .filter(([ek]) => nur(kantenTiefe(ek)))
+          .map(([ek, sorte]) => {
+            const [a, b] = kantePixel(ek);
+            return { a: a!, b: b!, stein: steinFuer(sorte) };
+          }),
+        f,
+      );
+      const gebaeude = Object.entries(state.buildings)
+        .filter(([vk]) => nur(gebaeudeTiefe(vk)))
+        .map(([vk, b]) => {
+          const ecke = parseVertexKey(vk);
+          const v = vertexToPixel(ecke, LAYOUT);
+          const p = geraet(v.x, v.y - liftVertex(ecke));
+          const bastion = bastionen.get(vk);
+          // Am Ring einer Hauptstadt kein Wachturm (rules/hauptstadt.ts, anHauptstadt) - auch nicht aus alten Staenden.
+          const turm = b.turm === true && !anHauptstadt(state, vk);
+          return {
+            fuss: Math.max(p.y + 3 * f, nachDerBurg.get(vk) ?? -Infinity),
+            male: () =>
+              bastion !== undefined
+                ? zeichneBastion(g, p.x, p.y, f, spielerFarbe(b.owner), bastion, turm)
+                : zeichneGebaeude(g, b.type === 'city' ? 'stadt' : 'dorf', p.x, p.y, f, spielerFarbe(b.owner), turm),
+          };
+        });
+      // Hauptstaedte stehen in der Feldmitte, im Stein ihres Gelaendes (units.ts).
+      const hauptstaedte = Object.entries(state.hauptstaedte ?? {})
+        .filter(([hk]) => nur(hauptstadtTiefe(hk)))
+        .map(([hk, h]) => {
+          const [q, r] = hk.split(':').map(Number) as [number, number];
+          const c = hexToPixel(q, r, LAYOUT);
+          const p = geraet(c.x, c.y - liftHex(q, r));
+          const sorte = sorteVon(hk, q, r);
+          return {
+            fuss: p.y + (h.stufe >= 2 ? 9 : 6) * f,
+            male: () => zeichneHauptstadt(g, p.x, p.y, f, spielerFarbe(h.owner), sorte, h.stufe),
+          };
+        });
+      // Von hinten nach vorn, nach dem Fuss: das vordere Bauwerk ueberdeckt das hintere.
+      for (const b of [...gebaeude, ...hauptstaedte].sort((u, w) => u.fuss - w.fuss)) b.male();
+    };
+
+    const vollModus = verdeckenModus() === 'voll';
+    if (!vollModus) {
+      zeichneBauten(ctx);
+    } else {
+      /*
+       * PROBE "voll" (?verdecken=voll): Wald und Berge verdecken ganz, was vor
+       * ihrer Reihe steht - Doerfer und Staedte an ihren drei oberen Ecken,
+       * Strassen an ihren oberen Kanten, die Hauptstadt hinter ihnen. Flache
+       * Kacheln verdecken nichts. Reihe fuer Reihe: die Bauten dieser Reihe in
+       * eine Schicht, mit den hohen Kacheln dieser und der naechsten Reihe
+       * ausstanzen, aufs Brett. Figuren bleiben, wie sie sind.
+       */
+      const tiefen = new Set<number>();
+      for (const ek of Object.keys(state.roads)) tiefen.add(kantenTiefe(ek));
+      for (const [ek] of asche) tiefen.add(kantenTiefe(ek));
+      for (const vk of Object.keys(state.buildings)) tiefen.add(gebaeudeTiefe(vk));
+      for (const hk of Object.keys(state.hauptstaedte ?? {})) tiefen.add(hauptstadtTiefe(hk));
+      const schicht = (vollRef.current ??= document.createElement('canvas'));
+      if (schicht.width !== bw || schicht.height !== bh) {
+        schicht.width = bw;
+        schicht.height = bh;
+      }
+      const g = schicht.getContext('2d');
+      if (g) {
+        g.imageSmoothingEnabled = false;
+        const w = Math.round(IMG.w * scale * dpr);
+        const h = Math.round(IMG.h * scale * dpr);
+        const hoheJeReihe = new Map<number, (typeof visible)[number][]>();
+        for (const t of visible) {
+          if (t.terrain !== 'forest' && t.terrain !== 'mountain') continue;
+          const liste = hoheJeReihe.get(t.r);
+          if (liste) liste.push(t);
+          else hoheJeReihe.set(t.r, [t]);
+        }
+        for (const tiefe of [...tiefen].sort((a, b) => a - b)) {
+          g.clearRect(0, 0, bw, bh);
+          zeichneBauten(g, (x) => x === tiefe);
+          g.globalCompositeOperation = 'destination-out';
+          for (const t of [...(hoheJeReihe.get(tiefe) ?? []), ...(hoheJeReihe.get(tiefe + 1) ?? [])]) {
+            const url = tileUrl(state.worldSeed, t.terrain, t.q, t.r);
+            const bild = url === null ? undefined : tileImage(url);
+            if (!bild) continue;
+            const k = hexKey(t.q, t.r);
+            const { x, y } = ursprung(t.q, t.r, liftHex(t.q, t.r) + (k === hover ? LIFT : 0));
+            g.drawImage(bild, x, y, w, h);
+          }
+          g.globalCompositeOperation = 'source-over';
+          ctx.drawImage(schicht, 0, 0);
+        }
+      }
+    }
 
     /*
      * Gipfel davor (DESIGN.md, Karte): was ein Berg ueber sein Sechseck hinaus
@@ -1070,7 +1152,7 @@ export function Board({
      * sie standen schon vorher obenauf und bleiben es.
      */
     // ?verdecken=aus schaltet auch das ab - zum Vergleich.
-    const berge = verdeckenModus() === 'aus' ? [] : visible.filter((t) => t.terrain === 'mountain');
+    const berge = verdeckenModus() === 'aus' || vollModus ? [] : visible.filter((t) => t.terrain === 'mountain');
     if (berge.length > 0) {
       const schicht = (ueberhangRef.current ??= document.createElement('canvas'));
       if (schicht.width !== bw || schicht.height !== bh) {
@@ -1116,7 +1198,7 @@ export function Board({
      * schnitte die Burg nur gerade ab, und das saehe aus wie ein Fehler.
      */
     const modus = verdeckenModus();
-    for (const [hk, h] of modus === 'aus' ? [] : Object.entries(state.hauptstaedte ?? {})) {
+    for (const [hk, h] of modus === 'aus' || modus === 'voll' ? [] : Object.entries(state.hauptstaedte ?? {})) {
       const [q, r] = hk.split(':').map(Number) as [number, number];
       const c = hexToPixel(q, r, LAYOUT);
       const p = geraet(c.x, c.y - liftHex(q, r));
