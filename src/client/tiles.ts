@@ -318,6 +318,112 @@ export function tileImageFog(url: string): CanvasImageSource | undefined {
  */
 const UEBERHANG = new WeakMap<object, HTMLCanvasElement>();
 
+/*
+ * Hoehenmaske (PROBE, Board ?verdecken=maske): welche Pixel einer Wald- oder
+ * Bergkachel "hoch" sind - Baumkronen, Staemme, Fels, Gipfel - und welche
+ * Boden: Grasrand, Erdkante, Schnee zwischen den Baeumen. Nur Hohes verdeckt,
+ * was dahinter steht.
+ *
+ * Automatisch geschaetzt, nicht gezeichnet: Bodenfarben je Kachelfamilie, von
+ * der Erdkante unten aus zusammenhaengend geflutet. Was die Flut nicht
+ * erreicht, ist hoch. Umrisspixel zaehlen zu der Seite, der die meisten
+ * Nachbarn angehoeren. Spaeter liessen sich die Masken als eigene Bilder
+ * nachzeichnen (forest_0_mask.png) - diese hier sind der erste Entwurf dafuer.
+ */
+const ERDE = ['#5f4036', '#6c4738', '#8a6048', '#9a6d4f', '#46352f', '#322d21', '#2b211a'];
+const GRAS = ['#6fad42', '#538c47', '#bad08e', '#cbbf5d', '#837131', '#8c833d'];
+const SCHNEE = ['#fefefe', '#d4e8f3', '#b9c3cc', '#aae8e3', '#89a7b0', '#9cb4cd', '#90999f', '#7abcc2', '#99c8bc', '#4d919e', '#327297'];
+const BODEN_JE_FAMILIE: Record<string, ReadonlySet<string>> = {
+  forest: new Set([...ERDE, ...GRAS]),
+  jungle: new Set([...ERDE, ...GRAS]),
+  taiga: new Set([...ERDE, ...GRAS, ...SCHNEE]),
+  mountains: new Set([...ERDE, ...GRAS, '#3d6a45']),
+};
+const UMRISS = new Set(['#120f12', '#161a19']);
+/** Ab dieser Zeile liegt die Erdkante - von dort beginnt die Flut. */
+const KANTE_AB = 25;
+const MASKEN = new WeakMap<object, HTMLCanvasElement>();
+
+/** Die Kachelfamilie aus der Bild-URL: "taiga_1_tile-abc.png" -> "taiga". */
+export function kachelFamilie(url: string): string | null {
+  const m = /(forest|jungle|taiga|mountains)_\d+_tile/.exec(url);
+  return m ? m[1]! : null;
+}
+
+/**
+ * Die Hoehenmaske eines Kachelbildes: deckend, wo es hoch ist, durchsichtig
+ * sonst. null fuer Kacheln ohne Hoehe (Gras, Feld, Wasser, ...).
+ */
+export function hoehenMaske(bild: HTMLImageElement, url: string): HTMLCanvasElement | null {
+  const da = MASKEN.get(bild);
+  if (da) return da;
+  const familie = kachelFamilie(url);
+  const boden = familie ? BODEN_JE_FAMILIE[familie] : undefined;
+  if (!boden) return null;
+  const b = bild.naturalWidth || IMG_W;
+  const h = bild.naturalHeight || IMG_H;
+  const c = document.createElement('canvas');
+  c.width = b;
+  c.height = h;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return null;
+  ctx.drawImage(bild, 0, 0);
+  const pixel = ctx.getImageData(0, 0, b, h);
+  const d = pixel.data;
+  const farbe = (i: number) =>
+    '#' + [d[i * 4]!, d[i * 4 + 1]!, d[i * 4 + 2]!].map((v) => v.toString(16).padStart(2, '0')).join('');
+  const n = b * h;
+  // 0 durchsichtig, 1 Boden, 2 hoch, 3 Umriss (noch offen)
+  const art = new Uint8Array(n);
+  const istBoden = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    if (d[i * 4 + 3]! === 0) continue;
+    const f = farbe(i);
+    art[i] = UMRISS.has(f) ? 3 : 2;
+    if (boden.has(f)) istBoden[i] = 1;
+  }
+  // Flut von der Erdkante aus, nur ueber Bodenfarben.
+  const schlange: number[] = [];
+  for (let i = KANTE_AB * b; i < n; i++) {
+    if (istBoden[i] && art[i] === 2) {
+      art[i] = 1;
+      schlange.push(i);
+    }
+  }
+  while (schlange.length > 0) {
+    const i = schlange.pop()!;
+    const x = i % b;
+    for (const j of [i - b, i + b, x > 0 ? i - 1 : -1, x < b - 1 ? i + 1 : -1]) {
+      if (j < 0 || j >= n || art[j] !== 2 || !istBoden[j]) continue;
+      art[j] = 1;
+      schlange.push(j);
+    }
+  }
+  // Umrisse: zu der Seite, der die meisten Nachbarn angehoeren.
+  for (let i = 0; i < n; i++) {
+    if (art[i] !== 3) continue;
+    const x = i % b;
+    let hoch = 0;
+    let tief = 0;
+    for (const j of [i - b, i + b, x > 0 ? i - 1 : -1, x < b - 1 ? i + 1 : -1]) {
+      if (j < 0 || j >= n) continue;
+      if (art[j] === 2) hoch++;
+      else if (art[j] === 1 || art[j] === 0) tief++;
+    }
+    art[i] = hoch > tief ? 2 : 1;
+  }
+  for (let i = 0; i < n; i++) {
+    const hochPixel = art[i] === 2;
+    d[i * 4] = 0;
+    d[i * 4 + 1] = 0;
+    d[i * 4 + 2] = 0;
+    d[i * 4 + 3] = hochPixel ? 255 : 0;
+  }
+  ctx.putImageData(pixel, 0, 0);
+  MASKEN.set(bild, c);
+  return c;
+}
+
 export function ueberhangBild(bild: CanvasImageSource): HTMLCanvasElement | null {
   const da = UEBERHANG.get(bild);
   if (da) return da;

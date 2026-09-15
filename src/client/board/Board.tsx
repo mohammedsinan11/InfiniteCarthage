@@ -60,6 +60,7 @@ import { AuftragsZeichen, Flammen, KronenZeichen } from './Marken';
 import { Kosten } from '../ui/Aktionsleiste';
 import type { Cost } from '../../core/rules/costs';
 import { loeschFelder } from '../../core/rules/feuer';
+import type { Pfeil } from '../net/store';
 import { anHauptstadt } from '../../core/rules/hauptstadt';
 import type { Brand } from '../../core/state';
 import { BRAND_WAS } from '../log';
@@ -70,6 +71,7 @@ import {
   HEX_CX,
   HEX_CY,
   ueberhangBild,
+  hoehenMaske,
   HEX_H,
   HEX_W,
   IMG_H,
@@ -238,6 +240,8 @@ type Props = {
   showAllNumbers: boolean;
   /** Felder, die kurz aufleuchten - etwa weil der Wurf sie getroffen hat. */
   flashHexes?: string[];
+  /** Pfeile der Bogenschuetzen, die gerade fliegen (net/store.ts). */
+  pfeile?: readonly Pfeil[];
   /** Karten, die zur Hand fliegen sollen. */
   flights?: Flight[];
   onPick: (kind: 'vertex' | 'edge' | 'hex', key: string) => void;
@@ -340,8 +344,8 @@ const KEINE_KRONEN: Krone[] = [];
  * ?verdecken=kasten|ueberhang|wald|halb|fuss|aus, im Browser auch window.__verdecken.
  * Ohne Angabe: kasten.
  */
-type VerdeckenModus = 'kasten' | 'ueberhang' | 'wald' | 'halb' | 'fuss' | 'aus' | 'voll';
-const VERDECKEN_MODI: readonly string[] = ['kasten', 'ueberhang', 'wald', 'halb', 'fuss', 'aus', 'voll'];
+type VerdeckenModus = 'kasten' | 'ueberhang' | 'wald' | 'halb' | 'fuss' | 'aus' | 'voll' | 'maske';
+const VERDECKEN_MODI: readonly string[] = ['kasten', 'ueberhang', 'wald', 'halb', 'fuss', 'aus', 'voll', 'maske'];
 function verdeckenModus(): VerdeckenModus {
   try {
     const gesetzt =
@@ -366,6 +370,7 @@ export function Board({
   targets,
   showAllNumbers,
   flashHexes,
+  pfeile,
   flights,
   onPick,
   sicht = null,
@@ -1091,7 +1096,9 @@ export function Board({
       for (const b of [...gebaeude, ...hauptstaedte].sort((u, w) => u.fuss - w.fuss)) b.male();
     };
 
-    const vollModus = verdeckenModus() === 'voll';
+    // "maske": wie voll, aber nur die hohen Pixel der Kachel verdecken (tiles.ts, hoehenMaske).
+    const maskenModus = verdeckenModus() === 'maske';
+    const vollModus = verdeckenModus() === 'voll' || maskenModus;
     if (!vollModus) {
       zeichneBauten(ctx);
     } else {
@@ -1132,10 +1139,12 @@ export function Board({
           for (const t of [...(hoheJeReihe.get(tiefe) ?? []), ...(hoheJeReihe.get(tiefe + 1) ?? [])]) {
             const url = tileUrl(state.worldSeed, t.terrain, t.q, t.r);
             const bild = url === null ? undefined : tileImage(url);
-            if (!bild) continue;
+            if (!bild || url === null) continue;
+            const stanze = maskenModus ? hoehenMaske(bild, url) : bild;
+            if (!stanze) continue;
             const k = hexKey(t.q, t.r);
             const { x, y } = ursprung(t.q, t.r, liftHex(t.q, t.r) + (k === hover ? LIFT : 0));
-            g.drawImage(bild, x, y, w, h);
+            g.drawImage(stanze, x, y, w, h);
           }
           g.globalCompositeOperation = 'source-over';
           ctx.drawImage(schicht, 0, 0);
@@ -1198,7 +1207,7 @@ export function Board({
      * schnitte die Burg nur gerade ab, und das saehe aus wie ein Fehler.
      */
     const modus = verdeckenModus();
-    for (const [hk, h] of modus === 'aus' || modus === 'voll' ? [] : Object.entries(state.hauptstaedte ?? {})) {
+    for (const [hk, h] of modus === 'aus' || vollModus ? [] : Object.entries(state.hauptstaedte ?? {})) {
       const [q, r] = hk.split(':').map(Number) as [number, number];
       const c = hexToPixel(q, r, LAYOUT);
       const p = geraet(c.x, c.y - liftHex(q, r));
@@ -1877,6 +1886,44 @@ export function Board({
             })
             .join(' ');
           return <polygon key={'f' + hk} className="hex-flash" points={punkte} />;
+        })}
+
+        {/*
+          Pfeile der Bogenschuetzen: fliegen im Bogen von der Feldmitte des
+          Schuetzen zur Feldmitte des Ziels, nacheinander. Trifft die Salve,
+          blitzt am Ziel ein roter Ring auf. PLATZHALTER (ASSETS.md).
+        */}
+        {(pfeile ?? []).map((p) => {
+          const a = hexToPixel(p.von.q, p.von.r, LAYOUT);
+          const b = hexToPixel(p.nach.q, p.nach.r, LAYOUT);
+          const ya = a.y - liftHex(p.von.q, p.von.r) - 8 + (p.nr % 2) * 4;
+          const yb = b.y - liftHex(p.nach.q, p.nach.r) - 4;
+          const winkel = (Math.atan2(yb - ya, b.x - a.x) * 180) / Math.PI;
+          const stil = {
+            '--dx': `${(b.x - a.x).toFixed(1)}px`,
+            '--dy': `${(yb - ya).toFixed(1)}px`,
+            '--verzug': `${p.nr * 0.14}s`,
+          } as React.CSSProperties;
+          return (
+            <g key={'pfeil' + p.id} pointerEvents="none" style={stil}>
+              <g className="pfeil-flug" style={stil}>
+                <g className="pfeil-bogen" style={stil}>
+                  <g transform={`translate(${a.x.toFixed(1)} ${ya.toFixed(1)}) rotate(${winkel.toFixed(1)})`}>
+                    <line x1={-9} y1={0} x2={6} y2={0} stroke="#3a2a1e" strokeWidth={3} />
+                    <line x1={-9} y1={0} x2={6} y2={0} stroke="#c9a46a" strokeWidth={1.4} />
+                    <path d="M 9 0 L 4 -3 L 4 3 Z" fill="#d8d8e0" stroke="#1b130d" strokeWidth={0.8} />
+                    <path d="M -9 0 L -12 -3 M -9 0 L -12 3" stroke="#f2efe6" strokeWidth={1.2} />
+                  </g>
+                </g>
+              </g>
+              {p.trifft && p.nr === 0 && (
+                <g className="pfeil-treffer" style={{ ...stil, transformOrigin: `${b.x}px ${yb}px` }}>
+                  <circle cx={b.x} cy={yb} r={7} />
+                  <circle cx={b.x} cy={yb} r={12} />
+                </g>
+              )}
+            </g>
+          );
         })}
 
         {/* Anklickbare Felder - fuer das Versetzen des Raeubers */}

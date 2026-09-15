@@ -67,7 +67,7 @@ describe('Verbaende', () => {
     for (const id of [held.id, r1.id, r2.id]) expect(hexDistance(von(game, id), ziel)).toBe(3);
   });
 
-  it('ohne Verband zieht nur die eine Einheit, und am Ziel loest sich der Verband', () => {
+  it('ohne Verband zieht nur die eine Einheit, und am Ziel bleibt die Schar beisammen', () => {
     const game = solo();
     game.state.phase = { t: 'main' };
     game.state.turn = 1;
@@ -85,9 +85,46 @@ describe('Verbaende', () => {
     tickArmy(game.state, game.world, []);
     for (const id of [r1.id, r2.id]) {
       expect(hexDistance(von(game, id), { q: mitte.q + 1, r: mitte.r })).toBe(0);
-      expect(von(game, id).verband).toBeNull();
+      expect(von(game, id).verband).toBe(r2.id);
       expect(von(game, id).ziel).toBeNull();
     }
+  });
+
+  it('eine frei gewaehlte Gruppe wird eine Schar; wer herausgewaehlt wird, laesst den Rest zurueck', () => {
+    const game = solo();
+    game.state.phase = { t: 'main' };
+    game.state.turn = 1;
+    const mitte = landFlaeche(game, 4);
+    const a = einheit(game, einheitVorlage('ritter', mitte.q, mitte.r, { owner: 'p0' }));
+    const b = einheit(game, einheitVorlage('bogen', mitte.q, mitte.r, { owner: 'p0' }));
+    const c = einheit(game, einheitVorlage('ritter', mitte.q, mitte.r, { owner: 'p0' }));
+    const ziel = { q: mitte.q + 2, r: mitte.r };
+
+    must(game, { t: 'orderUnits', units: [a.id, b.id, c.id], ...ziel });
+    const schar = von(game, a.id).verband;
+    expect(schar).not.toBeNull();
+    for (const id of [a.id, b.id, c.id]) expect(von(game, id)).toMatchObject({ verband: schar, ziel });
+
+    // Dieselbe ganze Schar behaelt ihr Banner.
+    must(game, { t: 'orderUnits', units: [c.id, b.id, a.id], q: mitte.q + 3, r: mitte.r });
+    expect(von(game, a.id).verband).toBe(schar);
+
+    // Zwei herausgewaehlt: neues Banner fuer sie, der Dritte behaelt das alte.
+    must(game, { t: 'orderUnits', units: [a.id, b.id], q: mitte.q + 1, r: mitte.r });
+    expect(von(game, a.id).verband).not.toBe(schar);
+    expect(von(game, a.id).verband).toBe(von(game, b.id).verband);
+    expect(von(game, c.id).verband).toBe(schar);
+
+    // Halt aendert die Schar nicht, Aufloesen schon.
+    const neu = von(game, a.id).verband!;
+    must(game, { t: 'orderUnits', units: [a.id, b.id], q: 0, r: 0, halt: true });
+    expect(von(game, a.id)).toMatchObject({ verband: neu, ziel: null });
+    must(game, { t: 'disbandGroup', verband: neu });
+    expect(von(game, a.id).verband).toBeNull();
+    expect(von(game, b.id).verband).toBeNull();
+
+    const fremd = einheit(game, einheitVorlage('ritter', mitte.q, mitte.r, { owner: 'p9' }));
+    expect(applyAction(game, { t: 'orderUnits', units: [c.id, fremd.id], ...ziel }, 'p0').ok).toBe(false);
   });
 
   it('ein Verband wartet, solange einer von ihnen kaempft', () => {

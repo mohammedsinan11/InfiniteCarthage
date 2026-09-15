@@ -15,9 +15,13 @@ import type { DevCardType, GameState } from '../state';
 
 const SALT_DECK = 11;
 
-/** Klassische Zusammensetzung eines Packs: 25 Karten. */
+/**
+ * Zusammensetzung eines Packs: das klassische ohne die 14 Ritter - 11 Karten.
+ * Ritter kommen nicht mehr aus dem Kartendeck, sondern werden angeworben
+ * (Truppen, rules/army.ts). Wer noch eine Ritterkarte aus einem alten Stand
+ * haelt, kann sie weiter spielen.
+ */
 const PACK: readonly DevCardType[] = [
-  ...Array<DevCardType>(14).fill('knight'),
   ...Array<DevCardType>(5).fill('victoryPoint'),
   ...Array<DevCardType>(2).fill('roadBuilding'),
   ...Array<DevCardType>(2).fill('yearOfPlenty'),

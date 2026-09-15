@@ -749,10 +749,10 @@ function schreite(
       gezogen = true;
       wachsen(s, world, u, u.kind === 'held' ? ERKUNDUNG_HELD : ERKUNDUNG_RADIUS, events);
     }
-    // Am Ziel oder ohne Weg: der Befehl ist erledigt - und der Verband auch.
+    // Am Ziel oder ohne Weg: der Befehl ist erledigt. Die Schar bleibt beisammen -
+    // ihr Banner loest erst ein neuer Einzelbefehl oder "Aufloesen".
     if (!weg || hexKey(u.q, u.r) === zk) {
       u.ziel = null;
-      u.verband = null;
     }
     if (!weg) break;
     if (u.owner !== null && ruinAt(seed, u.q, u.r) && !s.exploredRuins.includes(hexKey(u.q, u.r))) {

@@ -101,6 +101,9 @@ const NAME_KEY = 'infinitecarthage.name';
 /** platzwahl: die Partie laeuft, dieser Browser hat keinen Platz - welcher bist du (Home)? */
 type Status = 'idle' | 'connecting' | 'platzwahl' | 'lobby' | 'playing' | 'closed';
 
+/** Ein Pfeil auf dem Brett: von welchem Feld auf welches, der wievielte der Salve, und ob die Salve traf. */
+export type Pfeil = { id: number; von: { q: number; r: number }; nach: { q: number; r: number }; nr: number; trifft: boolean };
+
 /** Unter welchem Namen zuletzt beigetreten wurde - fuer die Platzwahl auf derselben Verbindung. */
 let beitrittsName = '';
 
@@ -140,6 +143,11 @@ export type Store = {
    * koennen. Die Nummer wechselt bei jedem Wurf und stoesst die Animation an.
    */
   produceEffect: { id: number; roll: number } | null;
+  /**
+   * Pfeile, die gerade fliegen (Beschuss, rules/army.ts): je Salve so viele,
+   * wie geschossen wurden. Das Brett zeigt sie kurz, Game raeumt sie weg.
+   */
+  pfeile: Pfeil[];
 
   /**
    * oeffentlich gilt nur beim Eroeffnen: erscheint der Raum in der Raumliste?
@@ -157,6 +165,7 @@ export type Store = {
   clearPendingRoll: () => void;
   dropAnnouncement: (id: number) => void;
   clearProduceEffect: () => void;
+  clearPfeile: () => void;
 };
 
 /** Wie viele Weltereignisse das Menue behaelt. */
@@ -529,8 +538,9 @@ export const useStore = create<Store>((set, get) => ({
   pendingRoll: null,
   announcements: [],
   produceEffect: null,
+  pfeile: [],
 
-  connect: (code, name, create, oeffentlich = true, token) => {
+  connect:(code, name, create, oeffentlich = true, token) => {
     beitrittsName = name;
     const alt = get().ws;
     if (alt) {
@@ -675,6 +685,19 @@ export const useStore = create<Store>((set, get) => ({
             const wurf = msg.events.find((e: GameEvent) => e.t === 'roll');
             const neue = meldungenAus(msg.events, get().state, get().you);
             const weltNeu = weltAus(msg.events, get().state, get().you);
+            // Beschuss: je Schuss ein Pfeil, hoechstens fuenf je Salve.
+            const pfeile: Pfeil[] = msg.events.flatMap((e: GameEvent) =>
+              e.t === 'volley'
+                ? Array.from({ length: Math.min(5, e.schuesse) }, (_, nr) => ({
+                    id: naechsteId++,
+                    von: { q: e.q, r: e.r },
+                    nach: { q: e.zq, r: e.zr },
+                    nr,
+                    trifft: e.treffer > 0,
+                  }))
+                : [],
+            );
+            if (pfeile.length > 0) set({ pfeile });
             set((s) => ({
               log: [
                 ...s.log,
@@ -767,6 +790,7 @@ export const useStore = create<Store>((set, get) => ({
   dropAnnouncement: (id) =>
     set((s) => ({ announcements: s.announcements.filter((a) => a.id !== id) })),
   clearProduceEffect: () => set({ produceEffect: null }),
+  clearPfeile: () => set({ pfeile: [] }),
 }));
 
 /*

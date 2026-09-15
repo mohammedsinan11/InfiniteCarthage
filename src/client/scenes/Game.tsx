@@ -107,6 +107,14 @@ export function Game() {
   const log = useStore((s) => s.log);
   const welt = useStore((s) => s.welt);
   const produceEffect = useStore((s) => s.produceEffect);
+  const pfeile = useStore((s) => s.pfeile);
+  const clearPfeile = useStore((s) => s.clearPfeile);
+  // Pfeile nach ihrem Flug wegraeumen - je Salve hoechstens fuenf, je 0,14 s versetzt.
+  useEffect(() => {
+    if (pfeile.length === 0) return;
+    const t = window.setTimeout(clearPfeile, 1800);
+    return () => window.clearTimeout(t);
+  }, [pfeile, clearPfeile]);
   const clearProduceEffect = useStore((s) => s.clearProduceEffect);
 
   const [mode, setMode] = useState<BuildMode>(null);
@@ -724,6 +732,17 @@ export function Game() {
                 : `${state.players.find((p) => p.id === state.currentPlayer)?.name} ist dran`}
             </span>
           )}
+          {/* Siegpunkte: eigene, bei mehreren auch die der anderen im Tooltip. */}
+          <span
+            className="hud-punkte"
+            title={[
+              state.targetPoints > 0 ? `Ziel: ${state.targetPoints} Siegpunkte` : 'Endlosspiel - kein Siegpunktziel',
+              ...state.players.filter((p) => p.id !== you).map((p) => `${p.name}: ${p.points}`),
+            ].join(' · ')}
+          >
+            ★ {state.myPoints}
+            {state.targetPoints > 0 ? ` / ${state.targetPoints}` : ''}
+          </span>
           {state.lastRoll && (
             <span className="hud-roll">
               {state.lastRoll[0]} + {state.lastRoll[1]} = {state.lastRoll[0] + state.lastRoll[1]}
@@ -841,6 +860,7 @@ export function Game() {
           targets={targets}
           showAllNumbers={pinNumbers}
           flashHexes={flashHexes}
+          pfeile={pfeile}
           flights={flights}
           onPick={onPick}
           sicht={sicht}

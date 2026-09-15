@@ -61,7 +61,7 @@ Rand nie erreichbar ist.
 | Haefen | Haengen an Wasserfeldern mitten im Land. Eine unendliche Karte hat keine Kueste. |
 | Raeuber | Genau einer, Start auf der Wueste im Ursprungschunk. |
 | Bank | Bleibt endlich (19 je Rohstoff) - auf unbegrenzter Flaeche die einzige verbleibende Knappheit. |
-| Entwicklungskarten | Paecke zu 25 Karten in klassischer Verteilung. Ist eines leer, wird das naechste gemischt, statt dass das Spiel karten los endet. |
+| Entwicklungskarten | Paecke zu 11 Karten: die klassische Verteilung ohne Ritter - die werden angeworben. Ist eines leer, wird das naechste gemischt, statt dass das Spiel kartenlos endet. |
 
 ## Grafik
 

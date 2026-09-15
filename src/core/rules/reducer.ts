@@ -119,6 +119,14 @@ export type Action =
    * Ziel heisst: halt. verband: alle eigenen Einheiten seines Feldes ziehen mit.
    */
   | { t: 'orderUnit'; unit: number; q: number; r: number; verband?: boolean }
+  /**
+   * Einer frei gewaehlten Gruppe eigener Einheiten ein Ziel geben (Befehlstafel).
+   * Mehrere bilden eine Schar mit Banner, die auch am Ziel beisammenbleibt.
+   * halt: stehen bleiben - die Schar bleibt, wie sie ist.
+   */
+  | { t: 'orderUnits'; units: number[]; q: number; r: number; halt?: boolean }
+  /** Eine Schar aufloesen: ihre Einheiten stehen wieder fuer sich. */
+  | { t: 'disbandGroup'; verband: number }
   /** Eine Beute einloesen: eine Kartenwahl. */
   | { t: 'claimLoot' }
   /** Ein eigenes Feuer mit einer Rohstoffkarte loeschen (rules/feuer.ts). */
@@ -813,6 +821,64 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         m.ziel = { q: action.q, r: action.r };
         m.verband = verbandId;
       }
+      break;
+    }
+
+    case 'orderUnits': {
+      if (phase.t !== 'main' && phase.t !== 'roll') {
+        return fail('Jetzt koennen keine Befehle gegeben werden.');
+      }
+      const liste = [...new Set(action.units)].map((id) => s.units.find((u) => u.id === id));
+      if (
+        liste.length === 0 ||
+        liste.some((u) => !u || u.owner !== actor || (u.kind !== 'ritter' && u.kind !== 'bogen' && u.kind !== 'held'))
+      ) {
+        return fail('Das sind nicht deine Einheiten.');
+      }
+      const gruppe = liste as (typeof s.units)[number][];
+      if (action.halt) {
+        for (const m of gruppe) {
+          m.ziel = null;
+          m.folgt = null;
+          m.auftrag = 'befehl';
+        }
+        break;
+      }
+      const feld = tileAt(world, action.q, action.r);
+      if (!feld) return fail('Dieses Feld ist noch nicht erkundet.');
+      if (feld.terrain === 'water') return fail('Einheiten gehen nicht uebers Wasser.');
+      const zk = hexKey(action.q, action.r);
+      if (gruppe.some((m) => hexKey(m.q, m.r) !== zk && !nextStep(s.worldSeed, m, new Set([zk])))) {
+        return fail('Dorthin fuehrt kein Landweg.');
+      }
+      /*
+       * Das Banner: ist genau eine bestehende Schar gewaehlt, behaelt sie es.
+       * Sonst bekommen die Gewaehlten ein neues - aus dem Zaehler der Einheiten,
+       * damit es keiner anderen Schar gleicht. Wer aus einer Schar herausgewaehlt
+       * wurde, laesst den Rest mit dem alten Banner zurueck.
+       */
+      const alt = gruppe[0]!.verband;
+      const ganzeSchar =
+        alt !== null &&
+        gruppe.every((m) => m.verband === alt) &&
+        s.units.filter((u) => u.verband === alt && u.owner === actor).length === gruppe.length;
+      const schar = gruppe.length < 2 ? null : ganzeSchar ? alt : s.nextUnitId++;
+      for (const m of gruppe) {
+        m.folgt = null;
+        m.auftrag = 'befehl';
+        m.verband = schar;
+        m.ziel = hexKey(m.q, m.r) === zk ? null : { q: action.q, r: action.r };
+      }
+      break;
+    }
+
+    case 'disbandGroup': {
+      if (phase.t !== 'main' && phase.t !== 'roll') {
+        return fail('Jetzt koennen keine Befehle gegeben werden.');
+      }
+      const mitglieder = s.units.filter((u) => u.owner === actor && u.verband === action.verband);
+      if (mitglieder.length === 0) return fail('Diese Schar gibt es nicht.');
+      for (const m of mitglieder) m.verband = null;
       break;
     }
 

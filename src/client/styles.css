@@ -759,6 +759,66 @@ em.off {
 .hud-roll {
   color: var(--muted);
 }
+.hud-punkte {
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* Pfeile der Bogenschuetzen (Board): fliegen im Bogen vom Schuetzen zum Ziel. */
+.pfeil-flug {
+  animation: pfeil-flug 0.55s linear both;
+}
+.pfeil-bogen {
+  animation: pfeil-bogen 0.55s ease-in-out both;
+}
+.pfeil-flug,
+.pfeil-bogen {
+  animation-delay: var(--verzug, 0s);
+}
+.pfeil-treffer {
+  animation: pfeil-treffer 0.5s ease-out both;
+  animation-delay: calc(var(--verzug, 0s) + 0.55s);
+}
+.pfeil-treffer circle {
+  fill: none;
+  stroke: #e0473a;
+  stroke-width: 2;
+}
+@keyframes pfeil-flug {
+  0% {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+  95% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy));
+    opacity: 0;
+  }
+}
+@keyframes pfeil-bogen {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-14px);
+  }
+}
+@keyframes pfeil-treffer {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+}
 
 .hud-win {
   position: absolute;
