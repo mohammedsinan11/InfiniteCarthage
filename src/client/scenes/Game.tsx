@@ -54,7 +54,6 @@ import {
   FAST_GESCHLOSSEN,
   STUFE_NAME,
   festungHindernis,
-  hatHauptstadt,
   hauptstadtFelder,
   hauptstadtHindernis,
 } from '../../core/rules/hauptstadt';
@@ -379,22 +378,20 @@ export function Game() {
     () => (you && phase.t !== 'setup' ? hauptstadtFelder(state, you) : []),
     [state, you, phase.t],
   );
-  const eigeneHauptstadt = you ? hatHauptstadt(state, you) : false;
+  // Beliebig viele Hauptstaedte: jede fast geschlossene Stelle bekommt ihre Krone.
   const kronen: Krone[] = useMemo(
     () =>
-      eigeneHauptstadt
-        ? []
-        : umland
-            .filter((u) => u.fehlt <= FAST_GESCHLOSSEN)
-            .map((u) => ({
-              q: u.q,
-              r: u.r,
-              bereit: u.bereit,
-              titel: u.bereit
-                ? 'Umschlossen - hier kann deine Hauptstadt entstehen. Klicken.'
-                : `Fast umschlossen: ${u.strassen}/6 Strassen, ${u.staedte}/3 Staedte. Klicken.`,
-            })),
-    [umland, eigeneHauptstadt],
+      umland
+        .filter((u) => u.fehlt <= FAST_GESCHLOSSEN)
+        .map((u) => ({
+          q: u.q,
+          r: u.r,
+          bereit: u.bereit,
+          titel: u.bereit
+            ? 'Umschlossen - hier kann eine Hauptstadt entstehen. Klicken.'
+            : `Fast umschlossen: ${u.strassen}/6 Strassen, ${u.staedte}/3 Staedte. Klicken.`,
+        })),
+    [umland],
   );
   const bereiteFelder = kronen.filter((k) => k.bereit);
   // Eine Bau- oder Befehlswahl schliesst die Tafel.
@@ -496,11 +493,10 @@ export function Game() {
         }),
       });
     }
-    if (!eigeneHauptstadt) {
-      const u = umland.find(
-        (x) => x.fehlt <= FAST_GESCHLOSSEN && hexVertices(x.q, x.r).some((v) => vertexKey(v) === ausbauOrt.key),
-      );
-      if (u) optionen.push(hauptstadtOption(u));
+    // Jedes fast geschlossene Feld an dieser Ecke - eine Stadt kann an mehreren Ringen liegen.
+    for (const u of umland) {
+      if (u.fehlt > FAST_GESCHLOSSEN || !hexVertices(u.q, u.r).some((v) => vertexKey(v) === ausbauOrt.key)) continue;
+      optionen.push(hauptstadtOption(u));
     }
     // An einer Ecke der eigenen Residenz: der Festungsring laesst sich auch von hier ausbauen.
     for (const [hk, h] of Object.entries(state.hauptstaedte ?? {})) {
@@ -509,7 +505,7 @@ export function Game() {
       if (hexVertices(q, r).some((v) => vertexKey(v) === ausbauOrt.key)) optionen.push(festungOption(q, r));
     }
     return { ort: ausbauOrt, titel: b.type === 'city' ? 'Stadt' : 'Dorf', optionen };
-  }, [ausbauOrt, you, isMine, phase.t, hand, state, umland, eigeneHauptstadt, act]);
+  }, [ausbauOrt, you, isMine, phase.t, hand, state, umland, act]);
 
   /** Was auf freien Bauplaetzen als Vorschau steht (Board). */
   const geisterBau: 'dorf' | 'stadt' | 'turm' | null =

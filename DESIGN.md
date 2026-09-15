@@ -325,15 +325,16 @@ anbieten oder brechen; ob Tribut mit der Groesse des Reichs steigen soll.
 
 - **Bedingung:** sechs eigene Strassen um ein Feld und drei eigene Staedte an
   seinen Ecken im Wechsel. Mehr als drei Gebaeude passen wegen der
-  Abstandsregel ohnehin nicht. Doerfer zaehlen vorerst nicht. Eine Hauptstadt
-  je Spieler, nicht auf Wasser (`rules/hauptstadt.ts`, Aktion `foundCapital`).
+  Abstandsregel ohnehin nicht. Doerfer zaehlen vorerst nicht. Beliebig viele
+  Hauptstaedte je Spieler - jedes geschlossene Feld darf eine werden -, eine je
+  Feld, nicht auf Wasser (`rules/hauptstadt.ts`, Aktion `foundCapital`).
 - **Werte, Platzhalter:** Kosten `COST_CAPITAL` (2 Holz, 2 Lehm, 2 Getreide,
   3 Erz), +2 Siegpunkte (`HAUPTSTADT_PUNKTE`). Die drei Staedte behalten Ertrag
   und Punkte - die Hauptstadt kommt obendrauf.
 - **Wie man davon erfaehrt:** eine Krone ueber dem Feld. Silbern, sobald
   hoechstens zwei Teile fehlen (Strassen oder Staedte, `FAST_GESCHLOSSEN`),
   golden und mit leuchtendem Feld, wenn der Ring geschlossen ist. Nur fuer den
-  eigenen Spieler, und nur solange er noch keine Hauptstadt hat. Der Knopf
+  eigenen Spieler, an jedem Feld, auf dem noch keine Hauptstadt steht. Der Knopf
   "Bauen" leuchtet dann, und in der Bauzeile steht "Hauptstadt".
 - **Ausbauen per Klick:** ein Klick auf ein eigenes Gebaeude oder eine Krone
   oeffnet eine kleine Tafel mit dem, was dort geht - Dorf zu Stadt, Wachturm,

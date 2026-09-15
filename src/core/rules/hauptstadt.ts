@@ -7,8 +7,9 @@
  * an ein Feld. Doerfer zaehlen vorerst nicht - erst drei Staedte schliessen den
  * Ring (DESIGN.md, Hauptstadt).
  *
- * Eine je Spieler. Die Ecken bleiben, was sie sind: Ertrag und Punkte der
- * Staedte aendern sich nicht, die Hauptstadt kommt obendrauf.
+ * Beliebig viele je Spieler - jedes geschlossene Feld darf eine werden. Die
+ * Ecken bleiben, was sie sind: Ertrag und Punkte der Staedte aendern sich
+ * nicht, die Hauptstadt kommt obendrauf.
  */
 
 import { edgeKey, hexEdges, hexKey, hexVertices, parseHexKey, parseVertexKey, vertexAdjacentHexes, vertexKey } from '../coords';
@@ -75,9 +76,6 @@ export function umlandVon(view: HauptstadtSicht, player: PlayerId, q: number, r:
   return beste;
 }
 
-export const hatHauptstadt = (view: HauptstadtSicht, player: PlayerId): boolean =>
-  Object.values(view.hauptstaedte ?? {}).some((h) => h.owner === player);
-
 /**
  * Alle Felder an eigenen Gebaeuden, sortiert nach dem, was fehlt. Wasser und
  * Felder, auf denen schon eine Hauptstadt steht, fallen weg.
@@ -102,7 +100,6 @@ export function hauptstadtFelder(view: HauptstadtSicht, player: PlayerId): Umlan
 
 /** Warum hier (noch) keine Hauptstadt entstehen kann - oder null. */
 export function hauptstadtHindernis(view: HauptstadtSicht, player: PlayerId, q: number, r: number): string | null {
-  if (hatHauptstadt(view, player)) return 'Du hast schon eine Hauptstadt.';
   if (view.hauptstaedte?.[hexKey(q, r)]) return 'Hier steht schon eine Hauptstadt.';
   if (terrainAt(view.worldSeed, q, r) === 'water') return 'Auf Wasser entsteht keine Hauptstadt.';
   const u = umlandVon(view, player, q, r);

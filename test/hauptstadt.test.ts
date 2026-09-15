@@ -1,6 +1,7 @@
 /**
  * Die Hauptstadt: sechs eigene Strassen und drei eigene Staedte ringsum
- * schliessen ein Feld, und darauf entsteht - einmal je Spieler - die Hauptstadt.
+ * schliessen ein Feld, und darauf entsteht eine Hauptstadt - so viele, wie man
+ * Felder schliesst.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -132,7 +133,7 @@ describe('Hauptstadt gruenden', () => {
     expect(applyAction(game, { t: 'foundCapital', q: h.q, r: h.r }, 'p0').ok).toBe(false);
   });
 
-  it('nur eine Hauptstadt je Spieler', () => {
+  it('beliebig viele Hauptstaedte je Spieler, aber nur eine je Feld', () => {
     const game = spiel();
     const a = landFeld(game, 0);
     const b = hexesInRange({ q: 0, r: 0 }, 12).find(
@@ -142,9 +143,14 @@ describe('Hauptstadt gruenden', () => {
     ring(game, b, ['city', 'city', 'city']);
     geben(game, 'p0');
     geben(game, 'p0');
+    geben(game, 'p0');
+    const vorher = publicPoints(game.state, 'p0');
     expect(applyAction(game, { t: 'foundCapital', q: a.q, r: a.r }, 'p0').ok).toBe(true);
-    expect(hauptstadtHindernis(game.state, 'p0', b.q, b.r)).toBe('Du hast schon eine Hauptstadt.');
-    expect(applyAction(game, { t: 'foundCapital', q: b.q, r: b.r }, 'p0').ok).toBe(false);
+    expect(hauptstadtHindernis(game.state, 'p0', b.q, b.r)).toBeNull();
+    expect(applyAction(game, { t: 'foundCapital', q: b.q, r: b.r }, 'p0').ok).toBe(true);
+    expect(publicPoints(game.state, 'p0')).toBe(vorher + 2 * HAUPTSTADT_PUNKTE);
+    expect(hauptstadtHindernis(game.state, 'p0', a.q, a.r)).toBe('Hier steht schon eine Hauptstadt.');
+    expect(applyAction(game, { t: 'foundCapital', q: a.q, r: a.r }, 'p0').ok).toBe(false);
   });
 });
 
