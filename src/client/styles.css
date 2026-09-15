@@ -765,9 +765,13 @@ em.off {
 }
 
 /* Heerleiste (ui/Heerleiste.tsx): je Schar oder Feld ein Kaertchen oben links. PLATZHALTER. */
+.main {
+  --heerleiste-oben: 52px;
+  --heerleiste-hoehe: 43px;
+}
 .heerleiste {
   position: absolute;
-  top: 52px;
+  top: var(--heerleiste-oben);
   left: 10px;
   right: 190px;
   z-index: 5;
@@ -775,9 +779,16 @@ em.off {
   gap: 5px;
   overflow-x: auto;
   scrollbar-width: none;
+  /* Der Streifen ist breiter als die Kaertchen - daneben soll die Karte greifbar bleiben. */
+  pointer-events: none;
+}
+/* Die Feldinfo sitzt sonst an derselben Stelle und laege unter der Leiste. */
+.main:has(.heerleiste) .feld-info {
+  top: calc(var(--heerleiste-oben) + var(--heerleiste-hoehe) + 6px);
 }
 .heer-karte,
 .heer-untaetig {
+  pointer-events: auto;
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
@@ -836,8 +847,10 @@ em.off {
   border-color: var(--accent);
 }
 @media (max-width: 700px) {
+  .main {
+    --heerleiste-oben: 96px;
+  }
   .heerleiste {
-    top: 96px;
     right: 10px;
   }
 }
