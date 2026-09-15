@@ -7,27 +7,15 @@
  * weit hinausbaut, will den Platz.
  *
  * Oben steht die Zeit, weil sie zum Spielstand gehoert und nicht zu den
- * Einstellungen. In der Mitte ist Raum fuer alles, was noch kommt:
- * Bevoelkerung, Beliebtheit, Technologien, Auftraege, Helden. Die Reiter
- * dafuer stehen schon, ihr Inhalt sagt ehrlich, dass er noch fehlt - ein
- * leerer Reiter ist besser als eine erfundene Zahl.
- *
- * Der Kartenreiter ist der erste, der wirklich etwas zeigt. Er muss es auch:
- * eine Karte wirkt dauerhaft und verschwindet nach der Wahl vom Bildschirm.
- * Ohne Ablage waere jeder Vorteil nach ein paar Runden vergessen - man haette
- * gewaehlt, ohne je nachsehen zu koennen, was man gewaehlt hat.
+ * Einstellungen. Darunter vier Reiter mit Symbol und Wort: Reich, Heer,
+ * Karten & Technologie, Optionen (mit dem Protokoll unten). Erklaerungen
+ * stehen nicht mehr als Absaetze da, sondern hinter einem "?" am Abschnitt -
+ * wer spielt, liest sie einmal, danach nehmen sie nur Platz.
  */
 
 import { useState } from 'react';
-import {
-  ROUNDS_PER_BIG_ROUND,
-  SEASON_NAME,
-  bigRoundOf,
-  roundOf,
-  roundsLeftInSeason,
-  seasonOf,
-  yearOf,
-} from '../../core/season';
+import type { ReactNode } from 'react';
+import { SEASON_NAME, bigRoundOf, ROUNDS_PER_BIG_ROUND, roundOf, seasonOf, yearOf } from '../../core/season';
 import { cardById } from '../../core/cards/catalog';
 import { modifiersOf } from '../../core/cards/effects';
 import { RARITY_ORDER } from '../../core/cards/types';
@@ -47,9 +35,9 @@ import { TRACKS, getMusicMode, getMusicVolume, setMusicMode, setMusicVolume } fr
 import type { MusicMode } from '../music';
 import { getUmgebungVolume, setUmgebungVolume } from '../ambiente';
 import { BRAND_WAS, auftragText, bundleText, resourceName } from '../log';
-import { einheitNamen } from '../heer';
+import { einheitNamen, gruppenName, heerGruppen, untaetig } from '../heer';
 
-type Reiter = 'reich' | 'karten' | 'technik' | 'auftraege' | 'ton';
+type Reiter = 'reich' | 'heer' | 'karten' | 'optionen';
 
 /** Eine bekannte Fraktion, fertig fuer die Anzeige. */
 export type FraktionsZeile = {
@@ -70,12 +58,46 @@ export type FraktionsZeile = {
   nimmtFrieden: boolean;
 };
 
-const REITER: ReadonlyArray<{ id: Reiter; kurz: string; titel: string }> = [
-  { id: 'reich', kurz: 'RE', titel: 'Reich' },
-  { id: 'karten', kurz: 'KA', titel: 'Karten' },
-  { id: 'technik', kurz: 'TE', titel: 'Technik' },
-  { id: 'auftraege', kurz: 'HE', titel: 'Heer & Auftraege' },
-  { id: 'ton', kurz: 'TO', titel: 'Ton' },
+/** Siegpunkte aufgeschluesselt (Game): Summe, Ziel (0 = endlos) und woher sie kommen. */
+export type PunkteSicht = { gesamt: number; ziel: number; zeilen: { text: string; wert: number | null }[] };
+
+/* Symbole der Reiter - kleine SVG-Flaechen. PLATZHALTER (ASSETS.md). */
+const SYMBOL: Record<Reiter, ReactNode> = {
+  reich: (
+    <svg viewBox="0 0 18 18" aria-hidden="true">
+      <path d="M3 15 V7 L9 3 L15 7 V15 Z" fill="none" stroke="currentColor" strokeWidth="2" />
+      <rect x="7" y="10" width="4" height="5" fill="currentColor" />
+    </svg>
+  ),
+  heer: (
+    <svg viewBox="0 0 18 18" aria-hidden="true">
+      <path d="M4 15 V6 Q9 0 14 6 V15 Z" fill="none" stroke="currentColor" strokeWidth="2" />
+      <rect x="6" y="7" width="6" height="2" fill="currentColor" />
+    </svg>
+  ),
+  karten: (
+    <svg viewBox="0 0 18 18" aria-hidden="true">
+      <rect x="3" y="4" width="8" height="11" fill="none" stroke="currentColor" strokeWidth="2" />
+      <rect x="8" y="2" width="8" height="11" fill="currentColor" opacity="0.6" />
+    </svg>
+  ),
+  optionen: (
+    <svg viewBox="0 0 18 18" aria-hidden="true">
+      <circle cx="9" cy="9" r="3" fill="none" stroke="currentColor" strokeWidth="2" />
+      <path
+        d="M9 1 V4 M9 14 V17 M1 9 H4 M14 9 H17 M3.5 3.5 L5.5 5.5 M12.5 12.5 L14.5 14.5 M3.5 14.5 L5.5 12.5 M12.5 5.5 L14.5 3.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+    </svg>
+  ),
+};
+
+const REITER: ReadonlyArray<{ id: Reiter; name: string }> = [
+  { id: 'reich', name: 'Reich' },
+  { id: 'heer', name: 'Heer' },
+  { id: 'karten', name: 'Karten & Technologie' },
+  { id: 'optionen', name: 'Optionen' },
 ];
 
 /** Gelaendenamen fuers Auge - der Kern kennt nur die englischen Kennungen. */
@@ -88,30 +110,23 @@ const GELAENDE: Partial<Record<Terrain, string>> = {
 };
 
 /**
- * Was die Karten zusammen bewirken, in Worten.
- *
- * Die einzelnen Kartentexte stehen darueber - hier interessiert die Summe,
- * denn zwei Karten auf dasselbe Gelaende addieren sich, und das sieht man
- * den Einzeltexten nicht an.
+ * Was die Karten zusammen bewirken, in Worten. Die einzelnen Karten stehen
+ * darueber - hier interessiert die Summe, denn zwei Karten auf dasselbe
+ * Gelaende addieren sich.
  */
 function wirkungen(cardIds: readonly string[]): string[] {
   const m = modifiersOf(cardIds);
   const zeilen: string[] = [];
   for (const [terrain, wert] of Object.entries(m.terrainBonus)) {
     if (!wert) continue;
-    const name = GELAENDE[terrain as Terrain] ?? terrain;
-    zeilen.push(`${name}: ${wert > 0 ? '+' : ''}${wert} je Ertrag`);
+    zeilen.push(`${GELAENDE[terrain as Terrain] ?? terrain} ${wert > 0 ? '+' : ''}${wert}`);
   }
-  if (m.tradeDiscount > 0) zeilen.push(`Bankhandel: ${m.tradeDiscount} guenstiger`);
-  if (m.handLimitBonus > 0) zeilen.push(`Handkarten: ${m.handLimitBonus} mehr erlaubt`);
+  if (m.tradeDiscount > 0) zeilen.push(`Bankhandel -${m.tradeDiscount}`);
+  if (m.handLimitBonus > 0) zeilen.push(`Hand +${m.handLimitBonus}`);
   return zeilen;
 }
 
-/**
- * Gleiche Karten als Stapel: eine Zeile je Karte mit ihrer Anzahl. Die
- * Reihenfolge, in der sie genommen wurden, sagt nichts - sortiert wird nach
- * Seltenheit, die seltensten oben, dann nach Namen.
- */
+/** Gleiche Karten als Stapel, die seltensten zuerst, dann nach Namen. */
 function kartenStapel(cardIds: readonly string[]) {
   const anzahl = new Map<string, number>();
   for (const id of cardIds) anzahl.set(id, (anzahl.get(id) ?? 0) + 1);
@@ -125,8 +140,7 @@ function kartenStapel(cardIds: readonly string[]) {
     );
 }
 
-
-/** Wer in einem Verband steht, kurz: "Held, 2 Ritter, 1 Bogenschuetze". */
+/** Wer in einer Gruppe steht, kurz: "Held, 2 Ritter, 1 Bogenschuetze". */
 function zusammensetzung(einheiten: readonly UnitState[]): string {
   const ritter = einheiten.filter((u) => u.kind === 'ritter').length;
   const bogen = einheiten.filter((u) => u.kind === 'bogen').length;
@@ -139,57 +153,76 @@ function zusammensetzung(einheiten: readonly UnitState[]): string {
     .join(', ');
 }
 
-/**
- * Die eigenen Einheiten je Feld. Mehrere auf einem Feld sind ein Verband: sie
- * lassen sich zusammen schicken und ziehen gemeinsam (rules/army.ts). Groessere
- * Verbaende zuerst, dann nach Nummer.
- */
-function nachFeld(einheiten: readonly UnitState[]) {
-  const m = new Map<string, { key: string; q: number; r: number; einheiten: UnitState[] }>();
-  for (const u of [...einheiten].sort((a, b) => a.id - b.id)) {
-    const key = `${u.q}:${u.r}`;
-    const g = m.get(key);
-    if (g) g.einheiten.push(u);
-    else m.set(key, { key, q: u.q, r: u.r, einheiten: [u] });
-  }
-  return [...m.values()].sort(
-    (a, b) => b.einheiten.length - a.einheiten.length || a.einheiten[0]!.id - b.einheiten[0]!.id,
-  );
-}
-
 /** Was eine Einheit gerade tut. */
 function statusVon(u: UnitState): { art: 'erkundet' | 'folgt' | 'zieht' | 'steht'; text: string } {
-  if (u.auftrag === 'erkunden') return { art: 'erkundet', text: 'erkundet von selbst' };
+  if (u.auftrag === 'erkunden') return { art: 'erkundet', text: 'erkundet' };
   if (u.folgt !== null) return { art: 'folgt', text: 'folgt dem Helden' };
   if (u.ziel) {
     const weit = hexDistance(u, u.ziel);
-    return { art: 'zieht', text: `zieht · noch ${weit} ${weit === 1 ? 'Feld' : 'Felder'}` };
+    return { art: 'zieht', text: `zieht, noch ${weit} ${weit === 1 ? 'Feld' : 'Felder'}` };
   }
   return { art: 'steht', text: 'steht' };
 }
 
-/** Alle Einheiten in einer Zeile: wie viele, wie viele Verbaende, was sie tun. */
-function einheitenSumme(einheiten: readonly UnitState[]): string {
-  const verbaende = nachFeld(einheiten).filter((g) => g.einheiten.length > 1).length;
-  const arten = [
-    ['zieht', 'zieht', 'ziehen'],
-    ['erkundet', 'erkundet', 'erkunden'],
-    ['folgt', 'folgt', 'folgen'],
-    ['steht', 'steht', 'stehen'],
-  ] as const;
-  const teile = [
-    verbaende > 0 ? `${verbaende} ${verbaende === 1 ? 'Verband' : 'Verbaende'}` : '',
-    ...arten.map(([art, eins, viele]) => {
-      const n = einheiten.filter((u) => statusVon(u).art === art).length;
-      return n > 0 ? `${n} ${n === 1 ? eins : viele}` : '';
-    }),
-  ].filter(Boolean);
-  return `${einheiten.length} ${einheiten.length === 1 ? 'Einheit' : 'Einheiten'} · ${teile.join(' · ')}`;
-}
+/** Protokoll-Filter: grob nach Worten, das Protokoll sind fertige Saetze (log.ts). */
+type LogFilter = 'alles' | 'kaempfe' | 'ertrag' | 'welt';
+const KAEMPFE = /kampf|bogenschuetzen|gefallen|lager|raubzug|pluender|hinterhalt|horde|fehde|ritter/i;
+const ERTRAG = /ertrag|wuerfelt|beute|monopol|handel|fund|karte/i;
 
 /** Was es noch nicht gibt, sagt das auch. */
 function NochNicht({ was }: { was: string }) {
   return <p className="menu-leer">{was} folgt noch.</p>;
+}
+
+/** Ein Abschnittskopf. hilfe: die Erklaerung hinter dem "?", ein Klick klappt sie auf. */
+function Kopf({ titel, hilfe, rechts, gefahr }: { titel: string; hilfe?: string; rechts?: ReactNode; gefahr?: boolean }) {
+  const [auf, setAuf] = useState(false);
+  return (
+    <>
+      <h3 className={gefahr ? 'menu-kopf gefahr' : 'menu-kopf'}>
+        <span>{titel}</span>
+        <span className="menu-kopf-rechts">
+          {rechts}
+          {hilfe && (
+            <button className={auf ? 'menu-hilfe aktiv' : 'menu-hilfe'} title={hilfe} aria-expanded={auf} onClick={() => setAuf((a) => !a)}>
+              ?
+            </button>
+          )}
+        </span>
+      </h3>
+      {auf && hilfe && <p className="menu-hilfe-text">{hilfe}</p>}
+    </>
+  );
+}
+
+/** Ein Schalter mit Beschriftung - an oder aus. */
+function Schalter({ an, onClick, children }: { an: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button className="menu-schalter" aria-pressed={an} onClick={onClick}>
+      <span>{children}</span>
+      <span className={an ? 'menu-kippe an' : 'menu-kippe'} />
+    </button>
+  );
+}
+
+/** Ein Lautstaerkeregler 0-100. */
+function Regler({ name, wert, setzen }: { name: string; wert: number; setzen: (v: number) => void }) {
+  return (
+    <label className="menu-regler">
+      <span>{name}</span>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        value={Math.round(wert * 100)}
+        onChange={(e) => {
+          initAudio();
+          setzen(Number(e.target.value) / 100);
+        }}
+      />
+      <b>{Math.round(wert * 100)}</b>
+    </label>
+  );
 }
 
 export function SideMenu({
@@ -200,13 +233,17 @@ export function SideMenu({
   einheiten,
   raumcode,
   pin,
+  punkte,
+  ertrag,
   lage,
   fraktionen,
   befehl,
+  zielAuswahl,
   beute,
   befehleMoeglich,
   beuteMoeglich,
   onBefehl,
+  onGruppeZiel,
   onHalt,
   onZeigen,
   onBeute,
@@ -234,8 +271,6 @@ export function SideMenu({
   onErkunden,
   stumm,
   onStumm,
-  verbandFeld,
-  onVerbandZiel,
   onZeigenAuftrag,
   kannLiefern,
   onLiefern,
@@ -252,12 +287,18 @@ export function SideMenu({
   /** Raumcode und Platz-PIN - fuer den Wiedereinstieg auf einem anderen Geraet. */
   raumcode: string;
   pin: string | null;
+  /** Siegpunkte aufgeschluesselt. */
+  punkte: PunkteSicht;
+  /** Rohstoffkarten je Wuerfelzahl aus eigenen Siedlungen. */
+  ertrag: Readonly<Record<number, number>>;
   /** Raubzuege unterwegs, wie nah der naechste den eigenen Siedlungen ist, Kaempfe in Sicht. */
   lage: { unterwegs: number; naechster: number | null; kaempfe: number };
   /** Bekannte Fraktionen, die naechsten zuerst. */
   fraktionen: readonly FraktionsZeile[];
-  /** Ritter, der gerade auf sein Ziel wartet. */
+  /** Die eine Einheit, die gerade auf ihr Ziel wartet. */
   befehl: number | null;
+  /** Alle Einheiten, die gerade auf ihr Ziel warten. */
+  zielAuswahl: readonly number[];
   /** Uneingeloeste Beute. */
   beute: number;
   /** Duerfen gerade Befehle gegeben werden (eigener Zug)? */
@@ -265,6 +306,8 @@ export function SideMenu({
   /** Darf gerade Beute eingeloest werden (eigene Bauphase)? */
   beuteMoeglich: boolean;
   onBefehl: (id: number) => void;
+  /** Eine ganze Gruppe auf ihr Ziel warten lassen. */
+  onGruppeZiel: (ids: number[]) => void;
   onHalt: (id: number) => void;
   onZeigen: (id: number) => void;
   onBeute: () => void;
@@ -304,9 +347,6 @@ export function SideMenu({
   stumm: boolean;
   /** Ton an oder aus - schaltet um. */
   onStumm: () => void;
-  /** Der Verband, der gerade auf sein Ziel wartet (Feldschluessel), oder null. */
-  verbandFeld: string | null;
-  onVerbandZiel: (q: number, r: number) => void;
   /** Auf der Karte zeigen, wohin ein Auftrag fuehrt. */
   onZeigenAuftrag: (a: WandererAuftrag) => void;
   kannLiefern: (a: WandererAuftrag) => boolean;
@@ -318,10 +358,13 @@ export function SideMenu({
     () => typeof window === 'undefined' || !window.matchMedia('(max-width: 700px)').matches,
   );
   const [reiter, setReiter] = useState<Reiter>('reich');
-  /** Welcher Ritter in der Liste aufgeklappt ist - hoechstens einer. */
+  /** Welche Einheit in der Liste aufgeklappt ist - hoechstens eine. */
   const [offenerRitter, setOffenerRitter] = useState<number | null>(null);
-  /** Welche Verbaende (Feldschluessel) aufgeklappt sind. */
-  const [offeneVerbaende, setOffeneVerbaende] = useState<ReadonlySet<string>>(() => new Set());
+  /** Welche Gruppen aufgeklappt sind. */
+  const [offeneGruppen, setOffeneGruppen] = useState<ReadonlySet<string>>(() => new Set());
+  /** Welche Karte ihren Text zeigt. */
+  const [karteOffen, setKarteOffen] = useState<string | null>(null);
+  const [logFilter, setLogFilter] = useState<LogFilter>('alles');
   const [ton, setTon] = useState(getVolume);
   const [musik, setMusik] = useState<MusicMode>(getMusicMode);
   const [musikPegel, setMusikPegel] = useState(getMusicVolume);
@@ -330,15 +373,16 @@ export function SideMenu({
   const saison = seasonOf(turn);
   // Raubzuege brechen zum Beginn jeder grossen Runde auf (rules/army.ts, sendRaiders).
   const bisPluenderung = ROUNDS_PER_BIG_ROUND - ((Math.max(1, turn) - 1) % ROUNDS_PER_BIG_ROUND);
-
   const namen = einheitNamen(einheiten);
-  const umschaltenVerband = (key: string) =>
-    setOffeneVerbaende((alt) => {
+
+  const umschaltenGruppe = (key: string) =>
+    setOffeneGruppen((alt) => {
       const neu = new Set(alt);
       if (neu.has(key)) neu.delete(key);
       else neu.add(key);
       return neu;
     });
+
   /** Eine Einheit als Zeile: Name, Leben, Status - ein Klick klappt ihre Befehle auf. */
   const einheitZeile = (u: UnitState) => {
     const status = statusVon(u);
@@ -364,11 +408,7 @@ export function SideMenu({
         {auf && (
           <div className="menu-ritter-knoepfe">
             <button onClick={() => onZeigen(u.id)}>Zeigen</button>
-            <button
-              disabled={!befehleMoeglich}
-              className={befehl === u.id ? 'aktiv' : ''}
-              onClick={() => onBefehl(u.id)}
-            >
+            <button disabled={!befehleMoeglich} className={befehl === u.id ? 'aktiv' : ''} onClick={() => onBefehl(u.id)}>
               {befehl === u.id ? 'Waehle Ziel' : 'Ziel'}
             </button>
             {u.ziel && (
@@ -402,15 +442,15 @@ export function SideMenu({
 
   if (!offen) {
     return (
-      <button
-        className="menu-auf"
-        title="Menue oeffnen"
-        onClick={() => setOffen(true)}
-      >
+      <button className="menu-auf" title="Menue oeffnen" onClick={() => setOffen(true)}>
         ‹
       </button>
     );
   }
+
+  const ertragMax = Math.max(1, ...Object.values(ertrag));
+  const gefilterterLog =
+    logFilter === 'kaempfe' ? log.filter((z) => KAEMPFE.test(z)) : logFilter === 'ertrag' ? log.filter((z) => ERTRAG.test(z)) : log;
 
   return (
     <aside className="menu">
@@ -429,10 +469,10 @@ export function SideMenu({
           <span> · </span>
           Gr. {bigRoundOf(turn)}
         </div>
-        <div className="menu-rest">noch {roundsLeftInSeason(turn)} bis zum Wechsel</div>
-        <div className="menu-rest">
-          {TAGESZEIT_NAME[zeitInfo.tageszeit]} noch {zeitInfo.bisTageszeit} · {WETTER_NAME[zeitInfo.wetter]} noch{' '}
+        <div className="menu-rest" title={zeitInfo.wirkung || undefined}>
+          {TAGESZEIT_NAME[zeitInfo.tageszeit]} noch {zeitInfo.bisTageszeit}, {WETTER_NAME[zeitInfo.wetter]} noch{' '}
           {zeitInfo.bisWetter}
+          {zeitInfo.wirkung && <span className="menu-rest-wirkung"> !</span>}
         </div>
       </div>
 
@@ -441,10 +481,11 @@ export function SideMenu({
           <button
             key={r.id}
             className={reiter === r.id ? 'menu-reiter-knopf aktiv' : 'menu-reiter-knopf'}
-            title={r.titel}
+            title={r.name}
             onClick={() => setReiter(r.id)}
           >
-            {r.kurz}
+            {SYMBOL[r.id]}
+            <span>{r.name}</span>
           </button>
         ))}
       </div>
@@ -452,74 +493,20 @@ export function SideMenu({
       <div className="menu-inhalt">
         {reiter === 'reich' && (
           <>
-            <h3>Reich</h3>
-            <NochNicht was="Bevoelkerung und Beliebtheit" />
-
-            {/* Wiedereinstieg auf einem anderen Geraet (protocol.ts, Platz-PIN). */}
-            <h3>Weiterspielen</h3>
-            <div className="menu-wache">
-              <span>Raumcode</span>
-              <b>{raumcode}</b>
-              <span>Deine PIN</span>
-              <b>{pin ?? '-'}</b>
-              <span className="menu-wache-hinweis">
-                Auf einem anderen Geraet: Raumcode eingeben, deinen Platz waehlen, PIN nennen. Hier im Browser steht
-                die Partie auf der Startseite unter "Deine Partien".
-              </span>
-            </div>
-
-            {/*
-              Die Lage draussen: wie viele Raubzuege unterwegs sind, wie nah der
-              naechste schon ist, und wann die naechsten aufbrechen - genau das
-              braucht man, um zu entscheiden, wohin die Ritter sollen.
-            */}
-            <h3>Lage</h3>
-            <div className="menu-wache">
-              <span>Raubzuege unterwegs</span>
-              <b className={lage.unterwegs > 0 ? 'gefahr' : undefined}>{lage.unterwegs}</b>
-              <span>Naechster bis zu dir</span>
-              <b className={lage.naechster !== null && lage.naechster <= 3 ? 'gefahr' : undefined}>
-                {lage.naechster === null ? '-' : `${lage.naechster} Felder`}
-              </b>
-              <span>Deine Einheiten</span>
-              <b>{einheiten.length}</b>
-              <span>Kaempfe in Sicht</span>
-              <b className={lage.kaempfe > 0 ? 'gefahr' : undefined}>{lage.kaempfe}</b>
-              <span>Naechster Aufbruch</span>
-              <b>{bisPluenderung === 1 ? 'naechste Runde' : `in ${bisPluenderung} Runden`}</b>
-              <span>Wetter</span>
-              <b className={zeitInfo.wirkung ? 'gefahr' : undefined}>{WETTER_NAME[zeitInfo.wetter]}</b>
-              {zeitInfo.wirkung && <span className="menu-wache-hinweis">{zeitInfo.wirkung}.</span>}
-              <span className="menu-wache-hinweis">
-                {lage.unterwegs === 0
-                  ? 'Ruhig. Zum Beginn jeder grossen Runde brechen Raubzuege aus nahen Lagern auf.'
-                  : 'Raeuber pluendern erst an einer Siedlung und tragen die Beute heim. Ein Ritter in ihrem Weg stellt sie - und holt die Beute zurueck.'}
-              </span>
-            </div>
-
-            {/*
-              Feuer: was brennt, und womit es sich loeschen laesst. Ein Zug
-              bleibt dafuer - danach brennt es ab (rules/feuer.ts).
-            */}
+            {/* Feuer zuerst: wer brennt, hat nur diesen Zug zum Loeschen (rules/feuer.ts). */}
             {braende.length > 0 && (
               <>
-                <h3 className="gefahr">Es brennt</h3>
+                <Kopf titel="Es brennt" gefahr hilfe="Loeschen kostet eine Karte vom groessten Stapel. Auch ein Ritter, Bogenschuetze oder dein Held daneben loescht, und Regen tut es von selbst. Sonst brennt es nach deinem Zug ab." />
                 <ul className="menu-braende">
                   {braende.map((b) => (
                     <li key={b.key}>
-                      <span>
-                        Es brennt {BRAND_WAS[b.art]} - loeschen, sonst brennt es nach deinem Zug ab.
-                      </span>
+                      <span>Es brennt {BRAND_WAS[b.art]}</span>
                       <div className="menu-ritter-knoepfe">
                         <button onClick={() => onZeigenFeld(b.q, b.r)}>Zeigen</button>
                         <button
                           className="aktiv"
                           disabled={!loeschenMoeglich || loeschKarte === null}
-                          title={
-                            loeschKarte
-                              ? `Loeschen kostet eine Karte: ${resourceName(loeschKarte)}`
-                              : 'Dafuer fehlt dir eine Karte'
-                          }
+                          title={loeschKarte ? `Loeschen kostet eine Karte: ${resourceName(loeschKarte)}` : 'Dafuer fehlt dir eine Karte'}
                           onClick={() => onLoeschen(b.key)}
                         >
                           Loeschen{loeschKarte ? ` (1 ${resourceName(loeschKarte)})` : ''}
@@ -528,41 +515,196 @@ export function SideMenu({
                     </li>
                   ))}
                 </ul>
-                <p className="menu-leer">Auch ein Ritter oder dein Held daneben loescht, und Regen tut es von selbst.</p>
               </>
             )}
 
+            <Kopf
+              titel="Siegpunkte"
+              hilfe={
+                punkte.ziel > 0
+                  ? `Wer zuerst ${punkte.ziel} Punkte hat, gewinnt. Dorf 1, Stadt 2, Hauptstadt 2 und je Ausbaustufe 1 mehr, Siegpunktkarten 1, Groesste Rittermacht 2.`
+                  : 'Endlosspiel: kein Siegpunktziel. Dorf 1, Stadt 2, Hauptstadt 2 und je Ausbaustufe 1 mehr, Siegpunktkarten 1, Groesste Rittermacht 2.'
+              }
+            />
+            <div className="menu-box">
+              <div className="menu-punkte">
+                <span className="menu-punkte-zahl">★ {punkte.gesamt}</span>
+                <span className="menu-punkte-ziel">{punkte.ziel > 0 ? `von ${punkte.ziel}` : 'endlos'}</span>
+              </div>
+              {punkte.ziel > 0 && (
+                <div className="menu-balken">
+                  <i style={{ width: `${Math.min(100, Math.round((punkte.gesamt / punkte.ziel) * 100))}%` }} />
+                </div>
+              )}
+              <div className="menu-zeilen">
+                {punkte.zeilen.map((z) => (
+                  <span key={z.text} className={z.wert === null ? 'grau' : undefined}>
+                    <span>{z.text}</span>
+                    <b>{z.wert ?? '-'}</b>
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <Kopf
+              titel="Ertrag je Zahl"
+              hilfe="Wie viele Rohstoffkarten dir jede Wuerfelzahl bringt: je Dorf 1, je Stadt 2 fuer jedes angrenzende Feld mit dieser Zahl. Karten und Wetter sind nicht eingerechnet."
+            />
+            <div className="menu-box">
+              <div className="menu-ertrag">
+                {[2, 3, 4, 5, 6, 8, 9, 10, 11, 12].map((z) => {
+                  const n = ertrag[z] ?? 0;
+                  return (
+                    <div key={z} title={`${z}: ${n} ${n === 1 ? 'Karte' : 'Karten'} je Wurf`}>
+                      <i className={z === 6 || z === 8 ? 'rot' : undefined} style={{ height: `${Math.round((n / ertragMax) * 40)}px` }} />
+                      <span>{z}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <Kopf
+              titel="Lage"
+              hilfe={
+                lage.unterwegs === 0
+                  ? 'Ruhig. Zum Beginn jeder grossen Runde brechen Raubzuege aus nahen Lagern auf.'
+                  : 'Raeuber pluendern erst an einer Siedlung und tragen die Beute heim. Ein Ritter in ihrem Weg stellt sie - und holt die Beute zurueck.'
+              }
+            />
+            <div className="menu-lage">
+              <div className={lage.unterwegs > 0 ? 'gefahr' : undefined} title="Raubzuege unterwegs">
+                <b>{lage.unterwegs}</b> Raubzuege
+              </div>
+              <div
+                className={lage.naechster !== null && lage.naechster <= 3 ? 'gefahr' : undefined}
+                title="So nah ist der naechste deinen Siedlungen"
+              >
+                <b>{lage.naechster ?? '-'}</b> Felder weg
+              </div>
+              <div className={lage.kaempfe > 0 ? 'gefahr' : undefined} title="Kaempfe in Sicht">
+                <b>{lage.kaempfe}</b> Kaempfe
+              </div>
+              <div title="Wann die naechsten Raubzuege aufbrechen">
+                <b>{bisPluenderung}</b> Rd. Aufbruch
+              </div>
+            </div>
+
+            <Kopf
+              titel="Weiterspielen"
+              hilfe='Auf einem anderen Geraet: Raumcode eingeben, deinen Platz waehlen, PIN nennen. Hier im Browser steht die Partie auf der Startseite unter "Deine Partien".'
+            />
+            <div className="menu-box menu-weiter">
+              <span>
+                Raum <b>{raumcode}</b>
+              </span>
+              <span>
+                PIN <b>{pin ?? '-'}</b>
+              </span>
+            </div>
+
+            <Kopf titel="Bevoelkerung" />
+            <NochNicht was="Bevoelkerung und Beliebtheit" />
+          </>
+        )}
+
+        {reiter === 'heer' && (
+          <>
             {/*
-              Die Fraktionen: wem die Lager ringsum gehoeren. Mit jeder laesst sich
-              verhandeln - Frieden (nur Raeuber) oder Tribut. Solange ein Abkommen
-              gilt, ziehen ihre Raubzuege an dir vorbei (rules/diplomatie.ts).
+              Die eigenen Einheiten nach Scharen und Feldern (client/heer.ts) -
+              dieselben Gruppen wie in der Heerleiste auf der Karte.
             */}
-            <h3>Fraktionen</h3>
+            <Kopf
+              titel="Einheiten"
+              rechts={
+                einheiten.length > 0 ? (
+                  <span className="menu-kopf-zahl">
+                    {einheiten.length}
+                    {einheiten.some(untaetig) ? ` · ${einheiten.filter(untaetig).length} untaetig` : ''}
+                  </span>
+                ) : undefined
+              }
+              hilfe="Ritter und Bogenschuetzen wirbst du in der Leiste unten an. Bogenschuetzen schiessen auf Feinde nebenan, neben einem Wachturm oder auf der Hauptstadt zwei Felder weit, und sind im Nahkampf schwach. Der Held zieht zwei Felder, geraet nie in einen Hinterhalt, und Ritter bei ihm treffen leichter. Wer zusammen geschickt wird, bildet eine Schar mit Banner."
+            />
+            {einheiten.length === 0 ? (
+              <p className="menu-leer">Noch keine.</p>
+            ) : (
+              <ul className="menu-ritter">
+                {heerGruppen(einheiten).map((g) => {
+                  if (g.einheiten.length === 1) return einheitZeile(g.einheiten[0]!);
+                  const ids = g.einheiten.map((u) => u.id);
+                  const wartet = ids.length === zielAuswahl.length && ids.every((id) => zielAuswahl.includes(id));
+                  const auf = offeneGruppen.has(g.key) || wartet;
+                  const status = statusVon(g.einheiten.find((u) => u.ziel) ?? g.einheiten[0]!);
+                  const leben = g.einheiten.reduce((n, u) => n + u.leben, 0);
+                  const max = g.einheiten.reduce((n, u) => n + WERTE[u.kind].leben, 0);
+                  return (
+                    <li
+                      key={g.key}
+                      className={['menu-verband', g.schar !== null ? 'schar' : '', auf ? 'offen' : '', wartet ? 'aktiv' : '']
+                        .filter(Boolean)
+                        .join(' ')}
+                    >
+                      <button className="menu-ritter-zeile" aria-expanded={auf} onClick={() => umschaltenGruppe(g.key)}>
+                        <span className="menu-ritter-name">
+                          {g.schar !== null ? `⚑${g.schar} ` : ''}
+                          {gruppenName(g)} · {g.einheiten.length}
+                        </span>
+                        <span className="menu-gruppe-leben" title={`Leben ${leben} von ${max}`}>
+                          <i style={{ width: `${Math.round((leben / max) * 100)}%` }} />
+                        </span>
+                        <span className="menu-ritter-pfeil">{auf ? '▾' : '▸'}</span>
+                        <span className={`menu-ritter-status ${status.art}`}>
+                          {zusammensetzung(g.einheiten)} · {status.text}
+                        </span>
+                      </button>
+                      {auf && (
+                        <>
+                          <div className="menu-ritter-knoepfe">
+                            <button onClick={() => onZeigenFeld(g.q, g.r)}>Zeigen</button>
+                            <button disabled={!befehleMoeglich} className={wartet ? 'aktiv' : ''} onClick={() => onGruppeZiel(ids)}>
+                              {wartet ? 'Waehle Ziel' : 'Ziel fuer alle'}
+                            </button>
+                          </div>
+                          <ul className="menu-ritter menu-verband-glieder">{g.einheiten.map(einheitZeile)}</ul>
+                        </>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {!held && (
+              <p className="menu-leer">
+                {heldZurueck !== null ? `Held gefallen - er kehrt in Runde ${heldZurueck} zurueck.` : 'Der Held tritt nach dem Aufbau an.'}
+              </p>
+            )}
+
+            {/* Fraktionen: wem die Lager ringsum gehoeren, und das Abkommen mit ihnen (rules/diplomatie.ts). */}
+            <Kopf
+              titel="Fraktionen"
+              hilfe={`Frieden (nur Raeuberbanden) haelt 20 Runden und kostet ${bundleText(FRIEDEN_PREIS)}. Tribut: ${TRIBUT_KARTEN} Karte sofort und zu Beginn jeder grossen Runde - wer nicht zahlen kann, hat wieder Krieg. Solange ein Abkommen gilt, ziehen ihre Raubzuege an dir vorbei.`}
+            />
             {fraktionen.length === 0 ? (
               <p className="menu-leer">Noch keine entdeckt.</p>
             ) : (
-              <ul className="menu-fraktionen">
+              <ul className="menu-frak">
                 {fraktionen.map((f) => (
                   <li key={f.id}>
-                    <span className="menu-fraktion-farbe" style={{ background: f.farbe }} />
-                    <span className="menu-fraktion-name">{f.name}</span>
-                    <span
-                      className={
-                        f.abkommen ? 'menu-fraktion-haltung friedlich' : 'menu-fraktion-haltung'
-                      }
-                    >
-                      {f.abkommen === null
-                        ? 'Krieg'
-                        : f.abkommen.art === 'tribut'
-                          ? 'Tribut'
-                          : `Frieden bis R${f.abkommen.bis}`}
+                    <span className="menu-frak-kopf">
+                      <i style={{ background: f.farbe }} />
+                      <span className="menu-frak-name">
+                        {f.name}
+                        <span className="menu-frak-info">
+                          {' '}
+                          · {f.lager} Lager{f.unterwegs > 0 ? ` · ${f.unterwegs} unterwegs` : ''}
+                        </span>
+                      </span>
+                      <span className={f.abkommen ? 'menu-chip frieden' : 'menu-chip krieg'}>
+                        {f.abkommen === null ? 'Krieg' : f.abkommen.art === 'tribut' ? 'Tribut' : `Frieden R${f.abkommen.bis}`}
+                      </span>
                     </span>
-                    <span className="menu-fraktion-info">
-                      {f.art === 'goblin' ? 'Goblins' : 'Raeuber'} · {f.lager} Lager
-                      {f.unterwegs > 0 ? ` · ${f.unterwegs} unterwegs` : ''}
-                      {f.naechster !== null ? ` · ${f.naechster} Felder` : ''}
-                    </span>
-                    <span className="menu-fraktion-knoepfe">
+                    <span className="menu-ritter-knoepfe">
                       {f.abkommen === null ? (
                         <>
                           {f.nimmtFrieden && (
@@ -574,11 +716,7 @@ export function SideMenu({
                               Frieden
                             </button>
                           )}
-                          <button
-                            disabled={!diplomatieMoeglich || !tributBezahlbar}
-                            title={`Tribut: ${TRIBUT_KARTEN} Karte sofort und zu Beginn jeder grossen Runde, vom groessten Stapel. Wer nicht zahlen kann, hat wieder Krieg.`}
-                            onClick={() => onDiplomatie(f.id, 'tribut')}
-                          >
+                          <button disabled={!diplomatieMoeglich || !tributBezahlbar} onClick={() => onDiplomatie(f.id, 'tribut')}>
                             Tribut
                           </button>
                         </>
@@ -593,166 +731,10 @@ export function SideMenu({
               </ul>
             )}
 
-            {/*
-              Das Protokoll stand frueher links neben dem Brett und ist beim
-              Umbau auf die Karte gewichen. Vermisst wurde es trotzdem. Hier
-              nimmt es der Karte keinen Platz weg.
-            */}
-            <h3>Protokoll</h3>
-            <div className="menu-log">
-              <LogPanel log={log} />
-            </div>
-
-            {/* Unten, und neueste zuerst: man sucht das Letzte, was geschah. */}
-            <h3 className="menu-welt-kopf">Weltereignisse</h3>
-            {welt.length === 0 ? (
-              <p className="menu-leer">Noch ruhig. Hier landen Pluenderungen und Zeitenwechsel.</p>
-            ) : (
-              <ul className="menu-welt">
-                {[...welt].reverse().map((w) => (
-                  <li key={w.id} className={`welt-${w.art}`}>
-                    <span className="menu-welt-runde">R{w.runde}</span>
-                    {w.text}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </>
-        )}
-
-        {reiter === 'karten' && (
-          <>
-            <h3>Karten{cards.length > 0 ? ` (${cards.length})` : ''}</h3>
-            {cards.length === 0 ? (
-              <p className="menu-leer">
-                Noch keine. Bei einer Sieben findest du welche.
-              </p>
-            ) : (
-              <>
-                <ul className="menu-karten">
-                  {kartenStapel(cards).map(({ karte, anzahl }) => (
-                    <li key={karte.id} className={`menu-karte selt-${karte.rarity}`}>
-                      <KartenBild karte={karte} klein />
-                      <span className="menu-karte-kopf">
-                        <span className="menu-karte-name">{karte.name}</span>
-                        {anzahl > 1 && <span className="menu-karte-anzahl">×{anzahl}</span>}
-                      </span>
-                      <span className="menu-karte-text">{karte.text}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                {wirkungen(cards).length > 0 && (
-                  <>
-                    <h3>Zusammen</h3>
-                    <ul className="menu-wirkung">
-                      {wirkungen(cards).map((z) => (
-                        <li key={z}>{z}</li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-              </>
-            )}
-          </>
-        )}
-
-        {reiter === 'technik' && (
-          <>
-            <h3>Technik</h3>
-            <NochNicht was="Der Technologiebaum" />
-          </>
-        )}
-
-        {reiter === 'auftraege' && (
-          <>
-            {/*
-              Die eigenen Einheiten je Feld. Mehrere auf einem Feld sind ein
-              Verband: eine Zeile fuer alle, aufgeklappt stehen die Einheiten
-              darin, jede mit ihren eigenen Befehlen. Ein Ziel fuer eine einzelne
-              Einheit loest sie aus dem Verband (rules/army.ts).
-            */}
-            <h3>Einheiten</h3>
-            {einheiten.length === 0 ? (
-              <p className="menu-leer">
-                Noch keine. Ritter und Bogenschuetzen wirbst du in der Leiste unten an, der Held tritt nach dem
-                Aufbau an.
-              </p>
-            ) : (
-              <>
-                <p className="menu-ritter-summe">{einheitenSumme(einheiten)}</p>
-                <ul className="menu-ritter">
-                  {nachFeld(einheiten).map((g) => {
-                    if (g.einheiten.length === 1) return einheitZeile(g.einheiten[0]!);
-                    const auf =
-                      offeneVerbaende.has(g.key) || verbandFeld === g.key || g.einheiten.some((u) => u.id === befehl);
-                    const status = statusVon(g.einheiten.find((u) => u.ziel) ?? g.einheiten[0]!);
-                    return (
-                      <li
-                        key={g.key}
-                        className={['menu-verband', auf ? 'offen' : '', verbandFeld === g.key ? 'aktiv' : '']
-                          .filter(Boolean)
-                          .join(' ')}
-                      >
-                        <button className="menu-ritter-zeile" aria-expanded={auf} onClick={() => umschaltenVerband(g.key)}>
-                          <span className="menu-ritter-name">Verband · {g.einheiten.length}</span>
-                          <span className="menu-ritter-pfeil">{auf ? '▾' : '▸'}</span>
-                          {/* Wer drin ist, in der zweiten Zeile - oben neben dem Namen war zu wenig Platz. */}
-                          <span className={`menu-ritter-status ${status.art}`}>
-                            {zusammensetzung(g.einheiten)} · {status.text}
-                          </span>
-                        </button>
-                        {auf && (
-                          <>
-                            <div className="menu-ritter-knoepfe">
-                              <button onClick={() => onZeigenFeld(g.q, g.r)}>Zeigen</button>
-                              <button
-                                disabled={!befehleMoeglich}
-                                className={verbandFeld === g.key ? 'aktiv' : ''}
-                                onClick={() => onVerbandZiel(g.q, g.r)}
-                              >
-                                {verbandFeld === g.key ? 'Waehle Ziel' : 'Ziel fuer alle'}
-                              </button>
-                            </div>
-                            <ul className="menu-ritter menu-verband-glieder">{g.einheiten.map(einheitZeile)}</ul>
-                          </>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </>
-            )}
-            <p className="menu-leer">
-              Bogenschuetzen schiessen jede Runde auf Feinde nebenan und stuermen nicht vor. Neben einem eigenen
-              Wachturm oder auf der eigenen Hauptstadt reichen sie zwei Felder weit. Im Nahkampf sind sie schwach.
-            </p>
-
-            {/*
-              Der Held: eine Figur, die schneller zieht, Ruinen ohne Hinterhalt
-              erkundet und Ritter anfuehrt (rules/army.ts). Seine Befehle stehen
-              oben bei den Einheiten.
-            */}
-            <h3>Held</h3>
-            <p className="menu-leer">
-              {held
-                ? `Leben ${held.leben}/${WERTE.held.leben} · ${statusVon(held).text}. `
-                : heldZurueck !== null
-                  ? `Gefallen - er kehrt in Runde ${heldZurueck} zurueck. `
-                  : 'Er tritt nach dem Aufbau an. '}
-              Zieht zwei Felder je Runde, geraet in Ruinen nie in einen Hinterhalt. Ritter bei ihm treffen leichter,
-              Ritter im Gefolge ziehen so schnell wie er. Nachts traegt er das hellste Licht.
-            </p>
-
-            {/*
-              Auftraege der Wanderer: annehmen, zeigen, liefern, und was sie
-              einbringen (rules/auftraege.ts).
-            */}
-            <h3>Auftraege</h3>
+            {/* Auftraege der Wanderer (rules/auftraege.ts). */}
+            <Kopf titel="Auftraege" hilfe="Wanderer bieten Auftraege an, wenn sie an deinen Siedlungen vorbeikommen. Lohn: eine Kartenwahl." />
             {auftraege.length === 0 ? (
-              <p className="menu-leer">
-                Wanderer bieten Auftraege an, wenn sie an deinen Siedlungen vorbeikommen.
-              </p>
+              <p className="menu-leer">Keine.</p>
             ) : (
               <ul className="menu-ritter menu-auftraege">
                 {auftraege.map((a) => (
@@ -763,8 +745,7 @@ export function SideMenu({
                         {a.art === 'jagd' && a.status === 'angenommen' ? ` (${a.fortschritt}/${a.menge})` : ''}
                       </span>
                       <span className="menu-ritter-ort">
-                        {a.status === 'angebot' ? 'Angebot' : 'angenommen'} · noch {Math.max(0, a.bis - turn + 1)}{' '}
-                        Runden · Lohn: eine Kartenwahl
+                        {a.status === 'angebot' ? 'Angebot' : 'angenommen'} · noch {Math.max(0, a.bis - turn + 1)} Rd.
                       </span>
                     </div>
                     <div className="menu-ritter-knoepfe">
@@ -793,9 +774,9 @@ export function SideMenu({
               </ul>
             )}
 
-            <h3>Beute</h3>
+            <Kopf titel="Beute" hilfe="Zerstoerte Lager und erkundete Ruinen bringen Beute: je eine Kartenwahl." />
             {beute === 0 ? (
-              <p className="menu-leer">Zerstoerte Lager und erkundete Ruinen bringen Beute.</p>
+              <p className="menu-leer">Keine.</p>
             ) : (
               <div className="menu-liste">
                 <button className="aktiv" disabled={!beuteMoeglich} onClick={onBeute}>
@@ -803,125 +784,169 @@ export function SideMenu({
                 </button>
               </div>
             )}
-
           </>
         )}
 
-        {reiter === 'ton' && (
+        {reiter === 'karten' && (
           <>
-            <h3>Ton</h3>
-            <div className="menu-liste">
-              <button
-                className={stumm ? 'aktiv' : ''}
-                onClick={onStumm}
-              >
-                {stumm ? 'Ton ist aus - einschalten' : 'Ton ausschalten'}
-              </button>
+            <Kopf
+              titel={`Karten${cards.length > 0 ? ` · ${cards.length}` : ''}`}
+              hilfe="Karten wirken dauerhaft. Bei einer Sieben, aus Beute und aus Auftraegen waehlst du eine von drei. Tippe eine Karte an, um ihren Text zu lesen."
+            />
+            {cards.length === 0 ? (
+              <p className="menu-leer">Noch keine.</p>
+            ) : (
+              <>
+                <ul className="menu-kartenraster">
+                  {kartenStapel(cards).map(({ karte, anzahl }) => (
+                    <li key={karte.id}>
+                      <button
+                        className={[`menu-karte-kachel selt-${karte.rarity}`, karteOffen === karte.id ? 'aktiv' : '']
+                          .filter(Boolean)
+                          .join(' ')}
+                        title={karte.text}
+                        onClick={() => setKarteOffen((k) => (k === karte.id ? null : karte.id))}
+                      >
+                        <KartenBild karte={karte} klein />
+                        <span className="menu-karte-kachel-name">{karte.name}</span>
+                        {anzahl > 1 && <span className="menu-karte-anzahl">×{anzahl}</span>}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                {karteOffen &&
+                  (() => {
+                    const k = cardById(karteOffen);
+                    return k ? (
+                      <p className="menu-karte-detail">
+                        <b>{k.name}</b> {k.text}
+                      </p>
+                    ) : null;
+                  })()}
+                {wirkungen(cards).length > 0 && (
+                  <>
+                    <Kopf titel="Zusammen" />
+                    <div className="menu-chips">
+                      {wirkungen(cards).map((z) => (
+                        <span key={z}>{z}</span>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+
+            <Kopf titel="Technologie" />
+            <NochNicht was="Der Technologiebaum" />
+          </>
+        )}
+
+        {reiter === 'optionen' && (
+          <>
+            <Kopf titel="Spiel" />
+            <div className="menu-box">
+              <Schalter an={autoWurf} onClick={onToggleAutoWurf}>
+                Selbstwurf nach <b className="menu-sek">{autoWurfSekunden} s</b>
+              </Schalter>
+              <Schalter an={showNumbers} onClick={onToggleNumbers}>
+                Zahlen immer zeigen
+              </Schalter>
             </div>
-            <p className="menu-leer">
-              Schaltet alles zusammen ab: Umgebung, Musik und Klaenge. Der Knopf steht auch oben neben dem Wetter.
-            </p>
-            <label className="menu-zeile">
-              Umgebung
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={Math.round(umgebung * 100)}
-                onChange={(e) => {
-                  initAudio();
-                  const v = Number(e.target.value) / 100;
-                  setUmgebungVolume(v);
-                  setUmgebung(v);
-                }}
-              />
-            </label>
-            <label className="menu-zeile">
-              Musik
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={Math.round(musikPegel * 100)}
-                onChange={(e) => {
-                  initAudio();
-                  const v = Number(e.target.value) / 100;
-                  setMusicVolume(v);
-                  setMusikPegel(v);
-                }}
-              />
-            </label>
-            <label className="menu-zeile">
-              Klaenge
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={Math.round(ton * 100)}
-                onChange={(e) => {
-                  initAudio();
-                  const v = Number(e.target.value) / 100;
+
+            <Kopf titel="Ton" hilfe="Der Tonknopf oben neben dem Wetter schaltet alles zusammen ab." />
+            <div className="menu-box">
+              <Schalter an={!stumm} onClick={onStumm}>
+                Ton
+              </Schalter>
+              <Regler
+                name="Klaenge"
+                wert={ton}
+                setzen={(v) => {
                   setVolume(v);
                   setTon(v);
                 }}
               />
-            </label>
+              <Regler
+                name="Musik"
+                wert={musikPegel}
+                setzen={(v) => {
+                  setMusicVolume(v);
+                  setMusikPegel(v);
+                }}
+              />
+              <Regler
+                name="Umgebung"
+                wert={umgebung}
+                setzen={(v) => {
+                  setUmgebungVolume(v);
+                  setUmgebung(v);
+                }}
+              />
+              <div className="menu-segment">
+                {[
+                  { id: 'aus' as MusicMode, name: 'Aus' },
+                  { id: 'erzeugt' as MusicMode, name: 'Erzeugt' },
+                  ...TRACKS.map((t) => ({ id: t.id as MusicMode, name: t.name })),
+                ].map((m) => (
+                  <button
+                    key={m.id}
+                    className={musik === m.id ? 'aktiv' : ''}
+                    onClick={() => {
+                      if (m.id !== 'aus') initAudio();
+                      setMusicMode(m.id);
+                      setMusik(m.id);
+                    }}
+                  >
+                    {m.name}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-            <h3>Musik</h3>
-            <div className="menu-liste">
-              <button
-                className={musik === 'aus' ? 'aktiv' : ''}
-                onClick={() => {
-                  setMusicMode('aus');
-                  setMusik('aus');
-                }}
-              >
-                aus
-              </button>
-              <button
-                className={musik === 'erzeugt' ? 'aktiv' : ''}
-                onClick={() => {
-                  initAudio();
-                  setMusicMode('erzeugt');
-                  setMusik('erzeugt');
-                }}
-              >
-                erzeugt
-              </button>
-              {TRACKS.map((t) => (
-                <button
-                  key={t.id}
-                  className={musik === t.id ? 'aktiv' : ''}
-                  onClick={() => {
-                    initAudio();
-                    setMusicMode(t.id);
-                    setMusik(t.id);
-                  }}
-                >
-                  {t.name}
+            <Kopf titel="Partie" />
+            <div className="menu-box menu-weiter">
+              <span>
+                Raum <b>{raumcode}</b>
+              </span>
+              <span>
+                Ziel <b>{punkte.ziel > 0 ? punkte.ziel : 'endlos'}</b>
+              </span>
+            </div>
+
+            {/* Protokoll und Weltereignisse in einem, mit Filter. */}
+            <Kopf titel="Protokoll" hilfe="Das Protokoll wird nur im Browser gefuehrt und beginnt nach einem Neuladen von vorn." />
+            <div className="menu-filter">
+              {(
+                [
+                  ['alles', 'Alles'],
+                  ['kaempfe', 'Kaempfe'],
+                  ['ertrag', 'Ertrag'],
+                  ['welt', 'Welt'],
+                ] as const
+              ).map(([id, name]) => (
+                <button key={id} className={logFilter === id ? 'aktiv' : ''} onClick={() => setLogFilter(id)}>
+                  {name}
                 </button>
               ))}
             </div>
-            {TRACKS.length === 0 && (
-              <p className="menu-leer">
-                Noch keine Stuecke eingebaut. Dateien nach src/assets/music legen -
-                das README dort nennt die Lizenzbedingungen.
-              </p>
+            {logFilter === 'welt' ? (
+              welt.length === 0 ? (
+                <p className="menu-leer">Noch ruhig.</p>
+              ) : (
+                <ul className="menu-welt">
+                  {[...welt].reverse().map((w) => (
+                    <li key={w.id} className={`welt-${w.art}`}>
+                      <span className="menu-welt-runde">R{w.runde}</span>
+                      {w.text}
+                    </li>
+                  ))}
+                </ul>
+              )
+            ) : (
+              <div className="menu-log">
+                <LogPanel log={gefilterterLog} />
+              </div>
             )}
-
-            <h3>Anzeige</h3>
-            <div className="menu-liste">
-              <button className={showNumbers ? 'aktiv' : ''} onClick={onToggleNumbers}>
-                Zahlen dauerhaft
-              </button>
-            </div>
-
-            <h3>Spiel</h3>
-            <div className="menu-liste">
-              <button className={autoWurf ? 'aktiv' : ''} onClick={onToggleAutoWurf}>
-                Nach {autoWurfSekunden} s selbst wuerfeln
-              </button>
-            </div>
           </>
         )}
       </div>

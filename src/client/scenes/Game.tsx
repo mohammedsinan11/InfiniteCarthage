@@ -53,6 +53,7 @@ import { brennt } from '../../core/rules/feuer';
 import { WERTE as EINHEIT_WERTE } from '../../core/units';
 import { kampfFelder as kampfFelderVon } from '../../core/combat';
 import type { UnitState as HeerEinheit } from '../../core/state';
+import { HAUPTSTADT_PUNKTE as PUNKTE_HAUPTSTADT, STUFE_PUNKTE as PUNKTE_STUFE } from '../../core/state';
 import { einheitNamen, gruppenStatus, heerGruppen, untaetig } from '../heer';
 import { Heerleiste } from '../ui/Heerleiste';
 import {
@@ -398,6 +399,41 @@ export function Game() {
     waehleGruppe((schar ? schar.einheiten : aufFeld).map((u) => u.id));
   };
   const befehleMoeglich = isMine && (phase.t === 'main' || phase.t === 'roll') && mode === null;
+
+  /** Siegpunkte aufgeschluesselt - fuers Menue (Reich). */
+  const punkte = useMemo(() => {
+    const eigene = Object.values(state.buildings).filter((b) => b.owner === you);
+    const doerfer = eigene.filter((b) => b.type === 'settlement').length;
+    const staedte = eigene.filter((b) => b.type === 'city').length;
+    const haupt = Object.values(state.hauptstaedte ?? {}).filter((h) => h.owner === you);
+    const hauptPunkte = haupt.reduce((n, h) => n + PUNKTE_HAUPTSTADT + (h.stufe - 1) * PUNKTE_STUFE, 0);
+    const karten = (state.players.find((p) => p.id === you)?.dev ?? []).filter((d) => d.type === 'victoryPoint').length;
+    return {
+      gesamt: state.myPoints,
+      ziel: state.targetPoints,
+      zeilen: [
+        { text: `Doerfer ${doerfer} × 1`, wert: doerfer > 0 ? doerfer : null },
+        { text: `Staedte ${staedte} × 2`, wert: staedte > 0 ? staedte * 2 : null },
+        { text: haupt.length > 1 ? `Hauptstaedte ${haupt.length}` : 'Hauptstadt', wert: hauptPunkte > 0 ? hauptPunkte : null },
+        { text: 'Siegpunktkarten', wert: karten > 0 ? karten : null },
+        { text: 'Groesste Rittermacht', wert: state.largestArmy === you ? 2 : null },
+      ],
+    };
+  }, [state, you]);
+
+  /** Rohstoffkarten je Wuerfelzahl aus eigenen Siedlungen - fuers Menue (Reich). */
+  const ertrag = useMemo(() => {
+    const out: Record<number, number> = {};
+    for (const [vk, b] of Object.entries(state.buildings)) {
+      if (b.owner !== you) continue;
+      for (const h of vertexAdjacentHexes(parseVertexKey(vk))) {
+        const t = world.tiles.get(hexKey(h.q, h.r));
+        if (!t || t.number === null) continue;
+        out[t.number] = (out[t.number] ?? 0) + (b.type === 'city' ? 2 : 1);
+      }
+    }
+    return out;
+  }, [state.buildings, world, you]);
 
   /*
    * Die Befehlstafel an den gewaehlten Einheiten (Board): jede Einheit als Chip
@@ -896,6 +932,10 @@ export function Game() {
           einheiten={meineEinheiten}
           raumcode={useStore.getState().code}
           pin={useStore.getState().pin}
+          punkte={punkte}
+          ertrag={ertrag}
+          zielAuswahl={zielWahl ? auswahl : []}
+          onGruppeZiel={(ids) => waehleGruppe(ids, true)}
           lage={lage}
           fraktionen={fraktionen}
           befehl={befehl}
@@ -938,22 +978,6 @@ export function Game() {
           loeschenMoeglich={loeschenMoeglich}
           onLoeschen={loeschen}
           onErkunden={(id, an) => act({ t: 'explore', unit: id, explore: an })}
-          verbandFeld={(() => {
-            if (!zielWahl || auswahl.length < 2) return null;
-            const orte = new Set(
-              auswahl.map((id) => {
-                const u = meineEinheiten.find((x) => x.id === id);
-                return u ? `${u.q}:${u.r}` : '';
-              }),
-            );
-            return orte.size === 1 ? [...orte][0]! : null;
-          })()}
-          onVerbandZiel={(q, r) =>
-            waehleGruppe(
-              meineEinheiten.filter((u) => u.q === q && u.r === r).map((u) => u.id),
-              true,
-            )
-          }
           onZeigenAuftrag={(a) => {
             const w = a.art === 'geleit' ? state.units.find((u) => u.id === a.wanderer) : undefined;
             zeigeFeld(w ? w.q : a.q, w ? w.r : a.r);
