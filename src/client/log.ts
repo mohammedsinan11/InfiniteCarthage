@@ -13,6 +13,7 @@ import { istSpielerSeite, spielerAus } from '../core/combat';
 import type { Seite } from '../core/combat';
 import type { WandererAuftrag } from '../core/state';
 import { STUFE_NAME } from '../core/rules/hauptstadt';
+import { TURM_NAME } from '../core/state';
 import { heldKurz } from '../core/lore';
 
 const RES_NAME: Record<Resource, string> = {
@@ -136,6 +137,8 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
       return `${who(state, e.player)} gruendet eine Hauptstadt.`;
     case 'capitalUpgrade':
       return `${who(state, e.player)} baut die Hauptstadt zum ${STUFE_NAME[e.stufe] ?? `Stufe ${e.stufe}`} aus.`;
+    case 'towerUpgrade':
+      return `${who(state, e.player)} baut einen Wachturm zum ${TURM_NAME[e.stufe] ?? `Stufe ${e.stufe}`} aus.`;
     // STUFE_NAME kommt aus rules/hauptstadt.ts (Residenz, Festungsring, Koenigssitz).
     case 'knightReady':
       return `${who(state, e.player)} stellt ${e.kind === 'bogen' ? 'einen Bogenschuetzen' : 'einen Ritter'} auf.`;

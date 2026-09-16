@@ -95,6 +95,21 @@ Stufe III ein eigener Koenigssitz statt des umgefaerbten Palastes, und die
 Reichsbauten der Phase 2 (Burgfeste, Handelskontor, Tempel) als freistehende
 Gebaeude ohne Palast-Unterbau.
 
+### Kampf sehen — **Platzhalter**
+
+- **Trefferzahlen:** SVG-Text ueber dem Feld (`.treffer-zahl`), in der Farbe
+  der getroffenen Seite, steigt auf und verblasst. Ein Fall ist groesser.
+- **Roter Puls:** ein Ring, der beim Fall einer Einheit aufgeht
+  (`.treffer-puls`).
+- **Kampftafel:** Rechteck neben den Schwertern mit einer Zeile je Seite -
+  Farbfeld, Anzahl, Summe der Leben, rot die Verluste der letzten Runde
+  (`.kampf-tafel`).
+- **Lebensbalken:** Pixelbalken ueber jeder Figur im Gefecht
+  (`client/units.ts`, `zeichneLeben`).
+
+*Was fehlt:* gezeichnete Zahlen im Pixelstil statt Schrift, ein Funkenbild
+fuer den Treffer und ein Rahmen fuer die Tafel.
+
 ### Name des Helden — **Platzhalter**
 
 - **Namensschild:** SVG-Text ueber der Heldenfigur (`.held-name` in

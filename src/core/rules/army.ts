@@ -55,7 +55,7 @@
  */
 
 import { Rng } from '../rng';
-import { hexDistance, hexKey, hexesInRange, neighbors } from '../coords';
+import { hexDistance, hexKey, hexesInRange, neighbors, parseVertexKey, vertexAdjacentHexes } from '../coords';
 import type { Hex } from '../coords';
 import { ensureGenerated, isGenerated } from '../world';
 import type { World } from '../world';
@@ -63,7 +63,7 @@ import type { ChunkCoord } from '../chunks';
 import { ruinAt, ruinResultFor } from '../ruins';
 import type { RuinResult } from '../ruins';
 import { RESOURCES } from '../types';
-import { emptyHand, handSize, playerById } from '../state';
+import { MAX_TURM_STUFE, emptyHand, handSize, playerById } from '../state';
 import type { GameState, Hand, PlayerId, UnitKind, UnitState } from '../state';
 import { wuerfleHeld } from '../lore';
 import type { HeldLore } from '../lore';
@@ -132,6 +132,11 @@ const ERKUNDUNG_RADIUS = 3;
 const ERKUNDUNG_HELD = 4;
 /** Felder je Runde fuer den Helden und sein Gefolge. */
 export const HELD_SCHRITTE = 2;
+/** Wie weit ein Geschuetzturm schiesst - von jedem seiner drei Nachbarfelder aus. */
+export const TURM_REICHWEITE = 2;
+/** Womit er trifft: wie ein Bogenschuetze, aber er steht fest und ruhig. */
+export const TURM_ANGRIFF = 3;
+
 /** Nach so vielen Runden kehrt ein gefallener Held zurueck. */
 export const HELD_RUECKKEHR = 10;
 
@@ -213,6 +218,12 @@ export type ArmyEvent =
       /** Wer am Ende steht - null, solange es weitergeht oder niemand bleibt. */
       sieger: Seite | null;
       verluste: Verlust[];
+      /**
+       * Jeder Treffer dieser Runde, je getroffener Einheit. Damit zeigt der
+       * Client, wer wie viel abbekommen hat - Zahl ueber der Figur, rotes
+       * Aufblitzen (DESIGN.md, Kampf sehen). Fehlt bei alten Staenden.
+       */
+      treffer?: { unit: number; seite: Seite; anzahl: number; gefallen: boolean }[];
     }
   | {
       t: 'plunder';
@@ -984,10 +995,13 @@ function schlacht(
     else verluste.set(key, { seite, kind, anzahl: 1 });
   };
   const gefallen: UnitState[] = [];
+  // Jeder Treffer wird gemeldet, nicht nur der toedliche - der Client zeigt ihn an.
+  const treffer: NonNullable<Extract<ArmyEvent, { t: 'fight' }>['treffer']> = [];
   for (const u of kaempfer) {
     const d = schaden.get(u.id) ?? 0;
     if (d === 0) continue;
     u.leben -= d;
+    treffer.push({ unit: u.id, seite: seiteVon(u), anzahl: d, gefallen: u.leben <= 0 });
     if (u.leben <= 0) {
       gefallen.push(u);
       zaehle(seiteVon(u), u.kind);
@@ -1059,7 +1073,7 @@ function schlacht(
   const sieger = !ende
     ? null
     : (nachher[0] ?? (isNestActive(s, q, r) ? nestFraktionOf(s, q, r) : null));
-  events.push({ t: 'fight', q, r, seiten, neu, ende, sieger, verluste: [...verluste.values()] });
+  events.push({ t: 'fight', q, r, seiten, neu, ende, sieger, verluste: [...verluste.values()], treffer });
 }
 
 /**
@@ -1113,6 +1127,55 @@ export function beschuss(s: GameState, rng: Rng, events: Ereignisse): void {
     else salve.verluste.push({ seite, kind: opfer.kind, anzahl: 1 });
     if (opfer.traegt > 0 || opfer.fracht) uebergib(s, opfer, u, events);
     entfernen(s, [opfer]);
+  }
+
+  /*
+   * Geschuetztuerme (state.tuerme ab Stufe 2) schiessen mit. Sie stehen auf
+   * einer Ecke, nicht auf einem Feld - der Schuss geht deshalb von dem ihrer
+   * drei Nachbarfelder aus, das dem Ziel am naechsten liegt. So fliegt der
+   * Pfeil auf der Karte von Kachel zu Kachel wie bei den Schuetzen.
+   */
+  for (const [vk, turm] of Object.entries(s.tuerme ?? {}).sort((a, b) => nachSchluessel(a[0], b[0]))) {
+    if (turm.stufe < MAX_TURM_STUFE) continue;
+    const eigene = spielerSeite(turm.owner);
+    let bestes: { von: { q: number; r: number }; ziel: { q: number; r: number }; feinde: UnitState[]; d: number } | null = null;
+    for (const von of vertexAdjacentHexes(parseVertexKey(vk))) {
+      for (const h of hexesInRange(von, TURM_REICHWEITE)) {
+        const feinde = s.units
+          .filter((x) => x.q === h.q && x.r === h.r && feindlich(eigene, seiteVon(x), s))
+          .sort(nachNummer);
+        if (feinde.length === 0) continue;
+        const d = hexDistance(von, h);
+        const besser =
+          !bestes ||
+          d < bestes.d ||
+          (d === bestes.d && nachSchluessel(hexKey(h.q, h.r), hexKey(bestes.ziel.q, bestes.ziel.r)) < 0);
+        if (besser) bestes = { von, ziel: h, feinde, d };
+      }
+    }
+    if (!bestes) continue;
+    const salve: Salve = {
+      t: 'volley',
+      player: turm.owner,
+      q: bestes.von.q,
+      r: bestes.von.r,
+      zq: bestes.ziel.q,
+      zr: bestes.ziel.r,
+      schuesse: 1,
+      treffer: 0,
+      verluste: [],
+    };
+    if (trifft(wurf(rng), TURM_ANGRIFF)) {
+      salve.treffer = 1;
+      const opfer = bestes.feinde[rng.int(bestes.feinde.length)]!;
+      opfer.leben -= 1;
+      if (opfer.leben <= 0) {
+        salve.verluste.push({ seite: seiteVon(opfer), kind: opfer.kind, anzahl: 1 });
+        if (opfer.traegt > 0 || opfer.fracht) frachtZurBank(s, opfer);
+        entfernen(s, [opfer]);
+      }
+    }
+    salven.set(`turm|${vk}`, salve);
   }
   events.push(...salven.values());
 }

@@ -38,6 +38,21 @@ const FILES = import.meta.glob('../assets/tiles/*.png', {
   import: 'default',
 }) as Record<string, string>;
 
+/** Handgemalte Hoehenmasken; fehlen sie, bleibt die automatische Schaetzung aktiv. */
+const MASKEN_DATEIEN = import.meta.glob('../assets/tiles/*_mask.png', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+}) as Record<string, string>;
+
+/** URL der handgemalten Maske je zugehoeriger Kachel-URL. */
+const MASKEN_URLS = new Map<string, string>();
+for (const [pfad, maskenUrl] of Object.entries(MASKEN_DATEIEN)) {
+  const kachelPfad = pfad.replace(/_mask\.png$/i, '_tile.png');
+  const kachelUrl = FILES[kachelPfad];
+  if (kachelUrl) MASKEN_URLS.set(kachelUrl, maskenUrl);
+}
+
 /** Nach Grundname gruppieren: "forest_2_tile.png" -> Gruppe "forest". */
 const GROUPS: Record<string, string[]> = (() => {
   const out: Record<string, string[]> = {};
@@ -247,25 +262,41 @@ export const availableGroups = (): string[] => Object.keys(GROUPS).sort();
  * imageSmoothingEnabled = false hart abschalten, das gilt in jedem Browser.
  */
 const IMAGES = new Map<string, HTMLImageElement>();
+const HANDMASKEN = new Map<string, HTMLImageElement>();
 
 /** Alle Kacheln laden. Aufloesung erst, wenn wirklich alle bereit sind. */
 export function preloadTiles(): Promise<void> {
   const urls = [...new Set(Object.values(GROUPS).flat())];
   return Promise.all(
-    urls.map(
-      (url) =>
-        new Promise<void>((resolve) => {
-          const img = new Image();
-          // Auch bei Fehlern aufloesen: eine fehlende Kachel darf das Brett
-          // nicht dauerhaft leer lassen.
-          img.onload = () => {
-            IMAGES.set(url, img);
-            resolve();
-          };
-          img.onerror = () => resolve();
-          img.src = url;
-        }),
-    ),
+    [
+      ...urls.map(
+        (url) =>
+          new Promise<void>((resolve) => {
+            const img = new Image();
+            // Auch bei Fehlern aufloesen: eine fehlende Kachel darf das Brett
+            // nicht dauerhaft leer lassen.
+            img.onload = () => {
+              IMAGES.set(url, img);
+              resolve();
+            };
+            img.onerror = () => resolve();
+            img.src = url;
+          }),
+      ),
+      ...[...MASKEN_URLS.entries()].map(
+        ([kachelUrl, maskenUrl]) =>
+          new Promise<void>((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+              HANDMASKEN.set(kachelUrl, img);
+              resolve();
+            };
+            // Eine fehlende oder kaputte Handmaske darf die automatische Maske nie blockieren.
+            img.onerror = () => resolve();
+            img.src = maskenUrl;
+          }),
+      ),
+    ],
   ).then(() => undefined);
 }
 
@@ -324,11 +355,10 @@ const UEBERHANG = new WeakMap<object, HTMLCanvasElement>();
  * Boden: Grasrand, Erdkante, Schnee zwischen den Baeumen. Nur Hohes verdeckt,
  * was dahinter steht.
  *
- * Automatisch geschaetzt, nicht gezeichnet: Bodenfarben je Kachelfamilie, von
- * der Erdkante unten aus zusammenhaengend geflutet. Was die Flut nicht
- * erreicht, ist hoch. Umrisspixel zaehlen zu der Seite, der die meisten
- * Nachbarn angehoeren. Spaeter liessen sich die Masken als eigene Bilder
- * nachzeichnen (forest_0_mask.png) - diese hier sind der erste Entwurf dafuer.
+ * Eine passende handgemalte *_mask.png hat Vorrang. Ohne sie wird wie bisher
+ * automatisch geschaetzt: Bodenfarben je Kachelfamilie werden von der
+ * Erdkante unten aus zusammenhaengend geflutet. Was die Flut nicht erreicht,
+ * ist hoch. Umrisspixel zaehlen zu der Seite, der die meisten Nachbarn angehoeren.
  */
 const ERDE = ['#5f4036', '#6c4738', '#8a6048', '#9a6d4f', '#46352f', '#322d21', '#2b211a'];
 const GRAS = ['#6fad42', '#538c47', '#bad08e', '#cbbf5d', '#837131', '#8c833d'];
@@ -367,6 +397,13 @@ export function hoehenMaske(bild: HTMLImageElement, url: string): HTMLCanvasElem
   c.height = h;
   const ctx = c.getContext('2d', { willReadFrequently: true });
   if (!ctx) return null;
+  const handmaske = HANDMASKEN.get(url);
+  if (handmaske) {
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(handmaske, 0, 0, b, h);
+    MASKEN.set(bild, c);
+    return c;
+  }
   ctx.drawImage(bild, 0, 0);
   const pixel = ctx.getImageData(0, 0, b, h);
   const d = pixel.data;

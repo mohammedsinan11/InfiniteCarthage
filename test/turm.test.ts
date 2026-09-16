@@ -10,14 +10,20 @@ import { applyAction, createGame } from '../src/core/rules/reducer';
 import type { Game } from '../src/core/rules/reducer';
 import { canPlaceTower, legalTowerVertices } from '../src/core/rules/placement';
 import { migriereStand } from '../src/core/rules/migration';
-import { COST_TOWER } from '../src/core/rules/costs';
-import { SICHT_TURM, isLandAt, sightOf } from '../src/core/units';
+import { beschuss } from '../src/core/rules/army';
+import type { ArmyEvent } from '../src/core/rules/army';
+import { COST_GESCHUETZTURM, COST_TOWER } from '../src/core/rules/costs';
+import { SICHT_TURM, einheitVorlage, isLandAt, sightOf } from '../src/core/units';
+import { MAX_TURM_STUFE } from '../src/core/state';
+import { Rng } from '../src/core/rng';
 import {
   edgeEndpoints,
   edgeKey,
   hexEdges,
   hexVertices,
   hexesInRange,
+  parseVertexKey,
+  vertexAdjacentHexes,
   vertexKey,
   vertexNeighborVertices,
 } from '../src/core/coords';
@@ -112,6 +118,56 @@ describe('Wachturm setzen', () => {
     expect(mit.size).toBeGreaterThan(ohne.size);
     for (const c of hexesInRange(h, SICHT_TURM - 1)) expect(mit.has(`${c.q}:${c.r}`)).toBe(true);
     expect(redactStateFor(game.state, 'p1').tuerme[vk]).toEqual({ owner: 'p0', stufe: 1 });
+  });
+});
+
+describe('Geschuetzturm', () => {
+  /** Einen eigenen Turm setzen und das Geld fuer den Ausbau geben. */
+  function mitTurm() {
+    const game = spiel();
+    const { h, vk } = eckeMitStrasse(game);
+    geben(game);
+    expect(applyAction(game, { t: 'buildTower', vertex: vk }, 'p0').ok).toBe(true);
+    for (const r of RESOURCES) game.state.players[0]!.hand[r] += COST_GESCHUETZTURM[r] ?? 0;
+    return { game, h, vk };
+  }
+
+  it('baut den Grenzposten zum Geschuetzturm aus - und hoeher geht es nicht', () => {
+    const { game, vk } = mitTurm();
+    const res = applyAction(game, { t: 'upgradeTower', vertex: vk }, 'p0');
+    expect(res.ok).toBe(true);
+    expect(game.state.tuerme[vk]).toEqual({ owner: 'p0', stufe: MAX_TURM_STUFE });
+    expect(RESOURCES.every((r) => game.state.players[0]!.hand[r] === 0)).toBe(true);
+    if (res.ok) expect(res.events).toContainEqual({ t: 'towerUpgrade', player: 'p0', at: vk, stufe: 2 });
+
+    for (const r of RESOURCES) game.state.players[0]!.hand[r] += COST_GESCHUETZTURM[r] ?? 0;
+    const nochmal = applyAction(game, { t: 'upgradeTower', vertex: vk }, 'p0');
+    expect(nochmal.ok).toBe(false);
+    if (!nochmal.ok) expect(nochmal.error).toContain('Geschuetzturm');
+  });
+
+  it('nicht der fremde Turm und nicht ausser der Bauphase', () => {
+    const { game, vk } = mitTurm();
+    expect(applyAction(game, { t: 'upgradeTower', vertex: vk }, 'p1').ok).toBe(false);
+    game.state.phase = { t: 'roll' };
+    expect(applyAction(game, { t: 'upgradeTower', vertex: vk }, 'p0').ok).toBe(false);
+  });
+
+  it('schiesst auf Feinde in Reichweite - der Grenzposten noch nicht', () => {
+    const { game, vk } = mitTurm();
+    // Ein Raeuber auf einem Nachbarfeld des Turms.
+    const feld = vertexAdjacentHexes(parseVertexKey(vk))[0]!;
+    game.state.units.push({ ...einheitVorlage('raeuber', feld.q, feld.r, { fraktion: 'f:9:9' }), id: 7 });
+
+    const ohne: ArmyEvent[] = [];
+    beschuss(game.state, new Rng(1), ohne);
+    expect(ohne.some((e) => e.t === 'volley')).toBe(false);
+
+    expect(applyAction(game, { t: 'upgradeTower', vertex: vk }, 'p0').ok).toBe(true);
+    const mit: ArmyEvent[] = [];
+    beschuss(game.state, new Rng(1), mit);
+    const salve = mit.find((e) => e.t === 'volley');
+    expect(salve).toMatchObject({ player: 'p0', zq: feld.q, zr: feld.r, schuesse: 1 });
   });
 });
 

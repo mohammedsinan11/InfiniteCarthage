@@ -100,6 +100,15 @@ export type Building = {
  */
 export type Turm = { owner: PlayerId; stufe: number };
 
+/**
+ * Hoechste Turmstufe. 1 ist der Grenzposten, 2 der Geschuetzturm: er schiesst
+ * selbst auf Feinde in Reichweite (rules/army.ts, beschuss).
+ */
+export const MAX_TURM_STUFE = 2;
+
+/** Namen der Turmstufen. */
+export const TURM_NAME: Record<number, string> = { 1: 'Grenzposten', 2: 'Geschuetzturm' };
+
 /** Was auf der Karte laufen kann. */
 export type UnitKind = 'ritter' | 'raeuber' | 'goblin' | 'wanderer' | 'held' | 'bogen';
 

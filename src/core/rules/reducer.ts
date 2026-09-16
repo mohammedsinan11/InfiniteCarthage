@@ -39,6 +39,8 @@ import {
   totalPoints,
 } from '../state';
 import type { GameState, Hand, PlayerId, Player } from '../state';
+// Turmstufen: 1 Grenzposten, 2 Geschuetzturm (state.ts, Turm).
+import { MAX_TURM_STUFE, TURM_NAME } from '../state';
 import type { DevCardType } from '../state';
 import type { Bundle } from '../types';
 import {
@@ -52,6 +54,7 @@ import {
   COST_TOWER,
   COST_CAPITAL,
   COST_STUFE,
+  COST_TURM_STUFE,
   canAfford,
   pay,
 } from './costs';
@@ -130,8 +133,10 @@ export type Action =
   | { t: 'claimLoot' }
   /** Ein eigenes Feuer mit einer Rohstoffkarte loeschen (rules/feuer.ts). */
   | { t: 'putOut'; key: string; mit: Resource }
-  /** Einen Wachturm an ein eigenes Dorf oder eine Stadt bauen. */
+  /** Einen Wachturm auf eine freie Ecke an einer eigenen Strasse setzen. */
   | { t: 'buildTower'; vertex: string }
+  /** Den eigenen Wachturm ausbauen - vom Grenzposten zum Geschuetzturm. */
+  | { t: 'upgradeTower'; vertex: string }
   /** Einen eigenen Ritter oder den Helden von selbst erkunden lassen - oder nicht mehr. */
   | { t: 'explore'; unit: number; explore: boolean }
   /** Einen eigenen Ritter dem Helden folgen lassen - oder nicht mehr. */
@@ -154,6 +159,8 @@ export type GameEvent =
   | { t: 'build'; player: PlayerId; kind: 'road' | 'settlement' | 'city' | 'tower'; at: string }
   | { t: 'capital'; player: PlayerId; q: number; r: number }
   | { t: 'capitalUpgrade'; player: PlayerId; q: number; r: number; stufe: number }
+  /** Ein Wachturm ist eine Stufe hoeher - Stufe 2 ist der Geschuetzturm. */
+  | { t: 'towerUpgrade'; player: PlayerId; at: string; stufe: number }
   | { t: 'buyDev'; player: PlayerId }
   | { t: 'playDev'; player: PlayerId; card: DevCardType }
   | { t: 'yearOfPlenty'; player: PlayerId; a: Resource; b: Resource }
@@ -909,6 +916,20 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       // Ein Turm am Rand schiebt die Welt vor sich her, wie jedes Bauteil.
       const added = grow(s, world, vertexAdjacentHexes(parseVertexKey(action.vertex)));
       if (added.length) events.push({ t: 'chunks', coords: added });
+      break;
+    }
+
+    case 'upgradeTower': {
+      if (phase.t !== 'main') return fail('Jetzt kann nicht gebaut werden.');
+      const turm = s.tuerme?.[action.vertex];
+      if (!turm || turm.owner !== actor) return fail('Das ist nicht dein Wachturm.');
+      if (turm.stufe >= MAX_TURM_STUFE) return fail(`Der ${TURM_NAME[MAX_TURM_STUFE]} steht schon.`);
+      const stufe = turm.stufe + 1;
+      const kosten = COST_TURM_STUFE[stufe]!;
+      if (!canAfford(actorPlayer.hand, kosten)) return fail(`Zu wenig Rohstoffe fuer den ${TURM_NAME[stufe]}.`);
+      pay(actorPlayer.hand, kosten);
+      turm.stufe = stufe;
+      events.push({ t: 'towerUpgrade', player: actor, at: action.vertex, stufe });
       break;
     }
 

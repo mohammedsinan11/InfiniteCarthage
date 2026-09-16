@@ -3056,6 +3056,81 @@ em.off {
 }
 
 /*
+ * Kampf sehen (DESIGN.md, Kampf): jeder Treffer steigt als Zahl ueber dem
+ * Feld auf, ein Fall blitzt rot. Daneben die Kampftafel mit den Seiten.
+ * PLATZHALTER (ASSETS.md).
+ */
+.treffer-zahl {
+  font-family: var(--pixel);
+  font-size: 9px;
+  paint-order: stroke;
+  stroke: #17120c;
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  text-anchor: middle;
+  pointer-events: none;
+  animation: treffer-steigt 1.1s ease-out both;
+}
+.treffer-zahl.gefallen {
+  font-size: 11px;
+}
+.treffer-puls {
+  fill: none;
+  stroke: #e0473a;
+  stroke-width: 2;
+  pointer-events: none;
+  animation: treffer-puls 0.6s ease-out both;
+}
+@keyframes treffer-steigt {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  15% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+}
+@keyframes treffer-puls {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.5);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+.kampf-tafel {
+  pointer-events: none;
+}
+.kampf-tafel rect {
+  fill: rgba(23, 18, 12, 0.92);
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.kampf-tafel text {
+  font-family: var(--pixel);
+  font-size: 7px;
+  fill: var(--text);
+}
+.kampf-tafel .verlust {
+  fill: #e0473a;
+}
+@media (prefers-reduced-motion: reduce) {
+  .treffer-zahl,
+  .treffer-puls {
+    animation-duration: 0.01s;
+  }
+}
+
+/*
  * Der Name des Helden ueber seiner Figur (core/lore.ts). Dunkler Rand, damit
  * er auf hellen wie dunklen Kacheln lesbar bleibt. PLATZHALTER (ASSETS.md).
  */

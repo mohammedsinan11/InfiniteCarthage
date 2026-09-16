@@ -37,6 +37,16 @@ export const COST_ARCHER: Cost = { lumber: 2, wool: 1 };
 export const COST_TOWER: Cost = { lumber: 1, brick: 1, ore: 1 };
 
 /**
+ * Den Wachturm zum Geschuetzturm ausbauen (Stufe 2): Erz fuer die Winden und
+ * Bolzen, Holz fuer das Geschuetz. Er schiesst dann selbst auf Feinde in
+ * Reichweite (rules/army.ts, beschuss). PLATZHALTER fuers Balancing.
+ */
+export const COST_GESCHUETZTURM: Cost = { lumber: 2, brick: 1, ore: 2 };
+
+/** Was ein Turm kostet, der auf diese Stufe ausgebaut wird. Stufe 1 ist der Bau selbst. */
+export const COST_TURM_STUFE: Record<number, Cost> = { 2: COST_GESCHUETZTURM };
+
+/**
  * Eine Hauptstadt auf einem Feld, das drei eigene Staedte und sechs eigene
  * Strassen umschliessen (rules/hauptstadt.ts). Etwas mehr als zwei Staedte -
  * den Ring hat man ohnehin schon bezahlt. PLATZHALTER fuers Balancing.

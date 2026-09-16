@@ -47,13 +47,18 @@ import { setAmbiente } from '../ambiente';
 import { seasonOf } from '../../core/season';
 import { RESOURCES } from '../../core/types';
 import type { Resource } from '../../core/types';
-import { COST_CAPITAL, COST_CITY, COST_STUFE, COST_ROAD, canAfford } from '../../core/rules/costs';
+import { COST_CAPITAL, COST_CITY, COST_STUFE, COST_ROAD, COST_TURM_STUFE, canAfford } from '../../core/rules/costs';
 import { FRIEDEN_PREIS, TRIBUT_KARTEN, nimmtFrieden } from '../../core/rules/diplomatie';
 import { brennt } from '../../core/rules/feuer';
 import { WERTE as EINHEIT_WERTE } from '../../core/units';
 import { kampfFelder as kampfFelderVon } from '../../core/combat';
 import type { UnitState as HeerEinheit } from '../../core/state';
-import { HAUPTSTADT_PUNKTE as PUNKTE_HAUPTSTADT, STUFE_PUNKTE as PUNKTE_STUFE } from '../../core/state';
+import {
+  HAUPTSTADT_PUNKTE as PUNKTE_HAUPTSTADT,
+  MAX_TURM_STUFE,
+  STUFE_PUNKTE as PUNKTE_STUFE,
+  TURM_NAME,
+} from '../../core/state';
 import { einheitNamen, gruppenStatus, heerGruppen, untaetig } from '../heer';
 import { heldKurz } from '../../core/lore';
 import { Heerleiste } from '../ui/Heerleiste';
@@ -118,12 +123,20 @@ export function Game() {
   const produceEffect = useStore((s) => s.produceEffect);
   const pfeile = useStore((s) => s.pfeile);
   const clearPfeile = useStore((s) => s.clearPfeile);
+  const treffer = useStore((s) => s.treffer);
+  const clearTreffer = useStore((s) => s.clearTreffer);
   // Pfeile nach ihrem Flug wegraeumen - je Salve hoechstens fuenf, je 0,14 s versetzt.
   useEffect(() => {
     if (pfeile.length === 0) return;
     const t = window.setTimeout(clearPfeile, 1800);
     return () => window.clearTimeout(t);
   }, [pfeile, clearPfeile]);
+  // Trefferzahlen steigen gut eine Sekunde lang auf, dann sind sie fort.
+  useEffect(() => {
+    if (treffer.length === 0) return;
+    const t = window.setTimeout(clearTreffer, 2200);
+    return () => window.clearTimeout(t);
+  }, [treffer, clearTreffer]);
   const clearProduceEffect = useStore((s) => s.clearProduceEffect);
 
   const [mode, setMode] = useState<BuildMode>(null);
@@ -641,6 +654,31 @@ export function Game() {
       if (!u) return null;
       return { ort: ausbauOrt, titel: u.bereit ? 'Umschlossenes Feld' : 'Fast umschlossen', optionen: [hauptstadtOption(u)] };
     }
+    // Ein eigener Wachturm: die Tafel zeigt, was er werden kann (state.tuerme).
+    const turm = state.tuerme?.[ausbauOrt.key];
+    if (turm && turm.owner === you) {
+      const naechste = turm.stufe < MAX_TURM_STUFE ? turm.stufe + 1 : null;
+      return {
+        ort: ausbauOrt,
+        titel: `Wachturm · ${TURM_NAME[turm.stufe] ?? `Stufe ${turm.stufe}`}`,
+        optionen:
+          naechste === null
+            ? []
+            : [
+                {
+                  name: TURM_NAME[naechste] ?? `Stufe ${naechste}`,
+                  kosten: COST_TURM_STUFE[naechste]!,
+                  darf: jetzt && bezahlbar(COST_TURM_STUFE[naechste]!),
+                  hinweis: warum ?? armut(COST_TURM_STUFE[naechste]!),
+                  wahl: dann(() => {
+                    act({ t: 'upgradeTower', vertex: ausbauOrt.key });
+                    playTurm();
+                  }),
+                },
+              ],
+        leer: 'Der Geschuetzturm steht - hoeher geht es nicht.',
+      };
+    }
     const b = state.buildings[ausbauOrt.key];
     if (!b || b.owner !== you) return null;
     const feuer = brennt(state, ausbauOrt.key) ? 'Hier brennt es' : undefined;
@@ -1023,6 +1061,7 @@ export function Game() {
           showAllNumbers={pinNumbers}
           flashHexes={flashHexes}
           pfeile={pfeile}
+          treffer={treffer}
           flights={flights}
           onPick={onPick}
           sicht={sicht}

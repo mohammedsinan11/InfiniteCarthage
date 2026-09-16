@@ -445,8 +445,34 @@ Der Turm steht fuer sich, nicht am Haus.
   (`rules/migration.ts`) - die laufende Partie ueberlebt den Umbau.
 - **Gezeichnet** steht er mittig auf seiner Ecke; frueher rueckte er nach
   rechts, um neben das Haus zu passen.
-- **Geplant:** eine eigene Mechanik und Ausbaustufen (die Stufe liegt schon im
-  Zustand bereit).
+- **Stufe 1, Grenzposten:** was oben steht - sehen, schuetzen, erhoehen.
+- **Stufe 2, Geschuetzturm:** ueber die Ausbau-Tafel (Klick auf den Turm,
+  Aktion `upgradeTower`, Kosten `COST_GESCHUETZTURM`, Platzhalter). Er
+  schiesst dann selbst: jede Runde einmal auf Feinde bis `TURM_REICHWEITE`
+  Felder weit, gerechnet von dem seiner drei Nachbarfelder, das dem Ziel am
+  naechsten liegt - von dort fliegt auch der Pfeil (`rules/army.ts`,
+  `beschuss`). Er trifft mit `TURM_ANGRIFF`, steht fest und kann nicht
+  zurueckgeschlagen werden.
+- **Geplant:** der Grenzposten soll die Umgebung erweitern, in der sich in
+  Phase 2 bauen laesst. Eine dritte Stufe (Signalkette: zwei Tuerme in
+  Sichtweite verbinden sich) liegt als Idee bereit.
+
+## Kampf sehen
+
+Ein Kampf war lange nur zwei gekreuzte Schwerter. Jetzt zeigt das Brett, was
+darin geschieht:
+
+- **Treffer:** jeder Treffer einer Kampfrunde steigt als Zahl ueber dem Feld
+  auf, in der Farbe der getroffenen Seite; ein Fall blitzt zusaetzlich rot
+  (`fight.treffer` aus `rules/army.ts`, `.treffer-zahl`, `.treffer-puls`). Die
+  Zahlen raeumt Game nach gut zwei Sekunden weg, wie die Pfeile.
+- **Lebensbalken:** wer im Gefecht steht, traegt seinen Balken - sonst nur die
+  Verwundeten. So sieht man, wie es auf dem Feld steht, ohne zu zaehlen.
+- **Kampftafel:** neben den Schwertern eine kleine Tafel, je Seite eine Zeile
+  mit Farbe, Anzahl und Summe der Leben, dazu rot die Verluste der letzten
+  Runde.
+- **Pfeile** fliegen wie bisher bei jeder Salve - seit dem Geschuetzturm auch
+  von ihm.
 
 ## Heldenlore
 

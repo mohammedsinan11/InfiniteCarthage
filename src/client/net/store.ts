@@ -13,6 +13,7 @@ import { lokalerSpeicher, merkePartie } from './partien';
 import { normalizePin } from '../../core/protocol';
 import type { ClientMsg, RoomInfo, ServerMsg } from '../../core/protocol';
 import type { PublicState } from '../../core/redact';
+import type { Seite } from '../../core/combat';
 import type { Action, GameEvent } from '../../core/rules/reducer';
 import {
   playAbgebrannt,
@@ -105,6 +106,22 @@ type Status = 'idle' | 'connecting' | 'platzwahl' | 'lobby' | 'playing' | 'close
 /** Ein Pfeil auf dem Brett: von welchem Feld auf welches, der wievielte der Salve, und ob die Salve traf. */
 export type Pfeil = { id: number; von: { q: number; r: number }; nach: { q: number; r: number }; nr: number; trifft: boolean };
 
+/**
+ * Ein Treffer der letzten Kampfrunde, damit man den Kampf sieht: die Zahl
+ * steigt ueber dem Feld auf, in der Farbe der getroffenen Seite
+ * (rules/army.ts, fight.treffer).
+ */
+export type Treffer = {
+  id: number;
+  q: number;
+  r: number;
+  seite: Seite;
+  anzahl: number;
+  gefallen: boolean;
+  /** Der wievielte Treffer auf diesem Feld - fuer Versatz und Verzoegerung. */
+  nr: number;
+};
+
 /** Unter welchem Namen zuletzt beigetreten wurde - fuer die Platzwahl auf derselben Verbindung. */
 let beitrittsName = '';
 
@@ -149,6 +166,8 @@ export type Store = {
    * wie geschossen wurden. Das Brett zeigt sie kurz, Game raeumt sie weg.
    */
   pfeile: Pfeil[];
+  /** Treffer der letzten Kampfrunde - das Brett zeigt sie kurz, Game raeumt sie weg. */
+  treffer: Treffer[];
 
   /**
    * oeffentlich gilt nur beim Eroeffnen: erscheint der Raum in der Raumliste?
@@ -167,6 +186,7 @@ export type Store = {
   dropAnnouncement: (id: number) => void;
   clearProduceEffect: () => void;
   clearPfeile: () => void;
+  clearTreffer: () => void;
 };
 
 /** Wie viele Weltereignisse das Menue behaelt. */
@@ -544,6 +564,7 @@ export const useStore = create<Store>((set, get) => ({
   announcements: [],
   produceEffect: null,
   pfeile: [],
+  treffer: [],
 
   connect:(code, name, create, oeffentlich = true, token) => {
     beitrittsName = name;
@@ -703,6 +724,21 @@ export const useStore = create<Store>((set, get) => ({
                 : [],
             );
             if (pfeile.length > 0) set({ pfeile });
+            // Treffer der Kampfrunden: je Treffer eine Zahl ueber dem Feld.
+            const treffer: Treffer[] = msg.events.flatMap((e: GameEvent) =>
+              e.t === 'fight'
+                ? (e.treffer ?? []).map((tr, nr) => ({
+                    id: naechsteId++,
+                    q: e.q,
+                    r: e.r,
+                    seite: tr.seite,
+                    anzahl: tr.anzahl,
+                    gefallen: tr.gefallen,
+                    nr,
+                  }))
+                : [],
+            );
+            if (treffer.length > 0) set({ treffer });
             set((s) => ({
               log: [
                 ...s.log,
@@ -796,6 +832,7 @@ export const useStore = create<Store>((set, get) => ({
     set((s) => ({ announcements: s.announcements.filter((a) => a.id !== id) })),
   clearProduceEffect: () => set({ produceEffect: null }),
   clearPfeile: () => set({ pfeile: [] }),
+  clearTreffer: () => set({ treffer: [] }),
 }));
 
 /*

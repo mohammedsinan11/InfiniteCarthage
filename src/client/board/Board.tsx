@@ -61,7 +61,7 @@ import { AuftragsZeichen, Flammen, KronenZeichen } from './Marken';
 import { Kosten } from '../ui/Aktionsleiste';
 import type { Cost } from '../../core/rules/costs';
 import { loeschFelder } from '../../core/rules/feuer';
-import type { Pfeil } from '../net/store';
+import type { Pfeil, Treffer } from '../net/store';
 import { scharNummern } from '../heer';
 import type { Brand } from '../../core/state';
 import { BRAND_WAS } from '../log';
@@ -243,6 +243,8 @@ type Props = {
   flashHexes?: string[];
   /** Pfeile der Bogenschuetzen, die gerade fliegen (net/store.ts). */
   pfeile?: readonly Pfeil[];
+  /** Treffer der letzten Kampfrunde - Zahlen, die ueber dem Feld aufsteigen. */
+  treffer?: readonly Treffer[];
   /** Karten, die zur Hand fliegen sollen. */
   flights?: Flight[];
   onPick: (kind: 'vertex' | 'edge' | 'hex', key: string) => void;
@@ -376,6 +378,7 @@ export function Board({
   showAllNumbers,
   flashHexes,
   pfeile,
+  treffer,
   flights,
   onPick,
   sicht = null,
@@ -868,7 +871,10 @@ export function Board({
         zeichneFigur(g, u.kind, fx, fy, f, farbeSeite(seiteVon(u)));
         if (fackeln && u.id >= 0) zeichneFigur(g, 'fackel', fx + 5 * f, fy - 2 * f, f);
         const max = WERTE[u.kind].leben;
-        if (u.id >= 0 && u.leben < max) zeichneLeben(g, u.kind, fx, fy, f, u.leben, max);
+        // Im Gefecht traegt jede Figur ihren Balken, sonst nur die verwundeten:
+        // so sieht man, wie es auf dem Feld steht (DESIGN.md, Kampf sehen).
+        const imGefecht = kampf.has(hexKey(t.q, t.r));
+        if (u.id >= 0 && (u.leben < max || imGefecht)) zeichneLeben(g, u.kind, fx, fy, f, u.leben, max);
       });
       g.globalAlpha = 1;
     };
@@ -1367,6 +1373,7 @@ export function Board({
     tageszeit,
     dpr,
     animZeit,
+    kampf,
   ]);
 
   /** Eine Stufe naeher (+1) oder weiter weg (-1); der Punkt unter x/y bleibt stehen. */
@@ -1760,6 +1767,15 @@ export function Board({
         const d = Math.hypot(p.x - wx, p.y - liftVertex(ecke) - 4 * SCALE - wy);
         if (d <= reichweite && (!beste || d < beste.d)) beste = { d, waehle: () => onGebaeude(vk) };
       }
+      // Eigene Wachtuerme stehen fuer sich auf ihrer Ecke - sie lassen sich
+      // genauso anklicken und ausbauen (state.tuerme).
+      for (const [vk, t] of Object.entries(state.tuerme ?? {})) {
+        if (t.owner !== du) continue;
+        const ecke = parseVertexKey(vk);
+        const p = vertexToPixel(ecke, LAYOUT);
+        const d = Math.hypot(p.x - wx, p.y - liftVertex(ecke) - 6 * SCALE - wy);
+        if (d <= reichweite && (!beste || d < beste.d)) beste = { d, waehle: () => onGebaeude(vk) };
+      }
     }
     if (onHauptstadtKlick) {
       for (const [hk, h] of Object.entries(state.hauptstaedte ?? {})) {
@@ -2092,21 +2108,95 @@ export function Board({
             );
           })}
 
-        {/* Kaempfe: zwei Schwerter ueber dem Feld, in den Farben der Seiten. Im Nebel nicht. */}
+        {/*
+          Kaempfe: zwei Schwerter ueber dem Feld, in den Farben der Seiten,
+          daneben eine Tafel - wer steht dort, wie stark, was hat die letzte
+          Runde gekostet (DESIGN.md, Kampf sehen). Im Nebel nichts davon.
+        */}
         {[...kampf].map(([k, seiten]) => {
           if (sicht !== null && !sicht.has(k)) return null;
           const [q, r] = k.split(':').map(Number) as [number, number];
           const c = hexToPixel(q, r, LAYOUT);
           const y = c.y - liftHex(q, r) - LAYOUT.h * 0.62;
+          const leute = state.units.filter((u) => u.q === q && u.r === r);
+          const zeilen = seiten
+            .map((seite) => {
+              const ihre = leute.filter((u) => seiteVon(u) === seite);
+              return {
+                seite,
+                anzahl: ihre.length,
+                leben: ihre.reduce((n, u) => n + u.leben, 0),
+                verlust: (treffer ?? []).filter((t) => t.q === q && t.r === r && t.seite === seite && t.gefallen).length,
+              };
+            })
+            .filter((z) => z.anzahl > 0 || z.verlust > 0);
+          const hoehe = 5 + zeilen.length * 9;
+          const tx = c.x + 9 * SCALE;
+          const ty = y - hoehe / 2;
           return (
-            <Schwerter
-              key={'kampf' + k}
-              x={c.x}
-              y={y}
-              k={SCALE}
-              links={farbeSeite(seiten[0])}
-              rechts={farbeSeite(seiten[seiten.length - 1])}
-            />
+            <g key={'kampf' + k}>
+              <Schwerter
+                x={c.x}
+                y={y}
+                k={SCALE}
+                links={farbeSeite(seiten[0])}
+                rechts={farbeSeite(seiten[seiten.length - 1])}
+              />
+              {zeilen.length > 0 && (
+                <g className="kampf-tafel">
+                  <rect x={tx} y={ty} width={52} height={hoehe} rx={1} />
+                  {zeilen.map((z, i) => (
+                    <g key={z.seite}>
+                      <rect x={tx + 3} y={ty + 4 + i * 9} width={5} height={5} fill={farbeSeite(z.seite)} stroke="none" />
+                      <text x={tx + 11} y={ty + 9 + i * 9}>
+                        {z.anzahl} · {z.leben}
+                      </text>
+                      {z.verlust > 0 && (
+                        <text className="verlust" x={tx + 48} y={ty + 9 + i * 9} textAnchor="end">
+                          -{z.verlust}
+                        </text>
+                      )}
+                    </g>
+                  ))}
+                </g>
+              )}
+            </g>
+          );
+        })}
+
+        {/*
+          Jeder Treffer der letzten Kampfrunde steigt als Zahl ueber dem Feld
+          auf, in der Farbe der getroffenen Seite; ein Fall blitzt rot
+          (rules/army.ts, fight.treffer). PLATZHALTER (ASSETS.md).
+        */}
+        {(treffer ?? []).map((tr) => {
+          const k = hexKey(tr.q, tr.r);
+          if (sicht !== null && !sicht.has(k)) return null;
+          const c = hexToPixel(tr.q, tr.r, LAYOUT);
+          const y = c.y - liftHex(tr.q, tr.r) - LAYOUT.h * 0.3;
+          const x = c.x + ((tr.nr % 3) - 1) * 11;
+          const stil = { animationDelay: `${(tr.nr * 0.12).toFixed(2)}s` } as React.CSSProperties;
+          return (
+            <g key={'treffer' + tr.id} pointerEvents="none">
+              {tr.gefallen && (
+                <circle
+                  className="treffer-puls"
+                  cx={c.x}
+                  cy={y}
+                  r={10}
+                  style={{ ...stil, transformOrigin: `${c.x}px ${y}px` }}
+                />
+              )}
+              <text
+                className={tr.gefallen ? 'treffer-zahl gefallen' : 'treffer-zahl'}
+                x={x}
+                y={y}
+                fill={farbeSeite(tr.seite)}
+                style={stil}
+              >
+                -{tr.anzahl}
+              </text>
+            </g>
           );
         })}
 
