@@ -72,20 +72,21 @@ export function gruppenStatus(g: HeerGruppe, kampf: ReadonlySet<string>): HeerSt
   return 'steht';
 }
 
-export function gruppenName(g: HeerGruppe): string {
+/** heldName: der Held heisst bei seinem Namen, wenn die Partie ihn kennt (core/lore.ts). */
+export function gruppenName(g: HeerGruppe, heldName?: string): string {
   if (g.schar !== null) return `Schar ${g.schar}`;
   if (g.einheiten.length > 1) return 'Verband';
   const u = g.einheiten[0]!;
-  return u.kind === 'held' ? 'Held' : u.kind === 'bogen' ? 'Bogenschuetze' : 'Ritter';
+  return u.kind === 'held' ? (heldName ?? 'Held') : u.kind === 'bogen' ? 'Bogenschuetze' : 'Ritter';
 }
 
 /** Wie eine Einheit heisst - je Art nach Nummer gezaehlt: "Ritter 2", "Bogenschuetze 1". */
-export function einheitNamen(einheiten: readonly UnitState[]): Map<number, string> {
+export function einheitNamen(einheiten: readonly UnitState[], heldName?: string): Map<number, string> {
   const zaehler = new Map<string, number>();
   const out = new Map<number, string>();
   for (const u of [...einheiten].sort((a, b) => a.id - b.id)) {
     if (u.kind === 'held') {
-      out.set(u.id, 'Held');
+      out.set(u.id, heldName ?? 'Held');
       continue;
     }
     const n = (zaehler.get(u.kind) ?? 0) + 1;

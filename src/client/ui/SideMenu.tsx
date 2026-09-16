@@ -231,6 +231,7 @@ export function SideMenu({
   log,
   welt,
   einheiten,
+  heldName,
   raumcode,
   pin,
   punkte,
@@ -284,6 +285,8 @@ export function SideMenu({
   welt: readonly WeltEintrag[];
   /** Die eigenen Einheiten: Held, Ritter, Bogenschuetzen. */
   einheiten: readonly UnitState[];
+  /** Wie der eigene Held heisst (core/lore.ts) - sonst steht da nur "Held". */
+  heldName?: string;
   /** Raumcode und Platz-PIN - fuer den Wiedereinstieg auf einem anderen Geraet. */
   raumcode: string;
   pin: string | null;
@@ -373,7 +376,7 @@ export function SideMenu({
   const saison = seasonOf(turn);
   // Raubzuege brechen zum Beginn jeder grossen Runde auf (rules/army.ts, sendRaiders).
   const bisPluenderung = ROUNDS_PER_BIG_ROUND - ((Math.max(1, turn) - 1) % ROUNDS_PER_BIG_ROUND);
-  const namen = einheitNamen(einheiten);
+  const namen = einheitNamen(einheiten, heldName);
 
   const umschaltenGruppe = (key: string) =>
     setOffeneGruppen((alt) => {
@@ -648,7 +651,7 @@ export function SideMenu({
                       <button className="menu-ritter-zeile" aria-expanded={auf} onClick={() => umschaltenGruppe(g.key)}>
                         <span className="menu-ritter-name">
                           {g.schar !== null ? `⚑${g.schar} ` : ''}
-                          {gruppenName(g)} · {g.einheiten.length}
+                          {gruppenName(g, heldName)} · {g.einheiten.length}
                         </span>
                         <span className="menu-gruppe-leben" title={`Leben ${leben} von ${max}`}>
                           <i style={{ width: `${Math.round((leben / max) * 100)}%` }} />

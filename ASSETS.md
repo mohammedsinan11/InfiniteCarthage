@@ -80,6 +80,9 @@ aufbrechende Truhe oder ein Sternenfunke, der in die Kartenwahl uebergeht.
   (`zeichneBastion`), Mauer als hoher Weg mit Zinnen entlang der Kanten
   (`zeichneMauern`). Stein nach `STEIN_JE_SORTE`, Turmdach nach
   `DACH_JE_SORTE`, Fahnen in Spielerfarbe.
+- **Koenigssitz (Stufe III):** derselbe Palast, Daecher in Gold (`y`/`Y` statt
+  `x`/`X`), dazu eine Krone 5 x 3 auf der Spitze statt der Fahne
+  (`client/units.ts`, `KOENIGSSITZ`, `KRONE`).
 - **Ausbau-Tafel:** reines CSS (`.ausbau-tafel`) mit Zipfel.
 - **Knoepfe der Bauzeile:** `SymBauen` (Hammer) und `SymHauptstadt` (Krone)
   in `ui/Aktionsleiste.tsx`, aus wenigen SVG-Flaechen.
@@ -87,7 +90,19 @@ aufbrechende Truhe oder ein Sternenfunke, der in die Kartenwahl uebergeht.
 *Was fehlt:* eine gezeichnete Burg je Gelaende statt umgefaerbtem Stein - neun
 Sorten (Wiese, Wald, Taiga, Dschungel, Lehm, Gebirge, Wueste, Schnee, Sumpf).
 Spaeter Stufe II (Palast, Bastionen, Mauerstuecke) je Gelaende. Eine Krone mit
-Glanz, ein Rahmen fuer die Tafel, Symbole fuer Bauen und Hauptstadt.
+Glanz, ein Rahmen fuer die Tafel, Symbole fuer Bauen und Hauptstadt. Fuer
+Stufe III ein eigener Koenigssitz statt des umgefaerbten Palastes, und die
+Reichsbauten der Phase 2 (Burgfeste, Handelskontor, Tempel) als freistehende
+Gebaeude ohne Palast-Unterbau.
+
+### Name des Helden — **Platzhalter**
+
+- **Namensschild:** SVG-Text ueber der Heldenfigur (`.held-name` in
+  `styles.css`), Pixelschrift in Akzentfarbe mit dunklem Rand. Der Name selbst
+  kommt aus `core/lore.ts`.
+
+*Was fehlt:* ein gezeichnetes Band oder Wappenschild statt blossem Text, und
+ein Wappen je Adelshaus.
 
 *Aufwand:* Burg etwa 24 x 24 px je Sorte; Krone 16 x 10 px mit zwei
 Bildern fuers Wippen.

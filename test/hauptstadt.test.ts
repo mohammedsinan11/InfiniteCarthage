@@ -9,13 +9,16 @@ import { applyAction, createGame } from '../src/core/rules/reducer';
 import type { Game } from '../src/core/rules/reducer';
 import {
   FAST_GESCHLOSSEN,
-  festungHindernis,
+  MAX_STUFE,
+  ausbauHindernis,
   festungsSchutz,
+  hatKoenigssitz,
   hauptstadtFelder,
   hauptstadtHindernis,
+  naechsteStufe,
   umlandVon,
 } from '../src/core/rules/hauptstadt';
-import { COST_CAPITAL, COST_FESTUNG, COST_TOWER } from '../src/core/rules/costs';
+import { COST_CAPITAL, COST_FESTUNG, COST_KOENIGSSITZ, COST_TOWER } from '../src/core/rules/costs';
 import { strasseGeschuetzt } from '../src/core/rules/feuer';
 import { edgeKey, hexEdges, hexKey, hexVertices, hexesInRange, vertexKey } from '../src/core/coords';
 import { terrainAt } from '../src/core/worldgen';
@@ -191,12 +194,14 @@ describe('Festungsring', () => {
     expect(publicPoints(game.state, 'p0')).toBe(vorher + STUFE_PUNKTE);
     expect(RESOURCES.every((r) => game.state.players[0]!.hand[r] === 0)).toBe(true);
     if (res.ok) expect(res.events).toContainEqual({ t: 'capitalUpgrade', player: 'p0', q: h.q, r: h.r, stufe: 2 });
-    expect(festungHindernis(game.state, 'p0', h.q, h.r)).toBe('Der Festungsring steht schon.');
+    // Nach dem Ring geht es weiter: der Koenigssitz ist die naechste Stufe.
+    expect(naechsteStufe(game.state, h.q, h.r)).toBe(3);
+    expect(ausbauHindernis(game.state, 'p0', h.q, h.r)).toBe(null);
   });
 
   it('nicht bei offenem Ring, nicht fremd, nicht ausser der Bauphase', () => {
     const { game, h } = mitHauptstadt();
-    expect(festungHindernis(game.state, 'p1', h.q, h.r)).toBe('Das ist nicht deine Hauptstadt.');
+    expect(ausbauHindernis(game.state, 'p1', h.q, h.r)).toBe('Das ist nicht deine Hauptstadt.');
     const kante = edgeKey(hexEdges(h.q, h.r)[0]!);
     delete game.state.roads[kante];
     expect(applyAction(game, { t: 'upgradeCapital', q: h.q, r: h.r }, 'p0').ok).toBe(false);
@@ -218,5 +223,54 @@ describe('Festungsring', () => {
     expect(strasseGeschuetzt(game.state, 'p0', kante)).toBe(true);
     expect(festungsSchutz(game.state, 'p0').ecken.has(stadt)).toBe(true);
     expect(festungsSchutz(game.state, 'p1').kanten.size).toBe(0);
+  });
+});
+
+describe('Koenigssitz', () => {
+  /**
+   * Hauptstadt gruenden, zum Festungsring ausbauen, Geld fuer die dritte Stufe
+   * geben. Die Hand wird nach jeder Aktion neu geholt: applyAction gibt einen
+   * neuen Zustand zurueck, der alte Spieler haengt daran nicht mehr.
+   */
+  function bisFestungsring() {
+    const game = spiel();
+    const h = landFeld(game);
+    ring(game, h, ['city', 'city', 'city']);
+    geben(game, 'p0');
+    expect(applyAction(game, { t: 'foundCapital', q: h.q, r: h.r }, 'p0').ok).toBe(true);
+    for (const r of RESOURCES) game.state.players[0]!.hand[r] += COST_FESTUNG[r] ?? 0;
+    expect(applyAction(game, { t: 'upgradeCapital', q: h.q, r: h.r }, 'p0').ok).toBe(true);
+    for (const r of RESOURCES) game.state.players[0]!.hand[r] += COST_KOENIGSSITZ[r] ?? 0;
+    return { game, h };
+  }
+
+  it('dritte Stufe: ein Punkt mehr, kostet, und hoeher geht es nicht', () => {
+    const { game, h } = bisFestungsring();
+    const vorher = publicPoints(game.state, 'p0');
+    const res = applyAction(game, { t: 'upgradeCapital', q: h.q, r: h.r }, 'p0');
+    expect(res.ok).toBe(true);
+    expect(game.state.hauptstaedte[hexKey(h.q, h.r)]?.stufe).toBe(MAX_STUFE);
+    expect(publicPoints(game.state, 'p0')).toBe(vorher + STUFE_PUNKTE);
+    expect(RESOURCES.every((r) => game.state.players[0]!.hand[r] === 0)).toBe(true);
+    if (res.ok) expect(res.events).toContainEqual({ t: 'capitalUpgrade', player: 'p0', q: h.q, r: h.r, stufe: 3 });
+    expect(naechsteStufe(game.state, h.q, h.r)).toBe(null);
+    expect(ausbauHindernis(game.state, 'p0', h.q, h.r)).toBe('Der Koenigssitz steht schon.');
+    for (const r of RESOURCES) game.state.players[0]!.hand[r] += COST_KOENIGSSITZ[r] ?? 0;
+    expect(applyAction(game, { t: 'upgradeCapital', q: h.q, r: h.r }, 'p0').ok).toBe(false);
+  });
+
+  it('erst mit dem Koenigssitz beginnt Phase 2', () => {
+    const { game, h } = bisFestungsring();
+    expect(hatKoenigssitz(game.state, 'p0')).toBe(false);
+    expect(applyAction(game, { t: 'upgradeCapital', q: h.q, r: h.r }, 'p0').ok).toBe(true);
+    expect(hatKoenigssitz(game.state, 'p0')).toBe(true);
+    expect(hatKoenigssitz(game.state, 'p1')).toBe(false);
+  });
+
+  it('der Koenigssitz ist auch fuer die anderen sichtbar', () => {
+    const { game, h } = bisFestungsring();
+    expect(applyAction(game, { t: 'upgradeCapital', q: h.q, r: h.r }, 'p0').ok).toBe(true);
+    const sicht = redactStateFor(game.state, 'p1');
+    expect(sicht.hauptstaedte[hexKey(h.q, h.r)]?.stufe).toBe(MAX_STUFE);
   });
 });

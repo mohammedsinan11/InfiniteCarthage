@@ -51,6 +51,19 @@ export const COST_CAPITAL: Cost = { lumber: 2, brick: 2, grain: 2, ore: 3 };
 export const COST_FESTUNG: Cost = { lumber: 1, brick: 3, grain: 1, ore: 3 };
 
 /**
+ * Die dritte Stufe, der Koenigssitz: goldene Spitze und Krone, und mit ihm
+ * beginnt Phase 2 (rules/hauptstadt.ts). Teurer als der Festungsring, mit
+ * Wolle fuer den Hofstaat. PLATZHALTER fuers Balancing.
+ */
+export const COST_KOENIGSSITZ: Cost = { lumber: 2, brick: 3, wool: 2, grain: 3, ore: 4 };
+
+/**
+ * Was eine Hauptstadt kostet, die auf diese Stufe ausgebaut wird. Stufe 1
+ * steht nicht darin - die gruendet man (COST_CAPITAL).
+ */
+export const COST_STUFE: Record<number, Cost> = { 2: COST_FESTUNG, 3: COST_KOENIGSSITZ };
+
+/**
  * Eine abgebrannte Strasse wieder aufbauen: nur Holz. Der Damm liegt noch, es
  * fehlen die Bohlen - und wer gebrannt wurde, soll nicht doppelt zahlen.
  */

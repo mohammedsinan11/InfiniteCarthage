@@ -369,19 +369,64 @@ anbieten oder brechen; ob Tribut mit der Groesse des Reichs steigen soll.
   brennt nicht, die Bastionen fangen kein Feuer, und der Ausbau loescht, was im
   Ring gerade brennt.
 
+- **Stufe III, Koenigssitz:** dieselbe Tafel, eine Stufe weiter (Aktion
+  `upgradeCapital`, Kosten `COST_KOENIGSSITZ`, +1 Siegpunkt, beides
+  Platzhalter). Derselbe Palast, aber die Daecher sind vergoldet und statt der
+  Fahne sitzt eine Krone auf der Spitze (`units.ts`, `KOENIGSSITZ`, `KRONE`).
+  Die Spielerfarbe bleibt an den Seitentuermen, sonst saehen alle
+  Koenigssitze gleich aus. `MAX_STUFE = 3`: hoeher geht es nicht, die Tafel
+  sagt das.
+
 - **Keine Wachtuerme am Ring:** neben Burg und Mauer brachte ein Turm nichts
   Eigenes. Wer dort einen hat, bekommt ihn beim Gruenden erstattet
   (`COST_TOWER`); neue lassen sich an Hauptstadt-Ecken nicht bauen
   (`anHauptstadt`).
 
+### Phase 2: was der Koenigssitz aufschliesst
+
+Steht der Koenigssitz, beginnt fuer diesen Spieler Phase 2
+(`hatKoenigssitz`). Der Weg dahin bleibt der alte: Residenz, Festungsring,
+Koenigssitz. Danach faellt die Siedler-Mechanik als Nadeloehr weg.
+
+- **Reichsbauten statt weiterer Burgen:** Burgfeste, Handelskontor und Tempel
+  werden einzeln freigeschaltet und stehen fuer sich auf einer Kachel - ohne
+  Ring aus Strassen und Staedten, ohne Palast-Unterbau. Man muss nicht mehr
+  fuer jede Richtung eine eigene Hauptstadt hochziehen.
+- **Der Koenig ernennt Helden:** mit dem Koenigssitz waehlt man den ersten
+  Zweig - Krieger, Hexe oder Haendler, passend zu den drei Bauten. Das ist der
+  Anfang des Technologiebaums.
+- Noch offen: wo die Bauoptionen stehen, was die drei Bauten kosten und
+  wirken, und ob ein Bau einmalig ist oder mehrfach.
+
 ### Geplant
 
 - **Eine eigene Aufgabe fuer Tuerme an der Hauptstadt** - etwa Bogenschuetzen
   darauf, die weiter schiessen.
-- **Stufe III** und **Richtungen** (Hexenturm, Burgfeste, Handelskontor, ...).
+- **Richtungen und Formen** je Gelaende (Hexenturm, Kasbah, Weltenbaum, ...) -
+  die Entwuerfe liegen als Bilder vor.
 - **Verdecken fuer Doerfer, Staedte und Einheiten:** fuer die Hauptstadt
   gebaut (siehe Karte, Zoom und Bedienung); die uebrigen folgen vielleicht.
 - Offen: Doerfer im Ring, was die Hauptstadt ueber die Punkte hinaus bringt.
+
+## Heldenlore
+
+Ein Held heisst nicht "Held", sondern etwa "Aldebrand der Kuehne, Markgraf von
+Sturmfels" (`core/lore.ts`).
+
+- **Woher der Name kommt:** aus dem `rngState` der Partie, also vom Server und
+  reproduzierbar - `Math.random` ist in `src/core` verboten. Vergeben wird er,
+  wenn der Held zum ersten Mal antritt (`benenneHeld`); er liegt beim Spieler
+  (`Player.held`), nicht bei der Einheit, und ueberlebt so dessen Tod.
+- **Wie er gebaut ist:** Vorname aus Stamm und Endung ("Alde" + "brand"),
+  Beiname mit Artikel, Adelshaus aus zwei Teilen ("Sturm" + "fels"), Titel in
+  der Form, die zum Geschlecht passt. Alles ohne Umlaute, wie ueberall.
+- **Wo er steht:** ueber der Figur auf der Karte (`.held-name`, auch bei
+  fremden Helden - wer gegen ein Haus kaempft, soll wissen, gegen welches),
+  in der Feldinfo mit Titel und Haus, in Heerleiste, Menue und Protokoll.
+- **Wofuer das gebaut ist (geplant):** ein Adelshaus. Faellt der Held, tritt
+  sein Nachfolger an - gleicher Stamm, gleiches Haus, gleicher Titel, neue
+  Endung, zufaelliges Geschlecht, wechselndes Aussehen (`nachfolger`, steht
+  schon bereit, wird noch nicht gerufen: heute kehrt derselbe Held zurueck).
 
 ## Verbaende
 

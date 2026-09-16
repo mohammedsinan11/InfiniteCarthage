@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<title>Probe: Ausbaustufen und Reichsbauten</title>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; padding: 20px 24px; background: #16110b; color: #f2e7d0;
+         font: 13px/1.45 -apple-system, system-ui, sans-serif; width: 1180px; }
+  h1 { font-family: 'Silkscreen', monospace; font-size: 20px; color: #ffd76a; margin: 0 0 4px; }
+  h2 { font-family: 'Silkscreen', monospace; font-size: 14px; color: #d9a441; margin: 22px 0 6px; }
+  p.lead { margin: 0 0 12px; color: #a8987c; max-width: 1120px; }
+  .reihe { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
+  figure { margin: 0; width: 364px; }
+  figcaption { font-size: 11.5px; color: #cdbd9c; margin-bottom: 4px; min-height: 52px; }
+  figcaption b { color: #f2e7d0; font-family: 'Silkscreen', monospace; font-size: 11px; }
+  canvas { display: block; image-rendering: pixelated; border: 2px solid #3a2c1c; background: #0f0c08; }
+</style></head>
+<body>
+<div id="inhalt"></div>
+<script type="module">
+// Die echten Zeichenfunktionen des Spiels - nicht nachgebaut, sondern dieselben.
+import {
+  zeichneHauptstadt, zeichneBastion, zeichneMauern, zeichneGebaeude, zeichneStrassen, steinFuer,
+} from '/src/client/units.ts';
+
+const S = 5;                      // Geraetepixel je Kunstpixel
+const OX = -36, OY = -32, W = 72, H = 58;
+const BLAU = '#3a7ac2';
+const SORTE = 'grass';            // Wiese: grauer Stein, Schieferdach
+const KACHEL = '/src/assets/tiles/grass_1_tile.png';
+
+const NACHBARN = [[1,0],[0,1],[-1,1],[-1,0],[0,-1],[1,-1]];
+const mitteVon = (q, r) => ({ x: 23 * q + Math.ceil(11.5 * r), y: 17 * r });
+const ECKEN = NACHBARN.map(([q, r], i) => {
+  const a = mitteVon(q, r), [q2, r2] = NACHBARN[(i + 1) % 6], b = mitteVon(q2, r2);
+  return { x: Math.round((a.x + b.x) / 3), y: Math.round((a.y + b.y) / 3) };
+});
+const px = (p) => ({ x: (p.x - OX) * S, y: (p.y - OY) * S });
+const MITTE = px({ x: 0, y: 0 });
+const ECKE_PX = ECKEN.map(px);
+
+const bild = (src) => new Promise((ok) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src; });
+const grass = await bild(KACHEL);
+
+// --- Pixelkarten der Richtungsbauten (aus den Entwuerfen) -------------------
+const PAL = {
+  k:'#1b130d', d:'#3a2a1e', m:'#b9b3a6', M:'#857e70', y:'#f2c94c', b:'#5e3d25', B:'#3f2818',
+  c:'#e2d2ab', C:'#b39c73', t:'#8a6a45', l:'#c94f3a', w:'#f2efe6',
+};
+const SPIEGEL = { m:'M', c:'C', p:'P', q:'p' };
+const spiegel = (halb) => {
+  const n = Math.max(...halb.map((z) => z.length));
+  return halb.map((z) => {
+    z = z.padEnd(n, '.').slice(0, n);
+    return z + z.slice(0, n - 1).split('').reverse().map((c) => SPIEGEL[c] ?? c).join('');
+  });
+};
+const BASIS  = spiegel(['d.d........','ddd........','dmd........','dmd.d.d.d.d','dmddddddddd','dmymmmmmmmm','dmmmmyymmdd','dmMmmmmmdbb','dmmmmmmmdbb','ddddddddddd']);
+const FESTE  = spiegel(['d.d.d.d','ddddddd','dmmmmmm','dmymmmm','dmpmmmm','dmpmmmy','dmqmmmm','dmmmmmm','dmmmmmm','ddddddd']);
+const KONTOR = spiegel(['....ddd','..ddlll','ddlllll','ddddddd','wlwlwlw','.dccccc','.dcyccc','.dcccbb','.dcccbb','ddddddd']);
+const TEMPEL = spiegel(['......y','......d','....ddd','...dyyy','..dcccc','.dccccc','.dccccc','ddddddd','dcdcdcd','dcdcdcd','dcdcdbb','ddddddd']);
+
+const dunkler = (f, a = 0.35) => misch(f, 0, a);
+const heller = (f, a = 0.35) => misch(f, 255, a);
+function misch(farbe, ziel, anteil) {
+  return '#' + [1, 3, 5].map((i) => {
+    const v = parseInt(farbe.slice(i, i + 2), 16);
+    return Math.round(v + (ziel - v) * anteil).toString(16).padStart(2, '0');
+  }).join('');
+}
+/** Eine Pixelkarte an ihren Fuessen (Kunstpixel) aufs Canvas malen. */
+function karte(g, rows, xArt, fyArt, farbe = BLAU, schatten = true) {
+  const breite = Math.max(...rows.map((z) => z.length));
+  const x0 = xArt - Math.floor(breite / 2), y0 = fyArt - (rows.length - 1);
+  if (schatten) {
+    g.fillStyle = 'rgba(0,0,0,0.32)';
+    g.fillRect((x0 + 1 - OX) * S, (fyArt + 1 - OY) * S, (breite - 2) * S, S);
+  }
+  rows.forEach((z, zy) => [...z].forEach((ch, zx) => {
+    if (ch === '.') return;
+    g.fillStyle = ch === 'p' ? farbe : ch === 'P' ? dunkler(farbe) : ch === 'q' ? heller(farbe) : (PAL[ch] ?? '#ff00ff');
+    g.fillRect((x0 + zx - OX) * S, (y0 + zy - OY) * S, S, S);
+  }));
+}
+
+/** Eine Szene: sieben Wiesenkacheln, darauf was die Funktion malt. */
+function szene(male) {
+  const c = document.createElement('canvas');
+  c.width = W * S; c.height = H * S;
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  const felder = [[0, 0], ...NACHBARN];
+  felder.sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+  for (const [q, r] of felder) {
+    const m = mitteVon(q, r);
+    if (grass) g.drawImage(grass, (m.x - 13 - OX) * S, (m.y - 19 - OY) * S, 26 * S, 32 * S);
+  }
+  male(g);
+  return c;
+}
+
+const stein = steinFuer(SORTE);
+const kanten = [0, 1, 2, 3, 4, 5].map((i) => ({ a: ECKE_PX[i], b: ECKE_PX[(i + 1) % 6], stein }));
+const strassen = [0, 1, 2, 3, 4, 5].map((i) => ({ a: ECKE_PX[i], b: ECKE_PX[(i + 1) % 6], farbe: BLAU, ohneWimpel: true }));
+const DREI = [0, 2, 4];
+
+/** Ecken hinter der Mitte zuerst, davorliegende danach - wie das Brett es sortiert. */
+function mitEcken(g, malEcke, malMitte) {
+  for (const i of DREI) if (ECKE_PX[i].y <= MITTE.y) malEcke(g, i);
+  malMitte(g);
+  for (const i of DREI) if (ECKE_PX[i].y > MITTE.y) malEcke(g, i);
+}
+
+const stufe = (n) => szene((g) => {
+  if (n === 1) zeichneStrassen(g, strassen, S);
+  else zeichneMauern(g, kanten, S);
+  mitEcken(
+    g,
+    (gg, i) => (n === 1
+      ? zeichneGebaeude(gg, 'stadt', ECKE_PX[i].x, ECKE_PX[i].y, S, BLAU)
+      : zeichneBastion(gg, ECKE_PX[i].x, ECKE_PX[i].y, S, BLAU, SORTE)),
+    (gg) => zeichneHauptstadt(gg, MITTE.x, MITTE.y, S, BLAU, SORTE, n),
+  );
+});
+
+/** Ein Richtungsbau: mit Palast-Unterbau, ohne ihn, oder ganz allein auf der Kachel. */
+const bau = (rows, art) => szene((g) => {
+  if (art === 'frei') {
+    karte(g, rows, 0, 9);
+    return;
+  }
+  zeichneMauern(g, kanten, S);
+  mitEcken(
+    g,
+    (gg, i) => zeichneBastion(gg, ECKE_PX[i].x, ECKE_PX[i].y, S, BLAU, SORTE),
+    (gg) => {
+      if (art === 'mit') { karte(gg, rows, 0, 4); karte(gg, BASIS, 0, 9); }
+      else karte(gg, rows, 0, 9);
+    },
+  );
+});
+
+function figur(canvas, titel, text) {
+  const f = document.createElement('figure');
+  f.innerHTML = `<figcaption><b>${titel}</b><br>${text}</figcaption>`;
+  f.append(canvas);
+  return f;
+}
+function abschnitt(titel, lead, stuecke) {
+  const w = document.getElementById('inhalt');
+  const h = document.createElement('h2'); h.textContent = titel;
+  const p = document.createElement('p'); p.className = 'lead'; p.textContent = lead;
+  const reihe = document.createElement('div'); reihe.className = 'reihe';
+  for (const [t, text, c] of stuecke) reihe.append(figur(c, t, text));
+  w.append(h, p, reihe);
+}
+
+const kopf = document.createElement('h1');
+kopf.textContent = 'Ausbaustufen und Reichsbauten - gezeichnet vom Spiel selbst';
+document.getElementById('inhalt').append(kopf);
+
+abschnitt('Die drei Ausbaustufen', 'So steht die Hauptstadt jetzt im Spiel. Stufe III ist neu.', [
+  ['Stufe I · Residenz', 'Burg in der Mitte, drei eigene Staedte an den Ecken, sechs Strassen ringsum.', stufe(1)],
+  ['Stufe II · Festungsring', 'Aus den Strassen wird Mauer, aus den Staedten Bastionen, in der Mitte der Palast.', stufe(2)],
+  ['Stufe III · Koenigssitz', 'Derselbe Palast mit vergoldeten Daechern, Krone statt Fahne. Ab hier Phase 2.', stufe(3)],
+]);
+
+abschnitt('Burgfeste, Handelskontor, Tempel - mit und ohne Unterbau',
+  'Links wie im alten Entwurf: der Bau sitzt auf dem Palast-Unterbau. In der Mitte ohne ihn, aber noch im Ring. Rechts freistehend auf einer Kachel - so, wie sie in Phase 2 gesetzt werden.', [
+  ['Burgfeste · wie bisher', 'Mit Palast-Unterbau davor.', bau(FESTE, 'mit')],
+  ['Burgfeste · ohne Unterbau', 'Nur der Bau, im Festungsring.', bau(FESTE, 'ohne')],
+  ['Burgfeste · freistehend', 'Allein auf der Kachel, ohne Ring und Bastionen.', bau(FESTE, 'frei')],
+  ['Handelskontor · wie bisher', 'Mit Palast-Unterbau davor.', bau(KONTOR, 'mit')],
+  ['Handelskontor · ohne Unterbau', 'Nur der Bau, im Festungsring.', bau(KONTOR, 'ohne')],
+  ['Handelskontor · freistehend', 'Allein auf der Kachel.', bau(KONTOR, 'frei')],
+  ['Tempel · wie bisher', 'Mit Palast-Unterbau davor.', bau(TEMPEL, 'mit')],
+  ['Tempel · ohne Unterbau', 'Nur der Bau, im Festungsring.', bau(TEMPEL, 'ohne')],
+  ['Tempel · freistehend', 'Allein auf der Kachel.', bau(TEMPEL, 'frei')],
+]);
+
+document.body.dataset.fertig = '1';
+</script>
+</body></html>

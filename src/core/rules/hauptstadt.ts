@@ -120,20 +120,39 @@ export function hauptstadtHindernis(view: HauptstadtSicht, player: PlayerId, q: 
 // --- Ausbaustufen -----------------------------------------------------------
 
 /** Namen der Ausbaustufen. */
-export const STUFE_NAME: Record<number, string> = { 1: 'Residenz', 2: 'Festungsring' };
+export const STUFE_NAME: Record<number, string> = { 1: 'Residenz', 2: 'Festungsring', 3: 'Koenigssitz' };
 
 /**
- * Warum diese Hauptstadt (noch) nicht zum Festungsring ausgebaut werden kann -
- * oder null. Der Ring muss dafuer noch geschlossen sein: eine abgebrannte
- * Strasse will erst wieder aufgebaut werden.
+ * Die hoechste Stufe. Steht der Koenigssitz, beginnt fuer diesen Spieler
+ * Phase 2: der Koenig ernennt seine Helden und laesst eigene Bauten setzen
+ * (DESIGN.md, Hauptstadt).
  */
-export function festungHindernis(view: HauptstadtSicht, player: PlayerId, q: number, r: number): string | null {
+export const MAX_STUFE = 3;
+
+/**
+ * Warum diese Hauptstadt (noch) nicht eine Stufe hoeher kann - oder null. Der
+ * Ring muss dafuer noch geschlossen sein: eine abgebrannte Strasse will erst
+ * wieder aufgebaut werden.
+ */
+export function ausbauHindernis(view: HauptstadtSicht, player: PlayerId, q: number, r: number): string | null {
   const h = view.hauptstaedte?.[hexKey(q, r)];
   if (!h || h.owner !== player) return 'Das ist nicht deine Hauptstadt.';
-  if (h.stufe >= 2) return 'Der Festungsring steht schon.';
+  if (h.stufe >= MAX_STUFE) return `Der ${STUFE_NAME[MAX_STUFE]} steht schon.`;
   const u = umlandVon(view, player, q, r);
   if (!u || !u.bereit) return 'Der Ring ist nicht mehr geschlossen - Strassen oder Staedte fehlen.';
   return null;
+}
+
+/** Auf welche Stufe diese Hauptstadt als naechstes ausgebaut wuerde - null, wenn sie oben ist. */
+export function naechsteStufe(view: HauptstadtSicht, q: number, r: number): number | null {
+  const h = view.hauptstaedte?.[hexKey(q, r)];
+  if (!h || h.stufe >= MAX_STUFE) return null;
+  return h.stufe + 1;
+}
+
+/** Steht irgendwo ein Koenigssitz dieses Spielers? Daran haengt Phase 2. */
+export function hatKoenigssitz(view: Pick<HauptstadtSicht, 'hauptstaedte'>, player: PlayerId): boolean {
+  return Object.values(view.hauptstaedte ?? {}).some((h) => h.owner === player && h.stufe >= MAX_STUFE);
 }
 
 /**

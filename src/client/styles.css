@@ -3055,6 +3055,22 @@ em.off {
   align-self: center;
 }
 
+/*
+ * Der Name des Helden ueber seiner Figur (core/lore.ts). Dunkler Rand, damit
+ * er auf hellen wie dunklen Kacheln lesbar bleibt. PLATZHALTER (ASSETS.md).
+ */
+.held-name {
+  font-family: var(--pixel);
+  font-size: 7px;
+  fill: var(--accent);
+  paint-order: stroke;
+  stroke: #17120c;
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  text-anchor: middle;
+  pointer-events: none;
+}
+
 /* Fraktionen im Menue (Reiter Reich). */
 .menu-fraktionen {
   list-style: none;

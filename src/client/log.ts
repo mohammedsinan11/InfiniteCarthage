@@ -12,6 +12,8 @@ import { fraktionById, istFraktion } from '../core/factions';
 import { istSpielerSeite, spielerAus } from '../core/combat';
 import type { Seite } from '../core/combat';
 import type { WandererAuftrag } from '../core/state';
+import { STUFE_NAME } from '../core/rules/hauptstadt';
+import { heldKurz } from '../core/lore';
 
 const RES_NAME: Record<Resource, string> = {
   lumber: 'Holz',
@@ -133,7 +135,8 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
     case 'capital':
       return `${who(state, e.player)} gruendet eine Hauptstadt.`;
     case 'capitalUpgrade':
-      return `${who(state, e.player)} baut die Hauptstadt zum Festungsring aus.`;
+      return `${who(state, e.player)} baut die Hauptstadt zum ${STUFE_NAME[e.stufe] ?? `Stufe ${e.stufe}`} aus.`;
+    // STUFE_NAME kommt aus rules/hauptstadt.ts (Residenz, Festungsring, Koenigssitz).
     case 'knightReady':
       return `${who(state, e.player)} stellt ${e.kind === 'bogen' ? 'einen Bogenschuetzen' : 'einen Ritter'} auf.`;
     case 'volley': {
@@ -187,10 +190,19 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
         : e.art === 'dorf'
           ? `Ein Dorf von ${who(state, e.player)} ist niedergebrannt.`
           : `Eine Stadt von ${who(state, e.player)} ist zum Dorf heruntergebrannt.`;
-    case 'heroReady':
-      return e.zurueck ? `Der Held von ${who(state, e.player)} kehrt zurueck.` : `${who(state, e.player)} bekommt einen Helden.`;
-    case 'heroFell':
-      return `Der Held von ${who(state, e.player)} faellt. Er kehrt in Runde ${e.zurueck} zurueck.`;
+    case 'heroReady': {
+      // Der Held hat einen Namen, sobald er einmal angetreten ist (core/lore.ts).
+      const lore = state?.players.find((p) => p.id === e.player)?.held;
+      const wer = lore ? heldKurz(lore) : 'Der Held';
+      return e.zurueck
+        ? `${wer} kehrt zu ${who(state, e.player)} zurueck.`
+        : `${who(state, e.player)} ruft ${wer} zu den Waffen.`;
+    }
+    case 'heroFell': {
+      const lore = state?.players.find((p) => p.id === e.player)?.held;
+      const wer = lore ? heldKurz(lore) : `Der Held von ${who(state, e.player)}`;
+      return `${wer} faellt. Er kehrt in Runde ${e.zurueck} zurueck.`;
+    }
     case 'pact':
       return e.art === 'frieden'
         ? `${who(state, e.player)} schliesst Frieden mit ${fraktionName(state, e.fraktion)} bis Runde ${e.bis}.`

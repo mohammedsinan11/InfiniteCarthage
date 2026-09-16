@@ -47,7 +47,7 @@ import { setAmbiente } from '../ambiente';
 import { seasonOf } from '../../core/season';
 import { RESOURCES } from '../../core/types';
 import type { Resource } from '../../core/types';
-import { COST_CAPITAL, COST_CITY, COST_FESTUNG, COST_ROAD, COST_TOWER, canAfford } from '../../core/rules/costs';
+import { COST_CAPITAL, COST_CITY, COST_STUFE, COST_ROAD, COST_TOWER, canAfford } from '../../core/rules/costs';
 import { FRIEDEN_PREIS, TRIBUT_KARTEN, nimmtFrieden } from '../../core/rules/diplomatie';
 import { brennt } from '../../core/rules/feuer';
 import { WERTE as EINHEIT_WERTE } from '../../core/units';
@@ -55,11 +55,14 @@ import { kampfFelder as kampfFelderVon } from '../../core/combat';
 import type { UnitState as HeerEinheit } from '../../core/state';
 import { HAUPTSTADT_PUNKTE as PUNKTE_HAUPTSTADT, STUFE_PUNKTE as PUNKTE_STUFE } from '../../core/state';
 import { einheitNamen, gruppenStatus, heerGruppen, untaetig } from '../heer';
+import { heldKurz } from '../../core/lore';
 import { Heerleiste } from '../ui/Heerleiste';
 import {
   FAST_GESCHLOSSEN,
+  MAX_STUFE,
   STUFE_NAME,
-  festungHindernis,
+  ausbauHindernis,
+  naechsteStufe,
   hauptstadtFelder,
   anHauptstadt,
   hauptstadtHindernis,
@@ -250,7 +253,12 @@ export function Game() {
   /** Das Heer in Gruppen (client/heer.ts): Scharen und Felder. */
   const heer = useMemo(() => heerGruppen(meineEinheiten), [meineEinheiten]);
   const kampfOrte = useMemo(() => new Set(kampfFelderVon(state).keys()), [state]);
-  const heerNamen = useMemo(() => einheitNamen(meineEinheiten), [meineEinheiten]);
+  /** Wie der eigene Held heisst (core/lore.ts) - undefined, bevor er antritt. */
+  const heldName = useMemo(() => {
+    const lore = state.players.find((p) => p.id === you)?.held;
+    return lore ? heldKurz(lore) : undefined;
+  }, [state.players, you]);
+  const heerNamen = useMemo(() => einheitNamen(meineEinheiten, heldName), [meineEinheiten, heldName]);
   const untaetige = meineEinheiten.filter(untaetig);
   const naechsteUntaetige = useRef(0);
 
@@ -604,13 +612,15 @@ export function Game() {
         }),
       };
     };
-    const festungOption = (q: number, r: number) => {
-      const hindernis = festungHindernis(state, you, q, r);
+    /** Die naechste Ausbaustufe einer eigenen Hauptstadt: Festungsring, dann Koenigssitz. */
+    const ausbauOption = (q: number, r: number, stufe: number) => {
+      const hindernis = ausbauHindernis(state, you, q, r);
+      const kosten = COST_STUFE[stufe]!;
       return {
-        name: 'Festungsring',
-        kosten: COST_FESTUNG,
-        darf: jetzt && hindernis === null && bezahlbar(COST_FESTUNG),
-        hinweis: hindernis ?? warum ?? armut(COST_FESTUNG),
+        name: STUFE_NAME[stufe] ?? `Stufe ${stufe}`,
+        kosten,
+        darf: jetzt && hindernis === null && bezahlbar(kosten),
+        hinweis: hindernis ?? warum ?? armut(kosten),
         wahl: dann(() => {
           act({ t: 'upgradeCapital', q, r });
           playBuild();
@@ -621,11 +631,12 @@ export function Game() {
       const hauptstadt = state.hauptstaedte?.[ausbauOrt.key];
       if (hauptstadt && hauptstadt.owner === you) {
         const [q, r] = ausbauOrt.key.split(':').map(Number) as [number, number];
+        const naechste = naechsteStufe(state, q, r);
         return {
           ort: ausbauOrt,
           titel: `Hauptstadt · ${STUFE_NAME[hauptstadt.stufe] ?? `Stufe ${hauptstadt.stufe}`}`,
-          optionen: hauptstadt.stufe < 2 ? [festungOption(q, r)] : [],
-          leer: 'Weitere Stufen folgen.',
+          optionen: naechste !== null ? [ausbauOption(q, r, naechste)] : [],
+          leer: 'Der Koenigssitz steht - hoeher geht es nicht.',
         };
       }
       const u = umland.find((x) => hexKey(x.q, x.r) === ausbauOrt.key);
@@ -666,11 +677,11 @@ export function Game() {
       if (u.fehlt > FAST_GESCHLOSSEN || !hexVertices(u.q, u.r).some((v) => vertexKey(v) === ausbauOrt.key)) continue;
       optionen.push(hauptstadtOption(u));
     }
-    // An einer Ecke der eigenen Residenz: der Festungsring laesst sich auch von hier ausbauen.
+    // An einer Ecke der eigenen Hauptstadt: die naechste Stufe geht auch von hier.
     for (const [hk, h] of Object.entries(state.hauptstaedte ?? {})) {
-      if (h.owner !== you || h.stufe >= 2) continue;
+      if (h.owner !== you || h.stufe >= MAX_STUFE) continue;
       const [q, r] = hk.split(':').map(Number) as [number, number];
-      if (hexVertices(q, r).some((v) => vertexKey(v) === ausbauOrt.key)) optionen.push(festungOption(q, r));
+      if (hexVertices(q, r).some((v) => vertexKey(v) === ausbauOrt.key)) optionen.push(ausbauOption(q, r, h.stufe + 1));
     }
     return { ort: ausbauOrt, titel: b.type === 'city' ? 'Stadt' : 'Dorf', optionen };
   }, [ausbauOrt, you, isMine, phase.t, hand, state, umland, act]);
@@ -930,6 +941,7 @@ export function Game() {
           log={log}
           welt={welt}
           einheiten={meineEinheiten}
+          heldName={heldName}
           raumcode={useStore.getState().code}
           pin={useStore.getState().pin}
           punkte={punkte}
@@ -1144,6 +1156,7 @@ export function Game() {
           {/* Heerleiste: je Schar oder Feld ein Kaertchen, dazu "untaetig" (ui/Heerleiste.tsx). */}
           <Heerleiste
             gruppen={heer}
+            heldName={heldName}
             status={(g) => gruppenStatus(g, kampfOrte)}
             aktiv={
               heer.find(

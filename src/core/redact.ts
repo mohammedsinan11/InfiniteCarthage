@@ -16,6 +16,7 @@ import { emptyHand, handSize, publicPoints } from './state';
 import type { DevCard, GameState, Hand, Phase, PlayerId, TradeOffer } from './state';
 import type { ChunkCoord } from './chunks';
 import type { GameEvent } from './rules/reducer';
+import type { HeldLore } from './lore';
 
 export type PublicPlayer = {
   id: PlayerId;
@@ -38,6 +39,8 @@ export type PublicPlayer = {
   loot: number;
   /** Wann der gefallene Held zurueckkehrt, oder null - oeffentlich wie sein Fall. */
   heldZurueck: number | null;
+  /** Name, Haus und Titel des Helden - oeffentlich: sein Schild steht auf der Karte. */
+  held: HeldLore | null;
   connected: boolean;
   /** Sichtbare Punkte, ohne verdeckte Siegpunktkarten. */
   points: number;
@@ -108,6 +111,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
       cards: [...p.cards],
       loot: p.loot,
       heldZurueck: p.heldZurueck,
+      held: p.held ?? null,
       connected: p.connected,
       points: publicPoints(state, p.id),
     };

@@ -53,7 +53,7 @@ import {
   COST_SETTLEMENT,
   COST_TOWER,
   COST_CAPITAL,
-  COST_FESTUNG,
+  COST_STUFE,
   canAfford,
   pay,
 } from './costs';
@@ -66,7 +66,7 @@ import {
 import { computeProduction } from './production';
 import { beginBigRound, beginNight, heldenRunde, spawnHeld, spawnKnight, tickArmy } from './army';
 import { brandRunde, brennt, mitKarteLoeschen } from './feuer';
-import { anHauptstadt, festungHindernis, festungsSchutz, hauptstadtHindernis } from './hauptstadt';
+import { STUFE_NAME, anHauptstadt, ausbauHindernis, festungsSchutz, hauptstadtHindernis } from './hauptstadt';
 import { abkommenRunde, tributRunde, verhandeln } from './diplomatie';
 import type { DiplomatieEvent, Verhandlung } from './diplomatie';
 import { auftraegePruefen, aufAuftragAntworten, auftragLiefern, wandererBieten } from './auftraege';
@@ -239,6 +239,7 @@ export function createGame(
       loot: 0,
       connected: true,
       heldZurueck: null,
+      held: null,
     })),
     order: players.map((p) => p.id),
     current: 0,
@@ -932,12 +933,14 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
 
     case 'upgradeCapital': {
       if (phase.t !== 'main') return fail('Jetzt kann nicht gebaut werden.');
-      const why = festungHindernis(s, actor, action.q, action.r);
+      const why = ausbauHindernis(s, actor, action.q, action.r);
       if (why) return fail(why);
-      if (!canAfford(actorPlayer.hand, COST_FESTUNG)) return fail('Zu wenig Rohstoffe fuer den Festungsring.');
-      pay(actorPlayer.hand, COST_FESTUNG);
       const hauptstadt = s.hauptstaedte[hexKey(action.q, action.r)]!;
-      hauptstadt.stufe = 2;
+      const stufe = hauptstadt.stufe + 1;
+      const kosten = COST_STUFE[stufe]!;
+      if (!canAfford(actorPlayer.hand, kosten)) return fail(`Zu wenig Rohstoffe fuer den ${STUFE_NAME[stufe]}.`);
+      pay(actorPlayer.hand, kosten);
+      hauptstadt.stufe = stufe;
       // Die neue Mauer loescht, was im Ring gerade brennt.
       const schutz = festungsSchutz(s, actor);
       s.braende = s.braende.filter((b) => b.owner !== actor || !(schutz.kanten.has(b.key) || schutz.ecken.has(b.key)));

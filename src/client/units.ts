@@ -50,6 +50,7 @@ const PALETTE: Record<string, string> = {
   m: '#b9b3a6', // Stein im Licht
   M: '#857e70', // Stein im Schatten
   y: '#f2c94c', // Gold, erleuchtetes Fenster
+  Y: '#a8832e', // Gold im Schatten - Dach und Krone des Koenigssitzes
   o: '#f08a24', // Flamme
   t: '#8a6a45', // Holz
   T: '#4f3a28', // Fachwerk, dunkles Holz
@@ -464,6 +465,15 @@ const PALAST = spiegeln([
 ]);
 const BASTION = spiegeln(['d.d.d', 'ddddd', 'dmmmm', 'dmmym', 'dmmmm', 'dpppp', 'dmmmm', 'dmMmm', 'dmmmm', 'ddddd']);
 
+/*
+ * Stufe III, Koenigssitz: derselbe Palast, aber die Daecher sind vergoldet
+ * (x/X werden y/Y) und statt der Fahne sitzt eine Krone auf der Spitze. Die
+ * Spielerfarbe bleibt an den Seitentuermen - sonst saehen alle Koenigssitze
+ * gleich aus. PLATZHALTER (ASSETS.md).
+ */
+const KOENIGSSITZ = PALAST.map((z) => z.replace(/x/g, 'y').replace(/X/g, 'Y'));
+const KRONE = ['y.y.y', 'yyyyy', 'dYYYd'];
+
 /**
  * Stein je Kachelsorte (tiles.ts, kachelSorte): die Hauptstadt nimmt die Farbe
  * ihres Gelaendes an - Sandstein in der Wueste, Ziegel auf Lehm, Granit im
@@ -568,14 +578,15 @@ export function zeichneHauptstadt(
   sorte: string,
   stufe = 1,
 ): void {
-  const karte = stufe >= 2 ? PALAST : BURG;
+  const karte = stufe >= 3 ? KOENIGSSITZ : stufe >= 2 ? PALAST : BURG;
   const breite = karte[0]!.length;
   const hoehe = karte.length + 3;
   const bild = bauwerkBild(
-    stufe >= 2 ? 'palast' : 'burg',
+    stufe >= 3 ? 'koenigssitz' : stufe >= 2 ? 'palast' : 'burg',
     [
       { karte, dx: 0, dy: 3 },
-      { karte: BURG_FAHNE, dx: 10, dy: 0 },
+      // Die Krone sitzt mittig auf der Spitze, wo sonst die Fahne weht.
+      stufe >= 3 ? { karte: KRONE, dx: 8, dy: 0 } : { karte: BURG_FAHNE, dx: 10, dy: 0 },
     ],
     breite,
     hoehe,

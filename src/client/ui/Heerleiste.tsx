@@ -31,9 +31,12 @@ export function Heerleiste({
   onWahl,
   untaetig,
   onUntaetig,
+  heldName,
 }: {
   gruppen: readonly HeerGruppe[];
   status: (g: HeerGruppe) => HeerStatus;
+  /** Wie der eigene Held heisst (core/lore.ts) - sonst steht da nur "Held". */
+  heldName?: string;
   /** Schluessel der gewaehlten Gruppe, oder null. */
   aktiv: string | null;
   onWahl: (g: HeerGruppe) => void;
@@ -60,7 +63,7 @@ export function Heerleiste({
           <button
             key={g.key}
             className={['heer-karte', `heer-${s}`, aktiv === g.key ? 'aktiv' : ''].filter(Boolean).join(' ')}
-            title={`${gruppenName(g)} · ${STATUS_TEXT[s]} · Leben ${leben}/${max}`}
+            title={`${gruppenName(g, heldName)} · ${STATUS_TEXT[s]} · Leben ${leben}/${max}`}
             onClick={() => onWahl(g)}
           >
             <span className="heer-kopf">

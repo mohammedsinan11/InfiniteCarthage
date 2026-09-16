@@ -33,6 +33,7 @@ import {
 } from '../audio';
 import { sichtLage } from '../../core/zeit';
 import type { PlayerId } from '../../core/state';
+import { STUFE_NAME } from '../../core/rules/hauptstadt';
 import { createWorld, mitAufgedeckt, revealChunks } from '../../core/world';
 import type { World } from '../../core/world';
 import { BRAND_WAS, auftragText, bundleText, describeEvent, fraktionName, seiteName } from '../log';
@@ -315,7 +316,11 @@ function meldungenAus(
       continue;
     }
     if (e.t === 'capitalUpgrade') {
-      meldung(e.player === you ? 'Der Festungsring steht' : `${wer(e.player)} baut einen Festungsring`, e.player === you ? 'gain' : 'info');
+      const was = STUFE_NAME[e.stufe] ?? `Stufe ${e.stufe}`;
+      meldung(
+        e.player === you ? `Der ${was} steht` : `${wer(e.player)} baut einen ${was}`,
+        e.player === you ? 'gain' : 'info',
+      );
       continue;
     }
     if (e.t === 'plunder') {

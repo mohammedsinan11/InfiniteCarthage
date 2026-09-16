@@ -11,6 +11,7 @@
 import type { Bundle, Resource } from './types';
 import type { ChunkCoord } from './chunks';
 import type { DraftSource } from './cards/types';
+import type { HeldLore } from './lore';
 
 export type PlayerId = string;
 
@@ -68,6 +69,12 @@ export type Player = {
    * oder bevor er zum ersten Mal angetreten ist.
    */
   heldZurueck: number | null;
+  /**
+   * Wer der Held ist: Name, Beiname, Haus und Titel (core/lore.ts). null, bis
+   * der erste antritt. Der Name bleibt ueber seinen Tod hinaus stehen - das
+   * Adelshaus ueberlebt seinen Traeger (DESIGN.md, Heldenlore).
+   */
+  held: HeldLore | null;
 };
 
 /**

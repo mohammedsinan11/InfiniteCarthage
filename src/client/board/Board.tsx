@@ -39,6 +39,7 @@ import { edgeAdjacentHexes, vertexAdjacentHexes } from '../../core/coords';
 import { edgeKey, hexEdges, hexVertices, vertexKey } from '../../core/coords';
 import { WERTE, garrisonOf, garrisonUnits, isNestActive, nestFraktionOf } from '../../core/units';
 import type { Unit } from '../../core/units';
+import { heldKurz, heldVoll } from '../../core/lore';
 import { istSpielerSeite, istKampf, kampfFelder, seiteVon, spielerAus } from '../../core/combat';
 import type { Seite } from '../../core/combat';
 import { fraktionById, istFraktion } from '../../core/factions';
@@ -318,7 +319,9 @@ const VORHABEN = {
 function einheitenText(state: PublicState, du: string | null, gruppe: readonly Unit[]): string {
   const u = gruppe[0]!;
   const n = gruppe.length;
-  const teile: string[] = [`${n > 1 ? `${n} ` : ''}${ART_NAME[u.kind][n > 1 ? 1 : 0]}`];
+  // Der Held steht mit Namen da, sobald die Partie ihn kennt (core/lore.ts).
+  const lore = u.kind === 'held' && n === 1 ? state.players.find((p) => p.id === u.owner)?.held : null;
+  const teile: string[] = [lore ? heldVoll(lore) : `${n > 1 ? `${n} ` : ''}${ART_NAME[u.kind][n > 1 ? 1 : 0]}`];
   if (u.owner !== null) {
     teile.push(
       u.owner === du
@@ -2005,6 +2008,29 @@ export function Board({
             </g>
           );
         })}
+
+        {/*
+          Der Name des Helden ueber seiner Figur (core/lore.ts) - auch bei
+          fremden Helden: wer gegen ein Haus kaempft, soll wissen, gegen welches.
+          Im Nebel nicht.
+        */}
+        {state.units
+          .filter((u) => u.kind === 'held' && u.owner !== null && (sicht === null || sicht.has(hexKey(u.q, u.r))))
+          .map((u) => {
+            const lore = state.players.find((p) => p.id === u.owner)?.held;
+            if (!lore) return null;
+            const c = hexToPixel(u.q, u.r, LAYOUT);
+            return (
+              <text
+                key={'heldname' + u.id}
+                className="held-name"
+                x={c.x}
+                y={c.y - liftHex(u.q, u.r) - LAYOUT.h * 0.42}
+              >
+                {heldKurz(lore)}
+              </text>
+            );
+          })}
 
         {/* Befehle: Weg und Ziel eigener Ritter und des Helden. Frueher nur der Ritter - der Held zog, aber man sah es nicht. */}
         {state.units

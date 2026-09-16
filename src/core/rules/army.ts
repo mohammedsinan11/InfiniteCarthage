@@ -65,6 +65,8 @@ import type { RuinResult } from '../ruins';
 import { RESOURCES } from '../types';
 import { emptyHand, handSize, playerById } from '../state';
 import type { GameState, Hand, PlayerId, UnitKind, UnitState } from '../state';
+import { wuerfleHeld } from '../lore';
+import type { HeldLore } from '../lore';
 import {
   BESATZUNG_MAX,
   WERTE,
@@ -355,15 +357,33 @@ export function spawnHeld(s: GameState, id: PlayerId, events: Ereignisse): UnitS
   if (!feldAn) return null;
   const p = playerById(s, id);
   const zurueck = p?.heldZurueck !== null && p?.heldZurueck !== undefined;
+  if (p) benenneHeld(s, p);
   const unit = aufstellen(s, einheitVorlage('held', feldAn.q, feldAn.r, { owner: id }));
   if (p) p.heldZurueck = null;
   events.push({ t: 'heroReady', player: id, unit: unit.id, q: unit.q, r: unit.r, zurueck });
   return unit;
 }
 
+/**
+ * Dafuer sorgen, dass der Held dieses Spielers einen Namen hat (core/lore.ts).
+ * Wer schon einen hat, behaelt ihn: der gefallene Held kehrt als derselbe
+ * zurueck. Der Nachfolger aus dem Adelshaus kommt spaeter (DESIGN.md,
+ * Heldenlore). Der Name kommt aus dem rngState - also vom Server.
+ */
+export function benenneHeld(s: GameState, p: GameState['players'][number]): HeldLore {
+  if (p.held) return p.held;
+  const rng = new Rng(s.rngState);
+  const lore = wuerfleHeld(rng);
+  s.rngState = rng.getState();
+  p.held = lore;
+  return lore;
+}
+
 /** Nach jeder Runde: gefallene Helden kehren zurueck, wenn ihre Zeit um ist. */
 export function heldenRunde(s: GameState, events: Ereignisse): void {
   for (const p of s.players) {
+    // Partien von vor der Heldenlore: der Held steht schon, nur der Name fehlt.
+    if (!p.held && s.units.some((u) => u.kind === 'held' && u.owner === p.id)) benenneHeld(s, p);
     if (p.heldZurueck === null || s.turn < p.heldZurueck) continue;
     spawnHeld(s, p.id, events);
   }
