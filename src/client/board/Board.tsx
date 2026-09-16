@@ -63,7 +63,6 @@ import type { Cost } from '../../core/rules/costs';
 import { loeschFelder } from '../../core/rules/feuer';
 import type { Pfeil } from '../net/store';
 import { scharNummern } from '../heer';
-import { anHauptstadt } from '../../core/rules/hauptstadt';
 import type { Brand } from '../../core/state';
 import { BRAND_WAS } from '../log';
 import { MAX_LICHTER, WetterSchicht } from './WetterSchicht';
@@ -690,8 +689,14 @@ export function Board({
       const ecke = parseVertexKey(vk);
       const v = vertexToPixel(ecke, LAYOUT);
       const p = geraet(v.x, v.y - liftVertex(ecke));
-      // Der Wachturm hat oben eine Feuerschale - er leuchtet weit.
-      out.push({ x: p.x, y: p.y, r: (b.turm ? 44 : b.type === 'city' ? 34 : 24) * f, waerme: b.turm ? 1 : 0.8 });
+      out.push({ x: p.x, y: p.y, r: (b.type === 'city' ? 34 : 24) * f, waerme: 0.8 });
+    }
+    // Der Wachturm hat oben eine Feuerschale - er leuchtet weiter als jedes Haus.
+    for (const vk of Object.keys(state.tuerme ?? {})) {
+      const ecke = parseVertexKey(vk);
+      const v = vertexToPixel(ecke, LAYOUT);
+      const p = geraet(v.x, v.y - liftVertex(ecke));
+      out.push({ x: p.x, y: p.y, r: 44 * f, waerme: 1 });
     }
     for (const b of state.braende) {
       const w = brandPunkt(b);
@@ -1007,20 +1012,44 @@ export function Board({
         return geraet(p.x, p.y - liftVertex(v));
       });
     /*
-     * Residenz (Stufe I): Staedte an den hinteren Ecken ihres Feldes kommen erst
-     * nach der Burg - nach dem Fuss sortiert schnitte deren Bergfried sie unten
-     * ab. Der Palast ab Stufe II bleibt davor, dort verschmilzt die Bastion mit ihm.
+     * Wer wen verdeckt. Es haengt daran, ob die unterste Ecke des Feldes
+     * bebaut ist - dann steht dort ohnehin etwas vor der Hauptstadt:
+     *
+     *   Stufe I   Steht unten eine Stadt, deckt die Burg die beiden oberen
+     *             Staedte. Sonst bleibt es umgekehrt, sonst schnitten deren
+     *             Haeuser den Bergfried unten ab.
+     *   Stufe II  Die unterste Bastion faellt weg - sie verdeckt nur den
+     *             Palast. Ertrag und Punkte der Stadt bleiben, gezeichnet
+     *             wird sie nicht.
+     *   Mauer     Was von einer oberen Bastion abwaerts fuehrt, laeuft vor
+     *             ihr entlang; was oben herumgeht, bleibt dahinter.
      */
     const nachDerBurg = new Map<string, number>();
+    const ohneBastion = new Set<string>();
+    const vordereMauer = new Set<string>();
     for (const [hk, h] of Object.entries(state.hauptstaedte ?? {})) {
-      if (h.stufe >= 2) continue;
       const [q, r] = hk.split(':').map(Number) as [number, number];
       const c = hexToPixel(q, r, LAYOUT);
-      const burgFuss = geraet(c.x, c.y - liftHex(q, r)).y + 6 * f;
-      for (const v of hexVertices(q, r)) {
-        if (vertexToPixel(v, LAYOUT).y >= c.y) continue;
-        const vk = vertexKey(v);
-        nachDerBurg.set(vk, Math.max(nachDerBurg.get(vk) ?? -Infinity, burgFuss + 1));
+      const eigene = hexVertices(q, r)
+        .map((v) => ({ vk: vertexKey(v), y: vertexToPixel(v, LAYOUT).y }))
+        .filter((e) => state.buildings[e.vk]?.owner === h.owner);
+      const untenBebaut = eigene.some((e) => e.y > c.y);
+      if (h.stufe < 2) {
+        if (untenBebaut) continue;
+        const burgFuss = geraet(c.x, c.y - liftHex(q, r)).y + 6 * f;
+        for (const e of eigene) {
+          if (e.y >= c.y) continue;
+          nachDerBurg.set(e.vk, Math.max(nachDerBurg.get(e.vk) ?? -Infinity, burgFuss + 1));
+        }
+        continue;
+      }
+      for (const e of eigene) if (e.y > c.y) ohneBastion.add(e.vk);
+      for (const kante of hexEdges(q, r)) {
+        const ek = edgeKey(kante);
+        if (state.roads[ek] !== h.owner) continue;
+        const enden = edgeEndpoints(kante).map((v) => ({ vk: vertexKey(v), y: vertexToPixel(v, LAYOUT).y }));
+        const [oben, unten] = enden[0]!.y <= enden[1]!.y ? [enden[0]!, enden[1]!] : [enden[1]!, enden[0]!];
+        if (oben.y < c.y && unten.y > oben.y && eigene.some((e) => e.vk === oben.vk)) vordereMauer.add(ek);
       }
     }
     // Die Hauptstadt steht vor der Reihe ihrer vorderen Nachbarn - die Staedte an ihren hinteren Ecken mit ihr.
@@ -1059,31 +1088,39 @@ export function Board({
           }),
         f,
       );
-      zeichneMauern(
-        g,
+      const mauerStuecke = (vorn: boolean) =>
         [...mauerKanten]
-          .filter(([ek]) => nur(kantenTiefe(ek)))
+          .filter(([ek]) => nur(kantenTiefe(ek)) && vordereMauer.has(ek) === vorn)
           .map(([ek, sorte]) => {
             const [a, b] = kantePixel(ek);
             return { a: a!, b: b!, stein: steinFuer(sorte) };
-          }),
-        f,
-      );
+          });
+      zeichneMauern(g, mauerStuecke(false), f);
       const gebaeude = Object.entries(state.buildings)
-        .filter(([vk]) => nur(gebaeudeTiefe(vk)))
+        .filter(([vk]) => nur(gebaeudeTiefe(vk)) && !ohneBastion.has(vk))
         .map(([vk, b]) => {
           const ecke = parseVertexKey(vk);
           const v = vertexToPixel(ecke, LAYOUT);
           const p = geraet(v.x, v.y - liftVertex(ecke));
           const bastion = bastionen.get(vk);
-          // Am Ring einer Hauptstadt kein Wachturm (rules/hauptstadt.ts, anHauptstadt) - auch nicht aus alten Staenden.
-          const turm = b.turm === true && !anHauptstadt(state, vk);
           return {
             fuss: Math.max(p.y + 3 * f, nachDerBurg.get(vk) ?? -Infinity),
             male: () =>
               bastion !== undefined
-                ? zeichneBastion(g, p.x, p.y, f, spielerFarbe(b.owner), bastion, turm)
-                : zeichneGebaeude(g, b.type === 'city' ? 'stadt' : 'dorf', p.x, p.y, f, spielerFarbe(b.owner), turm),
+                ? zeichneBastion(g, p.x, p.y, f, spielerFarbe(b.owner), bastion)
+                : zeichneGebaeude(g, b.type === 'city' ? 'stadt' : 'dorf', p.x, p.y, f, spielerFarbe(b.owner)),
+          };
+        });
+      // Wachtuerme stehen fuer sich auf ihrer Ecke (state.tuerme).
+      const tuerme = Object.entries(state.tuerme ?? {})
+        .filter(([vk]) => nur(eckTiefe(parseVertexKey(vk))))
+        .map(([vk, t]) => {
+          const ecke = parseVertexKey(vk);
+          const v = vertexToPixel(ecke, LAYOUT);
+          const p = geraet(v.x, v.y - liftVertex(ecke));
+          return {
+            fuss: p.y + 3 * f,
+            male: () => zeichneGebaeude(g, 'turm', p.x, p.y, f, spielerFarbe(t.owner)),
           };
         });
       // Hauptstaedte stehen in der Feldmitte, im Stein ihres Gelaendes (units.ts).
@@ -1100,7 +1137,9 @@ export function Board({
           };
         });
       // Von hinten nach vorn, nach dem Fuss: das vordere Bauwerk ueberdeckt das hintere.
-      for (const b of [...gebaeude, ...hauptstaedte].sort((u, w) => u.fuss - w.fuss)) b.male();
+      for (const b of [...gebaeude, ...tuerme, ...hauptstaedte].sort((u, w) => u.fuss - w.fuss)) b.male();
+      // Zuletzt die Mauerstuecke, die an einer Bastion abwaerts vor ihr entlanglaufen.
+      zeichneMauern(g, mauerStuecke(true), f);
     };
 
     // "maske": wie voll, aber nur die hohen Pixel der Kachel verdecken (tiles.ts, hoehenMaske).

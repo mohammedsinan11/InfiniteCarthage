@@ -18,8 +18,6 @@ import {
   parseEdgeKey,
   parseVertexKey,
   vertexAdjacentHexes,
-  hexVertices,
-  vertexKey,
 } from '../coords';
 import {
   createWorld,
@@ -61,12 +59,13 @@ import {
   canPlaceCity,
   canPlaceRoad,
   canPlaceSettlement,
+  canPlaceTower,
   legalRoadEdges,
 } from './placement';
 import { computeProduction } from './production';
 import { beginBigRound, beginNight, heldenRunde, spawnHeld, spawnKnight, tickArmy } from './army';
 import { brandRunde, brennt, mitKarteLoeschen } from './feuer';
-import { STUFE_NAME, anHauptstadt, ausbauHindernis, festungsSchutz, hauptstadtHindernis } from './hauptstadt';
+import { STUFE_NAME, ausbauHindernis, festungsSchutz, hauptstadtHindernis } from './hauptstadt';
 import { abkommenRunde, tributRunde, verhandeln } from './diplomatie';
 import type { DiplomatieEvent, Verhandlung } from './diplomatie';
 import { auftraegePruefen, aufAuftragAntworten, auftragLiefern, wandererBieten } from './auftraege';
@@ -246,6 +245,7 @@ export function createGame(
     phase: { t: 'setup', step: 0, awaiting: 'settlement', lastVertex: null },
     buildings: {},
     roads: {},
+    tuerme: {},
     deck: [],
     packIndex: 0,
     turn: 0,
@@ -900,15 +900,15 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
 
     case 'buildTower': {
       if (phase.t !== 'main') return fail('Jetzt kann nicht gebaut werden.');
-      const b = s.buildings[action.vertex];
-      if (!b || b.owner !== actor) return fail('Ein Wachturm braucht ein eigenes Dorf oder eine Stadt.');
-      if (b.turm) return fail('Dort steht schon ein Wachturm.');
-      if (anHauptstadt(s, action.vertex)) return fail('An einer Hauptstadt steht vorerst kein Wachturm.');
-      if (brennt(s, action.vertex)) return fail('Dort brennt es gerade.');
+      const why = canPlaceTower(s, world, actor, action.vertex);
+      if (why) return fail(why);
       if (!canAfford(actorPlayer.hand, COST_TOWER)) return fail('Zu wenig Rohstoffe fuer einen Wachturm.');
       pay(actorPlayer.hand, COST_TOWER);
-      b.turm = true;
+      s.tuerme[action.vertex] = { owner: actor, stufe: 1 };
       events.push({ t: 'build', player: actor, kind: 'tower', at: action.vertex });
+      // Ein Turm am Rand schiebt die Welt vor sich her, wie jedes Bauteil.
+      const added = grow(s, world, vertexAdjacentHexes(parseVertexKey(action.vertex)));
+      if (added.length) events.push({ t: 'chunks', coords: added });
       break;
     }
 
@@ -918,13 +918,6 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (why) return fail(why);
       if (!canAfford(actorPlayer.hand, COST_CAPITAL)) return fail('Zu wenig Rohstoffe fuer eine Hauptstadt.');
       pay(actorPlayer.hand, COST_CAPITAL);
-      // Wachtuerme am Ring gehen zurueck in die Hand - an der Hauptstadt stehen vorerst keine.
-      for (const v of hexVertices(action.q, action.r)) {
-        const b = s.buildings[vertexKey(v)];
-        if (!b || b.owner !== actor || !b.turm) continue;
-        b.turm = false;
-        for (const r of RESOURCES) actorPlayer.hand[r] += COST_TOWER[r] ?? 0;
-      }
       s.hauptstaedte[hexKey(action.q, action.r)] = { owner: actor, stufe: 1, seit: s.turn };
       events.push({ t: 'capital', player: actor, q: action.q, r: action.r });
       checkWin(s, events);

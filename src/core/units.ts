@@ -77,15 +77,12 @@ export const befehlbar = (kind: UnitKind): boolean => kind === 'ritter' || kind 
  * eigenen Wachturm? Dann schiesst er weiter (combat.ts, BOGEN_REICHWEITE_ERHOEHT).
  */
 export function bogenErhoeht(
-  view: Pick<GameState, 'buildings'> & { hauptstaedte?: GameState['hauptstaedte'] },
+  view: { hauptstaedte?: GameState['hauptstaedte']; tuerme?: GameState['tuerme'] },
   u: Pick<UnitState, 'q' | 'r' | 'owner'>,
 ): boolean {
   if (u.owner === null) return false;
   if (view.hauptstaedte?.[hexKey(u.q, u.r)]?.owner === u.owner) return true;
-  return hexVertices(u.q, u.r).some((v) => {
-    const b = view.buildings[vertexKey(v)];
-    return b !== undefined && b.owner === u.owner && b.turm === true;
-  });
+  return hexVertices(u.q, u.r).some((v) => view.tuerme?.[vertexKey(v)]?.owner === u.owner);
 }
 
 /** Eine neue Einheit mit vollen Leben und leeren Taschen. Die Nummer vergibt der Aufrufer. */
@@ -309,7 +306,7 @@ export function knightMusterHex(view: ArmyView, id: PlayerId, ohneZahl = false):
  * nimmt ihnen nichts - nur der Nebel.
  */
 export function sightOf(
-  view: Pick<GameState, 'buildings' | 'units'>,
+  view: Pick<GameState, 'buildings' | 'units'> & { tuerme?: GameState['tuerme'] },
   id: PlayerId,
   /** true heisst Nacht, wie frueher; sonst Nacht und Nebel einzeln. */
   lage: boolean | Partial<SichtLage> = false,
@@ -327,7 +324,12 @@ export function sightOf(
   const held = Math.max(2, SICHT_HELD - nebelAbzug);
   for (const [vk, b] of Object.entries(view.buildings)) {
     if (b.owner !== id) continue;
-    for (const h of vertexAdjacentHexes(parseVertexKey(vk))) dazu(h, b.turm ? turm : siedlung);
+    for (const h of vertexAdjacentHexes(parseVertexKey(vk))) dazu(h, siedlung);
+  }
+  // Wachtuerme stehen fuer sich und sehen am weitesten (state.tuerme).
+  for (const [vk, t] of Object.entries(view.tuerme ?? {})) {
+    if (t.owner !== id) continue;
+    for (const h of vertexAdjacentHexes(parseVertexKey(vk))) dazu(h, turm);
   }
   for (const u of view.units) if (u.owner === id) dazu(u, u.kind === 'held' ? held : einheit);
   return out;

@@ -133,7 +133,10 @@ Variante B) ist wieder draussen. Die grossen Fassungen bleiben zum Vergleich;
 alle Varianten: `labor.html?art=gebaeude`.
 
 - **Wachturm** (`turm`, 7 x 13): Steinturm mit Feuerschale und Band in
-  Spielerfarbe, rechts hinter Dorf oder Stadt.
+  Spielerfarbe. Er steht mittig auf seiner eigenen Ecke - frueher rueckte er
+  nach rechts, weil er hinter Dorf oder Stadt gehoerte (DESIGN.md, Wachturm).
+  *Was fehlt:* eine hoehere, weithin sichtbare Fassung, die den Turm als
+  eigenes Bauwerk zeigt, und spaeter Ausbaustufen.
 - **Asche:** abgebrannte Strasse als verkohlter Weg mit Glutpunkten, ohne
   Wimpel (`zeichneStrassen`, `verbrannt`).
 

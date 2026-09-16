@@ -29,7 +29,6 @@ import {
   canAfford,
 } from '../../core/rules/costs';
 import { haefenZu } from '../../core/rules/trade';
-import { anHauptstadt } from '../../core/rules/hauptstadt';
 import type { Cost } from '../../core/rules/costs';
 import type { Action } from '../../core/rules/reducer';
 import type { PublicPlayer, PublicState } from '../../core/redact';
@@ -425,9 +424,8 @@ export function Aktionsleiste({
   // Auf eigener Asche kostet eine Strasse nur Holz (rules/feuer.ts).
   const eigeneAsche = Object.values(state.asche).some((id) => id === me?.id);
   const strasseGeht = canAfford(hand, COST_ROAD) || (eigeneAsche && canAfford(hand, COST_REBUILD_ROAD));
-  const turmPlatz = Object.entries(state.buildings).some(
-    ([vk, b]) => b.owner === me?.id && !b.turm && !anHauptstadt(state, vk),
-  );
+  // Ein Turm braucht eine eigene Strasse an seiner Ecke (rules/placement.ts).
+  const turmPlatz = Object.values(state.roads).some((id) => id === me?.id);
   const umschalten = (t: 'handel' | 'karten') => () => setTafel((alt) => (alt === t ? null : t));
 
   return (
@@ -491,7 +489,7 @@ export function Aktionsleiste({
           kosten={COST_TOWER}
           gewaehlt={mode === 'tower'}
           darf={bauen && turmPlatz && canAfford(hand, COST_TOWER)}
-          tip={`Wachturm an ein Dorf oder eine Stadt: sieht weiter, auch nachts, und laesst Brandstifter nicht an Haus und Strassen. ${kostenText(COST_TOWER)}`}
+          tip={`Wachturm auf eine freie Ecke an einer eigenen Strasse - ohne Abstandsregel. Sieht weit, auch nachts, und laesst Brandstifter nicht an Haeuser und Strassen nebenan. ${kostenText(COST_TOWER)}`}
           onClick={bau('tower')}
         />
         {hauptstadtBereit && (

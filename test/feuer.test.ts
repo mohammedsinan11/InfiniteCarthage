@@ -11,10 +11,12 @@ import {
   edgeEndpoints,
   edgeKey,
   hexEdges,
+  hexVertices,
   hexesInRange,
   parseEdgeKey,
   vertexAdjacentHexes,
   vertexKey,
+  vertexNeighborVertices,
 } from '../src/core/coords';
 import { einheitVorlage, isLandAt } from '../src/core/units';
 import { nestAt } from '../src/core/raiders';
@@ -144,8 +146,14 @@ describe('Feuer', () => {
     const mitte = landFlaeche(game, 2);
     const ecke = { q: mitte.q, r: mitte.r, d: 'N' as const };
     const vk = vertexKey(ecke);
-    s.buildings[vk] = { owner: 'p0', type: 'city', turm: true };
+    // Der Turm steht fuer sich auf seiner Ecke; das Haus daneben schuetzt er als Nachbar.
+    s.tuerme[vk] = { owner: 'p0', stufe: 1 };
     const an = vertexAdjacentHexes(ecke).find((h) => isLandAt(s.worldSeed, h.q, h.r))!;
+    const nachbarn = vertexNeighborVertices(ecke).map(vertexKey);
+    const hausVk = hexVertices(an.q, an.r)
+      .map(vertexKey)
+      .find((k) => nachbarn.includes(k))!;
+    s.buildings[hausVk] = { owner: 'p0', type: 'city' };
     for (const e of hexEdges(an.q, an.r)) {
       const k = edgeKey(e);
       if (edgeEndpoints(e).some((v) => vertexKey(v) === vk)) s.roads[k] = 'p0';

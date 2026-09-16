@@ -33,7 +33,10 @@ import type { GameState, PlayerId } from '../state';
  * Sonst muesste der Client die Regeln nachbauen, um legale Bauplaetze zu
  * markieren - und genau diese Verdopplung soll es nicht geben.
  */
-export type BoardView = Pick<GameState, 'buildings' | 'roads'>;
+export type BoardView = Pick<GameState, 'buildings' | 'roads'> & {
+  /** Wachtuerme - optional, damit aeltere Staende und Teilsichten weiter passen. */
+  tuerme?: GameState['tuerme'];
+};
 
 /** Land = erzeugt und kein Wasser. Auf Wasser wird nicht gebaut. */
 export function isLand(world: World, q: number, r: number): boolean {
@@ -135,6 +138,28 @@ export function canPlaceCity(
   return null;
 }
 
+/**
+ * Ein Wachturm steht fuer sich - auf einer freien Ecke wie ein Dorf, nur ohne
+ * Abstandsregel: er darf dicht an Doerfern, Staedten und anderen Tuermen
+ * stehen. Eine eigene Strasse muss ihn erreichen, sonst stuende er im
+ * Nirgendwo (DESIGN.md, Wachturm).
+ */
+export function canPlaceTower(
+  state: BoardView,
+  world: World,
+  player: PlayerId,
+  vk: string,
+): string | null {
+  const v = parseVertexKey(vk);
+  if (state.buildings[vk] !== undefined) return 'Dort steht schon ein Haus.';
+  if (state.tuerme?.[vk] !== undefined) return 'Dort steht schon ein Wachturm.';
+  if (!vertexBuildable(world, v)) return 'Dort laesst sich nicht bauen.';
+  if (!vertexAdjacentEdges(v).some((e) => state.roads[edgeKey(e)] === player)) {
+    return 'Keine eigene Strasse an dieser Ecke.';
+  }
+  return null;
+}
+
 // --- Aufzaehlung fuer die Oberflaeche ---------------------------------------
 
 /** Alle Ecken der aufgedeckten Welt - Grundlage der Zuege im Aufbau. */
@@ -186,6 +211,12 @@ export function legalRoadEdges(
   return allEdges(world)
     .map(edgeKey)
     .filter((ek) => canPlaceRoad(state, world, player, ek, mustTouchVertex) === null);
+}
+
+export function legalTowerVertices(state: BoardView, world: World, player: PlayerId): string[] {
+  return allVertices(world)
+    .map(vertexKey)
+    .filter((vk) => canPlaceTower(state, world, player, vk) === null);
 }
 
 export function legalCityVertices(state: BoardView, player: PlayerId): string[] {

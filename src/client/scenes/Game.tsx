@@ -47,7 +47,7 @@ import { setAmbiente } from '../ambiente';
 import { seasonOf } from '../../core/season';
 import { RESOURCES } from '../../core/types';
 import type { Resource } from '../../core/types';
-import { COST_CAPITAL, COST_CITY, COST_STUFE, COST_ROAD, COST_TOWER, canAfford } from '../../core/rules/costs';
+import { COST_CAPITAL, COST_CITY, COST_STUFE, COST_ROAD, canAfford } from '../../core/rules/costs';
 import { FRIEDEN_PREIS, TRIBUT_KARTEN, nimmtFrieden } from '../../core/rules/diplomatie';
 import { brennt } from '../../core/rules/feuer';
 import { WERTE as EINHEIT_WERTE } from '../../core/units';
@@ -64,7 +64,6 @@ import {
   ausbauHindernis,
   naechsteStufe,
   hauptstadtFelder,
-  anHauptstadt,
   hauptstadtHindernis,
 } from '../../core/rules/hauptstadt';
 import type { Umland } from '../../core/rules/hauptstadt';
@@ -97,6 +96,7 @@ import {
   legalCityVertices,
   legalRoadEdges,
   legalSettlementVertices,
+  legalTowerVertices,
 } from '../../core/rules/placement';
 import { productionSources } from '../../core/rules/production';
 import { tradeRatio } from '../../core/rules/trade';
@@ -346,11 +346,8 @@ export function Game() {
           };
         }
         if (mode === 'tower') {
-          return {
-            vertices: Object.entries(state.buildings)
-              .filter(([vk, b]) => b.owner === you && !b.turm && !brennt(state, vk))
-              .map(([vk]) => vk),
-          };
+          // Freie Ecke an einer eigenen Strasse - ohne Abstandsregel (rules/placement.ts).
+          return { vertices: legalTowerVertices(state, world, you) };
         }
         if (mode === 'settlement') {
           return { vertices: legalSettlementVertices(state, world, you, { setup: false }) };
@@ -659,19 +656,8 @@ export function Game() {
         }),
       });
     }
-    // An einer Hauptstadt vorerst kein Wachturm (rules/hauptstadt.ts, anHauptstadt).
-    if (!b.turm && !anHauptstadt(state, ausbauOrt.key)) {
-      optionen.push({
-        name: 'Wachturm',
-        kosten: COST_TOWER,
-        darf: jetzt && !feuer && bezahlbar(COST_TOWER),
-        hinweis: warum ?? feuer ?? armut(COST_TOWER),
-        wahl: dann(() => {
-          act({ t: 'buildTower', vertex: ausbauOrt.key });
-          playTurm();
-        }),
-      });
-    }
+    // Der Wachturm gehoert nicht mehr hierher: er steht fuer sich auf einer
+    // freien Ecke und wird ueber die Leiste gesetzt (rules/placement.ts).
     // Jedes fast geschlossene Feld an dieser Ecke - eine Stadt kann an mehreren Ringen liegen.
     for (const u of umland) {
       if (u.fehlt > FAST_GESCHLOSSEN || !hexVertices(u.q, u.r).some((v) => vertexKey(v) === ausbauOrt.key)) continue;

@@ -45,6 +45,7 @@ import {
   parseVertexKey,
   vertexAdjacentHexes,
   vertexKey,
+  vertexNeighborVertices,
 } from '../coords';
 import type { Hex } from '../coords';
 import { imKampf } from '../combat';
@@ -78,15 +79,23 @@ type Ereignisse = { push(...e: FeuerEvent[]): number };
 export const brennt = (s: Pick<GameState, 'braende'>, key: string): boolean =>
   s.braende.some((b) => b.key === key);
 
-/** Steht an dieser Ecke ein Wachturm dieses Spielers? */
-const turmAn = (s: Pick<GameState, 'buildings'>, owner: PlayerId, vk: string): boolean => {
-  const b = s.buildings[vk];
-  return b !== undefined && b.owner === owner && b.turm === true;
-};
+/** Was die Brandregeln von Tuermen wissen muessen. */
+type TurmSicht = { tuerme?: GameState['tuerme'] };
+
+/** Steht auf dieser Ecke ein Wachturm dieses Spielers? */
+const turmAn = (s: TurmSicht, owner: PlayerId, vk: string): boolean => s.tuerme?.[vk]?.owner === owner;
+
+/**
+ * Steht ein eigener Wachturm an einer der drei Nachbarecken? Seit er fuer sich
+ * steht (state.tuerme), schuetzt er die Haeuser um sich herum statt das eine,
+ * an dem er frueher klebte.
+ */
+const turmNeben = (s: TurmSicht, owner: PlayerId, vk: string): boolean =>
+  vertexNeighborVertices(parseVertexKey(vk)).some((v) => turmAn(s, owner, vertexKey(v)));
 
 /** Schuetzt ein Wachturm diese Strasse - endet sie an seiner Ecke? Oder ist sie Mauer eines Festungsrings? */
 export function strasseGeschuetzt(
-  s: Pick<GameState, 'buildings'> & { hauptstaedte?: GameState['hauptstaedte'] },
+  s: Pick<GameState, 'buildings'> & { hauptstaedte?: GameState['hauptstaedte'] } & TurmSicht,
   owner: PlayerId,
   ek: string,
 ): boolean {
@@ -128,7 +137,7 @@ export function feuerLegen(
       })
       .sort();
     const bastionen = festungsSchutz(s, owner).ecken;
-    const offen = ecken.filter((vk) => !s.buildings[vk]!.turm && !bastionen.has(vk));
+    const offen = ecken.filter((vk) => !turmNeben(s, owner, vk) && !bastionen.has(vk));
     if (offen.length > 0) {
       const vk = offen[rng.int(offen.length)]!;
       legen(vk, s.buildings[vk]!.type === 'city' ? 'stadt' : 'dorf');

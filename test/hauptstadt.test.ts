@@ -18,7 +18,7 @@ import {
   naechsteStufe,
   umlandVon,
 } from '../src/core/rules/hauptstadt';
-import { COST_CAPITAL, COST_FESTUNG, COST_KOENIGSSITZ, COST_TOWER } from '../src/core/rules/costs';
+import { COST_CAPITAL, COST_FESTUNG, COST_KOENIGSSITZ } from '../src/core/rules/costs';
 import { strasseGeschuetzt } from '../src/core/rules/feuer';
 import { edgeKey, hexEdges, hexKey, hexVertices, hexesInRange, vertexKey } from '../src/core/coords';
 import { terrainAt } from '../src/core/worldgen';
@@ -136,20 +136,19 @@ describe('Hauptstadt gruenden', () => {
     expect(applyAction(game, { t: 'foundCapital', q: h.q, r: h.r }, 'p0').ok).toBe(false);
   });
 
-  it('am Ring kein Wachturm: vorhandene werden beim Gruenden erstattet, neue gehen nicht', () => {
+  it('ein Wachturm am Ring bleibt stehen - er gehoert nicht mehr zum Haus', () => {
     const game = spiel();
     const h = landFeld(game);
     ring(game, h, ['city', 'city', 'city']);
-    const ecke = vertexKey(hexVertices(h.q, h.r)[0]!);
-    game.state.buildings[ecke]!.turm = true;
+    // Eine freie Ecke des Rings: dort steht der Turm fuer sich (rules/placement.ts).
+    const frei = hexVertices(h.q, h.r)
+      .map(vertexKey)
+      .find((vk) => game.state.buildings[vk] === undefined)!;
+    game.state.tuerme[frei] = { owner: 'p0', stufe: 1 };
     geben(game, 'p0');
     expect(applyAction(game, { t: 'foundCapital', q: h.q, r: h.r }, 'p0').ok).toBe(true);
-    expect(game.state.buildings[ecke]!.turm).toBeFalsy();
-    const hand = game.state.players[0]!.hand;
-    expect(RESOURCES.every((r) => hand[r] === (COST_TOWER[r] ?? 0))).toBe(true);
-    const res = applyAction(game, { t: 'buildTower', vertex: ecke }, 'p0');
-    expect(res.ok).toBe(false);
-    if (!res.ok) expect(res.error).toContain('Hauptstadt');
+    expect(game.state.tuerme[frei]).toEqual({ owner: 'p0', stufe: 1 });
+    expect(RESOURCES.every((r) => game.state.players[0]!.hand[r] === 0)).toBe(true);
   });
 
   it('beliebig viele Hauptstaedte je Spieler, aber nur eine je Feld', () => {

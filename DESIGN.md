@@ -377,10 +377,17 @@ anbieten oder brechen; ob Tribut mit der Groesse des Reichs steigen soll.
   Koenigssitze gleich aus. `MAX_STUFE = 3`: hoeher geht es nicht, die Tafel
   sagt das.
 
-- **Keine Wachtuerme am Ring:** neben Burg und Mauer brachte ein Turm nichts
-  Eigenes. Wer dort einen hat, bekommt ihn beim Gruenden erstattet
-  (`COST_TOWER`); neue lassen sich an Hauptstadt-Ecken nicht bauen
-  (`anHauptstadt`).
+- **Wachtuerme am Ring:** seit der Turm fuer sich steht (siehe Wachturm),
+  nimmt ihm das Gruenden nichts mehr. Auf den drei freien Ecken des Rings darf
+  einer stehen bleiben; die anderen drei tragen ohnehin Staedte.
+
+- **Wer wen verdeckt:** steht auf der untersten Ecke eines Feldes eine Stadt,
+  dann deckt die Burg (Stufe I) die beiden oberen Staedte, und ab Stufe II
+  faellt die unterste Bastion weg - sie verdeckte nur den Palast. Ertrag und
+  Punkte der Stadt bleiben davon unberuehrt, gezeichnet wird sie nicht. Was
+  von einer oberen Bastion abwaerts fuehrt, laeuft als Mauer vor ihr entlang;
+  was oben herumgeht, bleibt dahinter (`Board.tsx`, `ohneBastion`,
+  `vordereMauer`).
 
 ### Phase 2: was der Koenigssitz aufschliesst
 
@@ -390,13 +397,22 @@ Koenigssitz. Danach faellt die Siedler-Mechanik als Nadeloehr weg.
 
 - **Reichsbauten statt weiterer Burgen:** Burgfeste, Handelskontor und Tempel
   werden einzeln freigeschaltet und stehen fuer sich auf einer Kachel - ohne
-  Ring aus Strassen und Staedten, ohne Palast-Unterbau. Man muss nicht mehr
-  fuer jede Richtung eine eigene Hauptstadt hochziehen.
+  Ring aus Strassen und Staedten. Man muss nicht mehr fuer jede Richtung eine
+  eigene Hauptstadt hochziehen. **Mehrfach erlaubt**, nicht einmal je Reich.
+- **Wo sie stehen duerfen:** in der Umgebung des Koenigssitzes. Die Umgebung
+  waechst mit dem, was schon steht - jeder Reichsbau und jedes Dorf, jede
+  Stadt erweitert sie. So dehnt sich das Reich in Phase 2 aus, ohne dass jede
+  Kachel eine Strasse braucht.
+- **Aussehen:** wie im Entwurf mit Palast-Unterbau (Spalte 1 der Probe,
+  `probe-bauten.html`).
 - **Der Koenig ernennt Helden:** mit dem Koenigssitz waehlt man den ersten
-  Zweig - Krieger, Hexe oder Haendler, passend zu den drei Bauten. Das ist der
-  Anfang des Technologiebaums.
-- Noch offen: wo die Bauoptionen stehen, was die drei Bauten kosten und
-  wirken, und ob ein Bau einmalig ist oder mehrfach.
+  Zweig - Krieger, Hexe oder Haendler, passend zu den drei Bauten. Sie treten
+  **zusaetzlich** zum bisherigen Helden an; ob man am Ende alle drei haben
+  kann, ist noch offen. Das ist der Anfang des Technologiebaums.
+- Noch offen: wo genau die Bauoptionen stehen (Vorschlag: ein Kronen-Knopf in
+  der Leiste, der erst mit dem Koenigssitz erscheint und die erlaubten Kacheln
+  aufleuchten laesst), was die drei Bauten kosten und wirken, und wie weit die
+  Umgebung reicht.
 
 ### Geplant
 
@@ -407,6 +423,30 @@ Koenigssitz. Danach faellt die Siedler-Mechanik als Nadeloehr weg.
 - **Verdecken fuer Doerfer, Staedte und Einheiten:** fuer die Hauptstadt
   gebaut (siehe Karte, Zoom und Bedienung); die uebrigen folgen vielleicht.
 - Offen: Doerfer im Ring, was die Hauptstadt ueber die Punkte hinaus bringt.
+
+## Wachturm
+
+Der Turm steht fuer sich, nicht am Haus.
+
+- **Wo:** auf einer freien Ecke, an der eine eigene Strasse anliegt - wie ein
+  Dorf, nur **ohne Abstandsregel** (`rules/placement.ts`, `canPlaceTower`). Er
+  darf also dicht an Doerfern, Staedten und anderen Tuermen stehen. Auf einer
+  Ecke mit Haus geht er nicht, und zweimal auf derselben Ecke auch nicht.
+- **Gesetzt** wird er ueber die Leiste wie Dorf und Stadt: Knopf "Turm", dann
+  leuchten die erlaubten Ecken. Aus der Ausbau-Tafel eines Hauses ist er
+  verschwunden - er gehoert dort nicht mehr hin.
+- **Was er kann:** Sicht 5, auch nachts (`SICHT_TURM`). Brandstifter kommen
+  nicht an die Haeuser an seinen **Nachbarecken** und nicht an die Strassen,
+  die an seiner Ecke enden (`rules/feuer.ts`, `turmNeben`). Bogenschuetzen auf
+  einem Feld an seiner Ecke schiessen zwei Felder weit (`bogenErhoeht`).
+  Kosten `COST_TOWER` (1 Holz, 1 Lehm, 1 Erz), keine Siegpunkte.
+- **Im Zustand:** `state.tuerme`, Ecke -> Besitzer und Stufe. Alte Staende, in
+  denen der Turm ein Flag am Gebaeude war, werden beim Laden umgeschrieben
+  (`rules/migration.ts`) - die laufende Partie ueberlebt den Umbau.
+- **Gezeichnet** steht er mittig auf seiner Ecke; frueher rueckte er nach
+  rechts, um neben das Haus zu passen.
+- **Geplant:** eine eigene Mechanik und Ausbaustufen (die Stufe liegt schon im
+  Zustand bereit).
 
 ## Heldenlore
 

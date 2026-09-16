@@ -59,6 +59,8 @@ export type PublicState = {
   phase: Phase;
   buildings: GameState['buildings'];
   roads: GameState['roads'];
+  /** Wachtuerme - oeffentlich wie die Gebaeude. */
+  tuerme: GameState['tuerme'];
   /** Hauptstaedte - oeffentlich wie die Gebaeude. */
   hauptstaedte: GameState['hauptstaedte'];
   /** Wie viele Entwicklungskarten im laufenden Pack noch liegen. */
@@ -142,6 +144,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     phase: state.phase,
     buildings: state.buildings,
     roads: state.roads,
+    tuerme: state.tuerme ?? {},
     hauptstaedte: state.hauptstaedte,
     deckLeft: state.deck.length,
     turn: state.turn,

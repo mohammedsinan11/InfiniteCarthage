@@ -102,7 +102,7 @@ describe('Bogenschuetzen', () => {
     expect(ohne.some((e) => e.t === 'volley')).toBe(false);
 
     const ecke = vertexKey(hexVertices(h.q, h.r)[0]!);
-    game.state.buildings[ecke] = { owner: 'p0', type: 'settlement', turm: true };
+    game.state.tuerme[ecke] = { owner: 'p0', stufe: 1 };
     expect(bogenErhoeht(game.state, { q: h.q, r: h.r, owner: 'p0' })).toBe(true);
     bisTreffer(game, ziel);
   });

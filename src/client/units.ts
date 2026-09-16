@@ -428,7 +428,9 @@ export function zeichneGebaeude(
 ): void {
   const fy = y + 3 * f;
   if (art === 'turm') {
-    zeichneFigur(ctx, 'turm', x + 8 * f, fy - 2 * f, f, farbe);
+    // Seit er fuer sich steht (state.tuerme), steht er mittig auf seiner Ecke -
+    // frueher rueckte er nach rechts, um neben das Haus zu passen.
+    zeichneFigur(ctx, 'turm', x, fy - 2 * f, f, farbe);
     return;
   }
   if (turm) zeichneFigur(ctx, 'turm', x + 8 * f, fy - 2 * f, f, farbe);

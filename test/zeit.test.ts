@@ -120,7 +120,8 @@ describe('Sicht', () => {
 
   it('Wachtuerme und der Held sehen weit - auch nachts', () => {
     const s = solo().state;
-    s.buildings[vertexKey({ q: 0, r: 0, d: 'N' })] = { owner: 'p0', type: 'settlement', turm: true };
+    // Der Wachturm steht fuer sich auf seiner Ecke (state.tuerme).
+    s.tuerme[vertexKey({ q: 0, r: 0, d: 'N' })] = { owner: 'p0', stufe: 1 };
     s.units.push({ ...einheitVorlage('held', 30, 0, { owner: 'p0' }), id: 2 });
     const nacht = sightOf(s, 'p0', true);
     expect(nacht.has(hexKey(SICHT_TURM, 0))).toBe(true);

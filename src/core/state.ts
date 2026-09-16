@@ -81,7 +81,24 @@ export type Player = {
  * Ein Gebaeude auf einer Ecke. turm: ein Wachturm steht daneben - er sieht
  * weiter und laesst Brandstifter nicht an Haus und Strassen (rules/feuer.ts).
  */
-export type Building = { owner: PlayerId; type: 'settlement' | 'city'; turm?: boolean };
+export type Building = {
+  owner: PlayerId;
+  type: 'settlement' | 'city';
+  /**
+   * VERALTET. Frueher stand der Wachturm neben dem Haus. Heute steht er fuer
+   * sich auf einer eigenen Ecke (state.tuerme); alte Staende werden beim Laden
+   * umgeschrieben (rules/migration.ts).
+   */
+  turm?: boolean;
+};
+
+/**
+ * Ein Wachturm auf einer eigenen Ecke. Er braucht kein Haus unter sich und
+ * haelt keinen Abstand - dafuer eine eigene Strasse (rules/placement.ts,
+ * canPlaceTower). Die Stufe beginnt bei 1; ausbauen laesst er sich spaeter
+ * (DESIGN.md, Wachturm).
+ */
+export type Turm = { owner: PlayerId; stufe: number };
 
 /** Was auf der Karte laufen kann. */
 export type UnitKind = 'ritter' | 'raeuber' | 'goblin' | 'wanderer' | 'held' | 'bogen';
@@ -269,6 +286,8 @@ export type GameState = {
 
   buildings: Record<string, Building>;
   roads: Record<string, PlayerId>;
+  /** Wachtuerme, Ecke -> Besitzer und Stufe. Stehen unabhaengig von Doerfern und Staedten. */
+  tuerme: Record<string, Turm>;
 
   deck: DevCardType[];
   packIndex: number;

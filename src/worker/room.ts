@@ -20,6 +20,7 @@
 import { applyAction, createGame, rebuildWorld } from '../core/rules/reducer';
 import type { Game, GameEvent } from '../core/rules/reducer';
 import { redactEventsFor, redactStateFor } from '../core/redact';
+import { migriereStand } from '../core/rules/migration';
 import type { GameState, PlayerId } from '../core/state';
 import {
   DEFAULT_TARGET_POINTS,
@@ -176,6 +177,8 @@ export class GameRoom implements DurableObject {
       return null;
     }
 
+    // Kleine Aenderungen am Zustand werden nachgetragen, statt die Partie zu verwerfen.
+    migriereStand(state);
     this.game = { state, world: rebuildWorld(state) };
     return this.game;
   }
