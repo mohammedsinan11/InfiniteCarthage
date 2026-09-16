@@ -401,7 +401,8 @@ export function Game() {
       return;
     }
     const schar = heer.find((g) => g.schar !== null && aufFeld.every((u) => g.einheiten.includes(u)));
-    waehleGruppe((schar ? schar.einheiten : aufFeld).map((u) => u.id));
+    // Gleich scharf: der naechste Klick auf die Karte ist das Ziel.
+    waehleGruppe((schar ? schar.einheiten : aufFeld).map((u) => u.id), true);
   };
   const befehleMoeglich = isMine && (phase.t === 'main' || phase.t === 'roll') && mode === null;
 
@@ -1150,7 +1151,8 @@ export function Game() {
               )?.key ?? null
             }
             onWahl={(g) => {
-              waehleGruppe(g.einheiten.map((u) => u.id));
+              // Ein Klick auf die Gruppe, ein Klick auf die Karte - fertig ist der Befehl.
+              waehleGruppe(g.einheiten.map((u) => u.id), true);
               zeigeFeld(g.q, g.r);
             }}
             untaetig={untaetige.length}
@@ -1159,7 +1161,7 @@ export function Game() {
               naechsteUntaetige.current += 1;
               if (!u) return;
               const g = heer.find((x) => x.einheiten.some((y) => y.id === u.id));
-              waehleGruppe((g ? g.einheiten : [u]).map((x) => x.id));
+              waehleGruppe((g ? g.einheiten : [u]).map((x) => x.id), true);
               zeigeFeld(u.q, u.r);
             }}
           />

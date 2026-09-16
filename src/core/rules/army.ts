@@ -816,11 +816,16 @@ function ziehe(
     }
 
     case 'befehl': {
-      // Im Verband: im Tempo des Langsamsten, also ein Feld. Ob der Verband
-      // wartet, weil einer kaempft, entscheidet tickArmy vor dem Ziehen.
+      // Im Verband: im Tempo des Langsamsten, also ein Feld - es sei denn, der
+      // Held zieht mit. Er gibt sein Tempo an seine Schar weiter, wie an sein
+      // Gefolge. Ob der Verband wartet, weil einer kaempft, entscheidet
+      // tickArmy vor dem Ziehen.
       if (u.verband !== null) {
         const genossen = s.units.filter((x) => x.verband === u.verband && x.owner === u.owner);
-        if (genossen.length > 1) return schreite(s, world, rng, u, 1, events);
+        if (genossen.length > 1) {
+          const mitHeld = genossen.some((x) => x.kind === 'held');
+          return schreite(s, world, rng, u, mitHeld ? HELD_SCHRITTE : 1, events);
+        }
         u.verband = null;
       }
       // Im Gefolge: das Ziel ist, wo der Held gerade steht.

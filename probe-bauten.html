@@ -13,6 +13,11 @@
   figcaption { font-size: 11.5px; color: #cdbd9c; margin-bottom: 4px; min-height: 52px; }
   figcaption b { color: #f2e7d0; font-family: 'Silkscreen', monospace; font-size: 11px; }
   canvas { display: block; image-rendering: pixelated; border: 2px solid #3a2c1c; background: #0f0c08; }
+  /* Fuer den Mauer-Turm-Vergleich: doppelt so gross und untereinander,
+     damit man die Pixel sieht und nichts am Rand abgeschnitten wird. */
+  .gross { flex-direction: column; gap: 18px; }
+  .gross figure { width: 728px; }
+  .gross canvas { width: 728px; height: 580px; max-width: none; }
 </style></head>
 <body>
 <div id="inhalt"></div>
@@ -176,6 +181,62 @@ abschnitt('Burgfeste, Handelskontor, Tempel - mit und ohne Unterbau',
   ['Tempel · ohne Unterbau', 'Nur der Bau, im Festungsring.', bau(TEMPEL, 'ohne')],
   ['Tempel · freistehend', 'Allein auf der Kachel.', bau(TEMPEL, 'frei')],
 ]);
+
+// --- Mauer und Turm: wie sie sich treffen ----------------------------------
+
+/** Der Eckensatz, bei dem die unterste Ecke bebaut ist - darum geht es hier. */
+const SATZ_UNTEN = [0, 2, 4].some((i) => ECKE_PX[i].y > MITTE.y) ? [0, 2, 4] : [1, 3, 5];
+
+/**
+ * Die sechs Mauerstuecke, getrennt nach "laeuft von einer oberen Bastion
+ * abwaerts" (vorn) und allem anderen (hinten). kuerzen: um so viele
+ * Geraetepixel rueckt der obere Anfang zur Bastion hin weg, damit die Mauer
+ * am Turm endet statt durch ihn zu laufen.
+ */
+function mauerTeile(kuerzen) {
+  const vorn = [];
+  const hinten = [];
+  for (let i = 0; i < 6; i++) {
+    const ia = i;
+    const ib = (i + 1) % 6;
+    const obenIdx = ECKE_PX[ia].y <= ECKE_PX[ib].y ? ia : ib;
+    const untenIdx = ECKE_PX[ia].y <= ECKE_PX[ib].y ? ib : ia;
+    const oben = ECKE_PX[obenIdx];
+    const unten = ECKE_PX[untenIdx];
+    const vonBastionAbwaerts = SATZ_UNTEN.includes(obenIdx) && oben.y < MITTE.y && unten.y > oben.y;
+    if (!vonBastionAbwaerts) {
+      hinten.push({ a: ECKE_PX[ia], b: ECKE_PX[ib], stein });
+      continue;
+    }
+    let start = oben;
+    if (kuerzen > 0) {
+      const laenge = Math.hypot(unten.x - oben.x, unten.y - oben.y);
+      const t = Math.min(0.9, kuerzen / laenge);
+      start = { x: oben.x + (unten.x - oben.x) * t, y: oben.y + (unten.y - oben.y) * t };
+    }
+    vorn.push({ a: start, b: unten, stein });
+  }
+  return { vorn, hinten };
+}
+
+const mauerTurm = (art) => szene((g) => {
+  const { vorn, hinten } = mauerTeile(art === 'halb' ? 5 * S : 0);
+  zeichneMauern(g, art === 'jetzt' ? hinten : [...hinten, ...vorn], S);
+  // Hintere Bastionen, dann der Palast, dann die vorderen - wie auf dem Brett.
+  for (const i of SATZ_UNTEN) if (ECKE_PX[i].y <= MITTE.y) zeichneBastion(g, ECKE_PX[i].x, ECKE_PX[i].y, S, BLAU, SORTE);
+  zeichneHauptstadt(g, MITTE.x, MITTE.y, S, BLAU, SORTE, 2);
+  for (const i of SATZ_UNTEN) if (ECKE_PX[i].y > MITTE.y) zeichneBastion(g, ECKE_PX[i].x, ECKE_PX[i].y, S, BLAU, SORTE);
+  if (art === 'jetzt') zeichneMauern(g, vorn, S);
+});
+
+abschnitt('Mauer und Turm - wie sie sich treffen',
+  'Derselbe Fall wie auf deinem Bild: unten steht eine Stadt, also sitzen die beiden anderen Bastionen oben links und oben rechts. Es geht nur um die Mauer, die von ihnen nach unten laeuft.', [
+  ['A - wie jetzt live', 'Die Mauer laeuft komplett ueber den Turm hinweg.', mauerTurm('jetzt')],
+  ['B - Mauer bis zur Haelfte, Turm darueber', 'Die Mauer laeuft auf den Turm zu und endet auf halber Hoehe an ihm. Der Turm steht davor, dahinter laeuft die Mauer weiter.', mauerTurm('halb')],
+  ['C - Mauer ganz hinter dem Turm', 'Ohne Kuerzen, nur nach hinten gelegt: der Turm deckt das Mauerstueck fast vollstaendig.', mauerTurm('hinter')],
+]);
+// Dieser Vergleich lebt von Einzelpixeln - deshalb doppelt so gross.
+[...document.querySelectorAll('.reihe')].at(-1).classList.add('gross');
 
 document.body.dataset.fertig = '1';
 </script>

@@ -471,10 +471,14 @@ Sturmfels" (`core/lore.ts`).
 ## Verbaende
 
 Alle eigenen Einheiten eines Feldes sind ein Verband. Ein Klick auf das Feld
-waehlt sie zusammen, und ein Ziel schickt alle.
-Sie ziehen im Tempo des Langsamsten - mit einem Ritter dabei also auch der Held
-nur ein Feld - und warten, solange einer von ihnen kaempft. Am Ziel loest sich
-der Verband. Wer einer einzelnen Einheit ein Ziel gibt, loest sie heraus.
+waehlt sie zusammen, und **der naechste Klick auf die Karte ist schon das
+Ziel** - ob der Klick auf die Gruppe auf der Karte, in der Heerleiste oder auf
+"untaetig" fiel.
+Sie ziehen im Tempo des Langsamsten, also ein Feld - **ausser der Held zieht
+mit**: er gibt sein Tempo an seine Schar weiter, wie an sein Gefolge
+(`rules/army.ts`, `HELD_SCHRITTE`). Sie warten, solange einer von ihnen
+kaempft. Am Ziel loest sich der Verband. Wer einer einzelnen Einheit ein Ziel
+gibt, loest sie heraus.
 
 **Scharen, Heerleiste, Befehlstafel** (Truppen A-C):
 - **Schar mit Banner:** Wer zusammen einen Befehl bekommt, bildet eine Schar

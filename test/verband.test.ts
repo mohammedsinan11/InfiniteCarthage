@@ -63,8 +63,22 @@ describe('Verbaende', () => {
     expect(von(game, fremd.id).ziel).toBeNull();
 
     tickArmy(game.state, game.world, []);
-    // Der Held zoege allein zwei Felder - im Verband geht er mit den Rittern.
-    for (const id of [held.id, r1.id, r2.id]) expect(hexDistance(von(game, id), ziel)).toBe(3);
+    // Der Held gibt sein Tempo an die Schar weiter: zwei Felder, nicht eines.
+    for (const id of [held.id, r1.id, r2.id]) expect(hexDistance(von(game, id), ziel)).toBe(2);
+  });
+
+  it('ohne den Helden zieht die Schar im Tempo des Langsamsten - ein Feld', () => {
+    const game = solo();
+    game.state.phase = { t: 'main' };
+    game.state.turn = 1;
+    const mitte = landFlaeche(game, 4);
+    const r1 = einheit(game, einheitVorlage('ritter', mitte.q, mitte.r, { owner: 'p0' }));
+    const r2 = einheit(game, einheitVorlage('ritter', mitte.q, mitte.r, { owner: 'p0' }));
+    const ziel = { q: mitte.q + 4, r: mitte.r };
+
+    must(game, { t: 'orderUnit', unit: r1.id, ...ziel, verband: true });
+    tickArmy(game.state, game.world, []);
+    for (const id of [r1.id, r2.id]) expect(hexDistance(von(game, id), ziel)).toBe(3);
   });
 
   it('ohne Verband zieht nur die eine Einheit, und am Ziel bleibt die Schar beisammen', () => {
