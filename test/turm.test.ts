@@ -10,7 +10,8 @@ import { applyAction, createGame } from '../src/core/rules/reducer';
 import type { Game } from '../src/core/rules/reducer';
 import { canPlaceTower, legalTowerVertices } from '../src/core/rules/placement';
 import { migriereStand } from '../src/core/rules/migration';
-import { beschuss } from '../src/core/rules/army';
+import { benenneHeld, beschuss } from '../src/core/rules/army';
+import { GESTALTEN } from '../src/core/lore';
 import type { ArmyEvent } from '../src/core/rules/army';
 import { COST_GESCHUETZTURM, COST_TOWER } from '../src/core/rules/costs';
 import { SICHT_TURM, einheitVorlage, isLandAt, sightOf } from '../src/core/units';
@@ -193,6 +194,23 @@ describe('Alte Staende', () => {
     delete (game.state.players[0] as { held?: unknown }).held;
     migriereStand(game.state);
     expect(game.state.players[0]!.held).toBe(null);
+  });
+
+  it('reicht dem laengst benannten Helden seine Gestalt nach', () => {
+    const game = spiel();
+    const lore = benenneHeld(game.state, game.state.players[0]!);
+    // Ein Held von vor den zehn Gestalten.
+    delete (lore as { gestalt?: number }).gestalt;
+    migriereStand(game.state);
+    const jetzt = game.state.players[0]!.held!;
+    expect(jetzt.gestalt).toBeGreaterThanOrEqual(0);
+    expect(jetzt.gestalt).toBeLessThan(GESTALTEN);
+    // Der Name bleibt derselbe - nur das Gesicht kam dazu.
+    expect(jetzt.vorname).toBe(lore.vorname);
+    // Zweimal migrieren wuerfelt nicht neu.
+    const gestalt = jetzt.gestalt;
+    migriereStand(game.state);
+    expect(game.state.players[0]!.held!.gestalt).toBe(gestalt);
   });
 });
 

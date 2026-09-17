@@ -11,6 +11,8 @@
  */
 
 import type { GameState } from '../state';
+import { GESTALTEN } from '../lore';
+import { Rng } from '../rng';
 
 export function migriereStand(state: GameState): GameState {
   // Wachtuerme standen frueher neben einem Haus (Building.turm), heute stehen
@@ -24,5 +26,13 @@ export function migriereStand(state: GameState): GameState {
   // Der Held hiess frueher nur "Held" (core/lore.ts). Den Namen bekommt er in
   // der naechsten Runde (rules/army.ts, heldenRunde) - hier fehlt nur das Feld.
   for (const p of state.players) if (p.held === undefined) p.held = null;
+  // Die Gestalt kam nach dem Namen dazu. Wer seinen Helden schon hat, bekommt
+  // sie hier nachgereicht - sonst bliebe er fuer immer die Standardfigur.
+  for (const p of state.players) {
+    if (!p.held || p.held.gestalt !== undefined) continue;
+    const rng = new Rng(state.rngState);
+    p.held.gestalt = rng.int(GESTALTEN);
+    state.rngState = rng.getState();
+  }
   return state;
 }
