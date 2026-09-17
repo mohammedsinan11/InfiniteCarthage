@@ -41,6 +41,7 @@ const ART_NAME = {
   wanderer: 'Wanderer',
   held: 'Held',
   bogen: 'Bogenschuetze',
+  schleim: 'Schleim',
   besatzung: 'Verteidiger',
 } as const;
 
@@ -156,6 +157,14 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
       return `Fehde: ${fraktionName(state, e.fraktion)} gegen ${fraktionName(state, e.gegen)}.`;
     case 'wanderer':
       return 'Ein Wanderer zieht durchs Land.';
+    case 'slimes':
+      return e.anzahl === 1
+        ? 'Ein Schleim kriecht aus dem Dunkel.'
+        : `${e.anzahl} Schleime kriechen aus dem Dunkel.`;
+    case 'slimesRest':
+      return e.anzahl === 1
+        ? 'Der Morgen kommt - der Schleim wird traege.'
+        : `Der Morgen kommt - ${e.anzahl} Schleime werden traege.`;
     case 'fight': {
       const tote = verlusteText(state, e.verluste);
       const gefallen = tote ? ` Gefallen: ${tote}.` : '';

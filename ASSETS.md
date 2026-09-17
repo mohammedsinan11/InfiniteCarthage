@@ -95,6 +95,17 @@ Stufe III ein eigener Koenigssitz statt des umgefaerbten Palastes, und die
 Reichsbauten der Phase 2 (Burgfeste, Handelskontor, Tempel) als freistehende
 Gebaeude ohne Palast-Unterbau.
 
+### Die Nacht und das Inventar — **Platzhalter**
+
+- **Schleim** (`schleim`, 7 x 6): flacher Klumpen in Goblingruen mit zwei
+  hellen Lichtern, breiter als hoch - die Nacht kriecht, sie geht nicht
+  (`client/units.ts`).
+- **Inventar** (`ui/Inventar.tsx`): Beutel als Schriftzeichen, Tafel aus
+  reinem CSS (`.inventar`), Gelee als Kreiszeichen.
+
+*Was fehlt:* ein gezeichneter Schleim mit zwei bis drei Bildern zum Wabern,
+ein Beutel-Sprite und gezeichnete Symbole je Ding.
+
 ### Kampf sehen — **Platzhalter**
 
 - **Trefferzahlen:** SVG-Text ueber dem Feld (`.treffer-zahl`), in der Farbe

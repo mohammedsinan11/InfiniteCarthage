@@ -41,16 +41,26 @@ const SALT_NAME = 83;
 
 const UINT = 4294967296;
 
-export type FraktionArt = 'raeuber' | 'goblin';
+export type FraktionArt = 'raeuber' | 'goblin' | 'nacht';
 
 export type Fraktion = {
-  /** "f:cx:cy" - die Zelle, aus der sie stammt. */
+  /** "f:cx:cy" - die Zelle, aus der sie stammt. Die Nacht hat keine. */
   id: string;
   art: FraktionArt;
   name: string;
   /** Nummer der Farbe, 0 bis FRAKTION_FARBEN-1. */
   farbe: number;
 };
+
+/**
+ * Die Nacht ist keine Bande mit Gebiet, sondern ueberall dieselbe: eine feste
+ * Fraktion ohne Zelle, der die Schleime gehoeren (rules/army.ts, nachtVolk).
+ * Mit ihr laesst sich kein Frieden schliessen - sie verhandelt nicht
+ * (rules/diplomatie.ts fragt nach der Art 'raeuber'). Bei Tag werden ihre
+ * Leute nur muede (core/combat.ts, seiteVon).
+ */
+export const NACHT_ID = 'nacht';
+const NACHT: Fraktion = { id: NACHT_ID, art: 'nacht', name: 'Die Nacht', farbe: 8 };
 
 const mod = (a: number, n: number): number => ((a % n) + n) % n;
 
@@ -127,6 +137,8 @@ export const istFraktion = (id: string): boolean => id.startsWith('f:');
 
 /** Eine Fraktion aus ihrer Kennung. Rein - gemerkt, weil die Karte oft fragt. */
 export function fraktionById(seed: number, id: string): Fraktion {
+  // Die Nacht stammt aus keiner Zelle - sie hat keine Koordinate zum Zerlegen.
+  if (id === NACHT_ID) return NACHT;
   merkePruefen(seed);
   const da = merkId.get(id);
   if (da) return da;

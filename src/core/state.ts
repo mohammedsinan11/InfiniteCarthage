@@ -75,6 +75,12 @@ export type Player = {
    * Adelshaus ueberlebt seinen Traeger (DESIGN.md, Heldenlore).
    */
   held: HeldLore | null;
+  /**
+   * Was der Spieler an Dingen besitzt: Kennung -> Anzahl, etwa "gelee" von
+   * erschlagenen Schleimen. Getrennt von der Hand, weil es keine Rohstoffe
+   * sind - man baut nichts damit, man sammelt es (DESIGN.md, Inventar).
+   */
+  inventar: Record<string, number>;
 };
 
 /**
@@ -110,7 +116,7 @@ export const MAX_TURM_STUFE = 2;
 export const TURM_NAME: Record<number, string> = { 1: 'Grenzposten', 2: 'Geschuetzturm' };
 
 /** Was auf der Karte laufen kann. */
-export type UnitKind = 'ritter' | 'raeuber' | 'goblin' | 'wanderer' | 'held' | 'bogen';
+export type UnitKind = 'ritter' | 'raeuber' | 'goblin' | 'wanderer' | 'held' | 'bogen' | 'schleim';
 
 /**
  * Was eine Einheit gerade vorhat.
@@ -121,8 +127,20 @@ export type UnitKind = 'ritter' | 'raeuber' | 'goblin' | 'wanderer' | 'held' | '
  *   heimkehr  zieht mit der Beute zurueck ins Lager.
  *   fehde     zieht gegen das Lager einer feindlichen Fraktion (ziel).
  *   wandern   neutral, zieht umher und verschwindet nach einer Weile.
+ *   jagd      Schleime bei Nacht: ziehen zur naechsten Siedlung und greifen an,
+ *             pluendern aber nichts und legen kein Feuer.
+ *   ruht      Schleime bei Tag: friedfertig (seiteVon gibt NEUTRAL), sie
+ *             bleiben liegen statt zu verschwinden.
  */
-export type Auftrag = 'befehl' | 'erkunden' | 'raub' | 'heimkehr' | 'fehde' | 'wandern';
+export type Auftrag =
+  | 'befehl'
+  | 'erkunden'
+  | 'raub'
+  | 'heimkehr'
+  | 'fehde'
+  | 'wandern'
+  | 'jagd'
+  | 'ruht';
 
 /**
  * Eine Einheit im Spielstand.

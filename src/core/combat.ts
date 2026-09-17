@@ -12,7 +12,7 @@
 
 import { garrisonOf, isNestActive, nestFraktionOf } from './units';
 import type { ArmyView } from './units';
-import type { Abkommen, PlayerId, UnitState } from './state';
+import type { Abkommen, Auftrag, PlayerId, UnitState } from './state';
 
 export type Seite = string;
 
@@ -24,8 +24,13 @@ export const istSpielerSeite = (s: Seite): boolean => s.startsWith('p:');
 /** Der Spieler hinter einer Spielerseite. */
 export const spielerAus = (s: Seite): PlayerId => s.slice(2);
 
-export function seiteVon(u: Pick<UnitState, 'kind' | 'owner' | 'fraktion'>): Seite {
+export function seiteVon(
+  u: Pick<UnitState, 'kind' | 'owner' | 'fraktion'> & { auftrag?: Auftrag },
+): Seite {
   if (u.kind === 'wanderer') return NEUTRAL;
+  // Schleime sind bei Tag friedfertig: sie liegen herum, und niemand kaempft
+  // mit ihnen. Erst die Nacht macht sie wieder zur Nacht (rules/army.ts).
+  if (u.kind === 'schleim' && u.auftrag === 'ruht') return NEUTRAL;
   if (u.owner !== null) return spielerSeite(u.owner);
   return u.fraktion ?? NEUTRAL;
 }

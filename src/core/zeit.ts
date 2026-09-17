@@ -64,6 +64,11 @@ export function nachtBeginntAt(turn: number): boolean {
   return turn >= 1 && istNacht(turn) && !istNacht(turn - 1);
 }
 
+/** Beginnt mit diesem Zug der Tag? Gegenstueck zu nachtBeginntAt. */
+export function tagBeginntAt(turn: number): boolean {
+  return turn >= 1 && !istNacht(turn) && istNacht(turn - 1);
+}
+
 /** Wie viele Runden die laufende Tageszeit noch dauert, diese eingerechnet. */
 export function rundenBisTageszeit(turn: number): number {
   const jetzt = tageszeitOf(turn);

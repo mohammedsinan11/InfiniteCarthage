@@ -3056,6 +3056,88 @@ em.off {
 }
 
 /*
+ * Inventar (ui/Inventar.tsx): der Beutel haengt rechts unter dem Menue und
+ * klappt nach links auf. PLATZHALTER (ASSETS.md).
+ */
+.inventar {
+  position: absolute;
+  right: 10px;
+  bottom: 84px;
+  z-index: 12;
+  display: flex;
+  align-items: flex-end;
+  flex-direction: row-reverse;
+  gap: 6px;
+  pointer-events: none;
+}
+.inventar > * {
+  pointer-events: auto;
+}
+.inventar-griff {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 7px;
+  font-family: var(--pixel);
+  font-size: 11px;
+  color: var(--text);
+  background: rgba(23, 18, 12, 0.94);
+  border: 2px solid var(--line);
+  cursor: pointer;
+}
+.inventar.offen .inventar-griff,
+.inventar-griff:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.inventar-beutel {
+  font-size: 14px;
+  line-height: 1;
+}
+.inventar-zahl {
+  color: var(--accent);
+}
+.inventar-tafel {
+  width: 168px;
+  padding: 6px 8px;
+  background: rgba(23, 18, 12, 0.94);
+  border: 2px solid var(--line);
+  font-size: 12px;
+}
+.inventar-titel {
+  font-family: var(--pixel);
+  font-size: 10px;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+.inventar-leer {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.inventar-zeile {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+.inventar-zeichen {
+  color: #8ab8e8;
+}
+.inventar-name {
+  flex: 1;
+}
+.inventar-anzahl {
+  font-family: var(--pixel);
+  font-size: 10px;
+  color: var(--accent);
+}
+@media (max-width: 700px) {
+  .inventar {
+    bottom: 120px;
+  }
+}
+
+/*
  * Kampf sehen (DESIGN.md, Kampf): jeder Treffer steigt als Zahl ueber dem
  * Feld auf, ein Fall blitzt rot. Daneben die Kampftafel mit den Seiten.
  * PLATZHALTER (ASSETS.md).

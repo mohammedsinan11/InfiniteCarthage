@@ -65,6 +65,19 @@ const PALETTE: Record<string, string> = {
 
 /** Die Platzhalter. '.' ist durchsichtig. */
 const ART: Record<FigurArt, readonly string[]> = {
+  /*
+   * Der Schleim: ein flacher Klumpen mit zwei Lichtern darin, breiter als hoch.
+   * Er soll von weitem nicht mit einer Figur zu verwechseln sein - die Nacht
+   * kriecht, sie geht nicht. PLATZHALTER (ASSETS.md).
+   */
+  schleim: [
+    '..ggg..',
+    '.ggGgg.',
+    'gGwgwGg',
+    'gGgggGg',
+    'kGGGGGk',
+    '.kkkkk.',
+  ],
   raeuber: [
     '..kkk..',
     '.khhhk.',

@@ -64,7 +64,17 @@ export const WERTE: Record<UnitKind, { angriff: number; leben: number }> = {
   // Trifft ab 4 wie ein Raeuber, aber aus der Ferne (rules/army.ts, beschuss);
   // im Nahkampf eins schlechter (combat.ts, BOGEN_NAHKAMPF).
   bogen: { angriff: 2, leben: 2 },
+  // Ein Schleim allein ist harmlos; gefaehrlich wird die Menge, die nachts
+  // aus dem Dunkel kommt (rules/army.ts, nachtVolk).
+  schleim: { angriff: 1, leben: 2 },
 };
+
+/**
+ * Wer in einem Lager dieser Fraktion wohnt. Die Nacht hat keine Lager - sie
+ * kommt aus dem Dunkel (rules/army.ts, nachtVolk) -, deshalb faellt sie hier
+ * auf Raeuber zurueck; der Fall tritt nie ein, haelt aber den Typ dicht.
+ */
+export const lagerArt = (art: FraktionArt): UnitKind => (art === 'nacht' ? 'raeuber' : art);
 
 /** Mehr Besatzung hat kein Lager - auch nicht, wenn Trupps heimkehren. */
 export const BESATZUNG_MAX = 3;
@@ -100,7 +110,13 @@ export function einheitVorlage(
     r,
     ziel: null,
     heimat: null,
-    auftrag: befehlbar(kind) ? 'befehl' : kind === 'wanderer' ? 'wandern' : 'raub',
+    auftrag: befehlbar(kind)
+      ? 'befehl'
+      : kind === 'wanderer'
+        ? 'wandern'
+        : kind === 'schleim'
+          ? 'ruht'
+          : 'raub',
     leben: WERTE[kind].leben,
     fracht: null,
     traegt: 0,
@@ -185,7 +201,7 @@ export function garrisonUnits(view: ArmyView, hexes: Iterable<Hex>): Unit[] {
   for (const h of hexes) {
     if (!isNestActive(view, h.q, h.r)) continue;
     const fraktion = nestFraktionOf(view, h.q, h.r);
-    const kind = fraktionById(view.worldSeed, fraktion).art;
+    const kind = lagerArt(fraktionById(view.worldSeed, fraktion).art);
     const n = garrisonOf(view, h.q, h.r);
     for (let i = 0; i < n; i++) {
       out.push({

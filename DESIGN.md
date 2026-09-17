@@ -476,6 +476,45 @@ darin geschieht:
 - **Pfeile** fliegen wie bisher bei jeder Salve - seit dem Geschuetzturm auch
   von ihm.
 
+## Die Nacht
+
+Mit dem Einbruch der Nacht kriecht etwas aus dem Dunkel. Den Anfang machen
+Schleime (`rules/army.ts`, `nachtVolk`).
+
+- **Eigene Fraktion:** „Die Nacht" (`NACHT_ID`, `core/factions.ts`) - ohne
+  Gebiet, ohne Lager, ohne Diplomatie. Mit ihr laesst sich kein Frieden
+  schliessen; Tribut kennt sie nicht.
+- **Woher sie kommen:** bei Nachtbeginn je Spieler `SCHLEIM_JE_NACHT` Stueck,
+  genau `SCHLEIM_ABSTAND` Felder von seinen Siedlungen entfernt - also aus dem
+  Nebel, nicht aus dem Vorgarten. Nicht auf Lagern, nicht auf besetzten
+  Feldern, nie zwei auf demselben.
+- **Was sie tun:** Auftrag `jagd` - sie ziehen zur naechsten Siedlung und
+  greifen an, was ihnen begegnet. **Pluendern nicht, legen kein Feuer**: die
+  Nacht will kein Gut. Ein Schleim allein ist harmlos (Angriff 1, Leben 2),
+  gefaehrlich wird die Menge.
+- **Bei Tagesanbruch** verschwinden sie nicht - sie werden friedfertig
+  (Auftrag `ruht`). Solange sie ruhen, ist ihre Seite NEUTRAL
+  (`core/combat.ts`, `seiteVon`), niemand kaempft mit ihnen, und ein laufender
+  Kampf endet von selbst. Mit der naechsten Nacht wachen sie wieder auf.
+- **Gelee:** wer einen Schleim erschlaegt, bekommt ein Stueck ins Inventar -
+  im Nahkampf alle Spieler, die noch auf dem Feld stehen, beim Beschuss der
+  Schuetze, beim Geschuetzturm sein Besitzer.
+- **Geplant:** staerkere Nachtmobs, und irgendwann so etwas wie ein Blutmond.
+
+## Inventar
+
+Was man sammelt, liegt nicht in der Hand: Rohstoffe baut man, Dinge sammelt
+man (`Player.inventar`, Kennung -> Anzahl).
+
+- **Wo:** rechts am Rand unter dem Menue (`ui/Inventar.tsx`). Eingeklappt ein
+  Beutel mit der Gesamtzahl, ausgeklappt eine Zeile je Ding mit Zeichen, Name
+  und Anzahl. Der Beutel bleibt sichtbar, auch wenn nichts drin ist - sonst
+  waere nicht zu sehen, dass es ihn gibt.
+- **Oeffentlich** wie die Beute: die redigierte Sicht traegt es mit
+  (`redact.ts`).
+- **Heute drin:** Gelee. Wofuer es gut ist, entscheidet sich noch - Handwerk
+  liegt nahe.
+
 ## Heldenlore
 
 Ein Held heisst nicht "Held", sondern etwa "Aldebrand der Kuehne, Markgraf von

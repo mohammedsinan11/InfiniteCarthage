@@ -41,6 +41,8 @@ export type PublicPlayer = {
   heldZurueck: number | null;
   /** Name, Haus und Titel des Helden - oeffentlich: sein Schild steht auf der Karte. */
   held: HeldLore | null;
+  /** Gesammelte Dinge, etwa Gelee - oeffentlich wie die Beute. */
+  inventar: Record<string, number>;
   connected: boolean;
   /** Sichtbare Punkte, ohne verdeckte Siegpunktkarten. */
   points: number;
@@ -114,6 +116,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
       loot: p.loot,
       heldZurueck: p.heldZurueck,
       held: p.held ?? null,
+      inventar: { ...(p.inventar ?? {}) },
       connected: p.connected,
       points: publicPoints(state, p.id),
     };

@@ -62,6 +62,7 @@ import {
 import { einheitNamen, gruppenStatus, heerGruppen, untaetig } from '../heer';
 import { heldKurz } from '../../core/lore';
 import { Heerleiste } from '../ui/Heerleiste';
+import { Inventar } from '../ui/Inventar';
 import {
   FAST_GESCHLOSSEN,
   MAX_STUFE,
@@ -1211,6 +1212,8 @@ export function Game() {
           )}
         </Board>
 
+        {/* Gesammeltes - klappt rechts unter dem Menue auf (ui/Inventar.tsx). */}
+        <Inventar inventar={me?.inventar ?? {}} />
       </main>
 
       {/* Abwerfen nach einer 7 */}

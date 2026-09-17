@@ -43,7 +43,8 @@ type Reiter = 'reich' | 'heer' | 'karten' | 'optionen';
 export type FraktionsZeile = {
   id: string;
   name: string;
-  art: 'raeuber' | 'goblin';
+  /** 'nacht' ist die Fraktion der Schleime - ohne Lager und ohne Diplomatie. */
+  art: 'raeuber' | 'goblin' | 'nacht';
   /** CSS-Farbe. */
   farbe: string;
   /** Aktive Lager auf der aufgedeckten Karte. */

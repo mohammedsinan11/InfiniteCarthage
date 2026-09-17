@@ -34,5 +34,7 @@ export function migriereStand(state: GameState): GameState {
     p.held.gestalt = rng.int(GESTALTEN);
     state.rngState = rng.getState();
   }
+  // Das Inventar kam mit den Schleimen dazu (DESIGN.md, Inventar).
+  for (const p of state.players) if (!p.inventar) p.inventar = {};
   return state;
 }

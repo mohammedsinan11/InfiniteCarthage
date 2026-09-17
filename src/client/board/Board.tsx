@@ -305,11 +305,14 @@ const ART_NAME = {
   wanderer: ['Wanderer', 'Wanderer'],
   held: ['Held', 'Helden'],
   bogen: ['Bogenschuetze', 'Bogenschuetzen'],
+  schleim: ['Schleim', 'Schleime'],
 } as const;
 
 const VORHABEN = {
   befehl: '',
   erkunden: 'erkundet',
+  jagd: 'auf Jagd',
+  ruht: 'traege',
   raub: 'auf Raubzug',
   heimkehr: 'auf dem Heimweg',
   fehde: 'in einer Fehde',

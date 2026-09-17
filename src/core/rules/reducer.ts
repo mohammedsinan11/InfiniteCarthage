@@ -66,14 +66,14 @@ import {
   legalRoadEdges,
 } from './placement';
 import { computeProduction } from './production';
-import { beginBigRound, beginNight, heldenRunde, spawnHeld, spawnKnight, tickArmy } from './army';
+import { beginBigRound, beginDay, beginNight, heldenRunde, spawnHeld, spawnKnight, tickArmy } from './army';
 import { brandRunde, brennt, mitKarteLoeschen } from './feuer';
 import { STUFE_NAME, ausbauHindernis, festungsSchutz, hauptstadtHindernis } from './hauptstadt';
 import { abkommenRunde, tributRunde, verhandeln } from './diplomatie';
 import type { DiplomatieEvent, Verhandlung } from './diplomatie';
 import { auftraegePruefen, aufAuftragAntworten, auftragLiefern, wandererBieten } from './auftraege';
 import type { AuftragEvent } from './auftraege';
-import { nachtBeginntAt } from '../zeit';
+import { nachtBeginntAt, tagBeginntAt } from '../zeit';
 import type { ArmyEvent } from './army';
 import { nextStep } from '../units';
 import { bigRoundChangedAt } from '../season';
@@ -246,6 +246,7 @@ export function createGame(
       connected: true,
       heldZurueck: null,
       held: null,
+      inventar: {},
     })),
     order: players.map((p) => p.id),
     current: 0,
@@ -1040,8 +1041,11 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         tributRunde(s, events);
       }
 
-      // Mit der Nacht kommen die Goblins in Horden (core/zeit.ts).
+      // Mit der Nacht kommen die Goblins in Horden und die Schleime aus dem
+      // Dunkel; im Morgengrauen werden die Schleime wieder friedfertig
+      // (core/zeit.ts, rules/army.ts).
       if (nachtBeginntAt(s.turn)) beginNight(s, events);
+      if (tagBeginntAt(s.turn)) beginDay(s, events);
 
       heldenRunde(s, events);
       abkommenRunde(s, events);

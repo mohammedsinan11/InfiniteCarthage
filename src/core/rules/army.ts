@@ -64,6 +64,7 @@ import { ruinAt, ruinResultFor } from '../ruins';
 import type { RuinResult } from '../ruins';
 import { RESOURCES } from '../types';
 import { MAX_TURM_STUFE, emptyHand, handSize, playerById } from '../state';
+import { NACHT_ID } from '../factions';
 import type { GameState, Hand, PlayerId, UnitKind, UnitState } from '../state';
 import { wuerfleHeld } from '../lore';
 import type { HeldLore } from '../lore';
@@ -77,6 +78,7 @@ import {
   isLandAt,
   isNestActive,
   knightMusterHex,
+  lagerArt,
   nestFraktionOf,
   nextStep,
   settlementApproaches,
@@ -132,6 +134,19 @@ const ERKUNDUNG_RADIUS = 3;
 const ERKUNDUNG_HELD = 4;
 /** Felder je Runde fuer den Helden und sein Gefolge. */
 export const HELD_SCHRITTE = 2;
+/**
+ * DIE NACHT. Mit ihrem Beginn kriechen Schleime aus dem Dunkel: je Spieler
+ * einige, in Abstand SCHLEIM_ABSTAND zu seinen Siedlungen, also ausserhalb der
+ * Sicht. Sie ziehen auf die Siedlungen zu und greifen an, was ihnen begegnet -
+ * pluendern aber nichts und legen kein Feuer. Bei Tagesanbruch verschwinden
+ * sie nicht, sie werden nur friedfertig (Auftrag 'ruht'); wer sie erschlaegt,
+ * bekommt Gelee ins Inventar.
+ */
+export const SCHLEIM_JE_NACHT = 2;
+export const SCHLEIM_ABSTAND = 4;
+/** Was ein erschlagener Schleim hinterlaesst (Player.inventar). */
+export const GELEE = 'gelee';
+
 /** Wie weit ein Geschuetzturm schiesst - von jedem seiner drei Nachbarfelder aus. */
 export const TURM_REICHWEITE = 2;
 /** Womit er trifft: wie ein Bogenschuetze, aber er steht fest und ruhig. */
@@ -204,6 +219,10 @@ export type ArmyEvent =
       anzahl: number;
     }
   | { t: 'wanderer'; q: number; r: number }
+  /** So viele Schleime sind mit der Nacht aus dem Dunkel gekrochen. */
+  | { t: 'slimes'; anzahl: number }
+  /** So viele Schleime sind im Morgengrauen friedfertig geworden. */
+  | { t: 'slimesRest'; anzahl: number }
   | {
       /** Eine Kampfrunde auf einem Feld. */
       t: 'fight';
@@ -400,6 +419,18 @@ export function heldenRunde(s: GameState, events: Ereignisse): void {
   }
 }
 
+/** Ein Stueck Gelee ins Inventar dieses Spielers (DESIGN.md, Inventar). */
+export function gelee(s: GameState, id: PlayerId, anzahl = 1): void {
+  const p = playerById(s, id);
+  if (!p) return;
+  if (!p.inventar) p.inventar = {};
+  p.inventar[GELEE] = (p.inventar[GELEE] ?? 0) + anzahl;
+}
+
+/** Welche Spieler unter diesen Einheiten stehen - jeder nur einmal, nach Nummer. */
+const spielerAuf = (leute: readonly UnitState[]): PlayerId[] =>
+  [...new Set(leute.filter((x) => x.owner !== null).map((x) => x.owner!))].sort();
+
 /** Ein Held faellt: sein Gefolge steht allein, und er kehrt spaeter zurueck. */
 function heldFaellt(s: GameState, u: UnitState, events: Ereignisse): void {
   if (u.owner === null) return;
@@ -471,17 +502,18 @@ export function sendRaiders(s: GameState, events: Ereignisse): void {
     const schonDa = zielSet.has(k);
     const weg = schonDa ? null : nextStep(s.worldSeed, nest, zielSet, SUCHE_RAEUBER);
     if (!weg && !schonDa) continue;
-    const kind = fraktionById(s.worldSeed, fraktion).art;
+    // Die Art der Fraktion meldet das Ereignis, die Art der Einheit stellt an.
+    const art = fraktionById(s.worldSeed, fraktion).art;
     aufstellen(
       s,
-      einheitVorlage(kind, nest.q, nest.r, {
+      einheitVorlage(lagerArt(art), nest.q, nest.r, {
         fraktion,
         heimat: k,
         auftrag: 'raub',
         ziel: weg ? weg.ziel : { q: nest.q, r: nest.r },
       }),
     );
-    parties.push({ q: nest.q, r: nest.r, kind, fraktion });
+    parties.push({ q: nest.q, r: nest.r, kind: art, fraktion });
   }
   if (parties.length > 0) events.push({ t: 'march', round: roundOf(s.turn), parties });
 }
@@ -524,7 +556,7 @@ export function sendFeud(s: GameState, rng: Rng, events: Ereignisse): void {
     const p = paare.splice(rng.int(paare.length), 1)[0]!;
     if (!nextStep(s.worldSeed, p.von, new Set([p.nk]), SUCHE_RAEUBER)) continue;
     const fraktion = nestFraktionOf(s, p.von.q, p.von.r);
-    const kind = fraktionById(s.worldSeed, fraktion).art;
+    const kind = lagerArt(fraktionById(s.worldSeed, fraktion).art);
     for (let i = 0; i < FEHDE_TRUPP; i++) {
       aufstellen(
         s,
@@ -601,7 +633,62 @@ const HORDE_REICHWEITE = SPAWN_RANGE + 4;
 export function beginNight(s: GameState, events: Ereignisse): void {
   const rng = new Rng(s.rngState);
   sendHorde(s, rng, events);
+  // Was vom letzten Mal noch herumliegt, wacht mit auf.
+  for (const u of s.units) if (u.kind === 'schleim') u.auftrag = 'jagd';
+  nachtVolk(s, rng, events);
   s.rngState = rng.getState();
+}
+
+/**
+ * Tagesanbruch: die Schleime werden friedfertig. Sie bleiben liegen, wo sie
+ * sind - anders als Wanderer verschwinden sie nie -, und solange sie ruhen,
+ * ist ihre Seite NEUTRAL (core/combat.ts, seiteVon). Ein laufender Kampf
+ * endet damit von selbst.
+ */
+export function beginDay(s: GameState, events: Ereignisse): void {
+  let wach = 0;
+  for (const u of s.units) {
+    if (u.kind !== 'schleim' || u.auftrag === 'ruht') continue;
+    u.auftrag = 'ruht';
+    u.ziel = null;
+    wach += 1;
+  }
+  if (wach > 0) events.push({ t: 'slimesRest', anzahl: wach });
+}
+
+/**
+ * Schleime aus dem Dunkel: je Spieler mit Siedlungen SCHLEIM_JE_NACHT Stueck,
+ * auf Landfeldern in SCHLEIM_ABSTAND um seine Siedlungen - weit genug, dass
+ * sie aus dem Nebel kommen, nah genug, dass sie vor dem Morgen ankommen.
+ * Nicht auf Lagern, nicht auf Feldern, auf denen schon jemand steht.
+ */
+export function nachtVolk(s: GameState, rng: Rng, events: Ereignisse): void {
+  let neu = 0;
+  for (const p of s.players) {
+    const eigene = [...settlementApproaches(s, p.id).keys()].map(feld);
+    if (eigene.length === 0) continue;
+    const plaetze = new Map<string, Hex>();
+    for (const an of eigene) {
+      for (const h of hexesInRange(an, SCHLEIM_ABSTAND)) {
+        if (hexDistance(an, h) < SCHLEIM_ABSTAND) continue;
+        const k = hexKey(h.q, h.r);
+        if (plaetze.has(k)) continue;
+        if (!isLandAt(s.worldSeed, h.q, h.r) || isNestActive(s, h.q, h.r)) continue;
+        if (s.units.some((x) => x.q === h.q && x.r === h.r)) continue;
+        plaetze.set(k, h);
+      }
+    }
+    const frei = [...plaetze.values()].sort((a, b) => nachSchluessel(hexKey(a.q, a.r), hexKey(b.q, b.r)));
+    for (let i = 0; i < SCHLEIM_JE_NACHT && frei.length > 0; i++) {
+      const h = frei.splice(rng.int(frei.length), 1)[0]!;
+      aufstellen(
+        s,
+        einheitVorlage('schleim', h.q, h.r, { fraktion: NACHT_ID, auftrag: 'jagd' }),
+      );
+      neu += 1;
+    }
+  }
+  if (neu > 0) events.push({ t: 'slimes', anzahl: neu });
 }
 
 /**
@@ -918,6 +1005,20 @@ function ziehe(
       return false;
     }
 
+    case 'ruht':
+      // Bei Tag liegt der Schleim, wo er liegt.
+      return false;
+
+    case 'jagd': {
+      // Zur naechsten Siedlung - und was im Weg steht, wird angegriffen.
+      // Gepluendert und gebrannt wird nicht: die Nacht will kein Gut.
+      const ziele = zieleFuer(u.fraktion);
+      const weg = ziele.size > 0 ? nextStep(seed, u, ziele, SUCHE_RAEUBER) : null;
+      if (!weg) return false;
+      schritt(weg.step);
+      return true;
+    }
+
     case 'wandern': {
       if ((u.dauer ?? 0) <= 0) {
         entfernen(s, [u]);
@@ -983,7 +1084,7 @@ function schlacht(
   }
   if (lagerSeite !== null && besatzungArt !== null) {
     for (let i = 0; i < besatzungVorher; i++) {
-      schlage(lagerSeite, WERTE[besatzungArt].angriff, -BESATZUNG_UNGEORDNET);
+      schlage(lagerSeite, WERTE[lagerArt(besatzungArt)].angriff, -BESATZUNG_UNGEORDNET);
     }
   }
 
@@ -1012,6 +1113,11 @@ function schlacht(
   entfernen(s, gefallen);
   for (const tot of gefallen) if (tot.kind === 'held') heldFaellt(s, tot, events);
   const stehen = kaempfer.filter((x) => !gefallen.includes(x));
+  // Gelee: jeder erschlagene Schleim hinterlaesst es denen, die ihn erschlugen.
+  for (const tot of gefallen) {
+    if (tot.kind !== 'schleim') continue;
+    for (const o of spielerAuf(stehen)) gelee(s, o);
+  }
 
   // Beute der Gefallenen: an einen Feind, der noch steht, sonst an einen Kameraden.
   for (const tot of gefallen) {
@@ -1126,6 +1232,8 @@ export function beschuss(s: GameState, rng: Rng, events: Ereignisse): void {
     if (v) v.anzahl += 1;
     else salve.verluste.push({ seite, kind: opfer.kind, anzahl: 1 });
     if (opfer.traegt > 0 || opfer.fracht) uebergib(s, opfer, u, events);
+    // Auch aus der Ferne erschlagen: das Gelee gehoert dem Schuetzen.
+    if (opfer.kind === 'schleim' && u.owner !== null) gelee(s, u.owner);
     entfernen(s, [opfer]);
   }
 
@@ -1172,6 +1280,8 @@ export function beschuss(s: GameState, rng: Rng, events: Ereignisse): void {
       if (opfer.leben <= 0) {
         salve.verluste.push({ seite: seiteVon(opfer), kind: opfer.kind, anzahl: 1 });
         if (opfer.traegt > 0 || opfer.fracht) frachtZurBank(s, opfer);
+        // Der Turm gehoert einem Spieler - sein Gelee bekommt er.
+        if (opfer.kind === 'schleim') gelee(s, turm.owner);
         entfernen(s, [opfer]);
       }
     }
