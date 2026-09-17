@@ -5,7 +5,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { Rng } from '../src/core/rng';
-import { heldKurz, heldVoll, nachfolger, wuerfleHeld } from '../src/core/lore';
+import { GESTALTEN, heldKurz, heldVoll, nachfolger, wuerfleHeld } from '../src/core/lore';
 import { createGame } from '../src/core/rules/reducer';
 import { benenneHeld } from '../src/core/rules/army';
 import { redactStateFor } from '../src/core/redact';
@@ -39,6 +39,28 @@ describe('Heldenname', () => {
       expect(neu.folge).toBe(alt.folge + 1);
       // Derselbe Titel, nur in der Form, die zum Geschlecht passt.
       if (neu.geschlecht === alt.geschlecht) expect(neu.titel).toBe(alt.titel);
+    }
+  });
+
+  it('jeder Held bekommt eine der zehn Gestalten - und alle kommen vor', () => {
+    const gesehen = new Set<number>();
+    for (let seed = 1; seed <= 300; seed++) {
+      const l = wuerfleHeld(new Rng(seed));
+      expect(l.gestalt).toBeGreaterThanOrEqual(0);
+      expect(l.gestalt).toBeLessThan(GESTALTEN);
+      gesehen.add(l.gestalt!);
+    }
+    expect(gesehen.size).toBe(GESTALTEN);
+  });
+
+  it('der Nachfolger sieht nie aus wie sein Vorgaenger', () => {
+    const rng = new Rng(2024);
+    let alt = wuerfleHeld(rng);
+    for (let i = 0; i < 50; i++) {
+      const neu = nachfolger(rng, alt);
+      expect(neu.gestalt).not.toBe(alt.gestalt);
+      expect(neu.gestalt).toBeLessThan(GESTALTEN);
+      alt = neu;
     }
   });
 });

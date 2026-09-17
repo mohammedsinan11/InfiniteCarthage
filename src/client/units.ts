@@ -342,11 +342,40 @@ export const heller = (farbe: string): string => mische(farbe, 255, 0.35);
 const BILDER = new Map<string, HTMLCanvasElement>();
 const BILDER_MAX = 400;
 
-function figurBild(art: FigurArt, grund: string, f: number): HTMLCanvasElement {
-  const schluessel = `${art}|${grund}|${f}`;
+/*
+ * Zehn Heldenfiguren (core/lore.ts, gestalt): fuenf Koepfe mal zwei Hauttoene.
+ * Der Rumpf bleibt derselbe - Umhang in Spielerfarbe, Ruestung, Stiefel -,
+ * gewechselt wird nur, was man auf den ersten Blick sieht. So erkennt man
+ * seinen Helden wieder, und der Nachfolger sieht anders aus. PLATZHALTER
+ * (ASSETS.md).
+ */
+const HELD_KOEPFE: readonly (readonly [string, string])[] = [
+  ['...yyy...', '..kyyyk..'], // langes Haar
+  ['...mmm...', '..kmymk..'], // Helm mit Nasal
+  ['...hhh...', '..khhhk..'], // Kapuze
+  ['...ppp...', '..kpppk..'], // Tuch in Spielerfarbe
+  ['..y.y.y..', '..kyyyk..'], // Reif mit Zacken
+];
+const HELD_HAUT = ['s', 'e'] as const;
+
+/** Die Karte einer Heldengestalt: Kopf tauschen, Hautton setzen. */
+function heldKarte(gestalt: number): readonly string[] {
+  const g = ((gestalt % (HELD_KOEPFE.length * HELD_HAUT.length)) + HELD_KOEPFE.length * HELD_HAUT.length) %
+    (HELD_KOEPFE.length * HELD_HAUT.length);
+  const kopf = HELD_KOEPFE[g % HELD_KOEPFE.length]!;
+  const haut = HELD_HAUT[Math.floor(g / HELD_KOEPFE.length)]!;
+  return ART.held.map((zeile, i) => {
+    if (i === 0) return kopf[0];
+    if (i === 1) return kopf[1];
+    return haut === 's' ? zeile : zeile.replace(/s/g, haut);
+  });
+}
+
+function figurBild(art: FigurArt, grund: string, f: number, gestalt?: number): HTMLCanvasElement {
+  const schluessel = `${art}|${grund}|${f}|${gestalt ?? ''}`;
   const da = BILDER.get(schluessel);
   if (da) return da;
-  const karte = ART[art];
+  const karte = art === 'held' && gestalt !== undefined ? heldKarte(gestalt) : ART[art];
   const breite = Math.max(...karte.map((z) => z.length));
   const c = document.createElement('canvas');
   c.width = breite * f;
@@ -383,6 +412,8 @@ export function zeichneFigur(
   fy: number,
   f: number,
   farbe?: string,
+  /** Nur beim Helden: welche der zehn Gestalten (core/lore.ts). */
+  gestalt?: number,
 ): void {
   const sprite = SPRITES.get(art);
   if (sprite) {
@@ -402,7 +433,7 @@ export function zeichneFigur(
     ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
     ctx.fillRect(x0 + f, fy + f, Math.max(1, breite - 2) * f, f);
   }
-  ctx.drawImage(figurBild(art, farbe ?? '#9c3226', f), x0, y0);
+  ctx.drawImage(figurBild(art, farbe ?? '#9c3226', f, gestalt), x0, y0);
 }
 
 /**

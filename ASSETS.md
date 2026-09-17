@@ -110,14 +110,17 @@ Gebaeude ohne Palast-Unterbau.
 *Was fehlt:* gezeichnete Zahlen im Pixelstil statt Schrift, ein Funkenbild
 fuer den Treffer und ein Rahmen fuer die Tafel.
 
-### Name des Helden — **Platzhalter**
+### Name und Gestalt des Helden — **Platzhalter**
 
 - **Namensschild:** SVG-Text ueber der Heldenfigur (`.held-name` in
   `styles.css`), Pixelschrift in Akzentfarbe mit dunklem Rand. Der Name selbst
   kommt aus `core/lore.ts`.
+- **Zehn Gestalten** (`client/units.ts`, `heldKarte`): dieselbe Figur 9 x 12,
+  getauscht werden nur die beiden Kopfzeilen - Haar, Helm mit Nasal, Kapuze,
+  Tuch in Spielerfarbe, Reif mit Zacken - mal zwei Hauttoene (`s`, `e`).
 
-*Was fehlt:* ein gezeichnetes Band oder Wappenschild statt blossem Text, und
-ein Wappen je Adelshaus.
+*Was fehlt:* zehn wirklich gezeichnete Helden statt Kopftausch, ein Band oder
+Wappenschild statt blossem Text, und ein Wappen je Adelshaus.
 
 *Aufwand:* Burg etwa 24 x 24 px je Sorte; Krone 16 x 10 px mit zwei
 Bildern fuers Wippen.

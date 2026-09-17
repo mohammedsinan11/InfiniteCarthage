@@ -13,11 +13,10 @@
   figcaption { font-size: 11.5px; color: #cdbd9c; margin-bottom: 4px; min-height: 52px; }
   figcaption b { color: #f2e7d0; font-family: 'Silkscreen', monospace; font-size: 11px; }
   canvas { display: block; image-rendering: pixelated; border: 2px solid #3a2c1c; background: #0f0c08; }
-  /* Fuer den Mauer-Turm-Vergleich: doppelt so gross und untereinander,
-     damit man die Pixel sieht und nichts am Rand abgeschnitten wird. */
-  .gross { flex-direction: column; gap: 18px; }
-  .gross figure { width: 728px; }
-  .gross canvas { width: 728px; height: 580px; max-width: none; }
+  /* Fuer den Mauer-Turm-Vergleich: anderthalbfach, zwei je Reihe - links wie
+     es live ist, rechts der Vorschlag, und das fuer jede Konstellation. */
+  .paar figure { width: 546px; }
+  .paar canvas { width: 546px; height: 435px; max-width: none; }
 </style></head>
 <body>
 <div id="inhalt"></div>
@@ -184,8 +183,13 @@ abschnitt('Burgfeste, Handelskontor, Tempel - mit und ohne Unterbau',
 
 // --- Mauer und Turm: wie sie sich treffen ----------------------------------
 
-/** Der Eckensatz, bei dem die unterste Ecke bebaut ist - darum geht es hier. */
+/**
+ * Die beiden moeglichen Eckensaetze eines Rings. Die Abstandsregel laesst nur
+ * jede zweite Ecke zu, also gibt es genau zwei Konstellationen: einmal steht
+ * eine Stadt auf der untersten Ecke, einmal auf der obersten.
+ */
 const SATZ_UNTEN = [0, 2, 4].some((i) => ECKE_PX[i].y > MITTE.y) ? [0, 2, 4] : [1, 3, 5];
+const SATZ_OBEN = SATZ_UNTEN[0] === 0 ? [1, 3, 5] : [0, 2, 4];
 
 /**
  * Die sechs Mauerstuecke, getrennt nach "laeuft von einer oberen Bastion
@@ -193,7 +197,7 @@ const SATZ_UNTEN = [0, 2, 4].some((i) => ECKE_PX[i].y > MITTE.y) ? [0, 2, 4] : [
  * Geraetepixel rueckt der obere Anfang zur Bastion hin weg, damit die Mauer
  * am Turm endet statt durch ihn zu laufen.
  */
-function mauerTeile(kuerzen) {
+function mauerTeile(satz, kuerzen) {
   const vorn = [];
   const hinten = [];
   for (let i = 0; i < 6; i++) {
@@ -203,7 +207,7 @@ function mauerTeile(kuerzen) {
     const untenIdx = ECKE_PX[ia].y <= ECKE_PX[ib].y ? ib : ia;
     const oben = ECKE_PX[obenIdx];
     const unten = ECKE_PX[untenIdx];
-    const vonBastionAbwaerts = SATZ_UNTEN.includes(obenIdx) && oben.y < MITTE.y && unten.y > oben.y;
+    const vonBastionAbwaerts = satz.includes(obenIdx) && oben.y < MITTE.y && unten.y > oben.y;
     if (!vonBastionAbwaerts) {
       hinten.push({ a: ECKE_PX[ia], b: ECKE_PX[ib], stein });
       continue;
@@ -219,24 +223,25 @@ function mauerTeile(kuerzen) {
   return { vorn, hinten };
 }
 
-const mauerTurm = (art) => szene((g) => {
-  const { vorn, hinten } = mauerTeile(art === 'halb' ? 5 * S : 0);
+const mauerTurm = (satz, art) => szene((g) => {
+  const { vorn, hinten } = mauerTeile(satz, art === 'halb' ? 5 * S : 0);
   zeichneMauern(g, art === 'jetzt' ? hinten : [...hinten, ...vorn], S);
   // Hintere Bastionen, dann der Palast, dann die vorderen - wie auf dem Brett.
-  for (const i of SATZ_UNTEN) if (ECKE_PX[i].y <= MITTE.y) zeichneBastion(g, ECKE_PX[i].x, ECKE_PX[i].y, S, BLAU, SORTE);
+  for (const i of satz) if (ECKE_PX[i].y <= MITTE.y) zeichneBastion(g, ECKE_PX[i].x, ECKE_PX[i].y, S, BLAU, SORTE);
   zeichneHauptstadt(g, MITTE.x, MITTE.y, S, BLAU, SORTE, 2);
-  for (const i of SATZ_UNTEN) if (ECKE_PX[i].y > MITTE.y) zeichneBastion(g, ECKE_PX[i].x, ECKE_PX[i].y, S, BLAU, SORTE);
+  for (const i of satz) if (ECKE_PX[i].y > MITTE.y) zeichneBastion(g, ECKE_PX[i].x, ECKE_PX[i].y, S, BLAU, SORTE);
   if (art === 'jetzt') zeichneMauern(g, vorn, S);
 });
 
-abschnitt('Mauer und Turm - wie sie sich treffen',
-  'Derselbe Fall wie auf deinem Bild: unten steht eine Stadt, also sitzen die beiden anderen Bastionen oben links und oben rechts. Es geht nur um die Mauer, die von ihnen nach unten laeuft.', [
-  ['A - wie jetzt live', 'Die Mauer laeuft komplett ueber den Turm hinweg.', mauerTurm('jetzt')],
-  ['B - Mauer bis zur Haelfte, Turm darueber', 'Die Mauer laeuft auf den Turm zu und endet auf halber Hoehe an ihm. Der Turm steht davor, dahinter laeuft die Mauer weiter.', mauerTurm('halb')],
-  ['C - Mauer ganz hinter dem Turm', 'Ohne Kuerzen, nur nach hinten gelegt: der Turm deckt das Mauerstueck fast vollstaendig.', mauerTurm('hinter')],
+abschnitt('Mauer und Turm - beide Fassungen, beide Konstellationen',
+  'Mehr Faelle gibt es nicht: die Abstandsregel laesst nur jede zweite Ecke zu, also steht entweder unten eine Stadt (obere Reihe, dein Fall) oder oben (untere Reihe). Links jeweils der Live-Stand, rechts der Vorschlag.', [
+  ['Stadt unten · A - wie jetzt live', 'Die Mauer laeuft komplett ueber die beiden oberen Tuerme hinweg.', mauerTurm(SATZ_UNTEN, 'jetzt')],
+  ['Stadt unten · B - Mauer endet am Turm', 'Die Mauer laeuft auf den Turm zu und endet auf halber Hoehe an ihm. Der Turm steht davor, dahinter laeuft sie weiter.', mauerTurm(SATZ_UNTEN, 'halb')],
+  ['Stadt oben · A - wie jetzt live', 'Hier steht nur ein Turm oben - die Mauer laeuft von ihm nach beiden Seiten hinunter und ueber ihn hinweg.', mauerTurm(SATZ_OBEN, 'jetzt')],
+  ['Stadt oben · B - Mauer endet am Turm', 'Dieselbe Regel: beide Mauerstuecke enden am oberen Turm, er steht davor.', mauerTurm(SATZ_OBEN, 'halb')],
 ]);
-// Dieser Vergleich lebt von Einzelpixeln - deshalb doppelt so gross.
-[...document.querySelectorAll('.reihe')].at(-1).classList.add('gross');
+// Zwei je Reihe: links live, rechts Vorschlag - so liegen sie nebeneinander.
+[...document.querySelectorAll('.reihe')].at(-1).classList.add('paar');
 
 document.body.dataset.fertig = '1';
 </script>

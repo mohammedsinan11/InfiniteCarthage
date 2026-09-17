@@ -384,10 +384,12 @@ anbieten oder brechen; ob Tribut mit der Groesse des Reichs steigen soll.
 - **Wer wen verdeckt:** steht auf der untersten Ecke eines Feldes eine Stadt,
   dann deckt die Burg (Stufe I) die beiden oberen Staedte, und ab Stufe II
   faellt die unterste Bastion weg - sie verdeckte nur den Palast. Ertrag und
-  Punkte der Stadt bleiben davon unberuehrt, gezeichnet wird sie nicht. Was
-  von einer oberen Bastion abwaerts fuehrt, laeuft als Mauer vor ihr entlang;
-  was oben herumgeht, bleibt dahinter (`Board.tsx`, `ohneBastion`,
-  `vordereMauer`).
+  Punkte der Stadt bleiben davon unberuehrt, gezeichnet wird sie nicht. Eine
+  Mauer, die von einer oberen Bastion abwaerts fuehrt, endet auf halber
+  Turmhoehe an ihr: sie laeuft auf den Turm zu, der Turm steht davor, dahinter
+  geht die Mauer weiter (`Board.tsx`, `ohneBastion`, `kurzeMauer`). Zuvor lief
+  sie ueber ihn hinweg und verdeckte gerade das Bauteil, das die Silhouette
+  traegt - in beiden Konstellationen, mit Stadt oben wie unten.
 
 ### Phase 2: was der Koenigssitz aufschliesst
 
@@ -489,6 +491,11 @@ Sturmfels" (`core/lore.ts`).
 - **Wo er steht:** ueber der Figur auf der Karte (`.held-name`, auch bei
   fremden Helden - wer gegen ein Haus kaempft, soll wissen, gegen welches),
   in der Feldinfo mit Titel und Haus, in Heerleiste, Menue und Protokoll.
+- **Wie er aussieht:** eine von zehn Gestalten (`gestalt`, `GESTALTEN`), beim
+  Antreten gewuerfelt - fuenf Koepfe (Haar, Helm, Kapuze, Tuch, Reif) mal zwei
+  Hauttoene (`client/units.ts`, `heldKarte`). Rumpf, Umhang in Spielerfarbe
+  und Stiefel bleiben gleich, damit die Figur als Held lesbar bleibt. Der
+  Nachfolger bekommt garantiert eine andere Gestalt.
 - **Wofuer das gebaut ist (geplant):** ein Adelshaus. Faellt der Held, tritt
   sein Nachfolger an - gleicher Stamm, gleiches Haus, gleicher Titel, neue
   Endung, zufaelliges Geschlecht, wechselndes Aussehen (`nachfolger`, steht

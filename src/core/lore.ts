@@ -32,7 +32,16 @@ export type HeldLore = {
   geschlecht: Geschlecht;
   /** Der wievielte seines Hauses - der erste ist 1. */
   folge: number;
+  /**
+   * Wie er aussieht: 0 bis GESTALTEN-1. Der Client zeichnet danach eine von
+   * zehn Figuren (client/units.ts). Der Nachfolger bekommt eine andere - das
+   * Haus bleibt, das Gesicht wechselt. Fehlt bei alten Staenden.
+   */
+  gestalt?: number;
 };
+
+/** So viele Heldenfiguren gibt es. */
+export const GESTALTEN = 10;
 
 /** Stamm des Vornamens - er bleibt im Haus. */
 const STAEMME = [
@@ -91,6 +100,7 @@ export function wuerfleHeld(rng: Rng): HeldLore {
     titel: titel[geschlecht === 'm' ? 0 : 1],
     geschlecht,
     folge: 1,
+    gestalt: rng.int(GESTALTEN),
   };
 }
 
@@ -114,6 +124,8 @@ export function nachfolger(rng: Rng, alt: HeldLore): HeldLore {
     titel: titel ? titel[geschlecht === 'm' ? 0 : 1] : alt.titel,
     geschlecht,
     folge: alt.folge + 1,
+    // Nie dieselbe Gestalt wie der Vorgaenger - sonst sieht der Nachfolger aus wie er.
+    gestalt: ((alt.gestalt ?? 0) + 1 + rng.int(GESTALTEN - 1)) % GESTALTEN,
   };
 }
 

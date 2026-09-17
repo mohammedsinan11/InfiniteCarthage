@@ -349,7 +349,8 @@ const KEINE_KRONEN: Krone[] = [];
 /**
  * Wie hohe Kacheln eine Hauptstadt verdecken - zum Vergleichen umschaltbar:
  * ?verdecken=kasten|ueberhang|wald|halb|fuss|aus, im Browser auch window.__verdecken.
- * Ohne Angabe: kasten.
+ * Ohne Angabe gilt die Hoehenmaske; eine handgemalte *_mask.png hat dabei
+ * Vorrang vor der automatischen Schaetzung (tiles.ts).
  */
 type VerdeckenModus = 'kasten' | 'ueberhang' | 'wald' | 'halb' | 'fuss' | 'aus' | 'voll' | 'maske';
 const VERDECKEN_MODI: readonly string[] = ['kasten', 'ueberhang', 'wald', 'halb', 'fuss', 'aus', 'voll', 'maske'];
@@ -358,10 +359,10 @@ function verdeckenModus(): VerdeckenModus {
     const gesetzt =
       (window as unknown as { __verdecken?: string }).__verdecken ??
       new URLSearchParams(window.location.search).get('verdecken') ??
-      'kasten';
-    return (VERDECKEN_MODI.includes(gesetzt) ? gesetzt : 'kasten') as VerdeckenModus;
+      'maske';
+    return (VERDECKEN_MODI.includes(gesetzt) ? gesetzt : 'maske') as VerdeckenModus;
   } catch {
-    return 'kasten';
+    return 'maske';
   }
 }
 /** Groesste Breite der Ausbau-Tafel (styles.css) und ungefaehre Hoehe - fuers Klemmen am Rand. */
@@ -868,7 +869,10 @@ export function Board({
           if (g === ctx) unterwegs.push({ u, fx, fy });
           return;
         }
-        zeichneFigur(g, u.kind, fx, fy, f, farbeSeite(seiteVon(u)));
+        // Der Held traegt die Gestalt seines Hauses - eine von zehn (core/lore.ts).
+        const gestalt =
+          u.kind === 'held' ? state.players.find((p) => p.id === u.owner)?.held?.gestalt : undefined;
+        zeichneFigur(g, u.kind, fx, fy, f, farbeSeite(seiteVon(u)), gestalt);
         if (fackeln && u.id >= 0) zeichneFigur(g, 'fackel', fx + 5 * f, fy - 2 * f, f);
         const max = WERTE[u.kind].leben;
         // Im Gefecht traegt jede Figur ihren Balken, sonst nur die verwundeten:
@@ -1027,12 +1031,15 @@ export function Board({
      *   Stufe II  Die unterste Bastion faellt weg - sie verdeckt nur den
      *             Palast. Ertrag und Punkte der Stadt bleiben, gezeichnet
      *             wird sie nicht.
-     *   Mauer     Was von einer oberen Bastion abwaerts fuehrt, laeuft vor
-     *             ihr entlang; was oben herumgeht, bleibt dahinter.
+     *   Mauer     Was von einer oberen Bastion abwaerts fuehrt, endet auf
+     *             halber Turmhoehe an ihr: die Mauer laeuft auf den Turm zu,
+     *             der Turm steht davor, dahinter geht die Mauer weiter.
+     *             Frueher lief sie ueber ihn hinweg und verdeckte gerade das
+     *             Bauteil, das die Silhouette traegt.
      */
     const nachDerBurg = new Map<string, number>();
     const ohneBastion = new Set<string>();
-    const vordereMauer = new Set<string>();
+    const kurzeMauer = new Set<string>();
     for (const [hk, h] of Object.entries(state.hauptstaedte ?? {})) {
       const [q, r] = hk.split(':').map(Number) as [number, number];
       const c = hexToPixel(q, r, LAYOUT);
@@ -1055,7 +1062,7 @@ export function Board({
         if (state.roads[ek] !== h.owner) continue;
         const enden = edgeEndpoints(kante).map((v) => ({ vk: vertexKey(v), y: vertexToPixel(v, LAYOUT).y }));
         const [oben, unten] = enden[0]!.y <= enden[1]!.y ? [enden[0]!, enden[1]!] : [enden[1]!, enden[0]!];
-        if (oben.y < c.y && unten.y > oben.y && eigene.some((e) => e.vk === oben.vk)) vordereMauer.add(ek);
+        if (oben.y < c.y && unten.y > oben.y && eigene.some((e) => e.vk === oben.vk)) kurzeMauer.add(ek);
       }
     }
     // Die Hauptstadt steht vor der Reihe ihrer vorderen Nachbarn - die Staedte an ihren hinteren Ecken mit ihr.
@@ -1094,14 +1101,27 @@ export function Board({
           }),
         f,
       );
-      const mauerStuecke = (vorn: boolean) =>
+      zeichneMauern(
+        g,
         [...mauerKanten]
-          .filter(([ek]) => nur(kantenTiefe(ek)) && vordereMauer.has(ek) === vorn)
+          .filter(([ek]) => nur(kantenTiefe(ek)))
           .map(([ek, sorte]) => {
             const [a, b] = kantePixel(ek);
-            return { a: a!, b: b!, stein: steinFuer(sorte) };
-          });
-      zeichneMauern(g, mauerStuecke(false), f);
+            const stein = steinFuer(sorte);
+            if (!kurzeMauer.has(ek)) return { a: a!, b: b!, stein };
+            // Oben sitzt die Bastion: dort endet die Mauer auf halber Turmhoehe,
+            // damit der Turm davor steht statt darunter zu verschwinden.
+            const [oben, unten] = a!.y <= b!.y ? [a!, b!] : [b!, a!];
+            const laenge = Math.hypot(unten.x - oben.x, unten.y - oben.y) || 1;
+            const t = Math.min(0.9, (5 * f) / laenge);
+            return {
+              a: { x: oben.x + (unten.x - oben.x) * t, y: oben.y + (unten.y - oben.y) * t },
+              b: unten,
+              stein,
+            };
+          }),
+        f,
+      );
       const gebaeude = Object.entries(state.buildings)
         .filter(([vk]) => nur(gebaeudeTiefe(vk)) && !ohneBastion.has(vk))
         .map(([vk, b]) => {
@@ -1144,8 +1164,6 @@ export function Board({
         });
       // Von hinten nach vorn, nach dem Fuss: das vordere Bauwerk ueberdeckt das hintere.
       for (const b of [...gebaeude, ...tuerme, ...hauptstaedte].sort((u, w) => u.fuss - w.fuss)) b.male();
-      // Zuletzt die Mauerstuecke, die an einer Bastion abwaerts vor ihr entlanglaufen.
-      zeichneMauern(g, mauerStuecke(true), f);
     };
 
     // "maske": wie voll, aber nur die hohen Pixel der Kachel verdecken (tiles.ts, hoehenMaske).
