@@ -97,7 +97,16 @@ import {
   trifft,
 } from '../combat';
 import type { Seite } from '../combat';
-import { ANFUEHRUNG, BOGEN_NAHKAMPF, BOGEN_REICHWEITE, BOGEN_REICHWEITE_ERHOEHT, spielerSeite } from '../combat';
+import {
+  ANFUEHRUNG,
+  BOGEN_NAHKAMPF,
+  BOGEN_REICHWEITE,
+  BOGEN_REICHWEITE_ERHOEHT,
+  MORAL_ANTEIL,
+  deckungFuer,
+  spielerSeite,
+} from '../combat';
+import { terrainAt } from '../worldgen';
 import { fraktionById } from '../factions';
 import type { FraktionArt } from '../factions';
 import { raidLoss, takeFromLargest } from './raid';
@@ -219,6 +228,14 @@ export type ArmyEvent =
       anzahl: number;
     }
   | { t: 'wanderer'; q: number; r: number }
+  /** Eine Seite hat zu viele verloren und weicht auf ein Nachbarfeld aus. */
+  | {
+      t: 'retreat';
+      seite: Seite;
+      von: { q: number; r: number };
+      nach: { q: number; r: number };
+      anzahl: number;
+    }
   /** So viele Schleime sind mit der Nacht aus dem Dunkel gekrochen. */
   | { t: 'slimes'; anzahl: number }
   /** So viele Schleime sind im Morgengrauen friedfertig geworden. */
@@ -1060,19 +1077,23 @@ function schlacht(
   // Alle schlagen gleichzeitig: erst Treffer sammeln, dann anwenden.
   const schaden = new Map<number, number>();
   let besatzungTreffer = 0;
+  const gelaende = terrainAt(s.worldSeed, q, r);
+  /*
+   * Erst das Ziel, dann der Wurf: wo einer steht, entscheidet mit, ob er
+   * getroffen wird (core/combat.ts, deckungFuer). Frueher wurde gewuerfelt
+   * und das Opfer danach gezogen - dann konnte Deckung nichts bewirken.
+   */
   const schlage = (seite: Seite, angriff: number, aufschlag: number) => {
     const einheiten = kaempfer.filter((x) => feindlich(seite, seiteVon(x), s));
     const plaetze = lagerSeite !== null && feindlich(seite, lagerSeite, s) ? besatzungVorher : 0;
     const anzahl = einheiten.length + plaetze;
     if (anzahl === 0) return;
-    if (!trifft(wurf(rng), angriff, aufschlag)) return;
     const i = rng.int(anzahl);
-    if (i < einheiten.length) {
-      const z = einheiten[i]!;
-      schaden.set(z.id, (schaden.get(z.id) ?? 0) + 1);
-    } else {
-      besatzungTreffer += 1;
-    }
+    const ziel = i < einheiten.length ? einheiten[i]! : null;
+    const deckung = ziel ? deckungFuer(s, gelaende, ziel) : 0;
+    if (!trifft(wurf(rng), angriff, aufschlag - deckung)) return;
+    if (ziel) schaden.set(ziel.id, (schaden.get(ziel.id) ?? 0) + 1);
+    else besatzungTreffer += 1;
   };
   for (const u of kaempfer) {
     const seite = seiteVon(u);
@@ -1117,6 +1138,34 @@ function schlacht(
   for (const tot of gefallen) {
     if (tot.kind !== 'schleim') continue;
     for (const o of spielerAuf(stehen)) gelee(s, o);
+  }
+
+  /*
+   * Moral: wer in einer Runde mindestens die Haelfte seiner Leute verliert,
+   * weicht aus, statt bis zum letzten Mann zu fallen (combat.ts,
+   * MORAL_ANTEIL). Der Held bleibt stehen - und wer bei ihm steht, auch.
+   * Ein verlorener Kampf ist damit kein Totalverlust mehr.
+   */
+  for (const seite of seiten) {
+    const vorher = kaempfer.filter((x) => seiteVon(x) === seite).length;
+    const tot = gefallen.filter((x) => seiteVon(x) === seite).length;
+    if (vorher === 0 || tot === 0 || tot / vorher < MORAL_ANTEIL) continue;
+    const rest = stehen.filter((x) => seiteVon(x) === seite);
+    if (rest.length === 0 || rest.some((x) => x.kind === 'held')) continue;
+    const weg = neighbors(q, r).find(
+      (h) =>
+        isLandAt(s.worldSeed, h.q, h.r) &&
+        !isNestActive(s, h.q, h.r) &&
+        !s.units.some((x) => x.q === h.q && x.r === h.r && feindlich(seite, seiteVon(x), s)),
+    );
+    if (!weg) continue;
+    for (const x of rest) {
+      x.q = weg.q;
+      x.r = weg.r;
+      x.ziel = null;
+      x.verband = null;
+    }
+    events.push({ t: 'retreat', seite, von: { q, r }, nach: { q: weg.q, r: weg.r }, anzahl: rest.length });
   }
 
   // Beute der Gefallenen: an einen Feind, der noch steht, sonst an einen Kameraden.

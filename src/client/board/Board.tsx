@@ -2156,6 +2156,16 @@ export function Board({
           const ty = y - hoehe / 2;
           return (
             <g key={'kampf' + k}>
+              {/*
+                Kaempft ein Held mit, zieht sein Hieb einmal durchs Feld -
+                man soll sehen, dass er dabei ist (DESIGN.md, Kampf sehen).
+              */}
+              {leute.some((u) => u.kind === 'held') && (
+                <g className="held-slash" style={{ transformOrigin: `${c.x}px ${y + 10}px` }}>
+                  <path className="breit" d={`M ${c.x - 15} ${y + 2} Q ${c.x} ${y + 20} ${c.x + 15} ${y + 2}`} />
+                  <path d={`M ${c.x - 15} ${y + 2} Q ${c.x} ${y + 20} ${c.x + 15} ${y + 2}`} />
+                </g>
+              )}
               <Schwerter
                 x={c.x}
                 y={y}

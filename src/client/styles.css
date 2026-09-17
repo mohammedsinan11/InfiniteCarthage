@@ -3188,6 +3188,44 @@ em.off {
     transform: scale(1.5);
   }
 }
+/*
+ * Der Hieb des Helden: ein heller Bogen, der einmal durchs Bild zieht, wenn
+ * ein Held auf dem Feld kaempft. PLATZHALTER (ASSETS.md).
+ */
+.held-slash {
+  pointer-events: none;
+  animation: held-slash 0.62s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  transform-origin: center;
+}
+.held-slash path {
+  fill: none;
+  stroke: #fff6d8;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.held-slash path.breit {
+  stroke: rgba(255, 246, 216, 0.35);
+  stroke-width: 7;
+}
+@keyframes held-slash {
+  0% {
+    opacity: 0;
+    transform: rotate(-38deg) scale(0.55);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(26deg) scale(1.25);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .held-slash {
+    animation-duration: 0.01s;
+  }
+}
+
 .kampf-tafel {
   pointer-events: none;
 }

@@ -475,6 +475,28 @@ darin geschieht:
   Runde.
 - **Pfeile** fliegen wie bisher bei jeder Salve - seit dem Geschuetzturm auch
   von ihm.
+- **Der Hieb des Helden:** kaempft ein Held auf dem Feld, zieht ein heller
+  Bogen einmal durchs Bild (`.held-slash`). Man soll sehen, dass er dabei ist.
+
+## Kampf: wo einer steht, zaehlt
+
+Frueher wuerfelte jeder Kaempfer einmal, und der Ort war gleichgueltig. Jetzt
+entscheidet mit, wo gekaempft wird und wer wie viel verloren hat.
+
+- **Deckung durch Gelaende** (`core/combat.ts`, `DECKUNG`): Wald und Gebirge
+  machen ein Ziel um eins schwerer zu treffen; Wiese, Feld, Huegel und Wueste
+  geben nichts. Gerechnet wird beim **Ziel**, nicht beim Schlagenden - deshalb
+  zieht die Schlacht jetzt erst das Opfer und wuerfelt dann (`rules/army.ts`,
+  `schlage`). Vorher war es umgekehrt, und Deckung haette nichts bewirkt.
+- **Deckung durch Mauerwerk** (`DECKUNG_BAU`): wer auf einer eigenen
+  Hauptstadt steht oder an einer Ecke seines Feldes einen eigenen Wachturm
+  hat, ist um eins schwerer zu treffen. Damit zahlen Tuerme und Festungsring
+  endlich auch im Kampf.
+- **Moral statt Ausloeschung** (`MORAL_ANTEIL`): verliert eine Seite in einer
+  Runde die Haelfte ihrer Leute, weicht der Rest auf ein Nachbarfeld aus -
+  Landfeld, kein Lager, keine Feinde darauf. Ein verlorener Kampf ist damit
+  kein Totalverlust mehr, sondern eine Niederlage, von der man sich erholt.
+  **Ausnahme: der Held.** Wo er steht, weicht niemand.
 
 ## Die Nacht
 

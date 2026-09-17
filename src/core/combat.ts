@@ -12,7 +12,9 @@
 
 import { garrisonOf, isNestActive, nestFraktionOf } from './units';
 import type { ArmyView } from './units';
-import type { Abkommen, Auftrag, PlayerId, UnitState } from './state';
+import type { Abkommen, Auftrag, GameState, PlayerId, UnitState } from './state';
+import type { Terrain } from './types';
+import { hexKey, hexVertices, vertexKey } from './coords';
 
 export type Seite = string;
 
@@ -96,11 +98,67 @@ export const BOGEN_REICHWEITE = 1;
 export const BOGEN_REICHWEITE_ERHOEHT = 2;
 export const BOGEN_NAHKAMPF = 1;
 
+/**
+ * DECKUNG. Wo einer steht, entscheidet mit, ob er getroffen wird. Im Wald und
+ * im Gebirge ist er schwerer zu fassen, im Sumpf ein wenig; auf Wiese, Feld
+ * und in der Wueste steht er frei. Der Abzug trifft den ANGREIFER - gerechnet
+ * wird er beim Ziel (rules/army.ts, schlacht).
+ */
+export const DECKUNG: Readonly<Record<Terrain, number>> = {
+  forest: 1,
+  mountain: 1,
+  hill: 0,
+  pasture: 0,
+  field: 0,
+  desert: 0,
+  water: 0,
+};
+
+/**
+ * Wer hinter eigenem Mauerwerk steht, ist noch schwerer zu treffen: ein
+ * Wachturm auf einer Ecke des Feldes oder eine eigene Hauptstadt darauf.
+ * Gilt nur fuer Spieler - Lager haben ihre Palisade (PALISADE).
+ */
+export const DECKUNG_BAU = 1;
+
+/**
+ * MORAL. Verliert eine Seite in einer Runde mindestens die Haelfte ihrer
+ * Leute, weicht der Rest auf ein Nachbarfeld aus, statt bis zum letzten Mann
+ * zu fallen. Der Held bleibt stehen - er ist der Grund, warum die anderen
+ * ueberhaupt noch dastehen.
+ */
+export const MORAL_ANTEIL = 0.5;
+
 /** Trifft dieser Wurf? Eine Sechs trifft immer, eine Eins nie. */
 export function trifft(wurf: number, angriff: number, aufschlag = 0): boolean {
   if (wurf >= 6) return true;
   if (wurf <= 1) return false;
   return wurf + angriff + aufschlag >= TRIFFT_AB;
+}
+
+/** Was die Deckungsregel vom Zustand braucht. */
+export type DeckungSicht = {
+  tuerme?: GameState['tuerme'];
+  hauptstaedte?: GameState['hauptstaedte'];
+};
+
+/**
+ * Wie schwer dieses Ziel zu treffen ist: Gelaende plus eigenes Mauerwerk.
+ * Das Ergebnis wird vom Angriff des Schlagenden abgezogen.
+ */
+export function deckungFuer(
+  view: DeckungSicht,
+  terrain: Terrain,
+  ziel: Pick<UnitState, 'q' | 'r' | 'owner'>,
+): number {
+  let d = DECKUNG[terrain] ?? 0;
+  if (ziel.owner === null) return d;
+  const eigeneHauptstadt = view.hauptstaedte?.[hexKey(ziel.q, ziel.r)]?.owner === ziel.owner;
+  const eigenerTurm = hexVertices(ziel.q, ziel.r).some(
+    (v) => view.tuerme?.[vertexKey(v)]?.owner === ziel.owner,
+  );
+  if (eigeneHauptstadt || eigenerTurm) d += DECKUNG_BAU;
+  return d;
 }
 
 /** Die kaempfenden Seiten auf einem Feld, sortiert - Einheiten und, wenn dort jemand steht, die Besatzung. */

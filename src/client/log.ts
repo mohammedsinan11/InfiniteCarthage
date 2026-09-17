@@ -157,6 +157,8 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
       return `Fehde: ${fraktionName(state, e.fraktion)} gegen ${fraktionName(state, e.gegen)}.`;
     case 'wanderer':
       return 'Ein Wanderer zieht durchs Land.';
+    case 'retreat':
+      return `${seiteName(state, e.seite)} weicht aus: ${e.anzahl} ${e.anzahl === 1 ? 'Einheit zieht' : 'Einheiten ziehen'} sich zurueck.`;
     case 'slimes':
       return e.anzahl === 1
         ? 'Ein Schleim kriecht aus dem Dunkel.'
