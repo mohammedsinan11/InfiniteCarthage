@@ -1,14 +1,25 @@
 /**
- * Das Inventar: was man gesammelt hat, rechts am Rand zum Ausklappen.
+ * Das Inventar: was man gesammelt hat - ein Knopf rechts neben dem Wuerfel.
  *
  * Getrennt von der Hand, weil es keine Rohstoffe sind - man baut nichts damit,
- * man sammelt es (core/state.ts, Player.inventar). Eingeklappt steht dort nur
- * ein Beutel mit der Gesamtzahl; ausgeklappt eine Zeile je Ding. Ist nichts
- * da, bleibt der Beutel leer, verschwindet aber nicht - sonst waere nicht zu
- * sehen, dass es ihn gibt. PLATZHALTER-Gestaltung (ASSETS.md).
+ * man sammelt es (core/state.ts, Player.inventar). Der Knopf zeigt eine Truhe
+ * und die Gesamtzahl; ein Klick klappt die Tafel nach oben auf, eine Zeile je
+ * Ding. Ist nichts da, bleibt der Knopf stehen - sonst waere nicht zu sehen,
+ * dass es ihn gibt. PLATZHALTER-Gestaltung (ASSETS.md).
  */
 
 import { useState } from 'react';
+
+/** Eine Truhe mit Beschlag und Schloss. PLATZHALTER (ASSETS.md). */
+function TruhenIcon() {
+  return (
+    <svg width={20} height={20} viewBox="0 0 16 16" aria-hidden="true" shapeRendering="crispEdges">
+      <path d="M2 6 L4 3 H12 L14 6 V13 H2 Z" fill="currentColor" opacity="0.9" />
+      <path d="M2 6 H14" stroke="#21170a" strokeWidth="1" />
+      <rect x="7" y="7" width="2" height="3" fill="#21170a" />
+    </svg>
+  );
+}
 
 /** Wie ein Ding heisst und aussieht. Spaeter kommen mehr dazu. */
 const DINGE: Record<string, { name: string; zeichen: string; was: string }> = {
@@ -32,14 +43,14 @@ export function Inventar({ inventar }: { inventar: Readonly<Record<string, numbe
     <div className={offen ? 'inventar offen' : 'inventar'}>
       <button
         className="inventar-griff"
-        title={offen ? 'Inventar einklappen' : 'Inventar ausklappen'}
+        title={offen ? 'Inventar schliessen' : 'Inventar: was du gesammelt hast'}
         aria-expanded={offen}
         onClick={() => setOffen((a) => !a)}
       >
-        <span className="inventar-beutel" aria-hidden>
-          ⛁
+        <span className="inventar-truhe" aria-hidden>
+          <TruhenIcon />
         </span>
-        {gesamt > 0 && <span className="inventar-zahl">{gesamt}</span>}
+        <span className="inventar-zahl">{gesamt}</span>
       </button>
       {offen && (
         <div className="inventar-tafel">

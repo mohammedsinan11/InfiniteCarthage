@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<title>Probe: Goblins und Raeuber</title>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; padding: 22px 26px; background: #16110b; color: #f2e7d0;
+         font: 13px/1.45 -apple-system, system-ui, sans-serif; width: 1180px; }
+  h1 { font-family: 'Silkscreen', monospace; font-size: 20px; color: #ffd76a; margin: 0 0 4px; }
+  h2 { font-family: 'Silkscreen', monospace; font-size: 14px; color: #d9a441; margin: 24px 0 6px; }
+  p.lead { margin: 0 0 14px; color: #a8987c; max-width: 1120px; }
+  .reihe { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+  figure { margin: 0; width: 216px; }
+  figcaption { font-size: 12px; color: #cdbd9c; margin-bottom: 6px; min-height: 76px; }
+  figcaption b { color: #f2e7d0; font-family: 'Silkscreen', monospace; font-size: 11px; }
+  canvas { display: block; image-rendering: pixelated; border: 2px solid #3a2c1c; background: #1d2a17; }
+</style></head>
+<body>
+<h1>Goblins und Raeuber - Texturen zur Wahl</h1>
+<p class="lead">Alles im Kunstpixel der Kacheln, alle mit denselben weissen Augen: man soll sie als Goblins erkennen und trotzdem auseinanderhalten. Gezeichnet in zehnfacher Groesse.</p>
+<div id="inhalt"></div>
+<script>
+const PAL = {
+  k:'#1b130d', d:'#3a2a1e', g:'#6aa83e', G:'#3f6f24', w:'#f2efe6', b:'#5e3d25', B:'#3f2818',
+  m:'#b9b3a6', M:'#857e70', y:'#f2c94c', r:'#9c3226', s:'#d9a066', h:'#3a2a22', o:'#f08a24',
+  c:'#e2d2ab', v:'#7f8f44', n:'#9c3226', z:'#3fa39a',
+};
+const SPIELER = '#3a7ac2';
+
+const GOBLIN_JETZT = [
+  'k.......k','gk.kkk.kg','.gkgggkg.','..kwgwk..','..kgggk..',
+  '..kGpGk..','.kbbbbbk.','kgkbbbkgk','..kbkbk..','..kk.kk..',
+];
+const SPAEHER = [
+  '.k...k...','gk.kkk.k.','.gkgggk..','..kwgwk..','..kgggk.m','..kGpGkkm',
+  '.kbbbbbkm','..kbbbk..','..kbkbk..','..kk.kk..',
+];
+const WERFER = [
+  'k.......k','gk.kkk.kg','.gkgggkg.','..kwgwk.m','..kgggkkm','..kGpGk..',
+  '.kbbbbbk.','kbkbbbkgk','..kbkbk..','..kk.kk..',
+];
+const HAEUPTLING = [
+  'c.c...c.c','.ckkkkkc.','gk.kkk.kg','.gkgggkg.','..kwrwk..','..kgggk..',
+  '.mkGpGkm.','.mkbbbkm.','.mkbbbkm.','..kbkbk..','..kk.kk..',
+];
+const SCHAMANE = [
+  '....o....','...khk..o','..khhhk..','..kwgwk.o','..kgggk..','..kGhGk.b',
+  '.khhhhhkb','..khhhk.b','..kbkbk.b','..kk.kk..',
+];
+const RAEUBER_JETZT = [
+  '..kkk..','.khhhk.','khhhhhk','khssshk','.kpppk.','kbpppbk','kbbbbbk','ksbBbsk','.kbBbk.','.kb.bk.','.kk.kk.',
+];
+const SCHNAPPHAHN = [
+  '..kkk..','.khhhk.','khhhhhk','khssshk','.kpppk.','kbpppbk','kbbbbbk','ksbBbsk','.kbBbkm','.kb.bkm','.kk.kkm',
+];
+const HAUPTMANN = [
+  '..yyy..','.khhhk.','khhhhhk','khsrshk','.kpppk.','kbpppbk','kbnnnbk','ksbBbsk','.kbBbk.','.kb.bk.','.kk.kk.',
+];
+
+function bild(rows, titel, text, grund) {
+  const S = 10;
+  const breite = Math.max(...rows.map((z) => z.length));
+  const c = document.createElement('canvas');
+  c.width = breite * S; c.height = rows.length * S;
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  rows.forEach((z, zy) => [...z].forEach((ch, zx) => {
+    if (ch === '.') return;
+    g.fillStyle = ch === 'p' ? (grund ?? SPIELER) : (PAL[ch] ?? '#ff00ff');
+    g.fillRect(zx * S, zy * S, S, S);
+  }));
+  const f = document.createElement('figure');
+  f.innerHTML = `<figcaption><b>${titel}</b><br>${text}</figcaption>`;
+  f.append(c);
+  return f;
+}
+
+function abschnitt(titel, lead, stuecke) {
+  const w = document.getElementById('inhalt');
+  const h = document.createElement('h2'); h.textContent = titel;
+  const p = document.createElement('p'); p.className = 'lead'; p.textContent = lead;
+  const reihe = document.createElement('div'); reihe.className = 'reihe';
+  for (const s of stuecke) reihe.append(s);
+  w.append(h, p, reihe);
+}
+
+abschnitt('Goblins', 'Links der heutige Goblin, daneben vier Rollen. Der Haeuptling ist der grosse Goblin, den jedes Lager bekommen soll.', [
+  bild(GOBLIN_JETZT, 'Heute im Spiel', 'Spitze Ohren, Lederwams, zwei weisse Augen.'),
+  bild(SPAEHER, 'Spaeher', 'Kleiner, geduckt, Dolch in der Hand. Zieht weiter als die anderen und meldet, was er sieht.'),
+  bild(WERFER, 'Werfer', 'Steinbeutel am Guertel, Arm zum Wurf erhoben. Trifft aus der Ferne wie ein Bogenschuetze.'),
+  bild(HAEUPTLING, 'Haeuptling', 'Knochenkrone, rotes Auge, Kriegsbemalung, breiter gebaut. Einer je Lager - faellt er, bricht die Bande ein.'),
+  bild(SCHAMANE, 'Schamane', 'Kapuze und Stab mit Funken. Heilt sein Lager oder ruft Nebel ueber das Feld.'),
+]);
+
+abschnitt('Raeuber', 'Dieselbe Idee fuer die Banden: eine Grundfigur, zwei Rollen daneben.', [
+  bild(RAEUBER_JETZT, 'Heute im Spiel', 'Kapuze, Wams in Fraktionsfarbe, Stiefel.', '#9c3226'),
+  bild(SCHNAPPHAHN, 'Schnapphahn', 'Mit Saebel an der Seite. Schlaegt haerter zu, haelt aber nicht mehr aus.', '#9c3226'),
+  bild(HAUPTMANN, 'Hauptmann', 'Federhut, Schaerpe, Narbe im Gesicht. Der Anfuehrer einer Bande.', '#9c3226'),
+]);
+
+document.body.dataset.fertig = '1';
+</script>
+</body></html>

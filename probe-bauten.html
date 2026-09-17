@@ -243,6 +243,75 @@ abschnitt('Mauer und Turm - beide Fassungen, beide Konstellationen',
 // Zwei je Reihe: links live, rechts Vorschlag - so liegen sie nebeneinander.
 [...document.querySelectorAll('.reihe')].at(-1).classList.add('paar');
 
+// --- Goblins: alternative Texturen -----------------------------------------
+
+const GOB_PAL = { k:'#1b130d', d:'#3a2a1e', g:'#6aa83e', G:'#3f6f24', w:'#f2efe6', b:'#5e3d25', B:'#3f2818',
+  m:'#b9b3a6', M:'#857e70', y:'#f2c94c', r:'#9c3226', s:'#d9a066', h:'#3a2a22', o:'#f08a24', c:'#e2d2ab' };
+
+/** Der Goblin, wie er heute im Spiel steht. */
+const GOBLIN_JETZT = [
+  'k.......k', 'gk.kkk.kg', '.gkgggkg.', '..kwgwk..', '..kgggk..',
+  '..kGpGk..', '.kbbbbbk.', 'kgkbbbkgk', '..kbkbk..', '..kk.kk..',
+];
+/** Spaeher: kleiner, geduckt, mit Dolch. */
+const GOBLIN_SPAEHER = [
+  '.k...k...', 'gk.kkk.k.', '.gkgggk..', '..kwgwk..', '..kgggk.m', '..kGpGkkm',
+  '.kbbbbbkm', '..kbbbk..', '..kbkbk..', '..kk.kk..',
+];
+/** Werfer: Buckel, Beutel mit Steinen, ein Arm hoch. */
+const GOBLIN_WERFER = [
+  'k.......k', 'gk.kkk.kg', '.gkgggkg.', '..kwgwk.m', '..kgggkkm', '..kGpGk..',
+  '.kbbbbbk.', 'kbkbbbkgk', '..kbkbk..', '..kk.kk..',
+];
+/** Haeuptling: groesser, Knochenkrone, Keule, Kriegsbemalung. */
+const GOBLIN_HAEUPTLING = [
+  'c.c...c.c', '.ckkkkkc.', 'gk.kkk.kg', '.gkgggkg.', '..kwrwk..', '..kgggk..',
+  '.mkGpGkm.', '.mkbbbkm.', '.mkbbbkm.', '..kbkbk..', '..kk.kk..',
+];
+/** Schamane: Kapuze, Stab mit Funken, gebeugt. */
+const GOBLIN_SCHAMANE = [
+  '....o....', '...khk..o', '..khhhk..', '..kwgwk.o', '..kgggk..', '..kGhGk.b',
+  '.khhhhhkb', '..khhhk.b', '..kbkbk.b', '..kk.kk..',
+];
+
+function goblinBild(rows, titel, text) {
+  const S2 = 10;
+  const breite = Math.max(...rows.map((z) => z.length));
+  const c = document.createElement('canvas');
+  c.width = breite * S2; c.height = rows.length * S2;
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  rows.forEach((z, zy) => [...z].forEach((ch, zx) => {
+    if (ch === '.') return;
+    g.fillStyle = ch === 'p' ? '#3a7ac2' : (GOB_PAL[ch] ?? '#ff00ff');
+    g.fillRect(zx * S2, zy * S2, S2, S2);
+  }));
+  const f = document.createElement('figure');
+  f.innerHTML = `<figcaption><b>${titel}</b><br>${text}</figcaption>`;
+  f.append(c);
+  return f;
+}
+
+{
+  const w = document.getElementById('inhalt');
+  const h = document.createElement('h2');
+  h.textContent = 'Goblins - alternative Texturen';
+  const p = document.createElement('p');
+  p.className = 'lead';
+  p.textContent = 'Links der heutige Goblin, daneben vier Rollen. Alle im selben Kunstpixel, alle mit denselben Augen - man soll sie als Goblins erkennen und trotzdem unterscheiden koennen.';
+  const reihe = document.createElement('div');
+  reihe.className = 'reihe';
+  reihe.append(
+    goblinBild(GOBLIN_JETZT, 'Heute im Spiel', 'Spitze Ohren, Lederwams, zwei weisse Augen.'),
+    goblinBild(GOBLIN_SPAEHER, 'Spaeher', 'Kleiner und geduckt, Dolch in der Hand. Zieht weiter als die anderen.'),
+    goblinBild(GOBLIN_WERFER, 'Werfer', 'Steinbeutel am Guertel, Arm zum Wurf erhoben. Trifft aus der Ferne.'),
+    goblinBild(GOBLIN_HAEUPTLING, 'Haeuptling', 'Knochenkrone, Kriegsbemalung, breiter gebaut - der grosse Goblin des Lagers.'),
+    goblinBild(GOBLIN_SCHAMANE, 'Schamane', 'Kapuze und Stab mit Funken. Heilt sein Lager oder ruft Nebel.'),
+  );
+  w.append(h, p, reihe);
+  reihe.querySelectorAll('figure').forEach((f) => { f.style.width = '200px'; });
+}
+
 document.body.dataset.fertig = '1';
 </script>
 </body></html>

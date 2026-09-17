@@ -1158,6 +1158,8 @@ export function Game() {
                 )}
               </button>
             )}
+            {/* Gesammeltes - der Knopf steht rechts neben dem Wuerfel (ui/Inventar.tsx). */}
+            {hand && <Inventar inventar={me?.inventar ?? {}} />}
           </div>
 
           {/*
@@ -1212,8 +1214,6 @@ export function Game() {
           )}
         </Board>
 
-        {/* Gesammeltes - klappt rechts unter dem Menue auf (ui/Inventar.tsx). */}
-        <Inventar inventar={me?.inventar ?? {}} />
       </main>
 
       {/* Abwerfen nach einer 7 */}
