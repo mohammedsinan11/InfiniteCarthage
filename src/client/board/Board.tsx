@@ -889,7 +889,8 @@ export function Board({
         // Der Held traegt die Gestalt seines Hauses - eine von zehn (core/lore.ts).
         const gestalt =
           u.kind === 'held' ? state.players.find((p) => p.id === u.owner)?.held?.gestalt : undefined;
-        zeichneFigur(g, u.kind, fx, fy, f, farbeSeite(seiteVon(u)), gestalt);
+        // Und wer sich hochgedient hat, traegt seinen Rang: Helm, Feder, Umhang.
+        zeichneFigur(g, u.kind, fx, fy, f, farbeSeite(seiteVon(u)), gestalt, u.stufe ?? 0);
         if (fackeln && u.id >= 0) zeichneFigur(g, 'fackel', fx + 5 * f, fy - 2 * f, f);
         // Wer sich hochgedient hat, traegt seine Winkel ueber dem Kopf.
         if (u.id >= 0 && (u.stufe ?? 0) > 0) zeichneStufe(g, u.kind, fx, fy, f, u.stufe ?? 0);

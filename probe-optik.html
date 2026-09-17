@@ -20,7 +20,7 @@
 <div id="inhalt"></div>
 <script type="module">
 import {
-  zeichneHauptstadt, zeichneBastion, zeichneMauern, zeichneFigur, steinFuer,
+  zeichneHauptstadt, zeichneBastion, zeichneMauern, zeichneFigur, zeichneStufe, steinFuer,
 } from '/src/client/units.ts';
 
 const S = 5;
@@ -227,12 +227,17 @@ abschnitt('3. Wald vor dem Ring', 'Ein Waldfeld vor der Hauptstadt. Heute steht 
 const RITTER = [
   '..kkk...','.kmmmk..','.kmMMk..','.kmmmk..','kkkkkkk.','kppmppmk','kpppppmk','kppyppmk','.kpppk..','.kMkMk..','.kMkMk..','.kk.kk..',
 ];
+/*
+ * Keine Narbe: in 9 x 12 Kunstpixeln sind zwei rote Punkte im Gesicht nicht
+ * zu erkennen - sie sehen aus wie ein Zeichenfehler. Der Rang zeigt sich am
+ * Helm, an der Feder und zuletzt am Umhang.
+ */
 const STUFE_ZUSATZ = [
   null,
   { helm: '#c9ccd6' },
   { helm: '#c9ccd6', feder: '#9c3226' },
-  { helm: '#e0e4ea', feder: '#f2c94c', narbe: true },
-  { helm: '#f2c94c', feder: '#f2c94c', narbe: true, umhang: '#6a4fa0' },
+  { helm: '#e0e4ea', feder: '#f2c94c' },
+  { helm: '#f2c94c', feder: '#f2c94c', umhang: '#6a4fa0' },
 ];
 
 function ritterStufe(stufe) {
@@ -250,7 +255,6 @@ function ritterStufe(stufe) {
     p(zx - 4, zy - 11, farbe);
   }));
   if (zusatz?.feder) { p(-1, -12, zusatz.feder); p(-1, -13, zusatz.feder); }
-  if (zusatz?.narbe) { p(1, -8, '#9c3226'); p(1, -7, '#9c3226'); }
   // Die Winkel, die es heute schon gibt.
   for (let i = 0; i < stufe; i++) {
     const x = -2 + i * 4 - (stufe - 1) * 2;
@@ -259,12 +263,30 @@ function ritterStufe(stufe) {
   return c;
 }
 
-abschnitt('4. Stufen am Aussehen', 'Heute zeigt nur ein goldener Winkel ueber dem Kopf die Stufe. Vorschlag: der Rang faerbt Helm, Feder, Narben und ab Stufe 4 einen Umhang.', [
-  ['Stufe 0', 'Wie er antritt.', ritterStufe(0)],
-  ['Stufe 1', 'Heller Helm.', ritterStufe(1)],
-  ['Stufe 2', 'Helm und rote Feder - ab hier hat er auch einen Namen.', ritterStufe(2)],
-  ['Stufe 3', 'Blanker Helm, goldene Feder, Narbe im Gesicht.', ritterStufe(3)],
-  ['Stufe 4', 'Goldener Helm und Umhang - ein Veteran, den man von weitem sieht.', ritterStufe(4)],
+/**
+ * Jetzt aus dem Spielcode selbst: dieselbe zeichneFigur, die das Brett
+ * benutzt, mit der Stufe als letztem Parameter - plus die Winkel darueber.
+ */
+function ausDemSpiel(kind, stufe) {
+  const c = leer(26, 24);
+  const g = c.getContext('2d');
+  const mx = (13 - OX) * S, my = (16 - OY) * S;
+  // Ein Stueck Wiese als Grund, damit heller Stahl nicht auf Schwarz liegt.
+  if (KACHEL.grass) g.drawImage(KACHEL.grass, mx - 13 * S, my - 22 * S, 26 * S, 32 * S);
+  zeichneFigur(g, kind, mx, my, S, BLAU, undefined, stufe);
+  zeichneStufe(g, kind, mx, my, S, stufe);
+  return c;
+}
+
+abschnitt('4. Stufen am Aussehen - so, wie das Spiel es jetzt zeichnet',
+  'Aus dem Spielcode, nicht nachgebaut: Helm, Feder und Umhang kommen aus stufenKarte, die Winkel aus zeichneStufe. Ohne Narbe.', [
+  ['Stufe 0', 'Wie er antritt.', ausDemSpiel('ritter', 0)],
+  ['Stufe 1', 'Blanker Helm statt grauem Stahl.', ausDemSpiel('ritter', 1)],
+  ['Stufe 2', 'Rote Feder - ab hier traegt er auch einen Namen.', ausDemSpiel('ritter', 2)],
+  ['Stufe 3', 'Die Feder wird golden.', ausDemSpiel('ritter', 3)],
+  ['Stufe 4', 'Goldener Helm und Umhang in seiner Farbe.', ausDemSpiel('ritter', 4)],
+  ['Bogen, Stufe 4', 'Dieselbe Regel gilt fuer Bogenschuetzen.', ausDemSpiel('bogen', 4)],
+  ['Held, Stufe 3', 'Und fuer den Helden - ueber seiner eigenen Gestalt.', ausDemSpiel('held', 3)],
 ]);
 
 document.body.dataset.fertig = '1';

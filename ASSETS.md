@@ -137,12 +137,17 @@ Alle Entwuerfe: `probe-goblins.html`.
 
 - **Stufenwinkel** (`client/units.ts`, `zeichneStufe`): je Stufe ein goldener
   Winkel ueber dem Kopf, auf dunklem Grund.
+- **Der Rang am Mann** (`stufenKarte`): ab Stufe 1 blanker Helm (`n`), ab 2
+  eine rote Feder, ab 3 eine goldene, ab 4 goldener Helm und ein Umhang in
+  Spielerfarbe. Die Figur bleibt dieselbe, damit man sie wiedererkennt.
+  **Keine Narbe** - in neun Kunstpixeln Breite sind zwei rote Punkte im
+  Gesicht nicht zu erkennen, sie sehen aus wie ein Zeichenfehler.
 - **Hieb des Helden** (`.held-slash`): ein heller Bogen, der einmal durchs
   Feld zieht, wenn ein Held mitkaempft.
 
-*Was fehlt:* ein gezeichnetes Rangabzeichen statt Winkeln, und ein echter
-Schwerthieb als Bildfolge statt eines SVG-Bogens. Spaeter soll die Stufe auch
-die Figur selbst aendern - Helm, Umhang, Narben.
+*Was fehlt:* ein gezeichnetes Rangabzeichen statt Winkeln, ein echter
+Schwerthieb als Bildfolge statt eines SVG-Bogens, und gezeichnete Ruestungen
+je Stufe statt umgefaerbter Kopfzeilen.
 
 ### Die Nacht und das Inventar — **Platzhalter**
 

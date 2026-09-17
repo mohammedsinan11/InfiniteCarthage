@@ -53,6 +53,7 @@ const PALETTE: Record<string, string> = {
   M: '#857e70', // Stein im Schatten
   y: '#f2c94c', // Gold, erleuchtetes Fenster
   Y: '#a8832e', // Gold im Schatten - Dach und Krone des Koenigssitzes
+  n: '#e0e4ea', // blanker Stahl - der Helm eines Veteranen (core/combat.ts, Stufen)
   '1': '#6a4fa0', // Hexengewand
   '2': '#9d7ad6', // Hexengewand im Licht
   '3': '#3a2a5a', // Spitzhut
@@ -471,11 +472,56 @@ function heldKarte(gestalt: number): readonly string[] {
   });
 }
 
-function figurBild(art: FigurArt, grund: string, f: number, gestalt?: number): HTMLCanvasElement {
-  const schluessel = `${art}|${grund}|${f}|${gestalt ?? ''}`;
+/*
+ * Der Rang am Mann (core/combat.ts, stufeFuer). Wer sich hochdient, sieht
+ * anders aus - aber er bleibt dieselbe Figur, damit man ihn im Getuemmel
+ * wiedererkennt:
+ *
+ *   ab 1   blanker Helm statt grauem Stahl
+ *   ab 2   Feder auf dem Helm, rot - dann traegt er auch einen Namen
+ *   ab 3   die Feder wird golden
+ *   ab 4   goldener Helm und ein Umhang in seiner Farbe
+ *
+ * Keine Narbe im Gesicht: in neun Kunstpixeln Breite sind zwei rote Punkte
+ * nicht zu erkennen, sie sehen aus wie ein Zeichenfehler.
+ */
+function stufenKarte(karte: readonly string[], stufe: number): readonly string[] {
+  const kopf = Math.min(4, karte.length);
+  const helm = stufe >= 4 ? 'y' : 'n';
+  // Helm faerben: nur die Kopfzeilen, damit die Ruestung Stahl bleibt.
+  let neu = karte.map((zeile, i) => (i < kopf ? zeile.replace(/m/g, helm) : zeile));
+  if (stufe >= 4) {
+    // Umhang: je eine Spalte links und rechts am Rumpf, in Spielerfarbe.
+    neu = neu.map((zeile, i) => {
+      const rumpf = i >= kopf && i < karte.length - 2;
+      return (rumpf ? 'P' : '.') + zeile + (rumpf ? 'P' : '.');
+    });
+  }
+  if (stufe >= 2) {
+    // Feder: ein Pixel ueber dem Helm, mittig.
+    const breite = Math.max(...neu.map((z) => z.length));
+    const mitte = Math.floor(breite / 2);
+    const farbe = stufe >= 3 ? 'y' : 'r';
+    neu = [
+      '.'.repeat(mitte) + farbe + '.'.repeat(Math.max(0, breite - mitte - 1)),
+      ...neu,
+    ];
+  }
+  return neu;
+}
+
+function figurBild(
+  art: FigurArt,
+  grund: string,
+  f: number,
+  gestalt?: number,
+  stufe = 0,
+): HTMLCanvasElement {
+  const schluessel = `${art}|${grund}|${f}|${gestalt ?? ''}|${stufe}`;
   const da = BILDER.get(schluessel);
   if (da) return da;
-  const karte = art === 'held' && gestalt !== undefined ? heldKarte(gestalt) : ART[art];
+  const grund0 = art === 'held' && gestalt !== undefined ? heldKarte(gestalt) : ART[art];
+  const karte = stufe > 0 ? stufenKarte(grund0, stufe) : grund0;
   const breite = Math.max(...karte.map((z) => z.length));
   const c = document.createElement('canvas');
   c.width = breite * f;
@@ -514,6 +560,8 @@ export function zeichneFigur(
   farbe?: string,
   /** Nur beim Helden: welche der zehn Gestalten (core/lore.ts). */
   gestalt?: number,
+  /** Der Rang: faerbt Helm und Feder, ab der hoechsten Stufe auch den Umhang. */
+  stufe = 0,
 ): void {
   const sprite = SPRITES.get(art);
   if (sprite) {
@@ -533,7 +581,7 @@ export function zeichneFigur(
     ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
     ctx.fillRect(x0 + f, fy + f, Math.max(1, breite - 2) * f, f);
   }
-  ctx.drawImage(figurBild(art, farbe ?? '#9c3226', f, gestalt), x0, y0);
+  ctx.drawImage(figurBild(art, farbe ?? '#9c3226', f, gestalt, stufe), x0, y0);
 }
 
 /**
