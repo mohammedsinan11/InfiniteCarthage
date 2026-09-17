@@ -36,6 +36,8 @@ export function migriereStand(state: GameState): GameState {
   }
   // Das Inventar kam mit den Schleimen dazu (DESIGN.md, Inventar).
   for (const p of state.players) if (!p.inventar) p.inventar = {};
+  // Feste kamen mit dem Lagerleben dazu (DESIGN.md, Lagerleben).
+  if (!state.feste) state.feste = {};
   // Siege und Stufe kamen mit dem Levelsystem dazu: wer schon auf der Karte
   // steht, faengt bei null an (DESIGN.md, Stufen).
   for (const u of state.units) {

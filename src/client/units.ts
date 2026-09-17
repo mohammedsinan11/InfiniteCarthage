@@ -78,6 +78,40 @@ const ART: Record<FigurArt, readonly string[]> = {
     'kGGGGGk',
     '.kkkkk.',
   ],
+  /*
+   * Der Haeuptling: der grosse Goblin eines Lagers. Knochenkrone, rotes Auge,
+   * Kriegsbemalung an den Armen, breiter gebaut als seine Leute - man soll ihn
+   * im Getuemmel sofort finden. PLATZHALTER (ASSETS.md).
+   */
+  haeuptling: [
+    'c.c...c.c',
+    '.ckkkkkc.',
+    'gk.kkk.kg',
+    '.gkgggkg.',
+    '..kwrwk..',
+    '..kgggk..',
+    '.mkGpGkm.',
+    '.mkbbbkm.',
+    '.mkbbbkm.',
+    '..kbkbk..',
+    '..kk.kk..',
+  ],
+  /*
+   * Der Schamane: Kapuze statt Ohren, Stab mit Funken. Gebeugt - er kaempft
+   * nicht, er haelt die Seinen auf den Beinen. PLATZHALTER (ASSETS.md).
+   */
+  schamane: [
+    '....o....',
+    '...khk..o',
+    '..khhhk..',
+    '..kwgwk.o',
+    '..kgggk..',
+    '..kGhGk.b',
+    '.khhhhhkb',
+    '..khhhk.b',
+    '..kbkbk.b',
+    '..kk.kk..',
+  ],
   raeuber: [
     '..kkk..',
     '.khhhk.',

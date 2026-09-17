@@ -116,7 +116,18 @@ export const MAX_TURM_STUFE = 2;
 export const TURM_NAME: Record<number, string> = { 1: 'Grenzposten', 2: 'Geschuetzturm' };
 
 /** Was auf der Karte laufen kann. */
-export type UnitKind = 'ritter' | 'raeuber' | 'goblin' | 'wanderer' | 'held' | 'bogen' | 'schleim';
+export type UnitKind =
+  | 'ritter'
+  | 'raeuber'
+  | 'goblin'
+  /** Der grosse Goblin: einer je Goblinlager, sein Anfuehrer. */
+  | 'haeuptling'
+  /** Der Schamane des Lagers - heilt die Seinen, statt selbst zuzuschlagen. */
+  | 'schamane'
+  | 'wanderer'
+  | 'held'
+  | 'bogen'
+  | 'schleim';
 
 /**
  * Was eine Einheit gerade vorhat.
@@ -327,6 +338,12 @@ export type GameState = {
   roads: Record<string, PlayerId>;
   /** Wachtuerme, Ecke -> Besitzer und Stufe. Stehen unabhaengig von Doerfern und Staedten. */
   tuerme: Record<string, Turm>;
+  /**
+   * Lager, die gerade feiern: Feldschluessel -> bis zu welcher Runde. Wer
+   * feiert, heilt seine Besatzung und schickt solange niemanden auf Raubzug
+   * (rules/army.ts, lagerLeben).
+   */
+  feste?: Record<string, number>;
 
   deck: DevCardType[];
   packIndex: number;

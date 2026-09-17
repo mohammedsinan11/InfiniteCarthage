@@ -42,6 +42,8 @@ const ART_NAME = {
   held: 'Held',
   bogen: 'Bogenschuetze',
   schleim: 'Schleim',
+  haeuptling: 'Haeuptling',
+  schamane: 'Schamane',
   besatzung: 'Verteidiger',
 } as const;
 
@@ -157,6 +159,12 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
       return `Fehde: ${fraktionName(state, e.fraktion)} gegen ${fraktionName(state, e.gegen)}.`;
     case 'wanderer':
       return 'Ein Wanderer zieht durchs Land.';
+    case 'watch':
+      return e.schamane
+        ? `Der Schamane von ${fraktionName(state, e.fraktion)} ruft ${e.anzahl} Leute ins Lager.`
+        : `${fraktionName(state, e.fraktion)} zieht ${e.anzahl} ${e.anzahl === 1 ? 'Wache' : 'Wachen'} nach.`;
+    case 'feast':
+      return `${fraktionName(state, e.fraktion)} feiert - aus diesem Lager kommt vorerst niemand.`;
     case 'levelUp':
       return e.name
         ? `${who(state, e.player)} hat einen Veteranen: ${e.name}, Stufe ${e.stufe}.`

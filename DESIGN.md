@@ -478,6 +478,27 @@ darin geschieht:
 - **Der Hieb des Helden:** kaempft ein Held auf dem Feld, zieht ein heller
   Bogen einmal durchs Bild (`.held-slash`). Man soll sehen, dass er dabei ist.
 
+## Lager mit eigenem Leben
+
+Lager waren bisher Ausgangspunkte fuer Raubzuege, sonst nichts. Jetzt geschieht
+dort etwas, auch wenn man sie in Ruhe laesst (`rules/army.ts`, `lagerLeben`,
+einmal je grosser Runde, nur im Umkreis der Spieler - was niemand sieht,
+braucht kein Leben).
+
+- **Der grosse Goblin:** jedes Goblinlager hat seinen **Haeuptling**
+  (`garrisonUnits`) - der erste Kopf der Besatzung. Er trifft wie ein Ritter
+  und haelt mehr aus als seine Leute; faellt er, ist die Bande kopflos.
+- **Der Schamane** heilt nicht mit dem Schwert: wo einer im Lager steht, zieht
+  es Wachen doppelt so schnell nach.
+- **Wachwechsel:** einem Lager, dem Leute fehlen, kommt je Runde einer nach,
+  bis `BESATZUNG_MAX`. Ein ausgeduenntes Lager fuellt sich also wieder - wer
+  es leeren will, muss es zu Ende bringen.
+- **Fest:** Goblinlager feiern (`FEST_CHANCE`). Wer feiert, heilt seine
+  Besatzung voll auf und schickt dafuer niemanden auf Raubzug (`feiert`). Eine
+  Nacht Ruhe fuer die Nachbarn - und am Morgen steht ein volles Lager da.
+- **Streit unter Banden** gibt es schon als Fehde (`sendFeud`): zwei
+  Fraktionen, die sich begegnen, kaempfen.
+
 ## Stufen: wer kaempft, dient sich hoch
 
 Eine Einheit, die Feinde erschlaegt, bleibt nicht dieselbe.

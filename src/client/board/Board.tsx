@@ -308,6 +308,8 @@ const ART_NAME = {
   held: ['Held', 'Helden'],
   bogen: ['Bogenschuetze', 'Bogenschuetzen'],
   schleim: ['Schleim', 'Schleime'],
+  haeuptling: ['Haeuptling', 'Haeuptlinge'],
+  schamane: ['Schamane', 'Schamanen'],
 } as const;
 
 const VORHABEN = {

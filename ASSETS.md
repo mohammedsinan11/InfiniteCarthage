@@ -95,6 +95,19 @@ Stufe III ein eigener Koenigssitz statt des umgefaerbten Palastes, und die
 Reichsbauten der Phase 2 (Burgfeste, Handelskontor, Tempel) als freistehende
 Gebaeude ohne Palast-Unterbau.
 
+### Haeuptling und Schamane — **Platzhalter**
+
+- **Haeuptling** (`haeuptling`, 9 x 11): der grosse Goblin eines Lagers -
+  Knochenkrone, rotes Auge, Kriegsbemalung an den Armen, breiter gebaut als
+  seine Leute (`client/units.ts`).
+- **Schamane** (`schamane`, 9 x 10): Kapuze statt Ohren, Stab mit Funken,
+  gebeugte Haltung.
+
+*Was fehlt:* Spaeher und Werfer waren als Rollen entworfen, sind aber
+vorerst draussen - sie unterschieden sich nur durch ein angeklebtes Detail.
+Wenn sie kommen, brauchen sie eigene Koerperhaltungen, nicht nur ein Beiwerk.
+Alle Entwuerfe: `probe-goblins.html`.
+
 ### Stufen und Hieb — **Platzhalter**
 
 - **Stufenwinkel** (`client/units.ts`, `zeichneStufe`): je Stufe ein goldener

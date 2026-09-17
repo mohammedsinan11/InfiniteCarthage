@@ -67,6 +67,12 @@ export const WERTE: Record<UnitKind, { angriff: number; leben: number }> = {
   // Ein Schleim allein ist harmlos; gefaehrlich wird die Menge, die nachts
   // aus dem Dunkel kommt (rules/army.ts, nachtVolk).
   schleim: { angriff: 1, leben: 2 },
+  // Der grosse Goblin: trifft wie ein Ritter und haelt mehr aus als seine
+  // Leute. Einer je Goblinlager - faellt er, ist die Bande kopflos.
+  haeuptling: { angriff: 3, leben: 4 },
+  // Der Schamane schlaegt kaum zu; er haelt die Seinen auf den Beinen
+  // (rules/army.ts, lagerLeben).
+  schamane: { angriff: 1, leben: 3 },
 };
 
 /**
@@ -204,11 +210,15 @@ export function garrisonUnits(view: ArmyView, hexes: Iterable<Hex>): Unit[] {
   for (const h of hexes) {
     if (!isNestActive(view, h.q, h.r)) continue;
     const fraktion = nestFraktionOf(view, h.q, h.r);
-    const kind = lagerArt(fraktionById(view.worldSeed, fraktion).art);
+    const art = fraktionById(view.worldSeed, fraktion).art;
+    const kind = lagerArt(art);
     const n = garrisonOf(view, h.q, h.r);
     for (let i = 0; i < n; i++) {
+      // Der erste Kopf eines Goblinlagers ist sein Haeuptling - jedes Lager
+      // hat einen (DESIGN.md, Lagerleben).
+      const wer = i === 0 && art === 'goblin' ? 'haeuptling' : kind;
       out.push({
-        ...einheitVorlage(kind, h.q, h.r, { fraktion, heimat: hexKey(h.q, h.r), auftrag: 'heimkehr' }),
+        ...einheitVorlage(wer, h.q, h.r, { fraktion, heimat: hexKey(h.q, h.r), auftrag: 'heimkehr' }),
         id: -1,
       });
     }

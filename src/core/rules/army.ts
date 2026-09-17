@@ -232,6 +232,10 @@ export type ArmyEvent =
       anzahl: number;
     }
   | { t: 'wanderer'; q: number; r: number }
+  /** Ein Lager zieht Wachen nach (lagerLeben). */
+  | { t: 'watch'; q: number; r: number; fraktion: string; anzahl: number; schamane: boolean }
+  /** Ein Goblinlager feiert: volle Besatzung, kein Raubzug bis zu dieser Runde. */
+  | { t: 'feast'; q: number; r: number; fraktion: string; bis: number }
   /** Eine Einheit ist eine Stufe aufgestiegen - mit Namen, wenn sie sich einen verdient hat. */
   | { t: 'levelUp'; unit: number; player: PlayerId; stufe: number; name: string | null }
   /** Eine Seite hat zu viele verloren und weicht auf ein Nachbarfeld aus. */
@@ -540,6 +544,8 @@ export function sendRaiders(s: GameState, events: Ereignisse): void {
   for (const [k, nest] of reihe) {
     if (parties.length >= grenze) break;
     if (unterwegs.has(k)) continue;
+    // Wer feiert, bleibt im Lager (lagerLeben).
+    if (feiert(s, k)) continue;
     const fraktion = nestFraktionOf(s, nest.q, nest.r);
     const zielSet = new Set(settlementApproaches(s, undefined, imKriegMit(s, fraktion)).keys());
     const schonDa = zielSet.has(k);
@@ -656,11 +662,74 @@ export function sendWanderer(s: GameState, rng: Rng, events: Ereignisse): void {
 
 /** Was zu Beginn jeder grossen Runde aufbricht. Nach dem Ziehen, damit Frische nicht sofort handeln. */
 export function beginBigRound(s: GameState, events: Ereignisse): void {
+  const rng0 = new Rng(s.rngState);
+  // Erst das Lagerleben: wer feiert, schickt in dieser Runde niemanden los.
+  lagerLeben(s, rng0, events);
+  s.rngState = rng0.getState();
   sendRaiders(s, events);
   const rng = new Rng(s.rngState);
   sendFeud(s, rng, events);
   sendWanderer(s, rng, events);
   s.rngState = rng.getState();
+}
+
+/** Wie lange ein Fest dauert, in grossen Runden. */
+export const FEST_DAUER = 1;
+/** Wie wahrscheinlich ein Goblinlager je grosser Runde ein Fest feiert. */
+const FEST_CHANCE = 0.35;
+/** So weit schaut das Lagerleben um die Siedlungen der Spieler. */
+const LAGER_SICHT = 12;
+
+/** Feiert dieses Lager gerade? Dann bricht von dort kein Raubzug auf. */
+export const feiert = (s: GameState, k: string): boolean => (s.feste?.[k] ?? -1) >= roundOf(s.turn);
+
+/**
+ * Das Leben in den Lagern, einmal je grosser Runde.
+ *
+ * WACHWECHSEL. Ein Lager, dem Leute fehlen, zieht einen nach - langsam, einen
+ * je Runde. Wo ein Schamane steht, geht es doppelt so schnell: er haelt die
+ * Seinen auf den Beinen.
+ *
+ * FEST. Goblinlager feiern. Wer feiert, heilt seine Besatzung voll auf und
+ * schickt dafuer niemanden auf Raubzug - eine Nacht Ruhe fuer die Nachbarn,
+ * und am Morgen steht ein volles Lager da.
+ *
+ * Nur in der Naehe der Spieler: was niemand sieht, braucht auch kein Leben.
+ */
+export function lagerLeben(s: GameState, rng: Rng, events: Ereignisse): void {
+  const runde = roundOf(s.turn);
+  if (s.feste) {
+    for (const [k, bis] of Object.entries(s.feste)) if (bis < runde) delete s.feste[k];
+  }
+  const naehe = new Set<string>();
+  for (const k of settlementApproaches(s).keys()) {
+    const an = feld(k);
+    for (const c of hexesInRange(an, LAGER_SICHT)) {
+      if (isNestActive(s, c.q, c.r)) naehe.add(hexKey(c.q, c.r));
+    }
+  }
+  for (const k of [...naehe].sort(nachSchluessel)) {
+    const { q, r } = feld(k);
+    const fraktion = nestFraktionOf(s, q, r);
+    const art = fraktionById(s.worldSeed, fraktion).art;
+    const da = garrisonOf(s, q, r);
+
+    // Wachwechsel: fehlende Koepfe langsam nachziehen.
+    if (da < BESATZUNG_MAX) {
+      const schamane = s.units.some((u) => u.kind === 'schamane' && u.heimat === k);
+      const dazu = Math.min(BESATZUNG_MAX - da, schamane ? 2 : 1);
+      s.nestGarrison[k] = da + dazu;
+      events.push({ t: 'watch', q, r, fraktion, anzahl: dazu, schamane });
+    }
+
+    // Fest: nur Goblins, nur wenn nicht schon gefeiert wird.
+    if (art !== 'goblin' || feiert(s, k)) continue;
+    if (rng.next() / UINT >= FEST_CHANCE) continue;
+    if (!s.feste) s.feste = {};
+    s.feste[k] = runde + FEST_DAUER;
+    s.nestGarrison[k] = BESATZUNG_MAX;
+    events.push({ t: 'feast', q, r, fraktion, bis: runde + FEST_DAUER });
+  }
 }
 
 // --- Die Nacht -----------------------------------------------------------------
