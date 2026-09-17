@@ -66,7 +66,7 @@ import { RESOURCES } from '../types';
 import { MAX_TURM_STUFE, emptyHand, handSize, playerById } from '../state';
 import { NACHT_ID } from '../factions';
 import type { GameState, Hand, PlayerId, UnitKind, UnitState } from '../state';
-import { wuerfleHeld } from '../lore';
+import { einheitName, wuerfleHeld } from '../lore';
 import type { HeldLore } from '../lore';
 import {
   BESATZUNG_MAX,
@@ -103,8 +103,12 @@ import {
   BOGEN_REICHWEITE,
   BOGEN_REICHWEITE_ERHOEHT,
   MORAL_ANTEIL,
+  NAME_AB_STUFE,
+  STUFE_ANGRIFF,
+  STUFE_LEBEN,
   deckungFuer,
   spielerSeite,
+  stufeFuer,
 } from '../combat';
 import { terrainAt } from '../worldgen';
 import { fraktionById } from '../factions';
@@ -228,6 +232,8 @@ export type ArmyEvent =
       anzahl: number;
     }
   | { t: 'wanderer'; q: number; r: number }
+  /** Eine Einheit ist eine Stufe aufgestiegen - mit Namen, wenn sie sich einen verdient hat. */
+  | { t: 'levelUp'; unit: number; player: PlayerId; stufe: number; name: string | null }
   /** Eine Seite hat zu viele verloren und weicht auf ein Nachbarfeld aus. */
   | {
       t: 'retreat';
@@ -434,6 +440,26 @@ export function heldenRunde(s: GameState, events: Ereignisse): void {
     if (p.heldZurueck === null || s.turn < p.heldZurueck) continue;
     spawnHeld(s, p.id, events);
   }
+}
+
+/**
+ * Einen Sieg gutschreiben: die Einheit zaehlt ihn, steigt vielleicht auf und
+ * verdient sich ab NAME_AB_STUFE einen Namen (core/combat.ts, stufeFuer).
+ * Jede Stufe hebt Angriff und Leben; das gewonnene Leben gibt es sofort, sonst
+ * bliebe der Aufstieg mitten im Kampf ohne Wirkung.
+ *
+ * Nur fuer Einheiten eines Spielers - Raeuber und Schleime dienen sich nicht hoch.
+ */
+export function siegGutschreiben(s: GameState, u: UnitState, rng: Rng, events: Ereignisse): void {
+  if (u.owner === null || !befehlbar(u.kind)) return;
+  const vorher = stufeFuer(u.siege ?? 0);
+  u.siege = (u.siege ?? 0) + 1;
+  const jetzt = stufeFuer(u.siege);
+  if (jetzt === vorher) return;
+  u.stufe = jetzt;
+  u.leben += STUFE_LEBEN * (jetzt - vorher);
+  if (jetzt >= NAME_AB_STUFE && !u.name) u.name = einheitName(rng);
+  events.push({ t: 'levelUp', unit: u.id, player: u.owner, stufe: jetzt, name: u.name ?? null });
 }
 
 /** Ein Stueck Gelee ins Inventar dieses Spielers (DESIGN.md, Inventar). */
@@ -1083,7 +1109,9 @@ function schlacht(
    * getroffen wird (core/combat.ts, deckungFuer). Frueher wurde gewuerfelt
    * und das Opfer danach gezogen - dann konnte Deckung nichts bewirken.
    */
-  const schlage = (seite: Seite, angriff: number, aufschlag: number) => {
+  /** Wer zuletzt auf dieses Ziel traf - ihm gehoert der Sieg, wenn es faellt. */
+  const letzterTreffer = new Map<number, UnitState>();
+  const schlage = (seite: Seite, angriff: number, aufschlag: number, von?: UnitState) => {
     const einheiten = kaempfer.filter((x) => feindlich(seite, seiteVon(x), s));
     const plaetze = lagerSeite !== null && feindlich(seite, lagerSeite, s) ? besatzungVorher : 0;
     const anzahl = einheiten.length + plaetze;
@@ -1092,8 +1120,10 @@ function schlacht(
     const ziel = i < einheiten.length ? einheiten[i]! : null;
     const deckung = ziel ? deckungFuer(s, gelaende, ziel) : 0;
     if (!trifft(wurf(rng), angriff, aufschlag - deckung)) return;
-    if (ziel) schaden.set(ziel.id, (schaden.get(ziel.id) ?? 0) + 1);
-    else besatzungTreffer += 1;
+    if (ziel) {
+      schaden.set(ziel.id, (schaden.get(ziel.id) ?? 0) + 1);
+      if (von) letzterTreffer.set(ziel.id, von);
+    } else besatzungTreffer += 1;
   };
   for (const u of kaempfer) {
     const seite = seiteVon(u);
@@ -1101,7 +1131,14 @@ function schlacht(
       u.kind === 'ritter' && kaempfer.some((x) => x.kind === 'held' && x.owner === u.owner) ? ANFUEHRUNG : 0;
     // Bogenschuetzen im Nahkampf treffen schlechter (combat.ts, BOGEN_NAHKAMPF).
     const nahkampf = u.kind === 'bogen' ? -BOGEN_NAHKAMPF : 0;
-    schlage(seite, WERTE[u.kind].angriff + angefuehrt, (lagerSeite !== null && seite !== lagerSeite ? -PALISADE : 0) + nahkampf);
+    // Wer sich hochgedient hat, trifft besser (core/combat.ts, STUFE_ANGRIFF).
+    const stufe = STUFE_ANGRIFF * (u.stufe ?? 0);
+    schlage(
+      seite,
+      WERTE[u.kind].angriff + angefuehrt + stufe,
+      (lagerSeite !== null && seite !== lagerSeite ? -PALISADE : 0) + nahkampf,
+      u,
+    );
   }
   if (lagerSeite !== null && besatzungArt !== null) {
     for (let i = 0; i < besatzungVorher; i++) {
@@ -1138,6 +1175,11 @@ function schlacht(
   for (const tot of gefallen) {
     if (tot.kind !== 'schleim') continue;
     for (const o of spielerAuf(stehen)) gelee(s, o);
+  }
+  // Siege: wer den letzten Treffer setzte, dient sich hoch - wenn er noch steht.
+  for (const tot of gefallen) {
+    const sieger = letzterTreffer.get(tot.id);
+    if (sieger && stehen.includes(sieger)) siegGutschreiben(s, sieger, rng, events);
   }
 
   /*
@@ -1281,8 +1323,9 @@ export function beschuss(s: GameState, rng: Rng, events: Ereignisse): void {
     if (v) v.anzahl += 1;
     else salve.verluste.push({ seite, kind: opfer.kind, anzahl: 1 });
     if (opfer.traegt > 0 || opfer.fracht) uebergib(s, opfer, u, events);
-    // Auch aus der Ferne erschlagen: das Gelee gehoert dem Schuetzen.
+    // Auch aus der Ferne erschlagen: Gelee und Sieg gehoeren dem Schuetzen.
     if (opfer.kind === 'schleim' && u.owner !== null) gelee(s, u.owner);
+    siegGutschreiben(s, u, rng, events);
     entfernen(s, [opfer]);
   }
 

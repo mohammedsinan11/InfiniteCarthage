@@ -129,6 +129,20 @@ export function nachfolger(rng: Rng, alt: HeldLore): HeldLore {
   };
 }
 
+/**
+ * Der Name einer einfachen Einheit, die sich hochgedient hat: Vorname und
+ * Beiname, ohne Haus und ohne Titel - sie ist niemand von Stand, sie hat sich
+ * das Recht auf einen Namen erkaempft (rules/army.ts, STUFEN_AB).
+ *
+ * Bewusst aus denselben Bausteinen wie der Held: dasselbe Land, dieselben
+ * Namen. Nur der Rang fehlt.
+ */
+export function einheitName(rng: Rng): string {
+  const geschlecht: Geschlecht = rng.int(2) === 0 ? 'm' : 'w';
+  const vorname = zieh(rng, STAEMME) + zieh(rng, ENDUNG[geschlecht]);
+  return `${vorname} ${mitArtikel(zieh(rng, BEIWORT), geschlecht)}`;
+}
+
 /** Wie der Held ueber seiner Figur steht: "Aldebrand der Kuehne". */
 export const heldKurz = (l: HeldLore): string => `${l.vorname} ${l.beiname}`;
 

@@ -784,6 +784,34 @@ export function figurHoehe(art: FigurArt): number {
  * uebrige, dunkel fuer verlorene. Unverletzte bekommen keine Anzeige - sonst
  * steht ueber jeder Figur ein Balken. PLATZHALTER (ASSETS.md).
  */
+/**
+ * Die Stufe einer Einheit: so viele kleine Winkel ueber ihrem Kopf, wie sie
+ * Stufen hat (core/combat.ts, stufeFuer). Gold, weil es ein Rang ist und kein
+ * Zustand - der Lebensbalken darunter bleibt rot. PLATZHALTER (ASSETS.md).
+ */
+export function zeichneStufe(
+  ctx: CanvasRenderingContext2D,
+  art: FigurArt,
+  fx: number,
+  fy: number,
+  f: number,
+  stufe: number,
+): void {
+  if (stufe <= 0) return;
+  const y = fy - (figurHoehe(art) + 3) * f;
+  const breite = stufe * 4 - 1;
+  const x0 = fx - Math.floor(breite / 2) * f;
+  for (let i = 0; i < stufe; i++) {
+    const x = x0 + i * 4 * f;
+    ctx.fillStyle = '#1b130d';
+    ctx.fillRect(x - f, y - f, 5 * f, 3 * f);
+    ctx.fillStyle = '#f2c94c';
+    ctx.fillRect(x, y, f, f);
+    ctx.fillRect(x + f, y - f, f, f);
+    ctx.fillRect(x + 2 * f, y, f, f);
+  }
+}
+
 export function zeichneLeben(
   ctx: CanvasRenderingContext2D,
   art: FigurArt,

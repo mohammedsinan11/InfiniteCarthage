@@ -181,6 +181,18 @@ export type UnitState = {
    * Langsamsten und warten, solange einer von ihnen kaempft. null: allein.
    */
   verband: number | null;
+  /**
+   * Wie viele Feinde sie erschlagen hat. Daraus waechst die Stufe
+   * (rules/army.ts, STUFEN_AB). Fehlt bei alten Staenden.
+   */
+  siege?: number;
+  /**
+   * Ihre Stufe, beginnend bei 0. Jede Stufe hebt Angriff und Leben und
+   * aendert das Aussehen; ab NAME_AB_STUFE traegt sie einen Namen.
+   */
+  stufe?: number;
+  /** Ihr Name, sobald sie sich einen verdient hat (core/lore.ts, einheitName). */
+  name?: string;
 };
 
 /**

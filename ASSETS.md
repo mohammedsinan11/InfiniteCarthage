@@ -95,6 +95,17 @@ Stufe III ein eigener Koenigssitz statt des umgefaerbten Palastes, und die
 Reichsbauten der Phase 2 (Burgfeste, Handelskontor, Tempel) als freistehende
 Gebaeude ohne Palast-Unterbau.
 
+### Stufen und Hieb — **Platzhalter**
+
+- **Stufenwinkel** (`client/units.ts`, `zeichneStufe`): je Stufe ein goldener
+  Winkel ueber dem Kopf, auf dunklem Grund.
+- **Hieb des Helden** (`.held-slash`): ein heller Bogen, der einmal durchs
+  Feld zieht, wenn ein Held mitkaempft.
+
+*Was fehlt:* ein gezeichnetes Rangabzeichen statt Winkeln, und ein echter
+Schwerthieb als Bildfolge statt eines SVG-Bogens. Spaeter soll die Stufe auch
+die Figur selbst aendern - Helm, Umhang, Narben.
+
 ### Die Nacht und das Inventar — **Platzhalter**
 
 - **Schleim** (`schleim`, 7 x 6): flacher Klumpen in Goblingruen mit zwei

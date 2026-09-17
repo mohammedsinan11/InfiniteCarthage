@@ -54,8 +54,10 @@ import {
   zeichneMauern,
   steinFuer,
   zeichneLeben,
+  zeichneStufe,
   zeichneStrassen,
 } from '../units';
+import { STUFE_LEBEN } from '../../core/combat';
 import { Schwerter } from './Schwerter';
 import { AuftragsZeichen, Flammen, KronenZeichen } from './Marken';
 import { Kosten } from '../ui/Aktionsleiste';
@@ -325,7 +327,11 @@ function einheitenText(state: PublicState, du: string | null, gruppe: readonly U
   const n = gruppe.length;
   // Der Held steht mit Namen da, sobald die Partie ihn kennt (core/lore.ts).
   const lore = u.kind === 'held' && n === 1 ? state.players.find((p) => p.id === u.owner)?.held : null;
-  const teile: string[] = [lore ? heldVoll(lore) : `${n > 1 ? `${n} ` : ''}${ART_NAME[u.kind][n > 1 ? 1 : 0]}`];
+  // Wer sich einen Namen erkaempft hat, wird beim Namen genannt - mit Rang.
+  const verdient = n === 1 && u.name ? `${u.name} (${ART_NAME[u.kind][0]} ${'✦'.repeat(u.stufe ?? 0)})` : null;
+  const teile: string[] = [
+    lore ? heldVoll(lore) : (verdient ?? `${n > 1 ? `${n} ` : ''}${ART_NAME[u.kind][n > 1 ? 1 : 0]}`),
+  ];
   if (u.owner !== null) {
     teile.push(
       u.owner === du
@@ -877,7 +883,9 @@ export function Board({
           u.kind === 'held' ? state.players.find((p) => p.id === u.owner)?.held?.gestalt : undefined;
         zeichneFigur(g, u.kind, fx, fy, f, farbeSeite(seiteVon(u)), gestalt);
         if (fackeln && u.id >= 0) zeichneFigur(g, 'fackel', fx + 5 * f, fy - 2 * f, f);
-        const max = WERTE[u.kind].leben;
+        // Wer sich hochgedient hat, traegt seine Winkel ueber dem Kopf.
+        if (u.id >= 0 && (u.stufe ?? 0) > 0) zeichneStufe(g, u.kind, fx, fy, f, u.stufe ?? 0);
+        const max = WERTE[u.kind].leben + STUFE_LEBEN * (u.stufe ?? 0);
         // Im Gefecht traegt jede Figur ihren Balken, sonst nur die verwundeten:
         // so sieht man, wie es auf dem Feld steht (DESIGN.md, Kampf sehen).
         const imGefecht = kampf.has(hexKey(t.q, t.r));

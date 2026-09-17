@@ -91,7 +91,8 @@ export function einheitNamen(einheiten: readonly UnitState[], heldName?: string)
     }
     const n = (zaehler.get(u.kind) ?? 0) + 1;
     zaehler.set(u.kind, n);
-    out.set(u.id, `${u.kind === 'bogen' ? 'Bogenschuetze' : 'Ritter'} ${n}`);
+    // Ein Veteran heisst bei seinem Namen, nicht bei seiner Nummer (core/lore.ts).
+    out.set(u.id, u.name ?? `${u.kind === 'bogen' ? 'Bogenschuetze' : 'Ritter'} ${n}`);
   }
   return out;
 }

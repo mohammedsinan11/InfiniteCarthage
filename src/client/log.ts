@@ -157,6 +157,10 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
       return `Fehde: ${fraktionName(state, e.fraktion)} gegen ${fraktionName(state, e.gegen)}.`;
     case 'wanderer':
       return 'Ein Wanderer zieht durchs Land.';
+    case 'levelUp':
+      return e.name
+        ? `${who(state, e.player)} hat einen Veteranen: ${e.name}, Stufe ${e.stufe}.`
+        : `Eine Einheit von ${who(state, e.player)} steigt auf Stufe ${e.stufe}.`;
     case 'retreat':
       return `${seiteName(state, e.seite)} weicht aus: ${e.anzahl} ${e.anzahl === 1 ? 'Einheit zieht' : 'Einheiten ziehen'} sich zurueck.`;
     case 'slimes':

@@ -136,6 +136,28 @@ export function trifft(wurf: number, angriff: number, aufschlag = 0): boolean {
   return wurf + angriff + aufschlag >= TRIFFT_AB;
 }
 
+/**
+ * STUFEN. Wer Feinde erschlaegt, steigt auf (rules/army.ts, siegGutschreiben).
+ * Jede Stufe bringt einen Punkt Angriff und einen Punkt Leben - wenig genug,
+ * dass eine Uebermacht eine Uebermacht bleibt, genug, dass ein Veteran sich
+ * anders anfuehlt als ein frischer Ritter.
+ */
+export const STUFE_ANGRIFF = 1;
+export const STUFE_LEBEN = 1;
+
+/** So viele Siege kostet die jeweils naechste Stufe: 2, dann 4, dann 7, dann 11. */
+export const STUFEN_AB: readonly number[] = [2, 4, 7, 11];
+
+/** Ab dieser Stufe verdient sich eine Einheit einen Namen. */
+export const NAME_AB_STUFE = 2;
+
+/** Die Stufe, die zu so vielen Siegen gehoert. */
+export function stufeFuer(siege: number): number {
+  let stufe = 0;
+  for (const ab of STUFEN_AB) if (siege >= ab) stufe += 1;
+  return stufe;
+}
+
 /** Was die Deckungsregel vom Zustand braucht. */
 export type DeckungSicht = {
   tuerme?: GameState['tuerme'];

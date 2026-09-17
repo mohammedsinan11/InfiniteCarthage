@@ -124,6 +124,9 @@ export function einheitVorlage(
     dauer: null,
     folgt: null,
     verband: null,
+    // Jede Einheit faengt ohne Siege und auf Stufe 0 an (DESIGN.md, Stufen).
+    siege: 0,
+    stufe: 0,
     ...felder,
   };
 }

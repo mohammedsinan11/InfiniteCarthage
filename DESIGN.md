@@ -478,6 +478,25 @@ darin geschieht:
 - **Der Hieb des Helden:** kaempft ein Held auf dem Feld, zieht ein heller
   Bogen einmal durchs Bild (`.held-slash`). Man soll sehen, dass er dabei ist.
 
+## Stufen: wer kaempft, dient sich hoch
+
+Eine Einheit, die Feinde erschlaegt, bleibt nicht dieselbe.
+
+- **Siege zaehlen:** wer den letzten Treffer setzt und selbst noch steht,
+  bekommt ihn gutgeschrieben (`rules/army.ts`, `siegGutschreiben`) - im
+  Nahkampf wie beim Beschuss. Nur Einheiten eines Spielers; Raeuber, Goblins
+  und Schleime dienen sich nicht hoch.
+- **Schwellen:** 2, 4, 7, 11 Siege (`STUFEN_AB`), also vier Stufen. Jede
+  bringt +1 Angriff (`STUFE_ANGRIFF`) und +1 Leben (`STUFE_LEBEN`); das Leben
+  gibt es sofort, sonst bliebe ein Aufstieg mitten im Kampf ohne Wirkung.
+- **Name ab Stufe 2** (`NAME_AB_STUFE`): dann wuerfelt die Partie ihr einen aus
+  denselben Bausteinen wie dem Helden - Vorname und Beiname, aber ohne Haus
+  und ohne Titel (`core/lore.ts`, `einheitName`). Sie ist niemand von Stand,
+  sie hat sich das Recht auf einen Namen erkaempft.
+- **Zu sehen:** goldene Winkel ueber dem Kopf, einer je Stufe
+  (`client/units.ts`, `zeichneStufe`); der Lebensbalken darunter waechst mit.
+  In Feldinfo und Heerleiste steht der Name statt der Nummer.
+
 ## Kampf: wo einer steht, zaehlt
 
 Frueher wuerfelte jeder Kaempfer einmal, und der Ort war gleichgueltig. Jetzt
