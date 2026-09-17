@@ -95,6 +95,18 @@ Stufe III ein eigener Koenigssitz statt des umgefaerbten Palastes, und die
 Reichsbauten der Phase 2 (Burgfeste, Handelskontor, Tempel) als freistehende
 Gebaeude ohne Palast-Unterbau.
 
+### Reichsbauten (Phase 2) — **Platzhalter**
+
+- **Burgfeste, Handelskontor, Tempel** (`client/units.ts`,
+  `zeichneReichsbau`): alle drei auf demselben Unterbau wie im Entwurf - ein
+  breiter Sockel mit Tor, darauf der Aufsatz, der die Art zeigt. Stein und
+  Dach richten sich nach der Kachelsorte wie bei der Hauptstadt.
+- **Knopfsymbole** in der Leiste (`SymReich`): Turm, Giebeldach, Saeulengang -
+  je ein paar SVG-Flaechen.
+
+*Was fehlt:* gezeichnete Fassungen je Bau, und spaeter je Gelaende - heute
+sind es umgefaerbte Pixelkarten aus `probe-bauten.html`.
+
 ### Hexe und Morast — **Platzhalter**
 
 - **Hexenhaus** (`hexenhaus`, 9 x 9): schiefe Huette mit krummem Schornstein,

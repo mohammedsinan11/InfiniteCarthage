@@ -47,6 +47,22 @@ export const COST_GESCHUETZTURM: Cost = { lumber: 2, brick: 1, ore: 2 };
 export const COST_TURM_STUFE: Record<number, Cost> = { 2: COST_GESCHUETZTURM };
 
 /**
+ * Die Reichsbauten der Phase 2 (rules/reich.ts). Jeder kostet etwa eine
+ * Stadt - sie sind kein Ersatz fuer Siedlungen, sondern das, was man baut,
+ * wenn Siedlungen nicht mehr das Nadeloehr sind. PLATZHALTER fuers Balancing.
+ */
+export const COST_BURGFESTE: Cost = { lumber: 2, brick: 2, ore: 3 };
+export const COST_HANDELSKONTOR: Cost = { lumber: 3, wool: 2, grain: 2 };
+export const COST_TEMPEL: Cost = { brick: 3, wool: 2, ore: 2 };
+
+/** Was ein Reichsbau dieser Art kostet. */
+export const COST_REICHSBAU: Record<string, Cost> = {
+  burgfeste: COST_BURGFESTE,
+  handelskontor: COST_HANDELSKONTOR,
+  tempel: COST_TEMPEL,
+};
+
+/**
  * Eine Hauptstadt auf einem Feld, das drei eigene Staedte und sechs eigene
  * Strassen umschliessen (rules/hauptstadt.ts). Etwas mehr als zwei Staedte -
  * den Ring hat man ohnehin schon bezahlt. PLATZHALTER fuers Balancing.

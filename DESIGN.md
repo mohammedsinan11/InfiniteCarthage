@@ -391,6 +391,28 @@ anbieten oder brechen; ob Tribut mit der Groesse des Reichs steigen soll.
   sie ueber ihn hinweg und verdeckte gerade das Bauteil, das die Silhouette
   traegt - in beiden Konstellationen, mit Stadt oben wie unten.
 
+### Phase 2: gebaut
+
+Das Reich um den Koenigssitz (`rules/reich.ts`).
+
+- **Gebiet:** um jeden eigenen Koenigssitz ein Kreis von `REICH_RADIUS`
+  Feldern. Jeder eigene Bau **darin** - Dorf, Stadt, Grenzposten, Reichsbau -
+  schiebt die Grenze um `REICH_ERWEITERUNG` weiter, und das wiederholt sich,
+  bis nichts mehr dazukommt. Das Reich waechst also von innen nach aussen;
+  eine ferne Siedlung erweitert nichts, sonst gaebe es Bauland-Inseln ohne
+  Zusammenhang.
+- **Reichsbauten:** Burgfeste, Handelskontor, Tempel (`buildReich`). Sie
+  stehen auf ganzen Kacheln, brauchen weder Strasse noch Ring, duerfen
+  mehrfach stehen - aber nur einer je Feld, nicht auf der Hauptstadt, nicht
+  auf einem Lager, nicht auf Wasser. Kosten je etwa eine Stadt
+  (`COST_REICHSBAU`, Platzhalter).
+- **Was sie bringen sollen** (`REICHSBAU_ZWECK`, noch Beschreibung, nicht
+  Regel): Burgfeste wirbt Truppen im Reich, Handelskontor verbessert den
+  Tausch, Tempel heilt in der Naehe.
+- Offen: die Wirkungen selbst, die Bau-Oberflaeche (Kronen-Knopf, der erst mit
+  dem Koenigssitz erscheint, dazu die aufleuchtenden Kacheln des Gebiets) und
+  die drei Helden, die der Koenig ernennt.
+
 ### Phase 2: was der Koenigssitz aufschliesst
 
 Steht der Koenigssitz, beginnt fuer diesen Spieler Phase 2

@@ -55,9 +55,12 @@ import {
   COST_CAPITAL,
   COST_STUFE,
   COST_TURM_STUFE,
+  COST_REICHSBAU,
   canAfford,
   pay,
 } from './costs';
+import { REICHSBAU_NAME, reichsbauHindernis } from './reich';
+import type { ReichsbauArt } from './reich';
 import {
   canPlaceCity,
   canPlaceRoad,
@@ -137,6 +140,8 @@ export type Action =
   | { t: 'buildTower'; vertex: string }
   /** Den eigenen Wachturm ausbauen - vom Grenzposten zum Geschuetzturm. */
   | { t: 'upgradeTower'; vertex: string }
+  /** Einen Reichsbau auf eine Kachel im eigenen Reich setzen (Phase 2, rules/reich.ts). */
+  | { t: 'buildReich'; q: number; r: number; art: string }
   /** Einen eigenen Ritter oder den Helden von selbst erkunden lassen - oder nicht mehr. */
   | { t: 'explore'; unit: number; explore: boolean }
   /** Einen eigenen Ritter dem Helden folgen lassen - oder nicht mehr. */
@@ -161,6 +166,8 @@ export type GameEvent =
   | { t: 'capitalUpgrade'; player: PlayerId; q: number; r: number; stufe: number }
   /** Ein Wachturm ist eine Stufe hoeher - Stufe 2 ist der Geschuetzturm. */
   | { t: 'towerUpgrade'; player: PlayerId; at: string; stufe: number }
+  /** Ein Reichsbau steht (Phase 2). */
+  | { t: 'reichsbau'; player: PlayerId; q: number; r: number; art: string }
   | { t: 'buyDev'; player: PlayerId }
   | { t: 'playDev'; player: PlayerId; card: DevCardType }
   | { t: 'yearOfPlenty'; player: PlayerId; a: Resource; b: Resource }
@@ -254,6 +261,7 @@ export function createGame(
     buildings: {},
     roads: {},
     tuerme: {},
+    reichsbauten: {},
     deck: [],
     packIndex: 0,
     turn: 0,
@@ -916,6 +924,25 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       events.push({ t: 'build', player: actor, kind: 'tower', at: action.vertex });
       // Ein Turm am Rand schiebt die Welt vor sich her, wie jedes Bauteil.
       const added = grow(s, world, vertexAdjacentHexes(parseVertexKey(action.vertex)));
+      if (added.length) events.push({ t: 'chunks', coords: added });
+      break;
+    }
+
+    case 'buildReich': {
+      if (phase.t !== 'main') return fail('Jetzt kann nicht gebaut werden.');
+      const kosten = COST_REICHSBAU[action.art];
+      if (!kosten) return fail('Diesen Bau gibt es nicht.');
+      const why = reichsbauHindernis(s, actor, action.q, action.r);
+      if (why) return fail(why);
+      if (!canAfford(actorPlayer.hand, kosten)) {
+        return fail(`Zu wenig Rohstoffe fuer ${REICHSBAU_NAME[action.art as ReichsbauArt] ?? 'den Bau'}.`);
+      }
+      pay(actorPlayer.hand, kosten);
+      if (!s.reichsbauten) s.reichsbauten = {};
+      s.reichsbauten[hexKey(action.q, action.r)] = { owner: actor, art: action.art, seit: s.turn };
+      events.push({ t: 'reichsbau', player: actor, q: action.q, r: action.r, art: action.art });
+      // Auch ein Reichsbau schiebt die Welt vor sich her.
+      const added = grow(s, world, [{ q: action.q, r: action.r }]);
       if (added.length) events.push({ t: 'chunks', coords: added });
       break;
     }

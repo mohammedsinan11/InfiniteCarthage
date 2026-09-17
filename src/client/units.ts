@@ -734,6 +734,62 @@ export function zeichneHauptstadt(
   ctx.drawImage(bild, x0, fy - (hoehe - 1) * f);
 }
 
+/*
+ * Die Reichsbauten der Phase 2 (rules/reich.ts): Burgfeste, Handelskontor,
+ * Tempel. Alle drei sitzen auf demselben Unterbau wie im Entwurf - ein
+ * breiter Sockel mit Tor, darauf der Aufsatz, der die Art zeigt. So erkennt
+ * man von weitem, dass es ein Reichsbau ist, und aus der Naehe, welcher.
+ * PLATZHALTER (ASSETS.md).
+ */
+const REICH_SOCKEL = spiegeln([
+  'd.d........', 'ddd........', 'dmd........', 'dmd.d.d.d.d', 'dmddddddddd',
+  'dmymmmmmmmm', 'dmmmmyymmdd', 'dmMmmmmmdbb', 'dmmmmmmmdbb', 'ddddddddddd',
+]);
+const REICH_AUFSATZ: Record<string, readonly string[]> = {
+  // Wehrhaft: Zinnen und ein Wimpel in Spielerfarbe.
+  burgfeste: spiegeln(['d.d.d.d', 'ddddddd', 'dmmmmmm', 'dmymmmm', 'dmpmmmm', 'dmpmmmy', 'dmqmmmm', 'dmmmmmm', 'dmmmmmm', 'ddddddd']),
+  // Markthalle: rotes Schindeldach, helle Front, Kisten davor.
+  handelskontor: spiegeln(['....ddd', '..ddxxx', 'ddxxxxx', 'ddddddd', 'wxwxwxw', '.dccccc', '.dcyccc', '.dcccbb', '.dcccbb', 'ddddddd']),
+  // Tempel: goldene Spitze ueber hellem Saeulengang.
+  tempel: spiegeln(['......y', '......d', '....ddd', '...dyyy', '..dcccc', '.dccccc', '.dccccc', 'ddddddd', 'dcdcdcd', 'dcdcdcd', 'dcdcdbb', 'ddddddd']),
+};
+
+/**
+ * Ein Reichsbau auf seinem Feld. (x, y) ist die Feldmitte in Geraetepixeln,
+ * sorte die Kachelsorte darunter - Stein und Dach richten sich danach wie bei
+ * der Hauptstadt.
+ */
+export function zeichneReichsbau(
+  ctx: CanvasRenderingContext2D,
+  art: string,
+  x: number,
+  y: number,
+  f: number,
+  farbe: string,
+  sorte: string,
+): void {
+  const aufsatz = REICH_AUFSATZ[art] ?? REICH_AUFSATZ.burgfeste!;
+  const breite = REICH_SOCKEL[0]!.length;
+  const hoehe = REICH_SOCKEL.length + aufsatz.length;
+  const bild = bauwerkBild(
+    `reich:${art}`,
+    [
+      { karte: aufsatz, dx: Math.floor((breite - aufsatz[0]!.length) / 2), dy: 0 },
+      { karte: REICH_SOCKEL, dx: 0, dy: aufsatz.length },
+    ],
+    breite,
+    hoehe,
+    f,
+    farbe,
+    sorte,
+  );
+  const fy = y + 6 * f;
+  const x0 = x - Math.floor(breite / 2) * f;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+  ctx.fillRect(x0 + 2 * f, fy + f, (breite - 4) * f, f);
+  ctx.drawImage(bild, x0, fy - (hoehe - 1) * f);
+}
+
 /**
  * Eine Bastion des Festungsrings - an der Ecke, an der vorher die Stadt stand.
  * (x, y) ist die Ecke in Geraetepixeln, wie bei zeichneGebaeude; ein Wachturm

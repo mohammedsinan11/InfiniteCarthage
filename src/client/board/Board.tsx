@@ -51,6 +51,7 @@ import {
   zeichneFigur,
   zeichneGebaeude,
   zeichneHauptstadt,
+  zeichneReichsbau,
   zeichneBastion,
   zeichneMauern,
   steinFuer,
@@ -1180,8 +1181,23 @@ export function Board({
             male: () => zeichneHauptstadt(g, p.x, p.y, f, spielerFarbe(h.owner), sorte, h.stufe),
           };
         });
+      // Reichsbauten der Phase 2 stehen wie Hauptstaedte in der Feldmitte.
+      const reichsbauten = Object.entries(state.reichsbauten ?? {})
+        .filter(([hk]) => nur(hauptstadtTiefe(hk)))
+        .map(([hk, b]) => {
+          const [q, r] = hk.split(':').map(Number) as [number, number];
+          const c = hexToPixel(q, r, LAYOUT);
+          const p = geraet(c.x, c.y - liftHex(q, r));
+          const sorte = sorteVon(hk, q, r);
+          return {
+            fuss: p.y + 6 * f,
+            male: () => zeichneReichsbau(g, b.art, p.x, p.y, f, spielerFarbe(b.owner), sorte),
+          };
+        });
       // Von hinten nach vorn, nach dem Fuss: das vordere Bauwerk ueberdeckt das hintere.
-      for (const b of [...gebaeude, ...tuerme, ...hauptstaedte].sort((u, w) => u.fuss - w.fuss)) b.male();
+      for (const b of [...gebaeude, ...tuerme, ...reichsbauten, ...hauptstaedte].sort((u, w) => u.fuss - w.fuss)) {
+        b.male();
+      }
     };
 
     // "maske": wie voll, aber nur die hohen Pixel der Kachel verdecken (tiles.ts, hoehenMaske).

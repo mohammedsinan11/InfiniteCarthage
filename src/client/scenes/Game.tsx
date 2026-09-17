@@ -68,6 +68,7 @@ import {
   MAX_STUFE,
   STUFE_NAME,
   ausbauHindernis,
+  hatKoenigssitz,
   naechsteStufe,
   hauptstadtFelder,
   hauptstadtHindernis,
@@ -108,6 +109,8 @@ import { productionSources } from '../../core/rules/production';
 import { tradeRatio } from '../../core/rules/trade';
 import { Aktionsleiste } from '../ui/Aktionsleiste';
 import type { BuildMode } from '../ui/Aktionsleiste';
+import { reichArtVon } from '../ui/Aktionsleiste';
+import { reichsbauHindernis, reichsgebiet } from '../../core/rules/reich';
 
 export function Game() {
   const state = useStore((s) => s.state)!;
@@ -363,6 +366,16 @@ export function Game() {
           // Freie Ecke an einer eigenen Strasse - ohne Abstandsregel (rules/placement.ts).
           return { vertices: legalTowerVertices(state, world, you) };
         }
+        if (reichArtVon(mode) !== null) {
+          // Phase 2: alle Kacheln des eigenen Reichs, auf denen ein Bau erlaubt ist.
+          const gebiet = reichsgebiet(state, you);
+          return {
+            hexes: [...gebiet].filter((k) => {
+              const [q, r] = k.split(':').map(Number) as [number, number];
+              return reichsbauHindernis(state, you, q, r, gebiet) === null;
+            }),
+          };
+        }
         if (mode === 'settlement') {
           return { vertices: legalSettlementVertices(state, world, you, { setup: false }) };
         }
@@ -390,6 +403,11 @@ export function Game() {
       if (mode === 'settlement' && kind === 'vertex') act({ t: 'buildSettlement', vertex: key });
       if (mode === 'city' && kind === 'vertex') act({ t: 'buildCity', vertex: key });
       if (mode === 'tower' && kind === 'vertex') act({ t: 'buildTower', vertex: key });
+      const reichArt = reichArtVon(mode);
+      if (reichArt !== null && kind === 'hex') {
+        const [q, r] = key.split(':').map(Number) as [number, number];
+        act({ t: 'buildReich', q, r, art: reichArt });
+      }
       if (mode === 'tower') playTurm();
       else if (mode !== null) playBuild();
       setMode(null);
@@ -1107,6 +1125,7 @@ export function Game() {
                 verhaeltnis={(r) => (you ? tradeRatio(state, world, you, r) : 4)}
                 onTafel={setTafelOffen}
                 hauptstadtBereit={bereiteFelder.length > 0}
+                reichOffen={you !== null && hatKoenigssitz(state, you)}
                 onHauptstadt={() => {
                   const k = bereiteFelder[0];
                   if (!k) return;

@@ -115,6 +115,12 @@ export const MAX_TURM_STUFE = 2;
 /** Namen der Turmstufen. */
 export const TURM_NAME: Record<number, string> = { 1: 'Grenzposten', 2: 'Geschuetzturm' };
 
+/**
+ * Ein Reichsbau auf einer Kachel (rules/reich.ts). Die Art steht als Zeichen
+ * da, damit alte Staende nicht brechen, wenn eine vierte dazukommt.
+ */
+export type Reichsbau = { owner: PlayerId; art: string; seit: number };
+
 /** Was auf der Karte laufen kann. */
 export type UnitKind =
   | 'ritter'
@@ -342,6 +348,12 @@ export type GameState = {
   roads: Record<string, PlayerId>;
   /** Wachtuerme, Ecke -> Besitzer und Stufe. Stehen unabhaengig von Doerfern und Staedten. */
   tuerme: Record<string, Turm>;
+  /**
+   * Reichsbauten der Phase 2: Feldschluessel -> Besitzer und Art. Sie stehen
+   * auf ganzen Kacheln, nicht auf Ecken, und brauchen weder Strasse noch Ring
+   * (rules/reich.ts). Mehrere je Reich sind erlaubt, einer je Feld.
+   */
+  reichsbauten?: Record<string, Reichsbau>;
   /**
    * Lager, die gerade feiern: Feldschluessel -> bis zu welcher Runde. Wer
    * feiert, heilt seine Besatzung und schickt solange niemanden auf Raubzug

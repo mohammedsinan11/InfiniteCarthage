@@ -29,6 +29,8 @@ import {
   canAfford,
 } from '../../core/rules/costs';
 import { haefenZu } from '../../core/rules/trade';
+import { REICHSBAU_NAME, REICHSBAU_ZWECK } from '../../core/rules/reich';
+import { COST_REICHSBAU } from '../../core/rules/costs';
 import type { Cost } from '../../core/rules/costs';
 import type { Action } from '../../core/rules/reducer';
 import type { PublicPlayer, PublicState } from '../../core/redact';
@@ -36,7 +38,23 @@ import type { DevCardType, Hand } from '../../core/state';
 import { devName, resourceName } from '../log';
 import { ResourceGlyph } from './ResourceIcon';
 
-export type BuildMode = null | 'road' | 'settlement' | 'city' | 'tower';
+/**
+ * Was gerade gebaut wird. Die Reichsbauten der Phase 2 stehen auf Kacheln,
+ * nicht auf Ecken - ihr Modus traegt die Art im Namen (rules/reich.ts).
+ */
+export type BuildMode =
+  | null
+  | 'road'
+  | 'settlement'
+  | 'city'
+  | 'tower'
+  | 'reich:burgfeste'
+  | 'reich:handelskontor'
+  | 'reich:tempel';
+
+/** Die Art hinter einem Reichsbau-Modus, sonst null. */
+export const reichArtVon = (m: BuildMode): string | null =>
+  typeof m === 'string' && m.startsWith('reich:') ? m.slice(6) : null;
 
 /**
  * Bauen als eigene Zeile (Entwurf V2): "Bauen" tauscht die Leiste gegen
@@ -158,6 +176,29 @@ const SymBauen = () => (
     <path d="M8 5 L13 2 L18 7 L15 12 Z" fill="#b9b3a6" stroke="#2a2016" strokeWidth={1.5} strokeLinejoin="round" />
   </Symbol>
 );
+/** Die drei Reichsbauten: Turm, Waage, Saeule - grob wie ihre Bauten. */
+const SymReich = ({ art }: { art: string }) => (
+  <Symbol>
+    {art === 'burgfeste' && (
+      <path d="M4 16 V6 h3 V4 h2 v2 h2 V4 h2 v2 h3 v10 Z" fill="#b9b3a6" stroke="#2a2016" strokeWidth={1.4} strokeLinejoin="round" />
+    )}
+    {art === 'handelskontor' && (
+      <>
+        <path d="M3 8 L10 3 L17 8 V16 H3 Z" fill="#c94f3a" stroke="#2a2016" strokeWidth={1.4} strokeLinejoin="round" />
+        <rect x={7} y={10} width={6} height={6} fill="#e2d2ab" />
+      </>
+    )}
+    {art === 'tempel' && (
+      <>
+        <path d="M10 2 L16 8 H4 Z" fill="#f2c94c" stroke="#2a2016" strokeWidth={1.4} strokeLinejoin="round" />
+        <rect x={5} y={8} width={2} height={8} fill="#e2d2ab" stroke="#2a2016" strokeWidth={1} />
+        <rect x={9} y={8} width={2} height={8} fill="#e2d2ab" stroke="#2a2016" strokeWidth={1} />
+        <rect x={13} y={8} width={2} height={8} fill="#e2d2ab" stroke="#2a2016" strokeWidth={1} />
+      </>
+    )}
+  </Symbol>
+);
+
 const SymHauptstadt = () => (
   <Symbol>
     <path d="M3 16 V7 L7 11 L10 4 L13 11 L17 7 V16 Z" fill="#f2c94c" stroke="#2a2016" strokeWidth={1.6} strokeLinejoin="round" />
@@ -360,6 +401,7 @@ export function Aktionsleiste({
   verhaeltnis,
   onTafel,
   hauptstadtBereit = false,
+  reichOffen = false,
   onHauptstadt,
 }: {
   state: PublicState;
@@ -374,6 +416,8 @@ export function Aktionsleiste({
   onTafel?: (offen: boolean) => void;
   /** Ein Feld ist fuer die Hauptstadt geschlossen - der Knopf erscheint in der Bauzeile. */
   hauptstadtBereit?: boolean;
+  /** Steht ein Koenigssitz? Dann zeigt die Leiste die Reichsbauten (Phase 2). */
+  reichOffen?: boolean;
   /** Zur Hauptstadt fahren und ihre Tafel oeffnen. */
   onHauptstadt?: () => void;
 }) {
@@ -502,6 +546,28 @@ export function Aktionsleiste({
             tip={`Hauptstadt auf dem umschlossenen Feld: ${kostenText(COST_CAPITAL)}`}
             onClick={() => onHauptstadt?.()}
           />
+        )}
+        {/*
+          Phase 2: die drei Reichsbauten. Sie erscheinen erst, wenn ein
+          Koenigssitz steht (rules/reich.ts, hatKoenigssitz) - vorher gibt es
+          kein Reich, in dem sie stehen koennten.
+        */}
+        {reichOffen && (
+          <>
+            <span className="dock-trenner" />
+            {(['burgfeste', 'handelskontor', 'tempel'] as const).map((art) => (
+              <DockKnopf
+                key={art}
+                titel={REICHSBAU_NAME[art]}
+                symbol={<SymReich art={art} />}
+                kosten={COST_REICHSBAU[art]!}
+                gewaehlt={mode === `reich:${art}`}
+                darf={bauen && canAfford(hand, COST_REICHSBAU[art]!)}
+                tip={`${REICHSBAU_NAME[art]}: ${REICHSBAU_ZWECK[art]}. Auf eine Kachel im eigenen Reich - ${kostenText(COST_REICHSBAU[art]!)}`}
+                onClick={bau(`reich:${art}` as Exclude<BuildMode, null>)}
+              />
+            ))}
+          </>
         )}
           </>
         )}

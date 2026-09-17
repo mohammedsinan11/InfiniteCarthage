@@ -38,6 +38,8 @@ export function migriereStand(state: GameState): GameState {
   for (const p of state.players) if (!p.inventar) p.inventar = {};
   // Feste kamen mit dem Lagerleben dazu (DESIGN.md, Lagerleben).
   if (!state.feste) state.feste = {};
+  // Reichsbauten kamen mit Phase 2 dazu (DESIGN.md, Phase 2).
+  if (!state.reichsbauten) state.reichsbauten = {};
   // Siege und Stufe kamen mit dem Levelsystem dazu: wer schon auf der Karte
   // steht, faengt bei null an (DESIGN.md, Stufen).
   for (const u of state.units) {

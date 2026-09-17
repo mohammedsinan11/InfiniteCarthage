@@ -97,6 +97,31 @@ abschnitt('Raeuber', 'Dieselbe Idee fuer die Banden: eine Grundfigur, zwei Rolle
   bild(HAUPTMANN, 'Hauptmann', 'Federhut, Schaerpe, Narbe im Gesicht. Der Anfuehrer einer Bande.', '#9c3226'),
 ]);
 
+// --- Die Nacht und die Hexe ------------------------------------------------
+
+const SCHLEIM = [
+  '..ggg..','.ggGgg.','gGwgwGg','gGgggGg','kGGGGGk','.kkkkk.',
+];
+const MORAST = [
+  '...ggggg...','..gggGgggg.','.ggGgwgGgg.','ggGgggggGgg',
+  'ggwgGGGgwgg','gGgGGGGGgGg','kGGGGGGGGGk','.kkkkkkkkk.',
+];
+const HEXE = [
+  '...3...','..323..','.32223.','3333333','..sss..','.21112.','2111112','2111112','.21112.','..k.k..',
+];
+const HEXENHAUS = [
+  '..4......','.4...d...','..4.dtd..','....dttd.','..ddddddd','.dtttyttd','.dttyyttd','.dtttttdd','.ddddddd.',
+];
+Object.assign(PAL, { '1':'#6a4fa0', '2':'#9d7ad6', '3':'#3a2a5a', '4':'#7fe0b0', t:'#8a6a45' });
+
+abschnitt('Die Nacht und die Hexe',
+  'Alles im selben Kunstpixel, zehnfach vergroessert. Der Morast steht neben einem gewoehnlichen Schleim, damit man den Groessenunterschied sieht.', [
+  bild(SCHLEIM, 'Schleim', 'Der gewoehnliche: flacher Klumpen, zwei Lichter. Angriff 1, Leben 2.'),
+  bild(MORAST, 'Der Morast', 'Der Endgegner: doppelt so breit, drei Lichter, dunkler Kern. Angriff 3, Leben 12.'),
+  bild(HEXE, 'Die Hexe', 'Spitzhut, violettes Gewand, Funke ueber der Hand. Angriff 4, Leben 4 - und sie zieht nie weg.'),
+  bild(HEXENHAUS, 'Das Hexenhaus', 'Schiefe Huette mit krummem Schornstein und Rauch. Liegt selten im Seed.'),
+]);
+
 document.body.dataset.fertig = '1';
 </script>
 </body></html>
