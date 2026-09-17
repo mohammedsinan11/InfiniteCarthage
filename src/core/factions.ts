@@ -62,6 +62,13 @@ export type Fraktion = {
 export const NACHT_ID = 'nacht';
 const NACHT: Fraktion = { id: NACHT_ID, art: 'nacht', name: 'Die Nacht', farbe: 8 };
 
+/**
+ * Die Hexe gehoert keiner Bande: eine Fraktion aus einer einzigen Person, die
+ * bei ihrem Haus bleibt (core/hexe.ts). Auch mit ihr wird nicht verhandelt.
+ */
+export const HEXE_FRAKTION = 'hexe';
+const HEXE: Fraktion = { id: HEXE_FRAKTION, art: 'nacht', name: 'Die Hexe', farbe: 6 };
+
 const mod = (a: number, n: number): number => ((a % n) + n) % n;
 
 /** Axial nach kartesisch - Abstaende sollen rund sein, nicht schief. */
@@ -137,8 +144,9 @@ export const istFraktion = (id: string): boolean => id.startsWith('f:');
 
 /** Eine Fraktion aus ihrer Kennung. Rein - gemerkt, weil die Karte oft fragt. */
 export function fraktionById(seed: number, id: string): Fraktion {
-  // Die Nacht stammt aus keiner Zelle - sie hat keine Koordinate zum Zerlegen.
+  // Nacht und Hexe stammen aus keiner Zelle - sie haben keine Koordinate zum Zerlegen.
   if (id === NACHT_ID) return NACHT;
+  if (id === HEXE_FRAKTION) return HEXE;
   merkePruefen(seed);
   const da = merkId.get(id);
   if (da) return da;

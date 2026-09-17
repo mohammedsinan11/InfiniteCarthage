@@ -124,6 +124,10 @@ export type UnitKind =
   | 'haeuptling'
   /** Der Schamane des Lagers - heilt die Seinen, statt selbst zuzuschlagen. */
   | 'schamane'
+  /** Die Hexe: sie bleibt bei ihrem Haus und verteidigt es (core/hexe.ts). */
+  | 'hexe'
+  /** Der Morast: der grosse Schleim, den die Nacht irgendwann ausspuckt. */
+  | 'morast'
   | 'wanderer'
   | 'held'
   | 'bogen'

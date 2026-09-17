@@ -27,6 +27,8 @@ export type FigurArt =
   | UnitKind
   | 'lager'
   | 'ruine'
+  /** Das Haus der Hexe (core/hexe.ts) - steht auf der Karte wie ein Lager. */
+  | 'hexenhaus'
   | 'dorf'
   | 'stadt'
   | 'dorfKlein'
@@ -51,6 +53,10 @@ const PALETTE: Record<string, string> = {
   M: '#857e70', // Stein im Schatten
   y: '#f2c94c', // Gold, erleuchtetes Fenster
   Y: '#a8832e', // Gold im Schatten - Dach und Krone des Koenigssitzes
+  '1': '#6a4fa0', // Hexengewand
+  '2': '#9d7ad6', // Hexengewand im Licht
+  '3': '#3a2a5a', // Spitzhut
+  '4': '#7fe0b0', // Hexenfunke, Rauch ueber dem Haus
   o: '#f08a24', // Flamme
   t: '#8a6a45', // Holz
   T: '#4f3a28', // Fachwerk, dunkles Holz
@@ -77,6 +83,53 @@ const ART: Record<FigurArt, readonly string[]> = {
     'gGgggGg',
     'kGGGGGk',
     '.kkkkk.',
+  ],
+  /*
+   * Das Hexenhaus: schiefe Huette mit krummem Schornstein, Rauch und einem
+   * erleuchteten Fenster. Es steht abseits, wo sonst nichts steht.
+   * PLATZHALTER (ASSETS.md).
+   */
+  hexenhaus: [
+    '..4......',
+    '.4...d...',
+    '..4.dtd..',
+    '....dttd.',
+    '..ddddddd',
+    '.dtttyttd',
+    '.dttyyttd',
+    '.dtttttdd',
+    '.ddddddd.',
+  ],
+  /*
+   * Die Hexe: Spitzhut, violettes Gewand, ein Funke ueber der Hand. Schmal
+   * und aufrecht - sie steht, wo sie steht. PLATZHALTER (ASSETS.md).
+   */
+  hexe: [
+    '...3...',
+    '..323..',
+    '.32223.',
+    '3333333',
+    '..sss..',
+    '.21112.',
+    '2111112',
+    '2111112',
+    '.21112.',
+    '..k.k..',
+  ],
+  /*
+   * Der Morast: der grosse Schleim. Doppelt so breit wie ein gewoehnlicher,
+   * mit drei Lichtern und dunklem Kern - man sieht sofort, dass das kein
+   * Nachtgezuecht von der Stange ist. PLATZHALTER (ASSETS.md).
+   */
+  morast: [
+    '...ggggg...',
+    '..gggGgggg.',
+    '.ggGgwgGgg.',
+    'ggGgggggGgg',
+    'ggwgGGGgwgg',
+    'gGgGGGGGgGg',
+    'kGGGGGGGGGk',
+    '.kkkkkkkkk.',
   ],
   /*
    * Der Haeuptling: der grosse Goblin eines Lagers. Knochenkrone, rotes Auge,

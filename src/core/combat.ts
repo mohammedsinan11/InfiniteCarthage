@@ -32,7 +32,8 @@ export function seiteVon(
   if (u.kind === 'wanderer') return NEUTRAL;
   // Schleime sind bei Tag friedfertig: sie liegen herum, und niemand kaempft
   // mit ihnen. Erst die Nacht macht sie wieder zur Nacht (rules/army.ts).
-  if (u.kind === 'schleim' && u.auftrag === 'ruht') return NEUTRAL;
+  // Die Hexe ruht zwar auch - aber sie ist nie friedlich, sie bleibt nur stehen.
+  if ((u.kind === 'schleim' || u.kind === 'morast') && u.auftrag === 'ruht') return NEUTRAL;
   if (u.owner !== null) return spielerSeite(u.owner);
   return u.fraktion ?? NEUTRAL;
 }

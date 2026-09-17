@@ -44,6 +44,7 @@ import { istSpielerSeite, istKampf, kampfFelder, seiteVon, spielerAus } from '..
 import type { Seite } from '../../core/combat';
 import { fraktionById, istFraktion } from '../../core/factions';
 import { ruinAt } from '../../core/ruins';
+import { hexenhausAt } from '../../core/hexe';
 import {
   aufstellung,
   preloadUnitSprites,
@@ -310,6 +311,8 @@ const ART_NAME = {
   schleim: ['Schleim', 'Schleime'],
   haeuptling: ['Haeuptling', 'Haeuptlinge'],
   schamane: ['Schamane', 'Schamanen'],
+  hexe: ['Hexe', 'Hexen'],
+  morast: ['Der Morast', 'Moraste'],
 } as const;
 
 const VORHABEN = {
@@ -860,6 +863,8 @@ export function Board({
         zeichneFigur(g, 'lager', mx, my + f, f, farbeSeite(nestFraktionOf(state, t.q, t.r)));
       }
       if (ruine) zeichneFigur(g, 'ruine', mx, my + 2 * f, f);
+      // Das Haus der Hexe steht fuer sich, abseits von Lagern und Ruinen.
+      if (hexenhausAt(state.worldSeed, t.q, t.r)) zeichneFigur(g, 'hexenhaus', mx, my + 2 * f, f);
       if (!leute || leute.length === 0) {
         g.globalAlpha = 1;
         return;

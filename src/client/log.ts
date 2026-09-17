@@ -44,6 +44,8 @@ const ART_NAME = {
   schleim: 'Schleim',
   haeuptling: 'Haeuptling',
   schamane: 'Schamane',
+  hexe: 'Hexe',
+  morast: 'Der Morast',
   besatzung: 'Verteidiger',
 } as const;
 
@@ -171,6 +173,10 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
         : `Eine Einheit von ${who(state, e.player)} steigt auf Stufe ${e.stufe}.`;
     case 'retreat':
       return `${seiteName(state, e.seite)} weicht aus: ${e.anzahl} ${e.anzahl === 1 ? 'Einheit zieht' : 'Einheiten ziehen'} sich zurueck.`;
+    case 'morast':
+      return `Der Morast erhebt sich - er kommt zu ${who(state, e.gegen)}.`;
+    case 'witch':
+      return 'Bei einem einsamen Haus steht eine Hexe.';
     case 'slimes':
       return e.anzahl === 1
         ? 'Ein Schleim kriecht aus dem Dunkel.'

@@ -73,6 +73,11 @@ export const WERTE: Record<UnitKind, { angriff: number; leben: number }> = {
   // Der Schamane schlaegt kaum zu; er haelt die Seinen auf den Beinen
   // (rules/army.ts, lagerLeben).
   schamane: { angriff: 1, leben: 3 },
+  // Die Hexe trifft hart, haelt aber wenig aus - und sie zieht nie vom Haus
+  // weg. Wer sie holen will, muss zu ihr (core/hexe.ts).
+  hexe: { angriff: 4, leben: 4 },
+  // Der Morast: der grosse Schleim. Kein Gegner fuer einen einzelnen Ritter.
+  morast: { angriff: 3, leben: 12 },
 };
 
 /**
@@ -120,9 +125,12 @@ export function einheitVorlage(
       ? 'befehl'
       : kind === 'wanderer'
         ? 'wandern'
-        : kind === 'schleim'
+        : kind === 'schleim' || kind === 'morast'
           ? 'ruht'
-          : 'raub',
+          : // Die Hexe zieht nie los - sie bleibt bei ihrem Haus (core/hexe.ts).
+            kind === 'hexe'
+            ? 'ruht'
+            : 'raub',
     leben: WERTE[kind].leben,
     fracht: null,
     traegt: 0,

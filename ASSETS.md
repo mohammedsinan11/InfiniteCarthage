@@ -95,6 +95,19 @@ Stufe III ein eigener Koenigssitz statt des umgefaerbten Palastes, und die
 Reichsbauten der Phase 2 (Burgfeste, Handelskontor, Tempel) als freistehende
 Gebaeude ohne Palast-Unterbau.
 
+### Hexe und Morast — **Platzhalter**
+
+- **Hexenhaus** (`hexenhaus`, 9 x 9): schiefe Huette mit krummem Schornstein,
+  Rauch und erleuchtetem Fenster. Steht auf der Karte wie ein Lager
+  (`client/units.ts`, gezeichnet in `zeichneBesatzung`).
+- **Hexe** (`hexe`, 7 x 10): Spitzhut, violettes Gewand, ein Funke ueber der
+  Hand. Neue Palettenfarben `1`-`4` fuer Gewand, Hut und Funken.
+- **Der Morast** (`morast`, 11 x 8): der grosse Schleim - doppelt so breit wie
+  ein gewoehnlicher, drei Lichter, dunkler Kern.
+
+*Was fehlt:* gezeichnete Fassungen aller drei, beim Morast mindestens zwei
+Bilder zum Wabern und ein Auftritt, der zu einem Endgegner passt.
+
 ### Haeuptling und Schamane — **Platzhalter**
 
 - **Haeuptling** (`haeuptling`, 9 x 11): der grosse Goblin eines Lagers -

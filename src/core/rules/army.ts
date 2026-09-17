@@ -64,7 +64,8 @@ import { ruinAt, ruinResultFor } from '../ruins';
 import type { RuinResult } from '../ruins';
 import { RESOURCES } from '../types';
 import { MAX_TURM_STUFE, emptyHand, handSize, playerById } from '../state';
-import { NACHT_ID } from '../factions';
+import { HEXE_FRAKTION, NACHT_ID } from '../factions';
+import { hexenhausAt } from '../hexe';
 import type { GameState, Hand, PlayerId, UnitKind, UnitState } from '../state';
 import { einheitName, wuerfleHeld } from '../lore';
 import type { HeldLore } from '../lore';
@@ -246,6 +247,10 @@ export type ArmyEvent =
       nach: { q: number; r: number };
       anzahl: number;
     }
+  /** Der Morast hat sich erhoben - gegen den, der am meisten Gelee sammelte. */
+  | { t: 'morast'; q: number; r: number; gegen: PlayerId }
+  /** Eine Hexe ist bei ihrem Haus aufgetaucht. */
+  | { t: 'witch'; q: number; r: number }
   /** So viele Schleime sind mit der Nacht aus dem Dunkel gekrochen. */
   | { t: 'slimes'; anzahl: number }
   /** So viele Schleime sind im Morgengrauen friedfertig geworden. */
@@ -745,10 +750,65 @@ const HORDE_REICHWEITE = SPAWN_RANGE + 4;
 export function beginNight(s: GameState, events: Ereignisse): void {
   const rng = new Rng(s.rngState);
   sendHorde(s, rng, events);
-  // Was vom letzten Mal noch herumliegt, wacht mit auf.
-  for (const u of s.units) if (u.kind === 'schleim') u.auftrag = 'jagd';
+  // Was vom letzten Mal noch herumliegt, wacht mit auf - der Morast auch.
+  for (const u of s.units) if (u.kind === 'schleim' || u.kind === 'morast') u.auftrag = 'jagd';
   nachtVolk(s, rng, events);
+  derMorast(s, events);
+  hexenWache(s, events);
   s.rngState = rng.getState();
+}
+
+/** So viel Gelee muss im Umlauf sein, bis sich der Morast erhebt. */
+export const MORAST_AB_GELEE = 12;
+
+/**
+ * Der Morast: der grosse Schleim, den die Nacht irgendwann ausspuckt.
+ *
+ * Er kommt nicht nach der Uhr, sondern nach dem Gemetzel: erst wenn die
+ * Spieler zusammen MORAST_AB_GELEE Gelee gesammelt haben, hat die Nacht genug
+ * verloren, um etwas Groesseres zu schicken. Einer reicht - solange er lebt,
+ * kommt kein zweiter.
+ */
+export function derMorast(s: GameState, events: Ereignisse): void {
+  if (s.units.some((u) => u.kind === 'morast')) return;
+  const gesamt = s.players.reduce((n, p) => n + (p.inventar?.[GELEE] ?? 0), 0);
+  if (gesamt < MORAST_AB_GELEE) return;
+  // Er steigt dort auf, wo am meisten gesammelt wurde - wer am fleissigsten
+  // Schleime erschlug, bekommt Besuch.
+  const opfer = [...s.players].sort(
+    (a, b) => (b.inventar?.[GELEE] ?? 0) - (a.inventar?.[GELEE] ?? 0) || (a.id < b.id ? -1 : 1),
+  )[0];
+  if (!opfer) return;
+  const felder = [...settlementApproaches(s, opfer.id).keys()].map(feld);
+  if (felder.length === 0) return;
+  const an = felder[0]!;
+  const platz = hexesInRange(an, SCHLEIM_ABSTAND).find(
+    (h) =>
+      hexDistance(an, h) === SCHLEIM_ABSTAND &&
+      isLandAt(s.worldSeed, h.q, h.r) &&
+      !isNestActive(s, h.q, h.r) &&
+      !s.units.some((x) => x.q === h.q && x.r === h.r),
+  );
+  if (!platz) return;
+  aufstellen(s, einheitVorlage('morast', platz.q, platz.r, { fraktion: NACHT_ID, auftrag: 'jagd' }));
+  events.push({ t: 'morast', q: platz.q, r: platz.r, gegen: opfer.id });
+}
+
+/**
+ * Die Hexe bei ihrem Haus: steht dort keine, tritt sie an. Sie zieht nie weg
+ * (Auftrag 'ruht' bei einer Hexe heisst: sie bleibt, nicht dass sie friedlich
+ * waere) - wer sie will, muss zu ihr (core/hexe.ts).
+ */
+export function hexenWache(s: GameState, events: Ereignisse): void {
+  for (const k of settlementApproaches(s).keys()) {
+    const an = feld(k);
+    for (const h of hexesInRange(an, LAGER_SICHT)) {
+      if (!hexenhausAt(s.worldSeed, h.q, h.r)) continue;
+      if (s.units.some((u) => u.kind === 'hexe' && u.q === h.q && u.r === h.r)) continue;
+      aufstellen(s, einheitVorlage('hexe', h.q, h.r, { fraktion: HEXE_FRAKTION, auftrag: 'ruht' }));
+      events.push({ t: 'witch', q: h.q, r: h.r });
+    }
+  }
 }
 
 /**

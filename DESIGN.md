@@ -478,6 +478,28 @@ darin geschieht:
 - **Der Hieb des Helden:** kaempft ein Held auf dem Feld, zieht ein heller
   Bogen einmal durchs Bild (`.held-slash`). Man soll sehen, dass er dabei ist.
 
+## Die Hexe und der Morast
+
+Zwei Dinge, die nicht zum Alltag gehoeren - man findet sie, oder sie findet
+einen.
+
+- **Das Hexenhaus** (`core/hexe.ts`, `hexenhausAt`) liegt wie Lager und Ruinen
+  im Seed, nur viel seltener: eine Region von 24 Feldern traegt hoechstens
+  eines, und nie im Umkreis von 8 um den Ursprung. Es teilt sein Feld mit
+  nichts - kein Lager, keine Ruine, kein Wasser.
+- **Die Hexe** steht dort, sobald jemand in Sichtweite siedelt
+  (`rules/army.ts`, `hexenWache`). Sie gehoert einer Fraktion aus einer
+  einzigen Person (`HEXE_FRAKTION`), mit der sich nicht verhandeln laesst. Sie
+  trifft hart (Angriff 4) und haelt wenig aus (Leben 4) - und sie **zieht
+  nie weg**. Wer sie will, muss zu ihr.
+- **Der Morast** (`derMorast`) ist der grosse Schleim, den die Nacht
+  ausspuckt. Er kommt nicht nach der Uhr, sondern nach dem Gemetzel: erst wenn
+  die Spieler zusammen `MORAST_AB_GELEE` Gelee gesammelt haben, hat die Nacht
+  genug verloren, um etwas Groesseres zu schicken. Er steigt bei dem Spieler
+  auf, der am meisten sammelte - wer am fleissigsten Schleime erschlug,
+  bekommt Besuch. Leben 12, Angriff 3: kein Gegner fuer einen einzelnen
+  Ritter. Solange er lebt, kommt kein zweiter.
+
 ## Lager mit eigenem Leben
 
 Lager waren bisher Ausgangspunkte fuer Raubzuege, sonst nichts. Jetzt geschieht
