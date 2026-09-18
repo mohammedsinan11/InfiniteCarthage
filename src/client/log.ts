@@ -15,6 +15,7 @@ import type { WandererAuftrag } from '../core/state';
 import { STUFE_NAME } from '../core/rules/hauptstadt';
 import { TURM_NAME } from '../core/state';
 import { REICHSBAU_NAME } from '../core/rules/reich';
+import { ZWEIG_NAME } from '../core/rules/zweig';
 import { heldKurz } from '../core/lore';
 
 const RES_NAME: Record<Resource, string> = {
@@ -227,16 +228,26 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
           : `Eine Stadt von ${who(state, e.player)} ist zum Dorf heruntergebrannt.`;
     case 'heroReady': {
       // Der Held hat einen Namen, sobald er einmal angetreten ist (core/lore.ts).
-      const lore = state?.players.find((p) => p.id === e.player)?.held;
-      const wer = lore ? heldKurz(lore) : 'Der Held';
+      // Der Ernannte hat seinen eigenen - und sein Amt (rules/zweig.ts).
+      const p = state?.players.find((x) => x.id === e.player);
+      const lore = e.zweig ? p?.ernannt?.lore : p?.held;
+      const amt = e.zweig ? ZWEIG_NAME[e.zweig] : 'Der Held';
+      const wer = lore ? `${heldKurz(lore)}${e.zweig ? `, ${ZWEIG_NAME[e.zweig]}` : ''}` : amt;
       return e.zurueck
         ? `${wer} kehrt zu ${who(state, e.player)} zurueck.`
         : `${who(state, e.player)} ruft ${wer} zu den Waffen.`;
     }
     case 'heroFell': {
-      const lore = state?.players.find((p) => p.id === e.player)?.held;
-      const wer = lore ? heldKurz(lore) : `Der Held von ${who(state, e.player)}`;
+      const p = state?.players.find((x) => x.id === e.player);
+      const lore = e.zweig ? p?.ernannt?.lore : p?.held;
+      const amt = e.zweig ? ZWEIG_NAME[e.zweig] : 'Der Held';
+      const wer = lore ? heldKurz(lore) : `${amt} von ${who(state, e.player)}`;
       return `${wer} faellt. Er kehrt in Runde ${e.zurueck} zurueck.`;
+    }
+    case 'ernennung': {
+      const lore = state?.players.find((x) => x.id === e.player)?.ernannt?.lore;
+      const wer = lore ? heldKurz(lore) : 'einen Getreuen';
+      return `${who(state, e.player)} ernennt ${wer} zum ${ZWEIG_NAME[e.zweig]}.`;
     }
     case 'pact':
       return e.art === 'frieden'

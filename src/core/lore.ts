@@ -87,9 +87,15 @@ const zieh = <T>(rng: Rng, liste: readonly T[]): T => liste[rng.int(liste.length
 /** Der Beiname mit Artikel: "der Kuehne", "die Kuehne". */
 const mitArtikel = (wort: string, g: Geschlecht) => `${g === 'm' ? 'der' : 'die'} ${wort}`;
 
-/** Ein frischer Held: neues Haus, neuer Titel, neuer Name. */
-export function wuerfleHeld(rng: Rng): HeldLore {
-  const geschlecht: Geschlecht = rng.int(2) === 0 ? 'm' : 'w';
+/**
+ * Ein frischer Held: neues Haus, neuer Titel, neuer Name.
+ *
+ * nurGeschlecht legt es fest, statt es zu wuerfeln - fuer die Heilerin, deren
+ * Amtsname weiblich ist (rules/zweig.ts). Ein Mann mit dem Titel "Heilerin"
+ * laese sich wie ein Fehler.
+ */
+export function wuerfleHeld(rng: Rng, nurGeschlecht?: Geschlecht): HeldLore {
+  const geschlecht: Geschlecht = nurGeschlecht ?? (rng.int(2) === 0 ? 'm' : 'w');
   const stamm = zieh(rng, STAEMME);
   const titel = zieh(rng, TITEL);
   return {

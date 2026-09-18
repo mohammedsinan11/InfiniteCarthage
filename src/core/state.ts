@@ -81,6 +81,26 @@ export type Player = {
    * sind - man baut nichts damit, man sammelt es (DESIGN.md, Inventar).
    */
   inventar: Record<string, number>;
+  /**
+   * Der Held, den der Koenig ernannt hat (DESIGN.md, Phase 2): welcher Zweig,
+   * wer er ist und wann er nach seinem Fall zurueckkehrt. null, bis ernannt
+   * wurde - und die Wahl ist endgueltig, es bleibt bei diesem einen.
+   *
+   * Getrennt von held/heldZurueck, weil beide den gewoehnlichen Helden meinen
+   * und ein Spieler nun zwei haben kann.
+   */
+  ernannt: Ernennung | null;
+};
+
+/** Die drei Helden, die der Koenigssitz freischaltet - einer davon, fuer immer. */
+export type HeldZweig = 'krieger' | 'heilerin' | 'haendler';
+
+export type Ernennung = {
+  zweig: HeldZweig;
+  /** Name, Haus und Titel - wie beim gewoehnlichen Helden (core/lore.ts). */
+  lore: HeldLore;
+  /** Wann er nach seinem Fall zurueckkehrt. null, solange er lebt. */
+  zurueck: number | null;
 };
 
 /**
@@ -177,6 +197,12 @@ export type UnitState = {
   owner: PlayerId | null;
   /** Fraktion bei Raeubern und Goblins (core/factions.ts), sonst null. */
   fraktion: string | null;
+  /**
+   * Beim ernannten Helden: welcher Zweig. Er behaelt kind 'held', damit alle
+   * Heldenregeln - Sicht, Schrittweite, Befehle, Folgen, Erkunden - ohne
+   * Ausnahme auch fuer ihn gelten. Fehlt beim gewoehnlichen Helden.
+   */
+  zweig?: HeldZweig;
   q: number;
   r: number;
   /** Wohin sie zieht - fuer Befehle, Fehden und die Anzeige. */

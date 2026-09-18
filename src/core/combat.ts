@@ -10,9 +10,9 @@
  * Die Besatzung eines Lagers kaempft fuer die Fraktion des Lagers.
  */
 
-import { garrisonOf, isNestActive, nestFraktionOf } from './units';
+import { WERTE, ZWEIG_WERTE, garrisonOf, isNestActive, nestFraktionOf } from './units';
 import type { ArmyView } from './units';
-import type { Abkommen, Auftrag, GameState, PlayerId, UnitState } from './state';
+import type { Abkommen, Auftrag, GameState, HeldZweig, PlayerId, UnitState } from './state';
 import type { Terrain } from './types';
 import { hexKey, hexVertices, vertexKey } from './coords';
 
@@ -157,6 +157,30 @@ export function stufeFuer(siege: number): number {
   let stufe = 0;
   for (const ab of STUFEN_AB) if (siege >= ab) stufe += 1;
   return stufe;
+}
+
+/** Was eine Einheit von Haus aus kann - beim ernannten Helden sein Zweig. */
+type Traeger = Pick<UnitState, 'kind'> & { zweig?: HeldZweig; stufe?: number };
+
+const grundwerte = (u: Traeger) => (u.zweig ? ZWEIG_WERTE[u.zweig] : WERTE[u.kind]);
+
+/**
+ * Wie hart diese Einheit zuschlaegt: ihre Art - beim ernannten Helden sein
+ * Zweig (rules/zweig.ts) - plus das, was der Rang ihr gegeben hat.
+ */
+export function angriffVon(u: Traeger): number {
+  return grundwerte(u).angriff + STUFE_ANGRIFF * (u.stufe ?? 0);
+}
+
+/**
+ * Wie viel Leben diese Einheit hoechstens hat.
+ *
+ * Der Rang zaehlt bewusst mit: sonst koennte sich ein aufgestiegener Ritter nie
+ * ueber seinen Grundwert hinaus erholen, obwohl der Aufstieg ihn erhoeht hat
+ * (rules/army.ts, Erholung).
+ */
+export function maxLeben(u: Traeger): number {
+  return grundwerte(u).leben + STUFE_LEBEN * (u.stufe ?? 0);
 }
 
 /** Was die Deckungsregel vom Zustand braucht. */

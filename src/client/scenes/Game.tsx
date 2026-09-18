@@ -50,7 +50,8 @@ import type { Resource } from '../../core/types';
 import { COST_CAPITAL, COST_CITY, COST_STUFE, COST_ROAD, COST_TURM_STUFE, canAfford } from '../../core/rules/costs';
 import { FRIEDEN_PREIS, TRIBUT_KARTEN, nimmtFrieden } from '../../core/rules/diplomatie';
 import { brennt } from '../../core/rules/feuer';
-import { WERTE as EINHEIT_WERTE } from '../../core/units';
+// maxLeben kennt Art, Zweig des Ernannten und Rang (core/combat.ts).
+import { maxLeben } from '../../core/combat';
 import { kampfFelder as kampfFelderVon } from '../../core/combat';
 import type { UnitState as HeerEinheit } from '../../core/state';
 import {
@@ -513,7 +514,7 @@ export function Game() {
                         title={an ? 'Geht mit - klicken, damit sie bleibt' : 'Bleibt - klicken, damit sie mitgeht'}
                         onClick={() => setAuswahl((a) => (an ? a.filter((x) => x !== u.id) : [...a, u.id]))}
                       >
-                        {heerNamen.get(u.id)} <span className="befehl-chip-leben">{u.leben}/{EINHEIT_WERTE[u.kind].leben}</span>
+                        {heerNamen.get(u.id)} <span className="befehl-chip-leben">{u.leben}/{maxLeben(u)}</span>
                       </button>
                     );
                   })}

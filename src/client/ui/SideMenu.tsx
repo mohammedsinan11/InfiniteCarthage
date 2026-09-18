@@ -22,7 +22,8 @@ import { RARITY_ORDER } from '../../core/cards/types';
 import type { Resource, Terrain } from '../../core/types';
 import type { Abkommen, Brand, UnitState, WandererAuftrag } from '../../core/state';
 import { hexDistance } from '../../core/coords';
-import { WERTE } from '../../core/units';
+// maxLeben kennt Art, Zweig des Ernannten und Rang (core/combat.ts).
+import { maxLeben } from '../../core/combat';
 import { TAGESZEIT_NAME, WETTER_NAME } from '../../core/zeit';
 import type { Tageszeit, Wetter } from '../../core/zeit';
 import { FRIEDEN_PREIS, TRIBUT_KARTEN } from '../../core/rules/diplomatie';
@@ -391,7 +392,7 @@ export function SideMenu({
   const einheitZeile = (u: UnitState) => {
     const status = statusVon(u);
     const auf = offenerRitter === u.id || befehl === u.id;
-    const max = WERTE[u.kind].leben;
+    const max = maxLeben(u);
     return (
       <li
         key={u.id}
@@ -641,7 +642,7 @@ export function SideMenu({
                   const auf = offeneGruppen.has(g.key) || wartet;
                   const status = statusVon(g.einheiten.find((u) => u.ziel) ?? g.einheiten[0]!);
                   const leben = g.einheiten.reduce((n, u) => n + u.leben, 0);
-                  const max = g.einheiten.reduce((n, u) => n + WERTE[u.kind].leben, 0);
+                  const max = g.einheiten.reduce((n, u) => n + maxLeben(u), 0);
                   return (
                     <li
                       key={g.key}

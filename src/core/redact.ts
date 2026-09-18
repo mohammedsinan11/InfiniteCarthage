@@ -43,6 +43,11 @@ export type PublicPlayer = {
   held: HeldLore | null;
   /** Gesammelte Dinge, etwa Gelee - oeffentlich wie die Beute. */
   inventar: Record<string, number>;
+  /**
+   * Der ernannte Held - oeffentlich: er steht sichtbar auf der Karte, und wen
+   * der Koenig beruft, erfaehrt ohnehin jeder (rules/zweig.ts).
+   */
+  ernannt: GameState['players'][number]['ernannt'];
   connected: boolean;
   /** Sichtbare Punkte, ohne verdeckte Siegpunktkarten. */
   points: number;
@@ -119,6 +124,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
       heldZurueck: p.heldZurueck,
       held: p.held ?? null,
       inventar: { ...(p.inventar ?? {}) },
+      ernannt: p.ernannt ? { ...p.ernannt, lore: { ...p.ernannt.lore } } : null,
       connected: p.connected,
       points: publicPoints(state, p.id),
     };

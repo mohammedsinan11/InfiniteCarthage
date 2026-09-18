@@ -40,6 +40,9 @@ export function migriereStand(state: GameState): GameState {
   if (!state.feste) state.feste = {};
   // Reichsbauten kamen mit Phase 2 dazu (DESIGN.md, Phase 2).
   if (!state.reichsbauten) state.reichsbauten = {};
+  // Der ernannte Held kam danach dazu. Wer schon spielt, hat noch keinen und
+  // darf ihn nachholen, sobald sein Koenigssitz steht (rules/zweig.ts).
+  for (const p of state.players) if (p.ernannt === undefined) p.ernannt = null;
   // Siege und Stufe kamen mit dem Levelsystem dazu: wer schon auf der Karte
   // steht, faengt bei null an (DESIGN.md, Stufen).
   for (const u of state.units) {

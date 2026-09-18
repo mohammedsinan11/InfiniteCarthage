@@ -443,10 +443,26 @@ Koenigssitz. Danach faellt die Siedler-Mechanik als Nadeloehr weg.
   Kachel eine Strasse braucht.
 - **Aussehen:** wie im Entwurf mit Palast-Unterbau (Spalte 1 der Probe,
   `probe-bauten.html`).
-- **Der Koenig ernennt Helden:** **Krieger, Heilerin, Haendler** - je einer
-  zu einem der drei Reichsbauten (Burgfeste, Tempel, Handelskontor). Sie
-  treten **zusaetzlich** zum bisherigen Helden an. Das ist der Anfang des
-  Technologiebaums.
+- **Der Koenig ernennt einen Helden** (`rules/zweig.ts`): **Krieger, Heilerin,
+  Haendler** - je einer zu einem der drei Reichsbauten (Burgfeste, Tempel,
+  Handelskontor). Er tritt **zusaetzlich** zum bisherigen Helden an, und zwar
+  sofort, bevorzugt an seinem eigenen Reichsbau.
+
+  **Genau einer, endgueltig.** Mit dem Koenigssitz faellt die Wahl ein
+  einziges Mal; die anderen beiden bleiben die Partie ueber zu. Das ist die
+  haerteste Entscheidung im Spiel - und der Grund, zwei Partien verschieden zu
+  spielen.
+
+  Gebaut: `p.ernannt` (Zweig, eigene Lore, eigene Rueckkehr), Aktion
+  `ernenne`, Ereignis `ernennung`. Er traegt `kind: 'held'` und
+  unterscheidet sich nur durch `u.zweig` - dadurch gelten Sicht, Schrittweite,
+  Befehle, Folgen und Erkunden unveraendert fuer ihn, ohne dass zwanzig
+  Stellen von ihm wissen muessten. Eigene Kampfwerte (`ZWEIG_WERTE`, ueber
+  `angriffVon`/`maxLeben`), eigene Rueckkehr getrennt vom gewoehnlichen
+  Helden.
+
+  Offen: seine drei Wirkungen (die Heilerin heilt noch nicht, der Haendler
+  handelt noch nicht), seine Figur und der Knopf in der Leiste.
 
   Nicht "Hexe": diesen Namen traegt schon die feindliche Figur auf der Karte
   (`HEXE_FRAKTION`, `core/hexe.ts`). Zwei Hexen mit entgegengesetzter Rolle

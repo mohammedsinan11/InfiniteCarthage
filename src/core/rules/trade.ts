@@ -36,6 +36,7 @@ export function tradeRatio(
     worldSeed?: number;
     turn?: number;
     reichsbauten?: GameState['reichsbauten'];
+    units?: GameState['units'];
   },
   world: World,
   player: PlayerId,
@@ -60,6 +61,14 @@ export function tradeRatio(
    * schliesst. Einen passenden 2:1-Hafen unterbietet es nicht.
    */
   if (hatReichsbau(state, player, 'handelskontor')) ratio = Math.min(ratio, 3);
+  /*
+   * Der ernannte Haendler (rules/zweig.ts) handelt, solange er auf der Karte
+   * steht: 2:1 auf alles. Faellt er, ist es damit vorbei, bis er zurueckkehrt -
+   * seine Wirkung haengt an ihm, nicht an einem Gebaeude.
+   */
+  if (state.units?.some((u) => u.zweig === 'haendler' && u.owner === player)) {
+    ratio = Math.min(ratio, 2);
+  }
   // Karten koennen den Handel guenstiger machen - aber nie unter zwei, sonst
   // waere Tauschen kein Handel mehr, sondern eine Umbenennung.
   const karten = state.players?.find((p) => p.id === player)?.cards ?? [];

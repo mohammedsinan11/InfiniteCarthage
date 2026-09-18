@@ -34,7 +34,8 @@ import { COST_REICHSBAU } from '../../core/rules/costs';
 import type { Cost } from '../../core/rules/costs';
 import type { Action } from '../../core/rules/reducer';
 import type { PublicPlayer, PublicState } from '../../core/redact';
-import type { DevCardType, Hand } from '../../core/state';
+import type { DevCardType, Hand, HeldZweig } from '../../core/state';
+import { ZWEIGE, ZWEIG_NAME, ZWEIG_ZWECK } from '../../core/rules/zweig';
 import { devName, resourceName } from '../log';
 import { ResourceGlyph } from './ResourceIcon';
 
@@ -176,6 +177,30 @@ const SymBauen = () => (
     <path d="M8 5 L13 2 L18 7 L15 12 Z" fill="#b9b3a6" stroke="#2a2016" strokeWidth={1.5} strokeLinejoin="round" />
   </Symbol>
 );
+/** Die drei Ernannten: Schwert, Kelch, Waage - und der Rueckweg. */
+const SymZweig = ({ zweig }: { zweig: HeldZweig | 'zurueck' }) => (
+  <Symbol>
+    {zweig === 'krieger' && (
+      <path d="M10 2 L12 7 V13 h-4 V7 Z M6 13 h8 v2 H6 Z" fill="#b9b3a6" stroke="#2a2016" strokeWidth={1.3} strokeLinejoin="round" />
+    )}
+    {zweig === 'heilerin' && (
+      <>
+        <path d="M7 4 h6 v4 a3 3 0 0 1 -6 0 Z" fill="#f2c94c" stroke="#2a2016" strokeWidth={1.3} strokeLinejoin="round" />
+        <path d="M10 11 v5 M7 16 h6" stroke="#2a2016" strokeWidth={1.4} strokeLinecap="round" />
+      </>
+    )}
+    {zweig === 'haendler' && (
+      <>
+        <path d="M10 3 v12 M4 7 h12" stroke="#2a2016" strokeWidth={1.4} strokeLinecap="round" />
+        <path d="M4 7 L2 11 h4 Z M16 7 L14 11 h4 Z" fill="#c9a46a" stroke="#2a2016" strokeWidth={1.1} strokeLinejoin="round" />
+      </>
+    )}
+    {zweig === 'zurueck' && (
+      <path d="M13 5 L7 10 L13 15" fill="none" stroke="#2a2016" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    )}
+  </Symbol>
+);
+
 /** Die drei Reichsbauten: Turm, Waage, Saeule - grob wie ihre Bauten. */
 const SymReich = ({ art }: { art: string }) => (
   <Symbol>
@@ -424,6 +449,8 @@ export function Aktionsleiste({
   const phase = state.phase;
   const bauen = isMine && phase.t === 'main';
   const [tafel, setTafel] = useState<null | 'handel' | 'karten'>(null);
+  // Welcher Ernannte gerade zur Bestaetigung ansteht (rules/zweig.ts).
+  const [ernennen, setErnennen] = useState<HeldZweig | null>(null);
 
   /** Steht die Bauzeile statt der Leiste? (BAU_ZEILE) */
   const [bauOffen, setBauOffen] = useState(false);
@@ -567,6 +594,51 @@ export function Aktionsleiste({
                 onClick={bau(`reich:${art}` as Exclude<BuildMode, null>)}
               />
             ))}
+          </>
+        )}
+        {/*
+          Phase 2: der Held, den der Koenig ernennt (rules/zweig.ts). Sichtbar,
+          solange die Wahl offen ist - danach steht er auf der Karte.
+
+          Zwei Schritte, weil die Wahl ENDGUELTIG ist: ein Fehlklick soll nicht
+          die groesste Entscheidung der Partie treffen.
+        */}
+        {reichOffen && !me?.ernannt && (
+          <>
+            <span className="dock-trenner" />
+            {ernennen === null ? (
+              ZWEIGE.map((z) => (
+                <DockKnopf
+                  key={z}
+                  titel={ZWEIG_NAME[z]}
+                  symbol={<SymZweig zweig={z} />}
+                  darf={bauen}
+                  tip={`${ZWEIG_NAME[z]} ernennen - ${ZWEIG_ZWECK[z]}. Du hast nur diese eine Wahl, sie gilt die ganze Partie.`}
+                  onClick={() => setErnennen(z)}
+                />
+              ))
+            ) : (
+              <>
+                <DockKnopf
+                  titel={`${ZWEIG_NAME[ernennen]} ernennen`}
+                  symbol={<SymZweig zweig={ernennen} />}
+                  leuchtet
+                  darf={bauen}
+                  tip={`Endgueltig ${ZWEIG_NAME[ernennen]} ernennen. Die anderen beiden bleiben die ganze Partie zu.`}
+                  onClick={() => {
+                    act({ t: 'ernenne', zweig: ernennen });
+                    setErnennen(null);
+                  }}
+                />
+                <DockKnopf
+                  titel="Zurueck"
+                  symbol={<SymZweig zweig="zurueck" />}
+                  darf
+                  tip="Doch nicht - noch ist nichts entschieden."
+                  onClick={() => setErnennen(null)}
+                />
+              </>
+            )}
           </>
         )}
           </>

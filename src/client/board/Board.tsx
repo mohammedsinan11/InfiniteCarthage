@@ -37,7 +37,7 @@ import { hexCornerPixel } from '../../core/coords';
 import { reliefLimitedAt } from '../../core/relief';
 import { edgeAdjacentHexes, vertexAdjacentHexes } from '../../core/coords';
 import { edgeKey, hexEdges, hexVertices, vertexKey } from '../../core/coords';
-import { WERTE, garrisonOf, garrisonUnits, isNestActive, nestFraktionOf } from '../../core/units';
+import { garrisonOf, garrisonUnits, isNestActive, nestFraktionOf } from '../../core/units';
 import type { Unit } from '../../core/units';
 import { heldKurz, heldVoll } from '../../core/lore';
 import { istSpielerSeite, istKampf, kampfFelder, seiteVon, spielerAus } from '../../core/combat';
@@ -59,7 +59,8 @@ import {
   zeichneStufe,
   zeichneStrassen,
 } from '../units';
-import { STUFE_LEBEN } from '../../core/combat';
+// maxLeben kennt Art, Zweig des Ernannten und Rang (core/combat.ts).
+import { maxLeben } from '../../core/combat';
 import { Schwerter } from './Schwerter';
 import { AuftragsZeichen, Flammen, KronenZeichen } from './Marken';
 import { Kosten } from '../ui/Aktionsleiste';
@@ -352,7 +353,7 @@ function einheitenText(state: PublicState, du: string | null, gruppe: readonly U
   if (VORHABEN[u.auftrag]) teile.push(VORHABEN[u.auftrag]);
   const beute = gruppe.reduce((s, x) => s + x.traegt, 0);
   if (beute > 0) teile.push(`traegt ${beute} ${beute === 1 ? 'Karte' : 'Karten'}`);
-  const max = WERTE[u.kind].leben;
+  const max = maxLeben(u);
   if (u.kind !== 'wanderer') {
     teile.push(n === 1 ? `Leben ${u.leben}/${max}` : `Leben ${gruppe.map((x) => x.leben).join(', ')} von ${max}`);
   }
@@ -894,7 +895,7 @@ export function Board({
         if (fackeln && u.id >= 0) zeichneFigur(g, 'fackel', fx + 5 * f, fy - 2 * f, f);
         // Wer sich hochgedient hat, traegt seine Winkel ueber dem Kopf.
         if (u.id >= 0 && (u.stufe ?? 0) > 0) zeichneStufe(g, u.kind, fx, fy, f, u.stufe ?? 0);
-        const max = WERTE[u.kind].leben + STUFE_LEBEN * (u.stufe ?? 0);
+        const max = maxLeben(u);
         // Im Gefecht traegt jede Figur ihren Balken, sonst nur die verwundeten:
         // so sieht man, wie es auf dem Feld steht (DESIGN.md, Kampf sehen).
         const imGefecht = kampf.has(hexKey(t.q, t.r));
@@ -974,7 +975,7 @@ export function Board({
       const y = Math.round(sy + (fy - sy) * e) - hops;
       zeichneFigur(ctx, u.kind, x, y, f, farbeSeite(seiteVon(u)));
       if (fackeln) zeichneFigur(ctx, 'fackel', x + 5 * f, y - 2 * f, f);
-      const max = WERTE[u.kind].leben;
+      const max = maxLeben(u);
       if (u.leben < max) zeichneLeben(ctx, u.kind, x, y, f, u.leben, max);
     }
 

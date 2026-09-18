@@ -66,7 +66,7 @@ import { RESOURCES } from '../types';
 import { MAX_TURM_STUFE, emptyHand, handSize, playerById } from '../state';
 import { HEXE_FRAKTION, NACHT_ID } from '../factions';
 import { hexenhausAt } from '../hexe';
-import type { GameState, Hand, PlayerId, UnitKind, UnitState } from '../state';
+import type { GameState, Hand, HeldZweig, PlayerId, UnitKind, UnitState } from '../state';
 import { einheitName, wuerfleHeld } from '../lore';
 import type { HeldLore } from '../lore';
 import {
@@ -104,9 +104,7 @@ import {
   BOGEN_REICHWEITE,
   BOGEN_REICHWEITE_ERHOEHT,
   MORAL_ANTEIL,
-  NAME_AB_STUFE,
-  STUFE_ANGRIFF,
-  STUFE_LEBEN,
+  NAME_AB_STUFE,  STUFE_LEBEN,
   deckungFuer,
   spielerSeite,
   stufeFuer,
@@ -116,6 +114,9 @@ import { fraktionById } from '../factions';
 import type { FraktionArt } from '../factions';
 import { raidLoss, takeFromLargest } from './raid';
 import { reichsbauFelder, tempelNah } from './reich';
+import { HEILERIN_RADIUS, ZWEIG_BAU } from './zweig';
+import { ZWEIG_WERTE } from '../units';
+import { angriffVon, maxLeben } from '../combat';
 import { roundOf } from '../season';
 import { einheitenRasten } from '../zeit';
 import { feuerLegen } from './feuer';
@@ -323,9 +324,11 @@ export type ArmyEvent =
       anzahl: number;
     }
   /** Der Held tritt an - zu Beginn oder nach seinem Fall (zurueck). */
-  | { t: 'heroReady'; player: PlayerId; unit: number; q: number; r: number; zurueck: boolean }
+  | { t: 'heroReady'; player: PlayerId; unit: number; q: number; r: number; zurueck: boolean; zweig?: HeldZweig }
+  /** Der Koenig ernennt seinen Helden - einmal je Partie (rules/zweig.ts). */
+  | { t: 'ernennung'; player: PlayerId; zweig: HeldZweig }
   /** Der Held ist gefallen und kehrt in Zug zurueck wieder. */
-  | { t: 'heroFell'; player: PlayerId; q: number; r: number; zurueck: number }
+  | { t: 'heroFell'; player: PlayerId; q: number; r: number; zurueck: number; zweig?: HeldZweig }
   /** Feuer: gelegt, abgewehrt, geloescht, abgebrannt (rules/feuer.ts). */
   | FeuerEvent
   | { t: 'chunks'; coords: ChunkCoord[] };
@@ -415,7 +418,9 @@ function uebergib(s: GameState, tot: UnitState, erbe: UnitState, events: Ereigni
  * eines anliegt. null ohne Siedlung oder wenn er schon steht.
  */
 export function spawnHeld(s: GameState, id: PlayerId, events: Ereignisse): UnitState | null {
-  if (s.units.some((u) => u.kind === 'held' && u.owner === id)) return null;
+  // Nur der gewoehnliche Held - der Ernannte traegt dieselbe Art, aber einen
+  // Zweig (spawnErnannt). Sonst traete der eine fuer den anderen nie an.
+  if (s.units.some((u) => u.kind === 'held' && u.owner === id && !u.zweig)) return null;
   const feldAn = knightMusterHex(s, id, true);
   if (!feldAn) return null;
   const p = playerById(s, id);
@@ -442,11 +447,57 @@ export function benenneHeld(s: GameState, p: GameState['players'][number]): Held
   return lore;
 }
 
+/**
+ * Der Koenig ernennt seinen Helden (rules/zweig.ts) - und der tritt sofort an.
+ *
+ * Ob er das darf, steht vorher fest (ernennungHindernis); hier wird nur noch
+ * ausgefuehrt. Die Wahl ist endgueltig: p.ernannt wird nie wieder ueberschrieben.
+ */
+export function ernenne(s: GameState, id: PlayerId, zweig: HeldZweig, events: Ereignisse): void {
+  const p = playerById(s, id);
+  if (!p || p.ernannt) return;
+  const rng = new Rng(s.rngState);
+  // Die Heilerin ist weiblich - ihr Amtsname ist es auch (core/lore.ts).
+  const lore = wuerfleHeld(rng, zweig === 'heilerin' ? 'w' : undefined);
+  s.rngState = rng.getState();
+  p.ernannt = { zweig, lore, zurueck: null };
+  events.push({ t: 'ernennung', player: id, zweig });
+  spawnErnannt(s, id, events);
+}
+
+/**
+ * Den ernannten Helden antreten lassen (rules/zweig.ts). null, wenn niemand
+ * ernannt ist, er schon steht oder kein Platz da ist.
+ *
+ * Er tritt bevorzugt an seinem eigenen Reichsbau an - der Krieger an der
+ * Burgfeste, die Heilerin am Tempel, der Haendler am Handelskontor -, sonst
+ * wie jeder andere an einer eigenen Siedlung.
+ */
+export function spawnErnannt(s: GameState, id: PlayerId, events: Ereignisse): UnitState | null {
+  const p = playerById(s, id);
+  if (!p?.ernannt) return null;
+  if (s.units.some((u) => u.kind === 'held' && u.owner === id && u.zweig)) return null;
+  const zweig = p.ernannt.zweig;
+  const feldAn = knightMusterHex(s, id, true, reichsbauFelder(s, id, ZWEIG_BAU[zweig]));
+  if (!feldAn) return null;
+  const zurueck = p.ernannt.zurueck !== null;
+  const unit = aufstellen(s, einheitVorlage('held', feldAn.q, feldAn.r, { owner: id, zweig }));
+  unit.leben = ZWEIG_WERTE[zweig].leben;
+  p.ernannt.zurueck = null;
+  events.push({ t: 'heroReady', player: id, unit: unit.id, q: unit.q, r: unit.r, zurueck, zweig });
+  return unit;
+}
+
 /** Nach jeder Runde: gefallene Helden kehren zurueck, wenn ihre Zeit um ist. */
 export function heldenRunde(s: GameState, events: Ereignisse): void {
   for (const p of s.players) {
     // Partien von vor der Heldenlore: der Held steht schon, nur der Name fehlt.
-    if (!p.held && s.units.some((u) => u.kind === 'held' && u.owner === p.id)) benenneHeld(s, p);
+    if (!p.held && s.units.some((u) => u.kind === 'held' && u.owner === p.id && !u.zweig)) benenneHeld(s, p);
+    // Der Ernannte tritt an, sobald er ernannt ist - und nach seinem Fall,
+    // wenn seine Zeit um ist. Steht er schon, tut spawnErnannt nichts.
+    if (p.ernannt && (p.ernannt.zurueck === null || s.turn >= p.ernannt.zurueck)) {
+      spawnErnannt(s, p.id, events);
+    }
     if (p.heldZurueck === null || s.turn < p.heldZurueck) continue;
     spawnHeld(s, p.id, events);
   }
@@ -489,9 +540,14 @@ function heldFaellt(s: GameState, u: UnitState, events: Ereignisse): void {
   if (u.owner === null) return;
   const zurueck = s.turn + HELD_RUECKKEHR;
   const p = playerById(s, u.owner);
-  if (p) p.heldZurueck = zurueck;
+  // Der Ernannte hat seine eigene Rueckkehr - sonst holte der Fall des einen
+  // den anderen vom Feld (rules/zweig.ts).
+  if (p) {
+    if (u.zweig && p.ernannt) p.ernannt.zurueck = zurueck;
+    else p.heldZurueck = zurueck;
+  }
   for (const x of s.units) if (x.folgt === u.id) x.folgt = null;
-  events.push({ t: 'heroFell', player: u.owner, q: u.q, r: u.r, zurueck });
+  events.push({ t: 'heroFell', player: u.owner, q: u.q, r: u.r, zurueck, zweig: u.zweig });
 }
 
 /**
@@ -1268,11 +1324,11 @@ function schlacht(
       u.kind === 'ritter' && kaempfer.some((x) => x.kind === 'held' && x.owner === u.owner) ? ANFUEHRUNG : 0;
     // Bogenschuetzen im Nahkampf treffen schlechter (combat.ts, BOGEN_NAHKAMPF).
     const nahkampf = u.kind === 'bogen' ? -BOGEN_NAHKAMPF : 0;
-    // Wer sich hochgedient hat, trifft besser (core/combat.ts, STUFE_ANGRIFF).
-    const stufe = STUFE_ANGRIFF * (u.stufe ?? 0);
     schlage(
       seite,
-      WERTE[u.kind].angriff + angefuehrt + stufe,
+      // Art oder - beim Ernannten - sein Zweig, dazu was der Rang gibt
+      // (core/combat.ts, angriffVon).
+      angriffVon(u) + angefuehrt,
       (lagerSeite !== null && seite !== lagerSeite ? -PALISADE : 0) + nahkampf,
       u,
     );
@@ -1637,16 +1693,22 @@ export function tickArmy(s: GameState, world: World, events: Ereignisse): void {
     feuerLegen(s, rng, u, owner, events);
   }
 
-  // 6. Erholung an eigenen Siedlungen - und im Umkreis eigener Tempel
-  // (rules/reich.ts). Wo gerade gekaempft wurde, erholt sich niemand: dort
-  // wird verbunden, wenn die Schlacht vorbei ist.
+  // 6. Erholung an eigenen Siedlungen, im Umkreis eigener Tempel
+  // (rules/reich.ts) und bei der eigenen Heilerin (rules/zweig.ts) - sie ist
+  // ein Tempel, der mitzieht. Wo gerade gekaempft wurde, erholt sich niemand:
+  // dort wird verbunden, wenn die Schlacht vorbei ist.
   for (const u of s.units) {
-    if (!befehlbar(u.kind) || u.leben >= WERTE[u.kind].leben) continue;
+    if (!befehlbar(u.kind) || u.leben >= maxLeben(u)) continue;
     const k = hexKey(u.q, u.r);
     if (gekaempft.has(k)) continue;
     const daheim = siedlungen.get(k) === u.owner;
     const amTempel = u.owner !== null && tempelNah(s, u.owner, u.q, u.r);
-    if (!daheim && !amTempel) continue;
+    const beiHeilerin =
+      u.owner !== null &&
+      s.units.some(
+        (x) => x.zweig === 'heilerin' && x.owner === u.owner && hexDistance(x, u) <= HEILERIN_RADIUS,
+      );
+    if (!daheim && !amTempel && !beiHeilerin) continue;
     u.leben += 1;
   }
 

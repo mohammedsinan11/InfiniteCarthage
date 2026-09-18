@@ -23,7 +23,7 @@ import { terrainAt, tileAtCoord } from './worldgen';
 import { fraktionAt, fraktionById } from './factions';
 import type { FraktionArt } from './factions';
 import type { Hex } from './coords';
-import type { GameState, PlayerId, UnitKind, UnitState } from './state';
+import type { GameState, HeldZweig, PlayerId, UnitKind, UnitState } from './state';
 import type { SichtLage } from './zeit';
 
 export type { UnitKind };
@@ -92,6 +92,18 @@ export const BESATZUNG_MAX = 3;
 
 /** Einheiten, die ein Spieler befehligt: Ritter, Bogenschuetzen, der Held. */
 export const befehlbar = (kind: UnitKind): boolean => kind === 'ritter' || kind === 'bogen' || kind === 'held';
+
+/**
+ * Kampfwerte der drei ernannten Helden (rules/zweig.ts). Sie traten mit
+ * kind 'held' an, sind aber nicht gleich stark: der Krieger schlaegt am
+ * haertesten zu und haelt am meisten aus, die Heilerin kaempft kaum - ihre
+ * Staerke ist, dass die anderen stehen bleiben.
+ */
+export const ZWEIG_WERTE: Record<HeldZweig, { angriff: number; leben: number }> = {
+  krieger: { angriff: 4, leben: 7 },
+  heilerin: { angriff: 1, leben: 4 },
+  haendler: { angriff: 2, leben: 4 },
+};
 
 /**
  * Steht ein Bogenschuetze erhoeht - auf der eigenen Hauptstadt oder neben einem

@@ -5,7 +5,8 @@
  * reihum zur naechsten Einheit ohne Auftrag. PLATZHALTER-Gestaltung (ASSETS.md).
  */
 
-import { WERTE } from '../../core/units';
+// maxLeben kennt Art, Zweig des Ernannten und Rang (core/combat.ts).
+import { maxLeben } from '../../core/combat';
 import { gruppenName } from '../heer';
 import type { HeerGruppe, HeerStatus } from '../heer';
 
@@ -55,7 +56,7 @@ export function Heerleiste({
       {gruppen.map((g) => {
         const s = status(g);
         const leben = g.einheiten.reduce((n, u) => n + u.leben, 0);
-        const max = g.einheiten.reduce((n, u) => n + WERTE[u.kind].leben, 0);
+        const max = g.einheiten.reduce((n, u) => n + maxLeben(u), 0);
         const zahl = (kind: string) => g.einheiten.filter((u) => u.kind === kind).length;
         const ritter = zahl('ritter');
         const bogen = zahl('bogen');

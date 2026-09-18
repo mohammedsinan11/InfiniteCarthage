@@ -38,7 +38,7 @@ import {
   setupPlayerId,
   totalPoints,
 } from '../state';
-import type { GameState, Hand, PlayerId, Player } from '../state';
+import type { GameState, Hand, HeldZweig, PlayerId, Player } from '../state';
 // Turmstufen: 1 Grenzposten, 2 Geschuetzturm (state.ts, Turm).
 import { MAX_TURM_STUFE, TURM_NAME } from '../state';
 import type { DevCardType } from '../state';
@@ -61,6 +61,7 @@ import {
 } from './costs';
 import { REICHSBAU_NAME, reichsbauHindernis } from './reich';
 import type { ReichsbauArt } from './reich';
+import { ZWEIGE, ernennungHindernis } from './zweig';
 import {
   canPlaceCity,
   canPlaceRoad,
@@ -69,7 +70,7 @@ import {
   legalRoadEdges,
 } from './placement';
 import { computeProduction } from './production';
-import { beginBigRound, beginDay, beginNight, heldenRunde, spawnHeld, spawnKnight, tickArmy } from './army';
+import { beginBigRound, beginDay, beginNight, ernenne, heldenRunde, spawnHeld, spawnKnight, tickArmy } from './army';
 import { brandRunde, brennt, mitKarteLoeschen } from './feuer';
 import { STUFE_NAME, ausbauHindernis, festungsSchutz, hauptstadtHindernis } from './hauptstadt';
 import { abkommenRunde, tributRunde, verhandeln } from './diplomatie';
@@ -142,6 +143,11 @@ export type Action =
   | { t: 'upgradeTower'; vertex: string }
   /** Einen Reichsbau auf eine Kachel im eigenen Reich setzen (Phase 2, rules/reich.ts). */
   | { t: 'buildReich'; q: number; r: number; art: string }
+  /**
+   * Den Helden ernennen, den der Koenigssitz freischaltet: Krieger, Heilerin
+   * oder Haendler. Einmal je Partie, danach steht es fest (rules/zweig.ts).
+   */
+  | { t: 'ernenne'; zweig: HeldZweig }
   /** Einen eigenen Ritter oder den Helden von selbst erkunden lassen - oder nicht mehr. */
   | { t: 'explore'; unit: number; explore: boolean }
   /** Einen eigenen Ritter dem Helden folgen lassen - oder nicht mehr. */
@@ -254,6 +260,7 @@ export function createGame(
       heldZurueck: null,
       held: null,
       inventar: {},
+      ernannt: null,
     })),
     order: players.map((p) => p.id),
     current: 0,
@@ -944,6 +951,16 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       // Auch ein Reichsbau schiebt die Welt vor sich her.
       const added = grow(s, world, [{ q: action.q, r: action.r }]);
       if (added.length) events.push({ t: 'chunks', coords: added });
+      break;
+    }
+
+    case 'ernenne': {
+      if (phase.t !== 'main') return fail('Ernannt wird in der Bauphase.');
+      // Der Client schickt eine Zeichenkette - hier wird sie geprueft, nicht geglaubt.
+      if (!ZWEIGE.includes(action.zweig)) return fail('Diesen Helden gibt es nicht.');
+      const why = ernennungHindernis(s, actor);
+      if (why) return fail(why);
+      ernenne(s, actor, action.zweig, events);
       break;
     }
 

@@ -258,6 +258,15 @@ tragen - ein geliefertes Sprite waere derzeit einfarbig.
 - **Held** (`held`, 9 x 12): Krone, Umhang in Spielerfarbe, Ruestung mit
   Goldschnalle. Nachts der groesste Lichtkreis im Shader. Sprite-bereit:
   `held.png`.
+- **Die drei Ernannten** (`krieger`, `heilerin`, `haendler`, rules/zweig.ts):
+  noch **ohne eigene Figur**. Sie zeichnen sich derzeit wie der gewoehnliche
+  Held (`client/units.ts`, `heldKarte`) und sind auf dem Brett nur am
+  Namensschild auseinanderzuhalten - das ist die auffaelligste offene Stelle.
+  Gebraucht: drei Figuren zu 9 x 12 in Spielerfarbe - Krieger mit Schwert und
+  schwerem Helm, Heilerin mit Stab und hellem Gewand, Haendler mit Kiepe und
+  Waage.
+- **Aktionssymbole der Ernannten** (`SymZweig`): Schwert, Kelch, Waage und ein
+  Rueckpfeil, alle aus SVG-Flaechen.
 - **Flammen** (`board/Marken.tsx`): zwei Pixelbilder im Wechsel (CSS
   `.flammen-a/-b`) an brennender Strasse oder brennendem Haus, anklickbar zum
   Loeschen; nachts ein warmer Lichtkreis.
