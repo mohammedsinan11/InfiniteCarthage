@@ -309,13 +309,23 @@ const AUSSCHAU = 8;
  *
  * ohneZahl (der Held): ein anliegendes Feld ohne Wuerfelzahl geht vor - dort
  * steht er nicht unter einem Zahlenmarker. Erst danach zaehlt die Gefahr.
+ *
+ * zusatz: weitere Musterplaetze, die keine Siedlung sind - die Burgfesten des
+ * Spielers (rules/reich.ts). Sie kommen als Felder herein, damit units.ts
+ * nichts von Phase 2 wissen muss; die Reichsregeln bleiben in reich.ts.
  */
-export function knightMusterHex(view: ArmyView, id: PlayerId, ohneZahl = false): Hex | null {
+export function knightMusterHex(
+  view: ArmyView,
+  id: PlayerId,
+  ohneZahl = false,
+  zusatz: readonly Hex[] = [],
+): Hex | null {
   const felder = [...settlementApproaches(view, id).keys()]
     .map((k) => {
       const [q, r] = k.split(':').map(Number);
       return { q: q!, r: r! };
     })
+    .concat(zusatz.map((h) => ({ q: h.q, r: h.r })))
     .filter((h) => !isNestActive(view, h.q, h.r));
   if (felder.length === 0) return null;
   const gefahr = (h: Hex): number => {

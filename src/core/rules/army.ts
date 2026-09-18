@@ -115,6 +115,7 @@ import { terrainAt } from '../worldgen';
 import { fraktionById } from '../factions';
 import type { FraktionArt } from '../factions';
 import { raidLoss, takeFromLargest } from './raid';
+import { reichsbauFelder, tempelNah } from './reich';
 import { roundOf } from '../season';
 import { einheitenRasten } from '../zeit';
 import { feuerLegen } from './feuer';
@@ -500,14 +501,21 @@ function heldFaellt(s: GameState, u: UnitState, events: Ereignisse): void {
 const imKriegMit = (s: GameState, fraktion: string | null) => (id: PlayerId): boolean =>
   fraktion === null || feindlich(spielerSeite(id), fraktion, s);
 
-/** Einen Ritter - oder Bogenschuetzen - fuer diesen Spieler antreten lassen. null ohne Siedlung. */
+/**
+ * Einen Ritter - oder Bogenschuetzen - fuer diesen Spieler antreten lassen.
+ *
+ * Ausser an eigenen Siedlungen auch an jeder eigenen Burgfeste: das ist ihre
+ * Wirkung in Phase 2 (rules/reich.ts). Eine Burgfeste an der Grenze wird damit
+ * zum Sammelplatz, weil ohnehin das Feld an der naechsten Gefahr gewinnt.
+ * null, wenn es keinen Platz gibt.
+ */
 export function spawnKnight(
   s: GameState,
   id: PlayerId,
   events: Ereignisse,
   kind: 'ritter' | 'bogen' = 'ritter',
 ): UnitState | null {
-  const feldAn = knightMusterHex(s, id);
+  const feldAn = knightMusterHex(s, id, false, reichsbauFelder(s, id, 'burgfeste'));
   if (!feldAn) return null;
   const unit = aufstellen(s, einheitVorlage(kind, feldAn.q, feldAn.r, { owner: id }));
   events.push({ t: 'knightReady', player: id, unit: unit.id, q: unit.q, r: unit.r, kind });
@@ -1629,11 +1637,16 @@ export function tickArmy(s: GameState, world: World, events: Ereignisse): void {
     feuerLegen(s, rng, u, owner, events);
   }
 
-  // 6. Erholung an eigenen Siedlungen.
+  // 6. Erholung an eigenen Siedlungen - und im Umkreis eigener Tempel
+  // (rules/reich.ts). Wo gerade gekaempft wurde, erholt sich niemand: dort
+  // wird verbunden, wenn die Schlacht vorbei ist.
   for (const u of s.units) {
     if (!befehlbar(u.kind) || u.leben >= WERTE[u.kind].leben) continue;
     const k = hexKey(u.q, u.r);
-    if (gekaempft.has(k) || siedlungen.get(k) !== u.owner) continue;
+    if (gekaempft.has(k)) continue;
+    const daheim = siedlungen.get(k) === u.owner;
+    const amTempel = u.owner !== null && tempelNah(s, u.owner, u.q, u.r);
+    if (!daheim && !amTempel) continue;
     u.leben += 1;
   }
 

@@ -12,14 +12,19 @@ import {
   REICH_ERWEITERUNG,
   REICH_RADIUS,
   REICHSBAU_NAME,
+  TEMPEL_RADIUS,
+  hatReichsbau,
   reichsbauHindernis,
   reichsgebiet,
+  tempelNah,
 } from '../src/core/rules/reich';
 import { MAX_STUFE } from '../src/core/rules/hauptstadt';
-import { COST_REICHSBAU } from '../src/core/rules/costs';
+import { COST_KNIGHT, COST_REICHSBAU } from '../src/core/rules/costs';
 import { migriereStand } from '../src/core/rules/migration';
+import { tickArmy } from '../src/core/rules/army';
+import { tradeRatio } from '../src/core/rules/trade';
 import { redactStateFor } from '../src/core/redact';
-import { isLandAt } from '../src/core/units';
+import { isLandAt, isNestActive } from '../src/core/units';
 import { hexDistance, hexKey, hexVertices, hexesInRange, vertexKey } from '../src/core/coords';
 import { RESOURCES } from '../src/core/types';
 
@@ -157,5 +162,96 @@ describe('Reichsbauten setzen', () => {
     delete (game.state as { reichsbauten?: unknown }).reichsbauten;
     migriereStand(game.state);
     expect(game.state.reichsbauten).toEqual({});
+  });
+});
+
+describe('Was die Reichsbauten bewirken', () => {
+  /** Ein Feld im Reich, auf dem noch nichts steht. */
+  function freiesFeld(game: Game, sitz: { q: number; r: number }, weite: number) {
+    return hexesInRange(sitz, weite).find(
+      (h) =>
+        (h.q !== sitz.q || h.r !== sitz.r) &&
+        !game.state.reichsbauten![hexKey(h.q, h.r)] &&
+        reichsbauHindernis(game.state, 'p0', h.q, h.r) === null,
+    )!;
+  }
+
+  const ritterGeben = (game: Game) => {
+    const p = game.state.players[0]!;
+    for (const r of RESOURCES) p.hand[r] += COST_KNIGHT[r] ?? 0;
+  };
+
+  it('die Burgfeste wirbt Ritter fern jeder Siedlung', () => {
+    const { game, sitz } = mitKoenigssitz();
+    // Ohne Siedlung und ohne Burgfeste hat niemand einen Platz zum Antreten.
+    ritterGeben(game);
+    expect(applyAction(game, { t: 'recruitKnight' }, 'p0').ok).toBe(false);
+
+    const platz = freiesFeld(game, sitz, 1);
+    geben(game, 'burgfeste');
+    expect(applyAction(game, { t: 'buildReich', q: platz.q, r: platz.r, art: 'burgfeste' }, 'p0').ok).toBe(true);
+
+    // Jetzt tritt er an - und zwar an der Burgfeste.
+    expect(applyAction(game, { t: 'recruitKnight' }, 'p0').ok).toBe(true);
+    const ritter = game.state.units.find((u) => u.kind === 'ritter' && u.owner === 'p0')!;
+    expect(ritter).toBeDefined();
+    expect({ q: ritter.q, r: ritter.r }).toEqual({ q: platz.q, r: platz.r });
+
+    // Der Nachbar hat davon nichts.
+    expect(hatReichsbau(game.state, 'p1', 'burgfeste')).toBe(false);
+  });
+
+  it('das Handelskontor gibt 3:1 im ganzen Reich', () => {
+    const { game, sitz } = mitKoenigssitz();
+    // Ohne Gebaeude gibt es keinen Hafen - also der Grundsatz 4:1.
+    expect(RESOURCES.every((r) => tradeRatio(game.state, game.world, 'p0', r) === 4)).toBe(true);
+
+    const platz = freiesFeld(game, sitz, 1);
+    geben(game, 'handelskontor');
+    expect(applyAction(game, { t: 'buildReich', q: platz.q, r: platz.r, art: 'handelskontor' }, 'p0').ok).toBe(true);
+
+    // Auf alles, ueberall - und nur fuer den Besitzer.
+    expect(RESOURCES.every((r) => tradeRatio(game.state, game.world, 'p0', r) === 3)).toBe(true);
+    expect(tradeRatio(game.state, game.world, 'p1', 'lumber')).toBe(4);
+  });
+
+  it('der Tempel heilt eigene Einheiten in der Naehe je Runde', () => {
+    const { game, sitz } = mitKoenigssitz();
+    const platz = freiesFeld(game, sitz, 1);
+    geben(game, 'burgfeste');
+    expect(applyAction(game, { t: 'buildReich', q: platz.q, r: platz.r, art: 'burgfeste' }, 'p0').ok).toBe(true);
+
+    // Der Tempel steht neben der Burgfeste, also in Reichweite des Musterplatzes.
+    const tempel = hexesInRange(sitz, 2).find(
+      (h) => hexDistance(h, platz) === 1 && reichsbauHindernis(game.state, 'p0', h.q, h.r) === null,
+    )!;
+    geben(game, 'tempel');
+    expect(applyAction(game, { t: 'buildReich', q: tempel.q, r: tempel.r, art: 'tempel' }, 'p0').ok).toBe(true);
+
+    ritterGeben(game);
+    expect(applyAction(game, { t: 'recruitKnight' }, 'p0').ok).toBe(true);
+
+    // Nur dieser Ritter steht auf der Karte: so stoert keine Schlacht die Erholung.
+    const ritter = game.state.units.find((u) => u.kind === 'ritter' && u.owner === 'p0')!;
+    game.state.units = [ritter];
+    ritter.leben = 1;
+    expect(tempelNah(game.state, 'p0', ritter.q, ritter.r)).toBe(true);
+    tickArmy(game.state, game.world, []);
+    expect(game.state.units[0]!.leben).toBe(2);
+
+    // Weiter weg als TEMPEL_RADIUS erholt sich niemand - ohne Siedlung schon gar nicht.
+    const fern = hexesInRange(sitz, 8).find(
+      (h) =>
+        hexDistance(h, tempel) > TEMPEL_RADIUS &&
+        isLandAt(game.state.worldSeed, h.q, h.r) &&
+        !isNestActive(game.state, h.q, h.r),
+    )!;
+    expect(tempelNah(game.state, 'p0', fern.q, fern.r)).toBe(false);
+    const weg = game.state.units[0]!;
+    weg.q = fern.q;
+    weg.r = fern.r;
+    weg.leben = 1;
+    tickArmy(game.state, game.world, []);
+    expect(game.state.units[0]!.leben).toBe(1);
   });
 });

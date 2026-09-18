@@ -16,7 +16,8 @@
  * einmal geschrieben.
  */
 
-import { hexKey, hexesInRange, parseHexKey, parseVertexKey, vertexAdjacentHexes } from '../coords';
+import { hexDistance, hexKey, hexesInRange, parseHexKey, parseVertexKey, vertexAdjacentHexes } from '../coords';
+import type { Hex } from '../coords';
 import type { GameState, PlayerId } from '../state';
 import { isLandAt, isNestActive } from '../units';
 import { MAX_STUFE } from './hauptstadt';
@@ -26,6 +27,9 @@ export const REICH_RADIUS = 3;
 
 /** Um so viel schiebt jeder eigene Bau im Gebiet die Grenze weiter. */
 export const REICH_ERWEITERUNG = 2;
+
+/** Wie weit ein Tempel heilt. */
+export const TEMPEL_RADIUS = 2;
 
 /** Was die Reichsregeln vom Zustand lesen. */
 export type ReichSicht = Pick<GameState, 'worldSeed' | 'buildings'> & {
@@ -45,11 +49,11 @@ export const REICHSBAU_NAME: Record<ReichsbauArt, string> = {
   tempel: 'Tempel',
 };
 
-/** Was jeder von ihnen einmal bringen soll - noch Beschreibung, nicht Regel. */
+/** Was jeder von ihnen bringt - die Regeln dazu stehen unten in dieser Datei. */
 export const REICHSBAU_ZWECK: Record<ReichsbauArt, string> = {
-  burgfeste: 'Ritter und Bogenschuetzen aus dem Reich',
-  handelskontor: 'besserer Tausch im ganzen Reich',
-  tempel: 'heilt die Einheiten in der Naehe',
+  burgfeste: 'hier treten Ritter und Bogenschuetzen an, auch fern der Siedlungen',
+  handelskontor: 'Tausch 3:1 auf alles im ganzen Reich, auch bei Sturm',
+  tempel: `heilt eigene Einheiten ${TEMPEL_RADIUS} Felder weit je Runde`,
 };
 
 /**
@@ -125,4 +129,38 @@ export function reichsbauHindernis(
   if (feld.size === 0) return 'Erst der Koenigssitz macht dich zum Reich.';
   if (!feld.has(k)) return 'Das Feld liegt ausserhalb deines Reichs.';
   return null;
+}
+
+// --- Was die drei bewirken ---------------------------------------------------
+
+/*
+ * Die Wirkungen lesen nur die Reichsbauten selbst, nicht das Gebiet: wer den
+ * Bau hat, hat die Wirkung. Sonst haetten sie aufgehoert zu wirken, sobald das
+ * Reich einmal anders verlaeuft - ein Tempel steht, wo er steht.
+ */
+
+/** Was die Wirkungen vom Zustand lesen - weniger als ReichSicht. */
+export type BautenSicht = { reichsbauten?: GameState['reichsbauten'] };
+
+/** Die Felder mit einem eigenen Reichsbau dieser Art. */
+export function reichsbauFelder(view: BautenSicht, player: PlayerId, art: ReichsbauArt): Hex[] {
+  const out: Hex[] = [];
+  for (const [hk, b] of Object.entries(view.reichsbauten ?? {})) {
+    if (b.owner === player && b.art === art) out.push(parseHexKey(hk));
+  }
+  return out;
+}
+
+/** Hat dieser Spieler einen Reichsbau dieser Art? */
+export function hatReichsbau(view: BautenSicht, player: PlayerId, art: ReichsbauArt): boolean {
+  return Object.values(view.reichsbauten ?? {}).some((b) => b.owner === player && b.art === art);
+}
+
+/**
+ * Heilt hier ein eigener Tempel? Er wirkt TEMPEL_RADIUS Felder weit, ohne dass
+ * eine Siedlung in der Naehe sein muesste - genau das ist sein Sinn: ein
+ * verwundeter Ritter muss nicht mehr heimkehren (rules/army.ts, Schritt 6).
+ */
+export function tempelNah(view: BautenSicht, player: PlayerId, q: number, r: number): boolean {
+  return reichsbauFelder(view, player, 'tempel').some((h) => hexDistance(h, { q, r }) <= TEMPEL_RADIUS);
 }

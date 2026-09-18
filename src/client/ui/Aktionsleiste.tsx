@@ -575,8 +575,8 @@ export function Aktionsleiste({
           <>
         {!BAU_ZEILE && <span className="dock-trenner" />}
         <DockKnopf titel="Karte" symbol={<SymKarte />} kosten={COST_DEV} darf={bauen && canAfford(hand, COST_DEV)} tip={`Entwicklungskarte kaufen (${state.deckLeft} im Stapel): ${kostenText(COST_DEV)}`} onClick={() => act({ t: 'buyDev' })} />
-        <DockKnopf titel="Ritter" symbol={<SymRitter />} kosten={COST_KNIGHT} darf={bauen && canAfford(hand, COST_KNIGHT)} tip={`Ein Ritter tritt an einer deiner Siedlungen an: ${kostenText(COST_KNIGHT)}`} onClick={() => act({ t: 'recruitKnight' })} />
-        <DockKnopf titel="Bogen" symbol={<SymBogen />} kosten={COST_ARCHER} darf={bauen && canAfford(hand, COST_ARCHER)} tip={`Ein Bogenschuetze tritt an einer deiner Siedlungen an. Schiesst auf Feinde nebenan, neben einem Wachturm zwei Felder weit: ${kostenText(COST_ARCHER)}`} onClick={() => act({ t: 'recruitArcher' })} />
+        <DockKnopf titel="Ritter" symbol={<SymRitter />} kosten={COST_KNIGHT} darf={bauen && canAfford(hand, COST_KNIGHT)} tip={`Ein Ritter tritt an einer deiner Siedlungen oder Burgfesten an: ${kostenText(COST_KNIGHT)}`} onClick={() => act({ t: 'recruitKnight' })} />
+        <DockKnopf titel="Bogen" symbol={<SymBogen />} kosten={COST_ARCHER} darf={bauen && canAfford(hand, COST_ARCHER)} tip={`Ein Bogenschuetze tritt an einer deiner Siedlungen oder Burgfesten an. Schiesst auf Feinde nebenan, neben einem Wachturm zwei Felder weit: ${kostenText(COST_ARCHER)}`} onClick={() => act({ t: 'recruitArcher' })} />
         <span className="dock-trenner" />
         <DockKnopf titel="Handel" symbol={<SymHandel />} gewaehlt={tafel === 'handel'} darf={bauen} tip="Bankhandel" onClick={umschalten('handel')} />
         <DockKnopf titel="Karten" symbol={<SymKarten />} zahl={offen.length} gewaehlt={tafel === 'karten'} darf={offen.length > 0} tip="Deine Entwicklungskarten" onClick={umschalten('karten')} />

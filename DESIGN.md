@@ -406,12 +406,26 @@ Das Reich um den Koenigssitz (`rules/reich.ts`).
   mehrfach stehen - aber nur einer je Feld, nicht auf der Hauptstadt, nicht
   auf einem Lager, nicht auf Wasser. Kosten je etwa eine Stadt
   (`COST_REICHSBAU`, Platzhalter).
-- **Was sie bringen sollen** (`REICHSBAU_ZWECK`, noch Beschreibung, nicht
-  Regel): Burgfeste wirbt Truppen im Reich, Handelskontor verbessert den
-  Tausch, Tempel heilt in der Naehe.
-- Offen: die Wirkungen selbst, die Bau-Oberflaeche (Kronen-Knopf, der erst mit
-  dem Koenigssitz erscheint, dazu die aufleuchtenden Kacheln des Gebiets) und
-  die drei Helden, die der Koenig ernennt.
+- **Was sie bewirken** (`REICHSBAU_ZWECK` - jetzt Regel, nicht mehr blosse
+  Beschreibung):
+  - **Burgfeste:** Ritter und Bogenschuetzen treten auch an ihr an, nicht nur
+    an Siedlungen (`spawnKnight` mit `reichsbauFelder`). Unter den
+    Musterplaetzen gewinnt ohnehin der an der naechsten Gefahr - eine
+    Burgfeste an der Grenze wird damit von selbst zum Sammelplatz. Man wirbt
+    dort, wo gekaempft wird, statt Nachschub quer durchs Reich laufen zu
+    lassen.
+  - **Handelskontor:** 3:1 auf alles, im ganzen Reich (`tradeRatio`). Es
+    handelt ueber Land, bleibt also offen, wenn der Sturm die Haefen
+    schliesst; einen passenden 2:1-Hafen unterbietet es nicht.
+  - **Tempel:** heilt eigene Einheiten `TEMPEL_RADIUS` Felder weit je Runde,
+    auch ohne Siedlung (`tempelNah`, Schritt 6 der Heerrunde). Wo gerade
+    gekaempft wurde, heilt er nicht. Ein verwundeter Ritter muss damit nicht
+    mehr heimkehren.
+  - Die Wirkungen haengen am Bau, nicht am Gebiet: wer ihn hat, hat sie - auch
+    wenn die Grenze des Reichs spaeter anders verlaeuft.
+- Offen: nur noch die drei Helden, die der Koenig ernennt. Die Bau-Oberflaeche
+  steht (Kronen-Knopf, der erst mit dem Koenigssitz erscheint, dazu die
+  aufleuchtenden Kacheln des Gebiets).
 
 ### Phase 2: was der Koenigssitz aufschliesst
 
@@ -429,14 +443,18 @@ Koenigssitz. Danach faellt die Siedler-Mechanik als Nadeloehr weg.
   Kachel eine Strasse braucht.
 - **Aussehen:** wie im Entwurf mit Palast-Unterbau (Spalte 1 der Probe,
   `probe-bauten.html`).
-- **Der Koenig ernennt Helden:** mit dem Koenigssitz waehlt man den ersten
-  Zweig - Krieger, Hexe oder Haendler, passend zu den drei Bauten. Sie treten
-  **zusaetzlich** zum bisherigen Helden an; ob man am Ende alle drei haben
-  kann, ist noch offen. Das ist der Anfang des Technologiebaums.
-- Noch offen: wo genau die Bauoptionen stehen (Vorschlag: ein Kronen-Knopf in
-  der Leiste, der erst mit dem Koenigssitz erscheint und die erlaubten Kacheln
-  aufleuchten laesst), was die drei Bauten kosten und wirken, und wie weit die
-  Umgebung reicht.
+- **Der Koenig ernennt Helden:** **Krieger, Heilerin, Haendler** - je einer
+  zu einem der drei Reichsbauten (Burgfeste, Tempel, Handelskontor). Sie
+  treten **zusaetzlich** zum bisherigen Helden an. Das ist der Anfang des
+  Technologiebaums.
+
+  Nicht "Hexe": diesen Namen traegt schon die feindliche Figur auf der Karte
+  (`HEXE_FRAKTION`, `core/hexe.ts`). Zwei Hexen mit entgegengesetzter Rolle
+  waeren beim Lesen des Bretts nicht auseinanderzuhalten - und "Heilerin"
+  sagt ohnehin genauer, was sie am Tempel tut.
+- Noch offen ist allein der Heldenzweig. Die Bauoptionen (Kronen-Knopf mit
+  aufleuchtenden Kacheln), die Kosten (`COST_REICHSBAU`), die Wirkungen und
+  die Weite der Umgebung (`REICH_RADIUS`, `REICH_ERWEITERUNG`) stehen.
 
 ### Geplant
 

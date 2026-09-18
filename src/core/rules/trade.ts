@@ -15,6 +15,7 @@ import type { GameState, Hand, PlayerId } from '../state';
 import type { BoardView } from './placement';
 import { modifiersOf } from '../cards/effects';
 import { sturm, wetterOf } from '../zeit';
+import { hatReichsbau } from './reich';
 
 export const DEFAULT_RATIO = 4;
 
@@ -25,14 +26,16 @@ export function haefenZu(state: { worldSeed?: number; turn?: number }): boolean 
 
 /**
  * Wie viele Karten dieser Spieler fuer eine Karte des gewuenschten Rohstoffs
- * hinlegen muss: 2 mit passendem 2:1-Hafen, 3 mit 3:1-Hafen, sonst 4. Bei
- * Sturm laeuft kein Schiff aus - dann gelten die Haefen nicht.
+ * hinlegen muss: 2 mit passendem 2:1-Hafen, 3 mit 3:1-Hafen oder mit einem
+ * Handelskontor, sonst 4. Bei Sturm laeuft kein Schiff aus - dann gelten die
+ * Haefen nicht, das Handelskontor aber schon.
  */
 export function tradeRatio(
   state: BoardView & {
     players?: ReadonlyArray<{ id: PlayerId; cards: string[] }>;
     worldSeed?: number;
     turn?: number;
+    reichsbauten?: GameState['reichsbauten'];
   },
   world: World,
   player: PlayerId,
@@ -51,6 +54,12 @@ export function tradeRatio(
     }
     if (port === 'any') ratio = Math.min(ratio, 3);
   }
+  /*
+   * Das Handelskontor der Phase 2 (rules/reich.ts) handelt ueber Land: 3:1 auf
+   * alles, im ganzen Reich, und es bleibt offen, wenn der Sturm die Haefen
+   * schliesst. Einen passenden 2:1-Hafen unterbietet es nicht.
+   */
+  if (hatReichsbau(state, player, 'handelskontor')) ratio = Math.min(ratio, 3);
   // Karten koennen den Handel guenstiger machen - aber nie unter zwei, sonst
   // waere Tauschen kein Handel mehr, sondern eine Umbenennung.
   const karten = state.players?.find((p) => p.id === player)?.cards ?? [];
