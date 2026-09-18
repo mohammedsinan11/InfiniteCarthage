@@ -9,7 +9,8 @@
   h2 { font-family: 'Silkscreen', monospace; font-size: 14px; color: #d9a441; margin: 26px 0 6px; }
   p.lead { margin: 0 0 12px; color: #a8987c; max-width: 1120px; }
   .reihe { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
-  figure { margin: 0; width: 276px; }
+  /* So breit wie das Canvas selbst (72 Kunstpixel x 5), sonst wird es beschnitten. */
+  figure { margin: 0; width: 372px; }
   figcaption { font-size: 12px; color: #cdbd9c; margin-bottom: 5px; min-height: 58px; }
   figcaption b { color: #f2e7d0; font-family: 'Silkscreen', monospace; font-size: 11px; }
   canvas { display: block; image-rendering: pixelated; border: 2px solid #3a2c1c; background: #0f0c08; }
@@ -207,11 +208,13 @@ function wald(art) {
   const c = leer();
   const g = c.getContext('2d');
   boden(g, 'forest', 'clay');
+  // Die Baeume stehen dicht am Ring - nur dort entscheidet sich, wer vorn ist.
+  const baeume = () => { baum(g, -11, 14); baum(g, 11, 14); baum(g, 0, 22); };
   if (art === 'davor') {
     g.drawImage(bauAllein('clay'), 0, 0);
-    baum(g, -14, 20); baum(g, 14, 20);
+    baeume();
   } else {
-    baum(g, -14, 20); baum(g, 14, 20);
+    baeume();
     g.drawImage(bauAllein('clay'), 0, 0);
   }
   return c;
@@ -270,7 +273,8 @@ function ritterStufe(stufe) {
 function ausDemSpiel(kind, stufe) {
   const c = leer(26, 24);
   const g = c.getContext('2d');
-  const mx = (13 - OX) * S, my = (16 - OY) * S;
+  // Mitte des kleinen Canvas - NICHT ueber OX/OY, die gelten fuers grosse.
+  const mx = 13 * S, my = 19 * S;
   // Ein Stueck Wiese als Grund, damit heller Stahl nicht auf Schwarz liegt.
   if (KACHEL.grass) g.drawImage(KACHEL.grass, mx - 13 * S, my - 22 * S, 26 * S, 32 * S);
   zeichneFigur(g, kind, mx, my, S, BLAU, undefined, stufe);
