@@ -2650,6 +2650,60 @@ em.off {
   stroke: var(--accent);
   stroke-width: 2;
 }
+
+/*
+ * Reichweite (core/units.ts, reichweite). Was diese Runde erreichbar ist,
+ * steht deutlich da; was spaeter kommt, bleibt blass und traegt die Zahl der
+ * Runden. Bewusst schwach gefuellt: darunter liegt die Landschaft, wegen der
+ * die Kacheln ueberhaupt da sind.
+ */
+.hex-reich {
+  fill: rgba(255, 215, 106, 0.13);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+.hex-reich.spaeter {
+  fill: rgba(255, 215, 106, 0.04);
+  stroke: rgba(217, 164, 65, 0.45);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.reich-runden {
+  font-family: var(--pixel);
+  font-size: 8px;
+  fill: rgba(242, 231, 208, 0.75);
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: #17120c;
+  stroke-width: 2.5px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+/* Der Weg, den die Einheit nehmen wuerde - dieselbe Sprache wie ein gesetztes Ziel. */
+.weg-vorschau {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  opacity: 0.9;
+}
+/*
+ * Angedockt: waehrend der Zielwahl sitzt die Befehlstafel am unteren Brettrand
+ * statt ueber der Einheit - sonst verdeckt sie die Felder, auf die man zielt.
+ */
+.ausbau-tafel.befehls-tafel.angedockt {
+  left: 50%;
+  bottom: 96px;
+  top: auto;
+  transform: translateX(-50%);
+  max-width: min(320px, calc(100vw - 20px));
+}
+.ausbau-tafel.befehls-tafel.angedockt::after {
+  display: none;
+}
 @media (prefers-reduced-motion: reduce) {
   .auswahl-ring {
     animation: none;

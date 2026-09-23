@@ -21,27 +21,37 @@ export type Modifiers = {
   tradeDiscount: number;
   /** Um wie viel die Handkartengrenze steigt. */
   handLimitBonus: number;
+  /** Eigene Haefen schliessen im Sturm nicht. */
+  stormPorts: boolean;
 };
 
-const LEER: Modifiers = { terrainBonus: {}, tradeDiscount: 0, handLimitBonus: 0 };
+const LEER: Modifiers = { terrainBonus: {}, tradeDiscount: 0, handLimitBonus: 0, stormPorts: false };
 
 export function modifiersOf(cardIds: readonly string[]): Modifiers {
   if (cardIds.length === 0) return LEER;
 
-  const m: Modifiers = { terrainBonus: {}, tradeDiscount: 0, handLimitBonus: 0 };
+  const m: Modifiers = { terrainBonus: {}, tradeDiscount: 0, handLimitBonus: 0, stormPorts: false };
   for (const id of cardIds) {
     const karte = cardById(id);
     if (!karte) continue;
     for (const l of dauerwirkungen(karte)) {
       switch (l.t) {
         case 'terrainBonus':
-          m.terrainBonus[l.terrain] = (m.terrainBonus[l.terrain] ?? 0) + l.amount;
+          m.terrainBonus[l.terrain] = Math.max(
+            -1,
+            Math.min(2, (m.terrainBonus[l.terrain] ?? 0) + l.amount),
+          );
           break;
         case 'tradeDiscount':
-          m.tradeDiscount += l.amount;
+          // Karten ergaenzen Haefen und Handelskontor, ersetzen sie aber nicht.
+          m.tradeDiscount = Math.min(1, m.tradeDiscount + l.amount);
           break;
         case 'handLimit':
-          m.handLimitBonus += l.amount;
+          // Nur die beste aktive Vorratskarte wirkt.
+          m.handLimitBonus = Math.max(m.handLimitBonus, l.amount);
+          break;
+        case 'stormPorts':
+          m.stormPorts = true;
           break;
       }
     }

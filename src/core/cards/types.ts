@@ -30,12 +30,22 @@ export const RARITY_ORDER: readonly Rarity[] = [
 export type DraftSource = 'fund' | 'belohnung' | 'markt';
 
 /**
+ * Drei getrennte Kartenbereiche.
+ *
+ * Reichskarten bauen die Wirtschaft auf und koennen Dauerwirkungen tragen.
+ * Taktikkarten liegen spielbereit auf der Hand und werden beim Einsatz
+ * verbraucht. Ausruestung ist fuer die Heldenplaetze vorbereitet; die ersten
+ * Gegenstaende folgen mit dem Abenteuerzweig.
+ */
+export type CardKind = 'reich' | 'taktik' | 'ausruestung';
+
+/**
  * Sofortwirkung - geschieht einmal beim Nehmen der Karte.
  */
 export type Instant =
   /** Diese Rohstoffe. */
   | { t: 'gain'; resources: Partial<Record<Resource, number>> }
-  /** Beliebige Rohstoffe nach Wahl - der Einfachheit halber gleichmaessig verteilt. */
+  /** Beliebige Rohstoffe nach echter Wahl des Spielers. */
   | { t: 'gainAny'; count: number };
 
 /**
@@ -51,23 +61,54 @@ export type Lasting =
   /** Bankhandel wird um so viele Karten guenstiger, nie unter zwei. */
   | { t: 'tradeDiscount'; amount: number }
   /** Die Handkartengrenze vor dem Abwerfen steigt. */
-  | { t: 'handLimit'; amount: number };
+  | { t: 'handLimit'; amount: number }
+  /** Haefen bleiben auch im Sturm geoeffnet. */
+  | { t: 'stormPorts' };
+
+/** Eine ausspielbare Taktik. value speist dasselbe Balancemodell wie Reichskarten. */
+export type TacticEffect =
+  | { t: 'healUnit'; amount: number; heroOnly?: boolean; value: number }
+  | { t: 'healField'; amount: number; value: number }
+  | { t: 'attack'; amount: number; value: number }
+  | { t: 'cover'; amount: number; value: number }
+  | { t: 'morale'; value: number }
+  | { t: 'siege'; value: number }
+  | { t: 'heroReroll'; value: number }
+  | { t: 'rangedAttack'; amount: number; value: number };
 
 export type Card = {
   id: string;
   name: string;
   rarity: Rarity;
+  /** Fehlt bei alten Reichskarten bewusst; cardKind normalisiert den Wert. */
+  kind?: CardKind;
   /** Ein Satz, der die Wirkung erklaert - erscheint auf der Karte. */
   text: string;
   instant?: Instant;
   /** Eine oder mehrere Dauerwirkungen. */
   lasting?: Lasting | readonly Lasting[];
+  /** Eine oder mehrere Wirkungen einer ausspielbaren Taktikkarte. */
+  tactic?: TacticEffect | readonly TacticEffect[];
 };
+
+export const cardKind = (c: Pick<Card, 'kind'>): CardKind => c.kind ?? 'reich';
 
 /** Die Dauerwirkungen einer Karte als Liste - ob sie eine oder mehrere hat. */
 export function dauerwirkungen(c: Pick<Card, 'lasting'>): readonly Lasting[] {
   if (c.lasting === undefined) return [];
   return Array.isArray(c.lasting) ? (c.lasting as readonly Lasting[]) : [c.lasting as Lasting];
+}
+
+export function taktikwirkungen(c: Pick<Card, 'tactic'>): readonly TacticEffect[] {
+  if (c.tactic === undefined) return [];
+  return Array.isArray(c.tactic)
+    ? (c.tactic as readonly TacticEffect[])
+    : [c.tactic as TacticEffect];
+}
+
+/** Dauerhafte Reichskarten und Ausruestung sind einzigartig; Verbrauchskarten duerfen wiederkommen. */
+export function istEinzigartig(c: Card): boolean {
+  return cardKind(c) === 'ausruestung' || dauerwirkungen(c).length > 0;
 }
 
 /** Wie oft eine Seltenheitsstufe je Quelle gezogen wird. Summe egal, es wird gewichtet. */

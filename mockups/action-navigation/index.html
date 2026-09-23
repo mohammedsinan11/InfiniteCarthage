@@ -1,0 +1,801 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Infinite Carthage – Kommandotafel</title>
+  <style>
+    :root {
+      --night: #101920;
+      --night-2: #17262a;
+      --wood: #211710;
+      --wood-2: #332317;
+      --bronze: #80603a;
+      --bronze-dark: #46301d;
+      --sand: #e2c681;
+      --gold: #dfad45;
+      --ivory: #f3ead2;
+      --muted: #b7a78a;
+      --danger: #a64b3f;
+      --hero: #6f648f;
+      --cards: #2e7774;
+      --army: #93493d;
+      --build: #bb7c37;
+      --tab-index: 0;
+      --pixel-edge: polygon(4px 0, calc(100% - 4px) 0, calc(100% - 4px) 2px, 100% 2px, 100% calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 4px calc(100% - 2px), 0 calc(100% - 2px), 0 4px, 4px 4px);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { height: 100%; }
+
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: var(--night);
+      color: var(--ivory);
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+    }
+
+    button { font: inherit; }
+
+    .game-shell {
+      position: relative;
+      min-height: 100dvh;
+      overflow: hidden;
+      isolation: isolate;
+      background:
+        linear-gradient(180deg, rgba(5, 12, 16, .08), rgba(4, 8, 11, .64)),
+        radial-gradient(circle at 68% 28%, rgba(224, 182, 86, .13), transparent 34%),
+        #17252a;
+    }
+
+    .game-shell::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 8;
+      opacity: .22;
+      background-image:
+        repeating-linear-gradient(0deg, transparent 0 2px, rgba(255,255,255,.025) 2px 3px),
+        repeating-linear-gradient(90deg, rgba(0,0,0,.05) 0 1px, transparent 1px 4px);
+      mix-blend-mode: overlay;
+    }
+
+    .map {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse at 45% 22%, transparent 0 22%, rgba(6,14,18,.35) 70%),
+        linear-gradient(145deg, #17313a, #101f25 65%, #0b171d);
+    }
+
+    .coast {
+      position: absolute;
+      left: -5%;
+      top: -22%;
+      width: 74%;
+      height: 102%;
+      background: #253b2e;
+      border: 8px solid rgba(222, 190, 118, .22);
+      transform: rotate(-7deg);
+      clip-path: polygon(0 0, 91% 0, 96% 17%, 87% 29%, 94% 42%, 82% 56%, 89% 73%, 72% 91%, 64% 100%, 0 100%);
+      box-shadow: 22px 20px 0 rgba(8, 15, 17, .5);
+    }
+
+    .hex-field {
+      position: absolute;
+      inset: -12% 9% 20% -4%;
+      transform: rotate(-4deg) scale(1.04);
+      opacity: .92;
+    }
+
+    .hex {
+      --c: #53693a;
+      position: absolute;
+      width: 124px;
+      aspect-ratio: 1.13;
+      display: grid;
+      place-items: center;
+      clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%);
+      background:
+        linear-gradient(30deg, transparent 47%, rgba(255,255,255,.06) 48% 51%, transparent 52%),
+        repeating-linear-gradient(90deg, rgba(0,0,0,.06) 0 2px, transparent 2px 7px),
+        var(--c);
+      filter: drop-shadow(0 0 0 #202319) drop-shadow(0 3px 0 rgba(6,10,7,.65));
+    }
+
+    .hex::after {
+      content: "";
+      width: 82%;
+      height: 80%;
+      clip-path: inherit;
+      border: 1px solid rgba(239,220,172,.14);
+      background: radial-gradient(circle, rgba(255,255,255,.08), transparent 60%);
+    }
+
+    .h1{left:5%;top:8%;--c:#5d743b}.h2{left:13%;top:19%;--c:#81713f}.h3{left:21%;top:8%;--c:#48693e}.h4{left:29%;top:19%;--c:#9b7241}.h5{left:37%;top:8%;--c:#8f854a}.h6{left:45%;top:19%;--c:#456d51}.h7{left:53%;top:8%;--c:#6b7043}
+    .h8{left:5%;top:32%;--c:#a26e45}.h9{left:21%;top:32%;--c:#596f3a}.h10{left:37%;top:32%;--c:#827442}.h11{left:53%;top:32%;--c:#4e6750}
+    .h12{left:13%;top:45%;--c:#536f3a}.h13{left:29%;top:45%;--c:#9a6743}.h14{left:45%;top:45%;--c:#7b7b56}
+
+    .road {
+      position: absolute;
+      height: 9px;
+      width: 150px;
+      border: 2px solid #342113;
+      background: #c89e62;
+      box-shadow: 0 2px 0 rgba(0,0,0,.42);
+      transform-origin: left center;
+      z-index: 2;
+    }
+    .r1 {left:28%;top:30%;transform:rotate(31deg)}
+    .r2 {left:38%;top:42%;transform:rotate(-29deg)}
+    .r3 {left:17%;top:53%;transform:rotate(-5deg)}
+
+    .city {
+      position: absolute;
+      z-index: 3;
+      width: 44px;
+      height: 34px;
+      background: #b83f32;
+      border: 3px solid #4a211b;
+      box-shadow: inset 0 -8px 0 #8d2e25, 4px 5px 0 rgba(0,0,0,.32);
+      clip-path: polygon(0 28%, 18% 28%, 18% 8%, 35% 8%, 35% 28%, 62% 28%, 62% 0, 80% 0, 80% 28%, 100% 28%, 100% 100%, 0 100%);
+    }
+    .c1 {left:35%;top:34%}.c2{left:20%;top:48%;transform:scale(.72)}
+
+    .army-marker {
+      position: absolute;
+      z-index: 4;
+      width: 36px;
+      height: 36px;
+      display: grid;
+      place-items: center;
+      color: #fff0d3;
+      background: #8e3f35;
+      border: 3px solid #e2c681;
+      box-shadow: 0 0 0 2px #332015, 3px 5px 0 rgba(0,0,0,.4);
+      transform: rotate(45deg);
+    }
+    .army-marker svg { width: 21px; transform: rotate(-45deg); }
+    .a1 {left:51%;top:29%}.a2{left:29%;top:57%;background:#315e84}
+
+    .hud {
+      position: absolute;
+      z-index: 10;
+      top: 14px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      pointer-events: none;
+    }
+
+    .status-ribbon,
+    .round-ribbon {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      min-height: 42px;
+      border: 2px solid var(--bronze);
+      background: rgba(26, 18, 12, .92);
+      box-shadow: 3px 4px 0 rgba(4,8,7,.5), inset 0 1px 0 rgba(255,255,255,.08);
+      clip-path: var(--pixel-edge);
+    }
+
+    .status-ribbon { padding: 0 12px; gap: 14px; }
+    .crest {
+      width: 25px;
+      height: 29px;
+      display: grid;
+      place-items: center;
+      color: #f2d37f;
+      background: #a33d31;
+      border: 2px solid #e2bd65;
+      clip-path: polygon(0 0,100% 0,100% 72%,50% 100%,0 72%);
+      font: 700 13px Georgia, serif;
+    }
+
+    .ruler strong,
+    .round-ribbon strong {
+      display: block;
+      color: var(--sand);
+      font: 700 12px/1 Georgia, "Times New Roman", serif;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+    .ruler span,
+    .round-ribbon span { color: var(--muted); font-size: 11px; }
+
+    .resource-strip { display: flex; gap: 7px; margin-left: 4px; }
+    .resource {
+      display: grid;
+      grid-template-columns: 18px auto;
+      align-items: center;
+      gap: 3px;
+      color: #f0dfba;
+      font: 700 12px/1 Georgia, serif;
+    }
+    .resource i {
+      width: 15px;
+      height: 15px;
+      display: block;
+      border: 1px solid rgba(30,20,12,.8);
+      transform: rotate(45deg);
+      background: var(--rc);
+      box-shadow: inset 2px 2px 0 rgba(255,255,255,.12);
+    }
+    .round-ribbon { padding: 0 13px; gap: 12px; text-align: right; }
+    .weather { width: 27px; height: 27px; color: #d7bd69; }
+
+    .command-wrap {
+      position: absolute;
+      z-index: 20;
+      left: 50%;
+      bottom: 18px;
+      width: min(1050px, calc(100% - 210px));
+      transform: translateX(-50%);
+      filter: drop-shadow(0 14px 16px rgba(0,0,0,.48));
+    }
+
+    .command-board {
+      position: relative;
+      border: 3px solid var(--bronze);
+      outline: 2px solid rgba(28,18,11,.95);
+      background:
+        repeating-linear-gradient(91deg, transparent 0 46px, rgba(255,255,255,.018) 47px, rgba(0,0,0,.08) 49px),
+        linear-gradient(180deg, #392719, #24170f 65%, #1b110c);
+      box-shadow:
+        inset 0 2px 0 rgba(255,255,255,.07),
+        inset 0 -5px 0 rgba(0,0,0,.22),
+        0 0 0 4px #140e09;
+      clip-path: var(--pixel-edge);
+    }
+
+    .tabs {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      min-height: 70px;
+      border-bottom: 2px solid var(--bronze-dark);
+      background: rgba(12,8,6,.28);
+    }
+
+    .seal {
+      position: absolute;
+      z-index: 0;
+      left: calc((100% / 4) * var(--tab-index) + (100% / 8) - 24px);
+      bottom: -10px;
+      width: 48px;
+      height: 18px;
+      background: var(--gold);
+      border: 3px solid #5a3c1d;
+      box-shadow: 0 0 12px rgba(223,173,69,.55);
+      clip-path: polygon(12% 0,88% 0,100% 50%,88% 100%,12% 100%,0 50%);
+      transition: left .3s cubic-bezier(.25,.9,.3,1.1);
+    }
+
+    .tab {
+      position: relative;
+      z-index: 1;
+      border: 0;
+      border-right: 2px solid rgba(128,96,58,.52);
+      background: transparent;
+      color: #a99c83;
+      cursor: pointer;
+      display: grid;
+      grid-template-columns: 34px auto;
+      justify-content: center;
+      align-content: center;
+      align-items: center;
+      gap: 9px;
+      min-height: 68px;
+      text-align: left;
+      transition: color .18s, background .18s;
+    }
+    .tab:last-of-type { border-right: 0; }
+    .tab:hover { color: var(--ivory); background: rgba(255,255,255,.035); }
+    .tab:focus-visible { outline: 3px solid var(--gold); outline-offset: -4px; }
+    .tab[aria-selected="true"] { color: var(--sand); background: linear-gradient(180deg, rgba(223,173,69,.12), transparent); }
+    .tab svg { width: 31px; height: 31px; }
+    .tab-copy strong {
+      display: block;
+      font: 700 14px/1 Georgia, "Times New Roman", serif;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+    }
+    .tab-copy small { display: block; margin-top: 4px; color: #8d806c; font-size: 10px; letter-spacing: .04em; }
+    .tab[aria-selected="true"] small { color: #c9b58d; }
+    .badge {
+      position: absolute;
+      top: 9px;
+      right: 16px;
+      min-width: 20px;
+      height: 20px;
+      display: grid;
+      place-items: center;
+      padding: 0 4px;
+      color: #fff2d6;
+      background: var(--danger);
+      border: 2px solid #e1bd71;
+      font-size: 10px;
+      font-weight: 800;
+      transform: rotate(3deg);
+    }
+    .badge.cards-badge { background: #286d69; }
+
+    .context-shell {
+      min-height: 123px;
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: 10px;
+      padding: 13px 14px 14px;
+    }
+
+    .context-note {
+      position: relative;
+      display: grid;
+      align-content: center;
+      padding: 10px 14px 10px 16px;
+      border-right: 2px solid var(--bronze-dark);
+    }
+    .context-note::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      width: 4px;
+      height: 70%;
+      background: var(--mode-color, var(--gold));
+      box-shadow: 0 0 8px color-mix(in srgb, var(--mode-color, var(--gold)), transparent 45%);
+    }
+    .context-note span { color: var(--muted); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+    .context-note strong { margin: 3px 0 5px; color: var(--sand); font: 700 17px/1.15 Georgia, serif; }
+    .context-note p { margin: 0; color: #b9aa91; font-size: 11px; line-height: 1.35; }
+
+    .panel { display: none; min-width: 0; }
+    .panel.active { display: flex; animation: reveal .24s ease-out both; }
+    @keyframes reveal { from { opacity: 0; transform: translateY(7px) } to { opacity: 1; transform: none } }
+
+    .orders {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      align-items: stretch;
+      gap: 7px;
+      overflow-x: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--bronze) transparent;
+    }
+
+    .order {
+      position: relative;
+      flex: 1 0 108px;
+      min-height: 94px;
+      padding: 9px 7px 7px;
+      display: grid;
+      grid-template-rows: 34px auto 20px;
+      justify-items: center;
+      align-items: center;
+      color: var(--ivory);
+      border: 2px solid #5f462d;
+      background: #35271c;
+      box-shadow: inset 1px 1px 0 rgba(255,255,255,.07), inset -3px -3px 0 rgba(0,0,0,.2);
+      clip-path: var(--pixel-edge);
+      cursor: pointer;
+    }
+    .order:hover { border-color: var(--sand); background: #443120; transform: translateY(-2px); }
+    .order:active { transform: translate(1px, 1px); }
+    .order:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+    .order svg { width: 30px; height: 30px; color: var(--mode-color, var(--gold)); }
+    .order strong { font: 700 11px/1.1 Georgia, serif; letter-spacing: .06em; text-align: center; text-transform: uppercase; }
+    .cost { align-self: end; display: flex; gap: 4px; min-height: 18px; color: #d4c7ab; font-size: 10px; }
+    .cost i { width: 12px; height: 12px; border: 1px solid #24170f; background: var(--rc); transform: rotate(45deg); }
+    .cost b { margin-right: 1px; color: #f1d88f; }
+    .order.featured { border-color: #9c743c; background: linear-gradient(180deg, #47321d, #352419); }
+    .order.danger svg { color: #cf6656; }
+    .order.disabled { opacity: .42; filter: grayscale(.35); }
+
+    .hero-panel { gap: 11px; width: 100%; }
+    .hero-card {
+      flex: 0 0 190px;
+      min-height: 94px;
+      display: grid;
+      grid-template-columns: 59px 1fr;
+      gap: 10px;
+      align-items: center;
+      padding: 8px;
+      border: 2px solid #756b8c;
+      background: linear-gradient(135deg, #332c40, #211b2c);
+      box-shadow: inset 0 0 0 2px rgba(226,198,129,.07);
+    }
+    .portrait {
+      position: relative;
+      width: 55px;
+      height: 68px;
+      overflow: hidden;
+      border: 2px solid #c0a96e;
+      background: #4a405b;
+      clip-path: polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px);
+    }
+    .portrait::before {
+      content: "";
+      position: absolute;
+      left: 16px; top: 13px;
+      width: 23px; height: 25px;
+      border-radius: 45% 45% 42% 42%;
+      background: #c58c69;
+      box-shadow: 0 -8px 0 #30221e, -8px 20px 0 3px #6f648f, 8px 20px 0 3px #6f648f;
+    }
+    .portrait::after {
+      content: "";
+      position: absolute;
+      left: 11px; top: 8px;
+      width: 34px; height: 15px;
+      border: 5px solid #d0b66f;
+      border-bottom: 0;
+      clip-path: polygon(0 100%,10% 0,30% 48%,50% 0,70% 48%,90% 0,100% 100%);
+    }
+    .hero-data strong { display: block; color: #e5d4a6; font: 700 14px Georgia, serif; }
+    .hero-data span { color: #aaa0b6; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+    .hp { height: 7px; margin-top: 8px; border: 1px solid #312420; background: #241815; }
+    .hp i { display: block; width: 72%; height: 100%; background: #b34d48; box-shadow: inset 0 1px 0 rgba(255,255,255,.25); }
+    .hero-data small { display: block; margin-top: 3px; color: #dbc6b5; font-size: 9px; }
+
+    .card-panel { align-items: center; gap: 14px; width: 100%; }
+    .deck {
+      flex: 0 0 64px;
+      height: 82px;
+      position: relative;
+      border: 2px solid #cbb781;
+      background: #1d5553;
+      box-shadow: 4px 4px 0 #143b3a, 7px 7px 0 #c5b279;
+      display: grid;
+      place-items: center;
+      color: #efe2bf;
+      font: 700 18px Georgia, serif;
+    }
+    .deck::before { content:""; width: 29px; height: 36px; border: 2px solid #bfa96f; transform: rotate(45deg); }
+    .deck span { position: absolute; bottom: -18px; font-size: 9px; letter-spacing: .1em; }
+    .hand-cards { display: flex; min-width: 0; align-items: center; padding-left: 8px; }
+    .tactic {
+      width: 94px;
+      height: 92px;
+      margin-left: -8px;
+      padding: 8px 7px;
+      position: relative;
+      border: 2px solid #c7b47d;
+      background: linear-gradient(145deg, #f0e4c7 0 32%, #d7c49a 33% 100%);
+      color: #30251a;
+      box-shadow: 3px 4px 0 rgba(0,0,0,.34);
+      transform: rotate(var(--tilt));
+      transition: transform .18s;
+      cursor: pointer;
+      clip-path: var(--pixel-edge);
+    }
+    .tactic:hover { transform: rotate(0) translateY(-8px); z-index: 3; }
+    .tactic b { display:block; color:#654631; font:700 10px/1.1 Georgia,serif; text-transform:uppercase; }
+    .tactic small { display:block; margin-top:5px; font-size:9px; line-height:1.2; }
+    .tactic svg { position:absolute; right:6px; bottom:5px; width:22px; color:#8e3f35; }
+
+    .universal {
+      position: absolute;
+      z-index: 22;
+      right: 18px;
+      bottom: 28px;
+      width: 150px;
+      display: grid;
+      grid-template-columns: 1fr 48px;
+      gap: 7px;
+    }
+    .primary-action,
+    .utility {
+      min-height: 48px;
+      border: 2px solid var(--bronze);
+      color: var(--ivory);
+      background: #2b1d13;
+      box-shadow: inset 1px 1px 0 rgba(255,255,255,.08), 3px 4px 0 rgba(0,0,0,.36);
+      clip-path: var(--pixel-edge);
+      cursor: pointer;
+    }
+    .primary-action {
+      grid-column: 1 / -1;
+      min-height: 62px;
+      display: grid;
+      grid-template-columns: 40px 1fr;
+      align-items: center;
+      padding: 8px 12px;
+      color: #24180c;
+      border-color: #f0cb6b;
+      background: linear-gradient(180deg,#e1b751,#b87e27);
+    }
+    .primary-action svg { width: 34px; }
+    .primary-action strong { display:block; font:700 13px Georgia,serif; text-transform:uppercase; letter-spacing:.08em; }
+    .primary-action small { font-size:10px; }
+    .primary-action:hover { filter: brightness(1.12); }
+    .utility { display:grid; place-items:center; gap:2px; padding:4px; font-size:9px; text-transform:uppercase; }
+    .utility svg { width:22px; height:22px; color:var(--sand); }
+    .utility:hover { border-color:var(--sand); background:#3c2b1d; }
+
+    .map-caption {
+      position: absolute;
+      z-index: 7;
+      left: 20px;
+      bottom: 22px;
+      color: rgba(239,225,190,.58);
+      font: 11px Georgia, serif;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    svg { fill: currentColor; stroke: currentColor; stroke-linecap: square; stroke-linejoin: miter; }
+    .stroke { fill: none; stroke-width: 1.8; }
+
+    @media (max-width: 1040px) {
+      .command-wrap { width: calc(100% - 190px); }
+      .context-shell { grid-template-columns: 156px 1fr; }
+      .context-note p { display: none; }
+      .tab-copy small { display:none; }
+      .resource-strip .resource:nth-last-child(-n+2) { display:none; }
+    }
+
+    @media (max-width: 720px) {
+      body { overflow: hidden; }
+      .hud { top: 8px; left: 8px; right: 8px; }
+      .status-ribbon { min-height: 40px; padding: 0 8px; gap: 8px; }
+      .resource-strip { gap: 6px; }
+      .resource-strip .resource:nth-child(n+4) { display:none; }
+      .round-ribbon { padding: 0 8px; min-height: 40px; }
+      .round-ribbon .round-copy span { display:none; }
+      .ruler span { display:none; }
+      .coast { width: 105%; height: 83%; top: -10%; }
+      .hex-field { inset: 2% -48% 28% -28%; transform: rotate(-4deg) scale(.82); }
+      .command-wrap {
+        left: 8px;
+        right: 8px;
+        bottom: 74px;
+        width: auto;
+        transform: none;
+      }
+      .tabs { min-height: 63px; }
+      .tab {
+        min-width: 0;
+        min-height: 62px;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        text-align: center;
+      }
+      .tab svg { width: 25px; height: 25px; }
+      .tab-copy strong { font-size: 11px; letter-spacing: .06em; }
+      .tab-copy small { display:none; }
+      .badge { top:4px; right:5px; min-width:18px; height:18px; border-width:1px; }
+      .seal { width:40px; left:calc((100% / 4) * var(--tab-index) + (100% / 8) - 20px); }
+      .context-shell { min-height: 142px; display:block; padding:10px 8px 9px; }
+      .context-note { min-height: 34px; padding: 2px 8px 7px 12px; border-right:0; border-bottom:1px solid #4a3422; }
+      .context-note::before { height:72%; width:3px; }
+      .context-note span, .context-note p { display:none; }
+      .context-note strong { font-size:14px; margin:0; }
+      .panel.active { margin-top:8px; }
+      .orders { gap:6px; padding-bottom:2px; }
+      .order { flex-basis:82px; min-height:90px; padding:6px 5px; grid-template-rows:30px auto 18px; }
+      .order svg { width:27px; height:27px; }
+      .order strong { font-size:10px; }
+      .hero-card { flex-basis:155px; grid-template-columns:47px 1fr; gap:7px; }
+      .portrait { width:45px; height:61px; }
+      .portrait::before { left:11px; }
+      .portrait::after { left:6px; }
+      .card-panel { overflow-x:auto; padding-bottom:4px; }
+      .deck { flex-basis:54px; width:54px; height:72px; }
+      .tactic { width:82px; height:86px; flex:0 0 82px; }
+      .universal {
+        position:absolute;
+        left:8px;
+        right:8px;
+        bottom:8px;
+        width:auto;
+        grid-template-columns:1fr 52px 52px;
+        gap:6px;
+      }
+      .primary-action { grid-column:auto; min-height:54px; grid-template-columns:34px 1fr; padding:5px 10px; }
+      .primary-action svg { width:29px; }
+      .utility { min-height:54px; }
+      .map-caption { display:none; }
+    }
+
+    @media (max-width: 390px) {
+      .command-wrap { bottom:68px; }
+      .context-shell { min-height:138px; }
+      .tab-copy strong { font-size:10px; }
+      .resource-strip .resource:nth-child(n+3) { display:none; }
+      .status-ribbon { gap:6px; }
+      .context-note { min-height:30px; }
+      .order { min-height:86px; flex-basis:79px; }
+      .order strong { font-size:9px; }
+      .universal { bottom:7px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration:.01ms !important; transition-duration:.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" aria-hidden="true" style="position:absolute">
+    <symbol id="i-hammer" viewBox="0 0 32 32"><path d="M5 26 18 13l3 3L8 29H5z"/><path d="m12 7 7-4 10 10-4 7-5-5-3 2-7-7 3-2z"/></symbol>
+    <symbol id="i-army" viewBox="0 0 32 32"><path d="M9 28V15c0-6 3-11 7-13 4 2 7 7 7 13v13z"/><path d="M8 16h16M13 11h6" class="stroke" style="stroke:#24160f"/></symbol>
+    <symbol id="i-hero" viewBox="0 0 32 32"><path d="M16 3 20 8l6-2-2 8 3 4-4 11H9L5 18l3-4-2-8 6 2z"/><path d="M11 17h10M13 12v2m6-2v2" class="stroke" style="stroke:#24160f"/></symbol>
+    <symbol id="i-cards" viewBox="0 0 32 32"><path d="m4 7 17-3 4 22-17 3z" opacity=".65"/><path d="M10 3h18v23H10z"/><path d="m19 8 4 6-4 7-4-7z" style="fill:#e1c87f;stroke:none"/></symbol>
+    <symbol id="i-road" viewBox="0 0 32 32"><path d="M3 26 25 5l5 4L8 30z"/><path d="m10 24 4-4m3-3 4-4m3-3 3-3" class="stroke" style="stroke:#f0d79c"/></symbol>
+    <symbol id="i-house" viewBox="0 0 32 32"><path d="M4 15 16 4l12 11v14H4z"/><path d="M13 29v-9h7v9" style="fill:#342318;stroke:none"/></symbol>
+    <symbol id="i-city" viewBox="0 0 32 32"><path d="M3 29V14l7-7 6 6 5-5 8 7v14z"/><path d="M8 20h4v4H8zm12 0h4v4h-4z" style="fill:#342318;stroke:none"/></symbol>
+    <symbol id="i-tower" viewBox="0 0 32 32"><path d="M8 29V10h16v19zM6 10V3h5v4h3V3h4v4h3V3h5v7z"/><path d="M14 18h4v7h-4z" style="fill:#342318;stroke:none"/></symbol>
+    <symbol id="i-palace" viewBox="0 0 32 32"><path d="M4 29V12l5 5 7-13 7 13 5-5v17z"/><path d="M9 23h14v3H9z" style="fill:#342318;stroke:none"/></symbol>
+    <symbol id="i-bow" viewBox="0 0 32 32"><path d="M8 3q21 13 0 26M8 3v26M3 16h25m-5-4 5 4-5 4" class="stroke"/><path d="M6 14h4v4H6z"/></symbol>
+    <symbol id="i-group" viewBox="0 0 32 32"><path d="M4 27V16l6-6 6 6v11zm12 0V11l6-6 6 6v16z"/><path d="M7 17h6m6-5h6" class="stroke" style="stroke:#2c1c13"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 32 32"><path d="M5 5h22v10c0 7-5 12-11 15C10 27 5 22 5 15z"/><path d="M16 7v19M8 14h16" class="stroke" style="stroke:#2c1c13"/></symbol>
+    <symbol id="i-compass" viewBox="0 0 32 32"><circle cx="16" cy="16" r="12" class="stroke"/><path d="m20 9-2 9-6 5 2-9z"/></symbol>
+    <symbol id="i-rest" viewBox="0 0 32 32"><path d="M4 21h24v6H4zM7 12h7c4 0 6 3 6 7H7z"/><circle cx="10" cy="10" r="4"/></symbol>
+    <symbol id="i-skill" viewBox="0 0 32 32"><path d="M16 2 20 12l10 4-10 4-4 10-4-10-10-4 10-4z"/><circle cx="16" cy="16" r="3" style="fill:#31243b;stroke:none"/></symbol>
+    <symbol id="i-pack" viewBox="0 0 32 32"><path d="M7 10h18v19H7zM11 10V6c0-3 10-3 10 0v4"/><path d="M10 17h12" class="stroke" style="stroke:#31243b"/></symbol>
+    <symbol id="i-dice" viewBox="0 0 32 32"><rect x="3" y="3" width="26" height="26" rx="2"/><circle cx="10" cy="10" r="2" style="fill:#37240e;stroke:none"/><circle cx="22" cy="10" r="2" style="fill:#37240e;stroke:none"/><circle cx="16" cy="16" r="2" style="fill:#37240e;stroke:none"/><circle cx="10" cy="22" r="2" style="fill:#37240e;stroke:none"/><circle cx="22" cy="22" r="2" style="fill:#37240e;stroke:none"/></symbol>
+    <symbol id="i-trade" viewBox="0 0 32 32"><path d="M4 9h21l-5-5m5 5-5 5M28 23H7l5 5m-5-5 5-5" class="stroke"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 32 32"><path d="M5 8h22M5 16h22M5 24h22" class="stroke"/></symbol>
+    <symbol id="i-sword" viewBox="0 0 32 32"><path d="m25 3 4 4-15 15-4-4zM8 18l6 6-3 3-6-6zM4 25l3 3-4 1z"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 32 32"><circle cx="16" cy="16" r="6"/><path d="M16 2v5m0 18v5M2 16h5m18 0h5M6 6l4 4m12 12 4 4M26 6l-4 4M10 22l-4 4" class="stroke"/></symbol>
+  </svg>
+
+  <main class="game-shell">
+    <section class="map" aria-label="Stilisierte Spielkarte">
+      <div class="coast"></div>
+      <div class="hex-field" aria-hidden="true">
+        <i class="hex h1"></i><i class="hex h2"></i><i class="hex h3"></i><i class="hex h4"></i><i class="hex h5"></i><i class="hex h6"></i><i class="hex h7"></i>
+        <i class="hex h8"></i><i class="hex h9"></i><i class="hex h10"></i><i class="hex h11"></i><i class="hex h12"></i><i class="hex h13"></i><i class="hex h14"></i>
+        <i class="road r1"></i><i class="road r2"></i><i class="road r3"></i>
+        <i class="city c1"></i><i class="city c2"></i>
+        <i class="army-marker a1"><svg><use href="#i-sword"/></svg></i>
+        <i class="army-marker a2"><svg><use href="#i-hero"/></svg></i>
+      </div>
+    </section>
+
+    <header class="hud">
+      <div class="status-ribbon">
+        <div class="crest">M</div>
+        <div class="ruler"><strong>Mago</strong><span>10 Siegpunkte · dein Zug</span></div>
+        <div class="resource-strip" aria-label="Rohstoffe">
+          <span class="resource"><i style="--rc:#6a8b45"></i>6</span>
+          <span class="resource"><i style="--rc:#e1ca82"></i>4</span>
+          <span class="resource"><i style="--rc:#dbb23f"></i>7</span>
+          <span class="resource"><i style="--rc:#b85d3d"></i>3</span>
+          <span class="resource"><i style="--rc:#87909a"></i>2</span>
+        </div>
+      </div>
+      <div class="round-ribbon">
+        <div class="round-copy"><strong>Runde 18</strong><span>Spätsommer · Tag</span></div>
+        <svg class="weather"><use href="#i-sun"/></svg>
+      </div>
+    </header>
+
+    <p class="map-caption">Westliches Grenzland · Provinz Thapsus</p>
+
+    <section class="command-wrap" aria-label="Kommandotafel">
+      <div class="command-board">
+        <nav class="tabs" role="tablist" aria-label="Aktionsbereiche">
+          <i class="seal" aria-hidden="true"></i>
+          <button class="tab" type="button" role="tab" aria-selected="true" aria-controls="panel-build" data-mode="build">
+            <svg><use href="#i-hammer"/></svg><span class="tab-copy"><strong>Bauen</strong><small>Reich &amp; Wege</small></span>
+          </button>
+          <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-army" data-mode="army">
+            <svg><use href="#i-army"/></svg><span class="tab-copy"><strong>Heer</strong><small>Truppen &amp; Befehle</small></span><span class="badge">3</span>
+          </button>
+          <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-hero" data-mode="hero">
+            <svg><use href="#i-hero"/></svg><span class="tab-copy"><strong>Held</strong><small>Reise &amp; Ausrüstung</small></span>
+          </button>
+          <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-cards" data-mode="cards">
+            <svg><use href="#i-cards"/></svg><span class="tab-copy"><strong>Karten</strong><small>Hand &amp; Taktik</small></span><span class="badge cards-badge">5</span>
+          </button>
+        </nav>
+
+        <div class="context-shell" style="--mode-color:var(--build)">
+          <aside class="context-note" aria-live="polite">
+            <span id="context-kicker">Bauordnung</span>
+            <strong id="context-title">Reich erweitern</strong>
+            <p id="context-copy">Wähle ein Bauwerk und danach den markierten Platz auf der Karte.</p>
+          </aside>
+
+          <section class="panel active" id="panel-build" role="tabpanel" data-panel="build">
+            <div class="orders">
+              <button class="order" style="--mode-color:var(--build)"><svg><use href="#i-road"/></svg><strong>Straße</strong><span class="cost"><b>1</b><i style="--rc:#6a8b45"></i><b>1</b><i style="--rc:#b85d3d"></i></span></button>
+              <button class="order" style="--mode-color:var(--build)"><svg><use href="#i-house"/></svg><strong>Dorf</strong><span class="cost"><b>1</b><i style="--rc:#6a8b45"></i><b>1</b><i style="--rc:#e1ca82"></i><b>2</b><i style="--rc:#b85d3d"></i></span></button>
+              <button class="order" style="--mode-color:var(--build)"><svg><use href="#i-city"/></svg><strong>Stadt</strong><span class="cost"><b>2</b><i style="--rc:#dbb23f"></i><b>3</b><i style="--rc:#87909a"></i></span></button>
+              <button class="order" style="--mode-color:var(--build)"><svg><use href="#i-tower"/></svg><strong>Turm</strong><span class="cost"><b>2</b><i style="--rc:#b85d3d"></i><b>1</b><i style="--rc:#87909a"></i></span></button>
+              <button class="order featured" style="--mode-color:var(--gold)"><svg><use href="#i-palace"/></svg><strong>Reichsbau</strong><span class="cost">3 verfügbar</span></button>
+            </div>
+          </section>
+
+          <section class="panel" id="panel-army" role="tabpanel" data-panel="army" hidden>
+            <div class="orders">
+              <button class="order" style="--mode-color:var(--army)"><svg><use href="#i-army"/></svg><strong>Ritter anwerben</strong><span class="cost"><b>1</b><i style="--rc:#e1ca82"></i><b>1</b><i style="--rc:#87909a"></i></span></button>
+              <button class="order" style="--mode-color:var(--army)"><svg><use href="#i-bow"/></svg><strong>Bogen anwerben</strong><span class="cost"><b>1</b><i style="--rc:#6a8b45"></i><b>1</b><i style="--rc:#e1ca82"></i></span></button>
+              <button class="order featured" style="--mode-color:var(--army)"><svg><use href="#i-group"/></svg><strong>Schar befehligen</strong><span class="cost">3 untätig</span></button>
+              <button class="order" style="--mode-color:var(--army)"><svg><use href="#i-shield"/></svg><strong>Haltung</strong><span class="cost">Schildwall</span></button>
+            </div>
+          </section>
+
+          <section class="panel hero-panel" id="panel-hero" role="tabpanel" data-panel="hero" hidden>
+            <article class="hero-card">
+              <div class="portrait" aria-hidden="true"></div>
+              <div class="hero-data"><strong>Hanno</strong><span>Erkunder · Stufe 3</span><div class="hp"><i></i></div><small>7 / 10 Leben</small></div>
+            </article>
+            <div class="orders">
+              <button class="order" style="--mode-color:var(--hero)"><svg><use href="#i-compass"/></svg><strong>Erkunden</strong><span class="cost">2 Bewegung</span></button>
+              <button class="order" style="--mode-color:var(--hero)"><svg><use href="#i-rest"/></svg><strong>Rasten</strong><span class="cost">+2 Leben</span></button>
+              <button class="order featured" style="--mode-color:var(--hero)"><svg><use href="#i-skill"/></svg><strong>Pfadfinder</strong><span class="cost">bereit</span></button>
+              <button class="order" style="--mode-color:var(--hero)"><svg><use href="#i-pack"/></svg><strong>Ausrüstung</strong><span class="cost">2 / 3 Plätze</span></button>
+            </div>
+          </section>
+
+          <section class="panel card-panel" id="panel-cards" role="tabpanel" data-panel="cards" hidden>
+            <div class="deck" aria-label="Nachziehstapel, 12 Karten">12<span>STAPEL</span></div>
+            <div class="hand-cards" aria-label="Kartenhand">
+              <button class="tactic" style="--tilt:-4deg"><b>Heilkräuter</b><small>Held heilt 2 Leben.</small><svg><use href="#i-rest"/></svg></button>
+              <button class="tactic" style="--tilt:2deg"><b>Schlachtruf</b><small>Eine Schar erhält +1 Angriff.</small><svg><use href="#i-sword"/></svg></button>
+              <button class="tactic" style="--tilt:-1deg"><b>Schildwall</b><small>+1 Deckung, keine Bewegung.</small><svg><use href="#i-shield"/></svg></button>
+              <button class="tactic" style="--tilt:4deg"><b>Späher</b><small>Decke zwei Grenzfelder auf.</small><svg><use href="#i-compass"/></svg></button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <aside class="universal" aria-label="Universelle Aktionen">
+      <button class="primary-action"><svg><use href="#i-dice"/></svg><span><strong>Zug beenden</strong><small>Heere ziehen danach</small></span></button>
+      <button class="utility"><svg><use href="#i-trade"/></svg><span>Handel</span></button>
+      <button class="utility"><svg><use href="#i-menu"/></svg><span>Menü</span></button>
+    </aside>
+  </main>
+
+  <script>
+    const tabs = [...document.querySelectorAll('[role="tab"]')];
+    const panels = [...document.querySelectorAll('[role="tabpanel"]')];
+    const shell = document.querySelector('.context-shell');
+    const copy = {
+      build: ['Bauordnung', 'Reich erweitern', 'Wähle ein Bauwerk und danach den markierten Platz auf der Karte.', 'var(--build)'],
+      army: ['Heerbefehl', 'Truppen führen', 'Wirb Einheiten an, bilde Scharen und lege ihre Haltung fest.', 'var(--army)'],
+      hero: ['Persönlicher Zug', 'Hannos Reise', 'Erkunde Ruinen, erhole dich oder nutze eine Heldenfähigkeit.', 'var(--hero)'],
+      cards: ['Taktikhand', 'Befehl ausspielen', 'Karten verändern den nächsten Kampf oder stärken deine Expedition.', 'var(--cards)']
+    };
+
+    function selectTab(tab, focus = false) {
+      const mode = tab.dataset.mode;
+      const index = tabs.indexOf(tab);
+      document.documentElement.style.setProperty('--tab-index', index);
+      tabs.forEach(item => item.setAttribute('aria-selected', String(item === tab)));
+      panels.forEach(panel => {
+        const active = panel.dataset.panel === mode;
+        panel.hidden = !active;
+        panel.classList.toggle('active', active);
+      });
+      const [kicker, title, description, color] = copy[mode];
+      document.querySelector('#context-kicker').textContent = kicker;
+      document.querySelector('#context-title').textContent = title;
+      document.querySelector('#context-copy').textContent = description;
+      shell.style.setProperty('--mode-color', color);
+      if (focus) tab.focus();
+    }
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => selectTab(tab));
+      tab.addEventListener('keydown', event => {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        event.preventDefault();
+        const here = tabs.indexOf(tab);
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (here + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+        selectTab(tabs[next], true);
+      });
+    });
+  </script>
+</body>
+</html>

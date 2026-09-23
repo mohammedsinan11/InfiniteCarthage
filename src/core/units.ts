@@ -312,6 +312,84 @@ export function nextStep(
   return null;
 }
 
+/**
+ * Der GANZE Weg zu einem Ziel - dieselbe Suche wie nextStep, nur bis zum Ende
+ * zurueckverfolgt. Ohne das Startfeld; leer, wenn die Einheit schon dort steht;
+ * null, wenn kein Landweg in Reichweite liegt oder das Ziel Wasser ist.
+ *
+ * Bewusst dieselben Regeln wie nextStep, das der Server zum Ziehen benutzt
+ * (rules/army.ts, schreite): der Client zeichnet damit die Wegvorschau, und
+ * sie darf nichts versprechen, was der Server danach anders rechnet.
+ */
+export function wegNach(seed: number, from: Hex, ziel: Hex, maxKnoten = 2500): Hex[] | null {
+  const start = hexKey(from.q, from.r);
+  const zk = hexKey(ziel.q, ziel.r);
+  if (start === zk) return [];
+  if (!isLandAt(seed, ziel.q, ziel.r)) return null;
+
+  const herkunft = new Map<string, string>();
+  herkunft.set(start, '');
+  const warte: Hex[] = [{ q: from.q, r: from.r }];
+  for (let i = 0; i < warte.length && herkunft.size <= maxKnoten; i++) {
+    const h = warte[i]!;
+    const hk = hexKey(h.q, h.r);
+    for (const n of neighbors(h.q, h.r)) {
+      const k = hexKey(n.q, n.r);
+      if (herkunft.has(k)) continue;
+      if (!isLandAt(seed, n.q, n.r)) continue;
+      herkunft.set(k, hk);
+      if (k === zk) {
+        const weg: Hex[] = [];
+        let cur = k;
+        while (cur !== start) {
+          const [cq, cr] = cur.split(':').map(Number);
+          weg.unshift({ q: cq!, r: cr! });
+          cur = herkunft.get(cur)!;
+        }
+        return weg;
+      }
+      warte.push(n);
+    }
+  }
+  return null;
+}
+
+/**
+ * Wie viele Schritte jedes erreichbare Feld kostet: Feldschluessel -> Schritte.
+ * Das Startfeld steht mit 0 darin.
+ *
+ * Damit faerbt der Client ein, wie weit eine Einheit kommt. maxSchritte 0 gibt
+ * nur das eigene Feld - der Fall im Schnee, wo in geraden Runden niemand zieht
+ * (core/zeit.ts, einheitenRasten).
+ */
+export function reichweite(
+  seed: number,
+  from: Hex,
+  maxSchritte: number,
+  maxKnoten = 2500,
+): Map<string, number> {
+  const out = new Map<string, number>();
+  out.set(hexKey(from.q, from.r), 0);
+  if (maxSchritte <= 0) return out;
+
+  let rand: Hex[] = [{ q: from.q, r: from.r }];
+  for (let schritt = 1; schritt <= maxSchritte && out.size <= maxKnoten; schritt++) {
+    const naechste: Hex[] = [];
+    for (const h of rand) {
+      for (const n of neighbors(h.q, h.r)) {
+        const k = hexKey(n.q, n.r);
+        if (out.has(k)) continue;
+        if (!isLandAt(seed, n.q, n.r)) continue;
+        out.set(k, schritt);
+        naechste.push(n);
+      }
+    }
+    if (naechste.length === 0) break;
+    rand = naechste;
+  }
+  return out;
+}
+
 /** Wie weit ein neuer Ritter nach Gefahr Ausschau haelt. */
 const AUSSCHAU = 8;
 

@@ -37,7 +37,7 @@ import { hexCornerPixel } from '../../core/coords';
 import { reliefLimitedAt } from '../../core/relief';
 import { edgeAdjacentHexes, vertexAdjacentHexes } from '../../core/coords';
 import { edgeKey, hexEdges, hexVertices, vertexKey } from '../../core/coords';
-import { garrisonOf, garrisonUnits, isNestActive, nestFraktionOf } from '../../core/units';
+import { garrisonOf, garrisonUnits, isNestActive, nestFraktionOf, wegNach } from '../../core/units';
 import type { Unit } from '../../core/units';
 import { heldKurz, heldVoll } from '../../core/lore';
 import { istSpielerSeite, istKampf, kampfFelder, seiteVon, spielerAus } from '../../core/combat';
@@ -224,6 +224,13 @@ export type Targets = {
   vertices?: string[];
   edges?: string[];
   hexes?: string[];
+  /**
+   * Wie weit die gewaehlten Einheiten kommen (core/units.ts, reichweite):
+   * Feldschluessel und in wie vielen Runden sie dort ankommen. runden 1 heisst
+   * noch in dieser Runde. Nur zum Zeigen - geklickt wird das Feld wie sonst
+   * auch, auch ausserhalb.
+   */
+  reich?: { key: string; runden: number }[];
 };
 
 /** Eine kleine Tafel am Gebaeude oder an der Krone: was sich dort ausbauen laesst. */
@@ -522,6 +529,25 @@ export function Board({
     [liftHex],
   );
 
+  /**
+   * Das Sechseck eines Feldes als SVG-Punkte, auf seiner eigenen Hoehe.
+   *
+   * Stand dreimal wortgleich im JSX (Aufleuchten, Krone, Zielfeld) - jetzt
+   * einmal hier, damit alle Markierungen deckungsgleich sitzen.
+   */
+  const hexPunkte = useCallback(
+    (q: number, r: number) => {
+      const hoch = liftHex(q, r);
+      return [0, 1, 2, 3, 4, 5]
+        .map((i) => {
+          const p = hexCornerPixel(q, r, i, LAYOUT);
+          return `${p.x.toFixed(1)},${(p.y - hoch).toFixed(1)}`;
+        })
+        .join(' ');
+    },
+    [liftHex],
+  );
+
   /** Wo ein Feuer auf der Karte steht, in Welteinheiten: Mitte der Strasse oder die Ecke. */
   const brandPunkt = useCallback(
     (b: Brand): { x: number; y: number } => {
@@ -733,6 +759,23 @@ export function Board({
 
   /** Wo gekaempft wird - dieselbe Frage, nach der die Regel kaempfen laesst. */
   const kampf = useMemo(() => kampfFelder(state), [state]);
+
+  /**
+   * Der Weg von der gewaehlten Einheit zum Feld unter dem Zeiger.
+   *
+   * Dieselbe Suche, mit der der Server zieht (core/units.ts, wegNach) - die
+   * Vorschau darf nichts anderes zeigen als das, was danach geschieht. Auf dem
+   * Handy gibt es kein Darueberfahren; dort traegt die Reichweitenfaerbung.
+   */
+  const wegVorschau = useMemo(() => {
+    if (!zielWahl || hover === null || auswahl.length === 0) return null;
+    const start = state.units.find((u) => u.id === auswahl[0]);
+    if (!start) return null;
+    const [hq, hr] = hover.split(':').map(Number) as [number, number];
+    const weg = wegNach(state.worldSeed, { q: start.q, r: start.r }, { q: hq, r: hr });
+    if (weg === null || weg.length === 0) return null;
+    return [{ q: start.q, r: start.r }, ...weg];
+  }, [zielWahl, hover, auswahl, state.units, state.worldSeed]);
 
   /**
    * Was auf dem Feld unter dem Zeiger steht, in Worten: Lager, Ruine, Einheiten
@@ -2415,6 +2458,44 @@ export function Board({
           });
         })()}
 
+        {/*
+          Wie weit die gewaehlten Einheiten kommen (core/units.ts, reichweite).
+          Diese Runde erreichbar: helles Feld. Spaeter erreichbar: blass, mit
+          der Zahl der Runden - so sieht man, dass ein Ziel zwar zu haben ist,
+          aber dauert. Geklickt werden darf trotzdem ueberallhin.
+        */}
+        {(targets.reich ?? []).map((z) => {
+          const [zq, zr] = z.key.split(':').map(Number) as [number, number];
+          const c = hexToPixel(zq, zr, LAYOUT);
+          return (
+            <g key={'reich' + z.key} pointerEvents="none">
+              <polygon
+                className={z.runden <= 1 ? 'hex-reich' : 'hex-reich spaeter'}
+                points={hexPunkte(zq, zr)}
+              />
+              {z.runden > 1 && (
+                <text x={c.x} y={c.y - liftHex(zq, zr) + 4} className="reich-runden">
+                  {z.runden}
+                </text>
+              )}
+            </g>
+          );
+        })}
+
+        {/* Der Weg dorthin, solange ein Befehl sein Ziel sucht. */}
+        {wegVorschau !== null && (
+          <polyline
+            className="weg-vorschau"
+            pointerEvents="none"
+            points={wegVorschau
+              .map((h) => {
+                const p = hexToPixel(h.q, h.r, LAYOUT);
+                return `${p.x.toFixed(1)},${(p.y - liftHex(h.q, h.r)).toFixed(1)}`;
+              })
+              .join(' ')}
+          />
+        )}
+
         {/* Waehrend ein Befehl sein Ziel sucht: das Feld unter dem Zeiger. */}
         {zielWahl &&
           hover !== null &&
@@ -2517,13 +2598,29 @@ export function Board({
           const links = Math.min(Math.max(sx, halb + 8), size.w - halb - 8);
           const unten = (wyOben - view.y) * scale < TAFEL_HOEHE + 40;
           return (
+            /*
+              Waehrend der Zielwahl darf die Tafel NICHT ueber der Karte
+              schweben: sie klappt nach oben aus und deckte damit genau die
+              zwei bis drei Kachelreihen ab, auf die man als naechstes zielt.
+              Dann dockt sie unten an den Brettrand.
+            */
             <div
-              className={unten ? 'ausbau-tafel befehls-tafel nach-unten' : 'ausbau-tafel befehls-tafel'}
-              style={{
-                left: links,
-                top: ((unten ? wyUnten : wyOben) - view.y) * scale,
-                ['--zipfel' as string]: `${Math.round(sx - links)}px`,
-              }}
+              className={
+                zielWahl
+                  ? 'ausbau-tafel befehls-tafel angedockt'
+                  : unten
+                    ? 'ausbau-tafel befehls-tafel nach-unten'
+                    : 'ausbau-tafel befehls-tafel'
+              }
+              style={
+                zielWahl
+                  ? undefined
+                  : {
+                      left: links,
+                      top: ((unten ? wyUnten : wyOben) - view.y) * scale,
+                      ['--zipfel' as string]: `${Math.round(sx - links)}px`,
+                    }
+              }
             >
               {befehlsTafel.inhalt}
             </div>

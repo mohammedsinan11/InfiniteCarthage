@@ -21,7 +21,7 @@
 import { Rng } from '../rng';
 import { hash3i } from '../hash';
 import { CARDS } from './catalog';
-import { RARITY_WEIGHTS } from './types';
+import { RARITY_WEIGHTS, istEinzigartig } from './types';
 import type { Card, DraftSource, Rarity } from './types';
 
 const SALT_DRAFT = 61;
@@ -36,9 +36,11 @@ const QUELLE_ZU_ZAHL: Record<DraftSource, number> = {
 };
 
 /** Eine Seltenheitsstufe nach den Gewichten der Quelle ziehen. */
-function ziehStufe(rng: Rng, source: DraftSource): Rarity | null {
+function ziehStufe(rng: Rng, source: DraftSource, erlaubt?: ReadonlySet<Rarity>): Rarity | null {
   const gewichte = RARITY_WEIGHTS[source];
-  const stufen = (Object.keys(gewichte) as Rarity[]).filter((r) => gewichte[r] > 0);
+  const stufen = (Object.keys(gewichte) as Rarity[]).filter(
+    (r) => gewichte[r] > 0 && (erlaubt === undefined || erlaubt.has(r)),
+  );
   const summe = stufen.reduce((n, r) => n + gewichte[r], 0);
   if (summe === 0) return null;
 
@@ -61,28 +63,22 @@ export function draftOptions(
   secretSeed: number,
   turn: number,
   source: DraftSource,
+  /** Bereits besessene einzigartige Karten werden nicht erneut angeboten. */
+  owned: readonly string[] = [],
 ): string[] {
   const rng = new Rng(hash3i(secretSeed, turn, QUELLE_ZU_ZAHL[source], SALT_DRAFT));
-  const gewaehlt: string[] = [];
-
-  for (let i = 0; i < DRAFT_SIZE; i++) {
-    let karte: Card | undefined;
-    // Mehrere Anlaeufe, um eine noch nicht gezogene Karte zu finden.
-    for (let versuch = 0; versuch < 12 && !karte; versuch++) {
-      const stufe = ziehStufe(rng, source);
-      if (stufe === null) break;
-      const passend = CARDS.filter(
-        (c) => c.rarity === stufe && !gewaehlt.includes(c.id),
-      );
-      if (passend.length > 0) karte = passend[rng.int(passend.length)];
-    }
-    // Notnagel: irgendeine noch nicht gewaehlte Karte.
-    if (!karte) {
-      const rest = CARDS.filter((c) => !gewaehlt.includes(c.id));
-      karte = rest.length > 0 ? rest[rng.int(rest.length)] : CARDS[rng.int(CARDS.length)];
-    }
-    if (karte) gewaehlt.push(karte.id);
+  const besitzt = new Set(owned);
+  const verfuegbar = CARDS.filter((c) => !istEinzigartig(c) || !besitzt.has(c.id));
+  const stufen = new Set<Rarity>();
+  for (const r of Object.keys(RARITY_WEIGHTS[source]) as Rarity[]) {
+    if (verfuegbar.filter((c) => c.rarity === r).length >= DRAFT_SIZE) stufen.add(r);
   }
 
-  return gewaehlt;
+  // Eine Seltenheit fuer die ganze Auslage: drei echte Alternativen statt
+  // einer offensichtlichen legendaer-gegen-ungewoehnlich-Entscheidung.
+  const stufe = ziehStufe(rng, source, stufen);
+  const passend: Card[] = stufe === null
+    ? verfuegbar
+    : verfuegbar.filter((c) => c.rarity === stufe);
+  return rng.shuffle([...passend]).slice(0, DRAFT_SIZE).map((c) => c.id);
 }

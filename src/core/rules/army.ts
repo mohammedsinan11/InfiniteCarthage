@@ -150,6 +150,16 @@ const ERKUNDUNG_RADIUS = 3;
 const ERKUNDUNG_HELD = 4;
 /** Felder je Runde fuer den Helden und sein Gefolge. */
 export const HELD_SCHRITTE = 2;
+
+/**
+ * Wie viele Felder diese Einheit in EINER Runde zieht (siehe schreite).
+ *
+ * Der Held zieht zwei, sein Gefolge auch - wer mit ihm geht, haelt Schritt.
+ * Alle anderen eins. Der Client zeigt damit die Reichweite an; die Regel steht
+ * hier, damit Anzeige und Zug nicht auseinanderlaufen koennen.
+ */
+export const schritteFuer = (kind: UnitKind, mitHeld = false): number =>
+  kind === 'held' || mitHeld ? HELD_SCHRITTE : 1;
 /**
  * DIE NACHT. Mit ihrem Beginn kriechen Schleime aus dem Dunkel: je Spieler
  * einige, in Abstand SCHLEIM_ABSTAND zu seinen Siedlungen, also ausserhalb der
