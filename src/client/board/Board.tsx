@@ -811,6 +811,24 @@ export function Board({
       const p = geraet(v.x, v.y - liftVertex(ecke));
       out.push({ x: p.x, y: p.y, r: 44 * f, waerme: 1 });
     }
+    /*
+     * Was in der Feldmitte steht, leuchtete bisher gar nicht: weder die
+     * Hauptstadt noch die Reichsbauten standen in dieser Liste. Beide sind
+     * bewohnt und gross - nachts blieben sie schwarze Loecher zwischen lauter
+     * erleuchteten Doerfern, gerade dort, wo das Reich seinen Kern hat.
+     */
+    for (const [hk, h] of Object.entries(state.hauptstaedte ?? {})) {
+      const [q, r] = hk.split(':').map(Number) as [number, number];
+      const c = hexToPixel(q, r, LAYOUT);
+      const p = geraet(c.x, c.y - liftHex(q, r));
+      out.push({ x: p.x, y: p.y, r: (h.stufe >= 2 ? 46 : 38) * f, waerme: 0.9 });
+    }
+    for (const hk of Object.keys(state.reichsbauten ?? {})) {
+      const [q, r] = hk.split(':').map(Number) as [number, number];
+      const c = hexToPixel(q, r, LAYOUT);
+      const p = geraet(c.x, c.y - liftHex(q, r));
+      out.push({ x: p.x, y: p.y, r: 34 * f, waerme: 0.9 });
+    }
     for (const b of state.braende) {
       const w = brandPunkt(b);
       const p = geraet(w.x, w.y);
@@ -1459,6 +1477,15 @@ export function Board({
       for (const [ek] of asche) tiefen.add(kantenTiefe(ek));
       for (const vk of Object.keys(state.buildings)) tiefen.add(gebaeudeTiefe(vk));
       for (const hk of Object.keys(state.hauptstaedte ?? {})) tiefen.add(hauptstadtTiefe(hk));
+      /*
+       * Reichsbauten gehoeren in dieselbe Menge - ihr Fehlen war ein echter
+       * Fehler, kein Schoenheitsmangel. Die Schleife unten zeichnet
+       * ausschliesslich ueber "tiefen"; stand das Band eines Reichsbaus nicht
+       * darin, wurde er nur gezeichnet, wenn zufaellig eine Strasse oder ein
+       * Haus im selben Band lag. Sonst halb oder gar nicht - was von aussen
+       * wie eine durchsichtige Textur aussah, war ein fehlender Durchgang.
+       */
+      for (const hk of Object.keys(state.reichsbauten ?? {})) tiefen.add(hauptstadtTiefe(hk));
       const schicht = (vollRef.current ??= document.createElement('canvas'));
       if (schicht.width !== bw || schicht.height !== bh) {
         schicht.width = bw;
@@ -2125,6 +2152,20 @@ export function Board({
         const c = hexToPixel(q, r, LAYOUT);
         // Burg und Palast ragen weit ueber die Feldmitte hinaus - der Palast noch hoeher.
         const hoch = h.stufe >= 2 ? 8 : 5;
+        const d = Math.hypot(c.x - wx, c.y - liftHex(q, r) - hoch * SCALE - wy);
+        if (d <= reichweite + (hoch + 4) * SCALE && (!beste || d < beste.d)) beste = { d, waehle: () => onHauptstadtKlick(hk) };
+      }
+      /*
+       * Reichsbauten sitzen wie die Hauptstadt in der Feldmitte und waren
+       * bisher kein Ziel - der eigene Bau liess sich nicht antippen. Sie ragen
+       * aehnlich weit ueber die Mitte hinaus (units.ts: Sockel plus Aufsatz),
+       * deshalb dieselbe grosszuegige Reichweite wie bei der Burg.
+       */
+      for (const [hk, b] of Object.entries(state.reichsbauten ?? {})) {
+        if (b.owner !== du) continue;
+        const [q, r] = hk.split(':').map(Number) as [number, number];
+        const c = hexToPixel(q, r, LAYOUT);
+        const hoch = 6;
         const d = Math.hypot(c.x - wx, c.y - liftHex(q, r) - hoch * SCALE - wy);
         if (d <= reichweite + (hoch + 4) * SCALE && (!beste || d < beste.d)) beste = { d, waehle: () => onHauptstadtKlick(hk) };
       }

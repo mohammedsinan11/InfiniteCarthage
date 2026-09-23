@@ -111,7 +111,7 @@ import { tradeRatio } from '../../core/rules/trade';
 import { Aktionsleiste } from '../ui/Aktionsleiste';
 import type { BuildMode } from '../ui/Aktionsleiste';
 import { reichArtVon } from '../ui/Aktionsleiste';
-import { reichsbauHindernis, reichsgebiet } from '../../core/rules/reich';
+import { REICHSBAU_NAME, REICHSBAU_ZWECK, reichsbauHindernis, reichsgebiet } from '../../core/rules/reich';
 
 export function Game() {
   const state = useStore((s) => s.state)!;
@@ -669,6 +669,21 @@ export function Game() {
           titel: `Hauptstadt · ${STUFE_NAME[hauptstadt.stufe] ?? `Stufe ${hauptstadt.stufe}`}`,
           optionen: naechste !== null ? [ausbauOption(q, r, naechste)] : [],
           leer: 'Der Koenigssitz steht - hoeher geht es nicht.',
+        };
+      }
+      /*
+       * Ein eigener Reichsbau: ausbauen laesst er sich nicht, aber die Tafel
+       * sagt, was er bewirkt. Ohne diesen Zweig fiel ein Klick auf ihn bis zum
+       * "return null" durch - die Tafel blieb leer, und der Bau wirkte tot.
+       */
+      const reichsbau = state.reichsbauten?.[ausbauOrt.key];
+      if (reichsbau && reichsbau.owner === you) {
+        const art = reichsbau.art as 'burgfeste';
+        return {
+          ort: ausbauOrt,
+          titel: REICHSBAU_NAME[art] ?? 'Reichsbau',
+          optionen: [],
+          leer: REICHSBAU_ZWECK[art] ?? 'Ein Bau deines Reichs.',
         };
       }
       const u = umland.find((x) => hexKey(x.q, x.r) === ausbauOrt.key);
