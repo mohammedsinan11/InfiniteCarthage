@@ -13,7 +13,6 @@ import { redactStateFor, redactEventsFor } from '../src/core/redact';
 import { tradeRatio } from '../src/core/rules/trade';
 import { RESOURCES } from '../src/core/types';
 import { vertexNeighborVertices, parseVertexKey, vertexKey, hexEdges, edgeKey } from '../src/core/coords';
-import { cardById } from '../src/core/cards/catalog';
 
 const NAMES = ['Anna', 'Bert', 'Cem', 'Dana'];
 
@@ -32,10 +31,7 @@ function must(game: Game, action: Action, actor: PlayerId) {
 }
 
 function kartenwahl(id: string): Action {
-  const sofort = cardById(id)?.instant;
-  return sofort?.t === 'gainAny'
-    ? { t: 'chooseCard', card: id, resources: { lumber: sofort.count } }
-    : { t: 'chooseCard', card: id };
+  return { t: 'chooseCard', card: id };
 }
 
 /** Aufbauphase automatisch durchspielen: immer der erste legale Zug. */

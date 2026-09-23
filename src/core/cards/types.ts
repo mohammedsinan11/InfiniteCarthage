@@ -45,7 +45,7 @@ export type CardKind = 'reich' | 'taktik' | 'ausruestung';
 export type Instant =
   /** Diese Rohstoffe. */
   | { t: 'gain'; resources: Partial<Record<Resource, number>> }
-  /** Beliebige Rohstoffe nach echter Wahl des Spielers. */
+  /** So viele zufaellige Rohstoffe, einzeln gezogen (rules/reducer.ts). */
   | { t: 'gainAny'; count: number };
 
 /**

@@ -122,7 +122,7 @@ export type Action =
   /** Anbieter zieht sein Angebot zurueck. */
   | { t: 'cancelTrade' }
   /** Eine der drei angebotenen Karten nehmen. */
-  | { t: 'chooseCard'; card: string; resources?: Bundle }
+  | { t: 'chooseCard'; card: string }
   /** Eine ausspielbare Taktikkarte auf eine eigene Einheit oder deren Feld anwenden. */
   | { t: 'playTactic'; card: string; unit: number }
   /** Einen Ritter anwerben - er tritt an einer eigenen Siedlung an. */
@@ -538,17 +538,6 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         return fail('Diese einzigartige Karte besitzt du bereits.');
       }
 
-      // Eine echte Wahl: Anzahl, Ganzzahligkeit und alle fuenf Sorten werden
-      // serverseitig geprueft, nicht nur in der Oberflaeche.
-      if (karte.instant?.t === 'gainAny') {
-        const wahl = action.resources ?? {};
-        const anzahl = RESOURCES.reduce((n, r) => n + (wahl[r] ?? 0), 0);
-        const ungueltig = RESOURCES.some((r) => !Number.isInteger(wahl[r] ?? 0) || (wahl[r] ?? 0) < 0);
-        if (ungueltig || anzahl !== karte.instant.count) {
-          return fail(`Waehle genau ${karte.instant.count} Rohstoffe.`);
-        }
-      }
-
       if (cardKind(karte) === 'taktik') actorPlayer.tactics.push(karte.id);
       else if (cardKind(karte) === 'ausruestung') actorPlayer.equipment.push(karte.id);
       else {
@@ -561,7 +550,21 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         if (karte.instant.t === 'gain') {
           for (const r of RESOURCES) actorPlayer.hand[r] += karte.instant.resources[r] ?? 0;
         } else {
-          for (const r of RESOURCES) actorPlayer.hand[r] += action.resources?.[r] ?? 0;
+          /*
+           * Zufaellige Rohstoffe, nicht gewaehlte. Das Aussuchen von Hand war
+           * auf dem Handy Fummelei: fuenf Sorten mit Plus und Minus auf einer
+           * Karte, die ohnehin das halbe Bild einnimmt.
+           *
+           * Jeder Rohstoff wird EINZELN gezogen - es koennen also mehrere
+           * derselben Sorte fallen. Der Wurf kommt aus dem rngState, wie
+           * Wuerfel und Deck: auf dem Server, aus dem Stand reproduzierbar,
+           * fuer niemanden vorhersagbar.
+           */
+          const rng = new Rng(s.rngState);
+          for (let i = 0; i < karte.instant.count; i++) {
+            actorPlayer.hand[RESOURCES[rng.int(RESOURCES.length)]!] += 1;
+          }
+          s.rngState = rng.getState();
         }
       }
 

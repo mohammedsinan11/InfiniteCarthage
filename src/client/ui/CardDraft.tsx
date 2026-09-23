@@ -18,10 +18,7 @@ import { useEffect, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import { cardById } from '../../core/cards/catalog';
 import type { DraftSource, Rarity } from '../../core/cards/types';
-import { RESOURCES } from '../../core/types';
-import type { Bundle, Resource } from '../../core/types';
 import { playCardDeal, playCardHover, playCardPick, playCardVanish } from '../audio';
-import { resourceName } from '../log';
 import { KartenBild } from './KartenBild';
 
 const RARITY_NAME: Record<Rarity, string> = {
@@ -70,11 +67,9 @@ export function CardDraft({
   source?: DraftSource;
   /** Nur der Spieler am Zug waehlt - die anderen sehen zu. */
   darfWaehlen: boolean;
-  onChoose: (card: string, resources?: Bundle) => void;
+  onChoose: (card: string) => void;
 }) {
   const [genommen, setGenommen] = useState<string | null>(null);
-  const [waehltRohstoffe, setWaehltRohstoffe] = useState<string | null>(null);
-  const [rohstoffe, setRohstoffe] = useState<Bundle>({});
 
   useEffect(() => {
     playCardDeal();
@@ -99,15 +94,12 @@ export function CardDraft({
           const stufe = STUFEN.indexOf(karte.rarity);
           const gewaehlt = genommen === id;
           const verworfen = genommen !== null && !gewaehlt;
-          const beliebig = karte.instant?.t === 'gainAny' ? karte.instant.count : 0;
-          const gewaehltRohstoffe = waehltRohstoffe === id;
-          const summe = RESOURCES.reduce((n, r) => n + (rohstoffe[r] ?? 0), 0);
-          const nehmen = (resources?: Bundle) => {
+          const nehmen = () => {
             if (genommen !== null) return;
             setGenommen(id);
             playCardPick(stufe);
             window.setTimeout(playCardVanish, 180);
-            window.setTimeout(() => onChoose(id, resources), NACHKLANG_MS);
+            window.setTimeout(() => onChoose(id), NACHKLANG_MS);
           };
           return (
             <div
@@ -132,12 +124,7 @@ export function CardDraft({
                   if (genommen === null) neigen(e);
                 }}
                 onPointerLeave={aufrichten}
-                onClick={() => {
-                  if (beliebig > 0) {
-                    setWaehltRohstoffe(id);
-                    setRohstoffe({});
-                  } else nehmen();
-                }}
+                onClick={nehmen}
               >
                 <span className="draft-glanz" aria-hidden />
                 <span className="draft-selt">{RARITY_NAME[karte.rarity]}</span>
@@ -145,40 +132,6 @@ export function CardDraft({
                 <KartenBild karte={karte} />
                 <span className="draft-text">{karte.text}</span>
               </button>
-              {gewaehltRohstoffe && genommen === null && (
-                <div className="draft-rohstoffwahl">
-                  <strong>Noch {beliebig - summe} waehlen</strong>
-                  <div className="draft-rohstoffknopfe">
-                    {RESOURCES.map((r: Resource) => (
-                      <span key={r} className="draft-rohstoff">
-                        <button
-                          type="button"
-                          disabled={summe >= beliebig}
-                          onClick={() => setRohstoffe((alt) => ({ ...alt, [r]: (alt[r] ?? 0) + 1 }))}
-                        >
-                          + {resourceName(r)}
-                        </button>
-                        <b>{rohstoffe[r] ?? 0}</b>
-                        <button
-                          type="button"
-                          disabled={(rohstoffe[r] ?? 0) === 0}
-                          onClick={() => setRohstoffe((alt) => ({ ...alt, [r]: (alt[r] ?? 0) - 1 }))}
-                        >
-                          −
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    className="primary draft-rohstoff-nehmen"
-                    disabled={summe !== beliebig}
-                    onClick={() => nehmen(rohstoffe)}
-                  >
-                    Karte nehmen
-                  </button>
-                </div>
-              )}
               {stufe >= 3 && (
                 <span className={stufe === 3 ? 'draft-funken episch' : 'draft-funken'} aria-hidden>
                   {Array.from({ length: 10 }, (_, k) => (

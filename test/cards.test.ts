@@ -33,10 +33,7 @@ function must(game: Game, action: Action, actor: PlayerId) {
 }
 
 function kartenwahl(id: string): Action {
-  const sofort = cardById(id)?.instant;
-  return sofort?.t === 'gainAny'
-    ? { t: 'chooseCard', card: id, resources: { lumber: sofort.count } }
-    : { t: 'chooseCard', card: id };
+  return { t: 'chooseCard', card: id };
 }
 
 const phaseOf = (game: Game): string => game.state.phase.t;
@@ -235,19 +232,31 @@ describe('Der Fund', () => {
     } else expect(zugewinn).toBe(karte.instant.count);
   });
 
-  it('fordert bei beliebigen Rohstoffen eine exakte, echte Wahl', () => {
-    const game = solo();
-    runSetup(game);
-    game.state.phase = { t: 'draft' };
-    game.state.draft = { source: 'fund', options: ['wanderhaendler', 'baumeister', 'muehlen'] };
+  it('wuerfelt die Rohstoffe, statt waehlen zu lassen', () => {
+    const aufbau = () => {
+      const game = solo();
+      runSetup(game);
+      game.state.phase = { t: 'draft' };
+      game.state.draft = { source: 'fund', options: ['wanderhaendler', 'baumeister', 'muehlen'] };
+      return game;
+    };
 
-    expect(applyAction(game, { t: 'chooseCard', card: 'wanderhaendler' }, 'p0')).toEqual({
-      ok: false,
-      error: 'Waehle genau 5 Rohstoffe.',
-    });
-    must(game, { t: 'chooseCard', card: 'wanderhaendler', resources: { wool: 2, ore: 3 } }, 'p0');
-    expect(playerById(game.state, 'p0')!.hand.wool).toBeGreaterThanOrEqual(2);
-    expect(playerById(game.state, 'p0')!.hand.ore).toBeGreaterThanOrEqual(3);
+    const game = aufbau();
+    const vorher = { ...playerById(game.state, 'p0')!.hand };
+    // Ohne Angabe von Rohstoffen - die Karte fragt nicht mehr.
+    must(game, { t: 'chooseCard', card: 'wanderhaendler' }, 'p0');
+    const nachher = playerById(game.state, 'p0')!.hand;
+    expect(RESOURCES.reduce((n, r) => n + (nachher[r] - vorher[r]), 0)).toBe(5);
+
+    /*
+     * Der Wurf kommt aus dem rngState, nicht aus Math.random: derselbe Stand
+     * und dieselbe Aktion muessen dasselbe ergeben. Sonst rechnete der Server
+     * bei jeder Wiederholung anders, und der Spielstand waere nicht mehr die
+     * Wahrheit ueber die Partie.
+     */
+    const zwei = aufbau();
+    must(zwei, { t: 'chooseCard', card: 'wanderhaendler' }, 'p0');
+    expect(playerById(zwei.state, 'p0')!.hand).toEqual(nachher);
   });
 });
 

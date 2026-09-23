@@ -18,7 +18,6 @@ import {
 import { currentPlayerId, playerById, totalPoints } from '../src/core/state';
 import type { PlayerId } from '../src/core/state';
 import { MIN_PLAYERS, NO_TARGET } from '../src/core/protocol';
-import { cardById } from '../src/core/cards/catalog';
 
 function solo(targetPoints = NO_TARGET): Game {
   return createGame([{ id: 'p0', name: 'Solo' }], 4242, 77, targetPoints);
@@ -31,10 +30,7 @@ function must(game: Game, action: Action, actor: PlayerId) {
 }
 
 function kartenwahl(id: string): Action {
-  const sofort = cardById(id)?.instant;
-  return sofort?.t === 'gainAny'
-    ? { t: 'chooseCard', card: id, resources: { lumber: sofort.count } }
-    : { t: 'chooseCard', card: id };
+  return { t: 'chooseCard', card: id };
 }
 
 const phaseOf = (game: Game): string => game.state.phase.t;

@@ -11,7 +11,6 @@ import { redactStateFor } from '../src/core/redact';
 import { bundleSize, hasBundle } from '../src/core/rules/trade';
 import { RESOURCES } from '../src/core/types';
 import type { Resource } from '../src/core/types';
-import { cardById } from '../src/core/cards/catalog';
 
 function newGame(n = 3): Game {
   return createGame(
@@ -28,10 +27,7 @@ function must(game: Game, action: Action, actor: PlayerId) {
 }
 
 function kartenwahl(id: string): Action {
-  const sofort = cardById(id)?.instant;
-  return sofort?.t === 'gainAny'
-    ? { t: 'chooseCard', card: id, resources: { lumber: sofort.count } }
-    : { t: 'chooseCard', card: id };
+  return { t: 'chooseCard', card: id };
 }
 
 const phaseOf = (game: Game): string => game.state.phase.t;

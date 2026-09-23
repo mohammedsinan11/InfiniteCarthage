@@ -1094,7 +1094,7 @@ export function Game() {
             options={state.draft.options}
             source={state.draft.source}
             darfWaehlen={isMine}
-            onChoose={(card, resources) => act({ t: 'chooseCard', card, resources })}
+            onChoose={(card) => act({ t: 'chooseCard', card })}
           />
         )}
 
