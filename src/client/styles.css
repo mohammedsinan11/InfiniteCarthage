@@ -4051,32 +4051,80 @@ em.off {
     scrollbar-width: none;
   }
   /*
-   * AUFGEKLAPPT SCHWEBT DAS BLATT.
+   * AUFGEKLAPPT SITZT DAS BLATT LINKS NEBEN DEM WUERFEL - UND GENAU SO HOCH.
    *
-   * Fuenf Karten brauchen 360 Punkte (je 62,4 plus Luecken und Rand), neben
-   * Wuerfel und Inventar bleiben rund 200. Vorher stand hier "lieber schieben
-   * als verdecken" - dadurch wurden Lehm und Erz einfach abgeschnitten, und
-   * man sah seine eigenen Rohstoffe nicht mehr.
+   * Vorher schwebte es ueber der Leiste, weil es bei voller Kartengroesse
+   * 356 Punkte breit ist und neben Wuerfel und Inventar nur 188 frei sind.
+   * Statt auszuweichen schrumpfen jetzt die Karten.
    *
-   * Jetzt legt es sich ueber die Leiste statt neben sie: nichts wird
-   * geschoben, nichts beschnitten, Wuerfel und Baumenue bleiben an ihrem
-   * Platz. Ein Tipp schliesst es wieder. Seine Rasterspalte bleibt so lange
-   * leer - ein kurzer, selbst herbeigefuehrter Zustand.
+   * Am Geraet gemessen: Wuerfelknopf 106x52, links davon 188 frei.
+   * Rueckwaerts gerechnet ergibt die Zielhoehe 52 = 2x3 Innenabstand
+   * + 2x2 Rahmen + Karte 42. Das Bildverhaeltnis 24:32 macht daraus
+   * 31,5 Breite, und in der Breite bleibt es dabei:
+   * 5x31,5 + 4x4 Luecke + 6 + 4 = 183,5 von 188.
+   *
+   * Preis dafuer: die Karte faellt von 62x83 auf 31,5x42. Sie bleibt
+   * unterscheidbar, weil jede Sorte eine eigene Farbflaeche hat - die
+   * Zeichnung darin ist bei der Groesse aber nur noch angedeutet.
    */
   .unten .hand.hand-breit {
-    position: absolute;
-    left: 0;
-    bottom: calc(100% + 6px);
-    width: max-content;
-    max-width: calc(100vw - 20px);
-    z-index: 12;
     /*
-     * Gemessen: mit der gewohnten Luecke von 6 braucht das Blatt 360 Punkte,
-     * erlaubt sind 355 - es scrollte also um fuenf. Mit 4 sind es 352. Die
-     * Karten bleiben dabei in voller Groesse; kleiner duerfen sie nicht
-     * werden, sonst sind Getreide und Erz nicht mehr zu unterscheiden.
+     * Gemessen, sonst waere es durchgerutscht: die Grundregel .hand setzt
+     * left und bottom auf 10px. ".unten .hand" stellt zwar auf position:
+     * relative um, raeumt die beiden Werte aber nicht weg - und bei
+     * relativer Positionierung verschieben sie das Blatt rein optisch,
+     * ohne das Layout zu aendern. Das Raster setzte es korrekt auf 10,
+     * left schob es auf 20, und damit lag sein rechter Rand (204) vier
+     * Punkte ueber dem Wuerfelknopf (ab 200). Frueher verdeckt, weil die
+     * schwebende Regel left ausdruecklich auf 0 setzte.
      */
+    left: 0;
+    bottom: 0;
+    padding: 3px;
     gap: 4px;
+  }
+  /*
+   * Schlaegt die width/height des SVG: das sind Praesentationsattribute und
+   * stehen in der Rangfolge unter jedem CSS. Dank viewBox skaliert die
+   * Zeichnung mit, statt beschnitten zu werden. Die Karten auf dem Brett
+   * (ResourceCard size=1.5) bleiben unberuehrt.
+   */
+  .unten .hand.hand-breit .res-card {
+    width: 31.5px;
+    height: 42px;
+  }
+  /*
+   * Der Faecher hob die mittleren Karten um 6 bzw. 11 Punkte an und machte
+   * das Blatt damit 11 Punkte hoeher als seine hoechste Karte - exakt der
+   * Abstand, der zum Wuerfelknopf fehlte. Bei 42 Punkt hohen Karten ist der
+   * Effekt ohnehin nur noch Unruhe.
+   */
+  .unten .hand.hand-breit .hand-card:nth-child(2),
+  .unten .hand.hand-breit .hand-card:nth-child(3),
+  .unten .hand.hand-breit .hand-card:nth-child(4) {
+    margin-bottom: 0;
+  }
+  /*
+   * Die Marke ist mit Mindestbreite, Innenabstand und Rahmen 38 Punkte breit
+   * - mehr als die Karte, auf der sie sitzt. Der Ueberstand bleibt mit 2
+   * Punkten innerhalb des Innenabstands, damit "overflow-x: auto" ihn nicht
+   * abschneidet.
+   */
+  .unten .hand.hand-breit .hand-zahl {
+    right: -2px;
+    bottom: -2px;
+    min-width: 13px;
+    padding: 0 3px;
+    font-size: 10px;
+    border-width: 1px;
+  }
+  /*
+   * Das ganze Blatt klappt auf Antippen ein. Das Minuszeichen daneben sass
+   * bei 9 Punkten Ueberstand ueber einem nur noch 52 Punkte hohen Blatt und
+   * waere hier nur ein Stolperstein.
+   */
+  .unten .hand.hand-breit .hand-zu {
+    display: none;
   }
   .unten .inventar {
     grid-area: inventar;
