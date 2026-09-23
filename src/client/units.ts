@@ -854,6 +854,23 @@ const REICH_SOCKEL = spiegeln([
   'd.d........', 'ddd........', 'dmd........', 'dmd.d.d.d.d', 'dmddddddddd',
   'dmymmmmmmmm', 'dmmmmyymmdd', 'dmMmmmmmdbb', 'dmmmmmmmdbb', 'ddddddddddd',
 ]);
+/*
+ * UM SO VIEL STECKT DER AUFSATZ IM SOCKEL.
+ *
+ * Nicht stapeln, sondern ueberlappen - der Entwurf (probe-bauten.html, bau())
+ * setzt den Bau mit den Fuessen auf Zeile 4 und den Sockel auf Zeile 9, also
+ * fuenf Reihen ineinander. Beim Uebertragen ins Spiel ist diese Ueberlappung
+ * verloren gegangen: Aufsatz 0-9, Sockel ab 10, sauber gestapelt.
+ *
+ * Das sah aus, als fehlten dem Handelskontor die Mauern. Die obersten drei
+ * Sockelreihen sind naemlich 'd.d........', 'ddd........', 'dmd........' -
+ * nach dem Spiegeln zwei schmale Tuerme ganz aussen und dazwischen nichts.
+ * Ohne Ueberlappung schwebt der Bau ueber diesem Loch, statt es mit seiner
+ * eigenen Wand zu fuellen. Nachgemessen an den Bildpunkten: die Mauerreihen
+ * (#e2d2ab) wurden gezeichnet, drei Reihen darunter waren vollstaendig leer.
+ */
+const REICH_UEBERLAPP = 5;
+
 const REICH_AUFSATZ: Record<string, readonly string[]> = {
   // Wehrhaft: Zinnen und ein Wimpel in Spielerfarbe.
   burgfeste: spiegeln(['d.d.d.d', 'ddddddd', 'dmmmmmm', 'dmymmmm', 'dmpmmmm', 'dmpmmmy', 'dmqmmmm', 'dmmmmmm', 'dmmmmmm', 'ddddddd']),
@@ -879,12 +896,12 @@ export function zeichneReichsbau(
 ): void {
   const aufsatz = REICH_AUFSATZ[art] ?? REICH_AUFSATZ.burgfeste!;
   const breite = REICH_SOCKEL[0]!.length;
-  const hoehe = REICH_SOCKEL.length + aufsatz.length;
+  const hoehe = REICH_SOCKEL.length + aufsatz.length - REICH_UEBERLAPP;
   const bild = bauwerkBild(
     `reich:${art}`,
     [
       { karte: aufsatz, dx: Math.floor((breite - aufsatz[0]!.length) / 2), dy: 0 },
-      { karte: REICH_SOCKEL, dx: 0, dy: aufsatz.length },
+      { karte: REICH_SOCKEL, dx: 0, dy: aufsatz.length - REICH_UEBERLAPP },
     ],
     breite,
     hoehe,

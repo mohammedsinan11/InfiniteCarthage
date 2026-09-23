@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<title>Probe: fehlen dem Handelskontor die Mauern?</title>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; padding: 18px 22px; background: #16110b; color: #f2e7d0;
+         font: 13px/1.45 -apple-system, system-ui, sans-serif; width: 1100px; }
+  h1 { font-family: 'Silkscreen', monospace; font-size: 17px; color: #ffd76a; margin: 0 0 4px; }
+  p.lead { margin: 0 0 14px; color: #a8987c; max-width: 1040px; }
+  table { border-collapse: collapse; }
+  th { font-family: 'Silkscreen', monospace; font-size: 10px; color: #d9a441;
+       text-align: left; padding: 0 0 6px 4px; font-weight: normal; }
+  td { padding: 0 6px 10px 0; vertical-align: top; }
+  td.sorte { font-family: 'Silkscreen', monospace; font-size: 10px; color: #cdbd9c;
+             padding: 44px 10px 0 0; white-space: nowrap; }
+  canvas { display: block; image-rendering: pixelated; background: #0f0c08;
+           border: 1px solid #3a2c1c; }
+  .farben { margin-top: 16px; font-size: 11.5px; color: #a8987c; }
+  .farben b { color: #f2e7d0; }
+</style></head>
+<body>
+<h1>Fehlen dem Handelskontor die Mauern?</h1>
+<p class="lead">
+  Gezeichnet mit der echten <code>zeichneReichsbau</code> aus
+  <code>src/client/units.ts</code> &ndash; nicht nachgebaut, damit die Probe
+  nicht ihren eigenen Fehler zeigt. Die Mauerreihen sind bei Kontor und Tempel
+  dieselbe Farbe (<code>c</code>, Putz). Zeigt der Tempel sie und das Kontor
+  nicht, liegt es am Dach; fehlen sie bei beiden, ist es baulich.
+</p>
+<div id="inhalt"></div>
+<script type="module">
+import { zeichneReichsbau, steinFuer, DACH_JE_SORTE } from '/src/client/units.ts';
+
+const F = 6;               // Geraetepixel je Kunstpixel
+const BREITE = 21, HOEHE = 20;
+const CW = BREITE * F + 24, CH = HOEHE * F + 30;
+const MX = CW / 2, MY = CH - 48;
+const FARBE = '#3a7ac2';   // Spielerfarbe
+
+const SORTEN = ['forest', 'taiga', 'sand', 'clay', 'snow', 'mountains', 'swamp', 'unbekannt'];
+const ARTEN = ['burgfeste', 'handelskontor', 'tempel'];
+
+function feld(art, sorte) {
+  const c = document.createElement('canvas');
+  c.width = CW; c.height = CH;
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  zeichneReichsbau(g, art, MX, MY, F, FARBE, sorte);
+  return c;
+}
+
+const tab = document.createElement('table');
+const kopf = document.createElement('tr');
+kopf.innerHTML = '<th></th>' + ARTEN.map((a) => `<th>${a}</th>`).join('');
+tab.appendChild(kopf);
+
+for (const sorte of SORTEN) {
+  const tr = document.createElement('tr');
+  const td0 = document.createElement('td');
+  td0.className = 'sorte';
+  td0.textContent = sorte;
+  tr.appendChild(td0);
+  for (const art of ARTEN) {
+    const td = document.createElement('td');
+    td.appendChild(feld(art, sorte));
+    tr.appendChild(td);
+  }
+  tab.appendChild(tr);
+}
+document.getElementById('inhalt').appendChild(tab);
+
+// Die beteiligten Farben ausschreiben - dann muss niemand raten, was man sieht.
+const zeile = (n, v) => `<b>${n}</b> ${v}`;
+const info = document.createElement('div');
+info.className = 'farben';
+info.innerHTML =
+  '<div>' + zeile('Mauer c', '#e2d2ab') + ' &nbsp; ' + zeile('Reihe w', '#f2efe6') +
+  ' &nbsp; ' + zeile('Umriss d', '#3a2a1e') + '</div>' +
+  '<div>Dach je Sorte: ' +
+  SORTEN.map((s) => {
+    const d = DACH_JE_SORTE[s];
+    return `${s} ${d ? d.hell : '#6a7a98 (Vorgabe)'}`;
+  }).join(' &nbsp;&middot;&nbsp; ') + '</div>' +
+  '<div>Stein je Sorte: ' +
+  SORTEN.map((s) => `${s} ${steinFuer(s).hell}`).join(' &nbsp;&middot;&nbsp; ') + '</div>';
+document.body.appendChild(info);
+</script>
+</body></html>
