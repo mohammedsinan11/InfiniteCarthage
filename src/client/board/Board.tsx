@@ -502,8 +502,12 @@ export function Board({
   const obenRef = useRef<HTMLCanvasElement | null>(null);
   /** Was ein Einzelbild zum Zusammensetzen braucht - ohne den Kacheldurchlauf. */
   const schichtenRef = useRef<{
+    /** Groesse des SICHTBAREN Canvas - die Schichten selbst sind groesser. */
     bw: number;
     bh: number;
+    /** Ausschnitt, fuer den die Schichten entstanden sind (zView). */
+    zx: number;
+    zy: number;
     f: number;
     fackeln: boolean;
     tint: (typeof SEASON_TINT)[keyof typeof SEASON_TINT];
@@ -619,6 +623,41 @@ export function Board({
     };
   }, [cam, size, scale, dpr]);
 
+  /*
+   * DER ZEICHEN-AUSSCHNITT.
+   *
+   * Beim Schieben aendert sich view bei jeder Zeigerbewegung. Haengt die grosse
+   * Zeichenroutine daran, wird das ganze Brett je Bild neu gemalt - das war das
+   * Ruckeln. Sie haengt deshalb an zView: dem Ausschnitt, fuer den die
+   * Schichten zuletzt entstanden sind, auf jeder Seite um RAND_PX groesser als
+   * das Bild.
+   *
+   * Beim Schieben werden die fertigen Schichten nur noch versetzt kopiert
+   * (komponiere). Erst wenn der Versatz den Rand aufbraucht, wird neu
+   * gezeichnet - bei 192 Geraetepixeln also etwa alle zwei Fingerbreit statt
+   * sechzigmal je Sekunde.
+   *
+   * Der Rand steckt bewusst im AUSSCHNITT und nicht in einer Verschiebung der
+   * Leinwand: ursprung() rechnet ohnehin gegen den Ausschnitt, visible
+   * beschneidet ohnehin dagegen, und die Band- und Gipfelschichten passen ohne
+   * Sonderbehandlung. Mit setTransform haetten drei Stellen gleichzeitig um
+   * denselben Betrag stimmen muessen.
+   */
+  const RAND_PX = 192;
+  const [zView, setZView] = useState(() => {
+    const rand = RAND_PX / (scale * dpr);
+    return { x: view.x - rand, y: view.y - rand, w: view.w + 2 * rand, h: view.h + 2 * rand };
+  });
+  useEffect(() => {
+    const rand = RAND_PX / (scale * dpr);
+    const neu = { x: view.x - rand, y: view.y - rand, w: view.w + 2 * rand, h: view.h + 2 * rand };
+    // Acht Pixel Sicherheit, damit am Rand nie eine leere Kante aufblitzt.
+    const dx = Math.abs(view.x - (zView.x + rand)) * scale * dpr;
+    const dy = Math.abs(view.y - (zView.y + rand)) * scale * dpr;
+    const anders = Math.abs(zView.w - neu.w) > 1e-6 || Math.abs(zView.h - neu.h) > 1e-6;
+    if (anders || dx > RAND_PX - 8 || dy > RAND_PX - 8) setZView(neu);
+  }, [view, zView, scale, dpr]);
+
   /**
    * Sichtbare Felder, zeilenweise sortiert. Der Rand von einer Kachelgroesse
    * verhindert, dass am Bildrand halbe Felder aufblitzen.
@@ -628,12 +667,12 @@ export function Board({
     for (const t of world.tiles.values()) {
       const p = hexToPixel(t.q, t.r, LAYOUT);
       if (
-        p.x < view.x - LAYOUT.w ||
-        p.x > view.x + view.w + LAYOUT.w ||
-        p.y < view.y - IMG.h ||
+        p.x < zView.x - LAYOUT.w ||
+        p.x > zView.x + zView.w + LAYOUT.w ||
+        p.y < zView.y - IMG.h ||
         // Nach unten grosszuegiger: eine angehobene Kachel weit unten kann
         // noch ins Bild ragen, obwohl ihr Fuss darunter liegt.
-        p.y > view.y + view.h + IMG.h + RELIEF_MAX
+        p.y > zView.y + zView.h + IMG.h + RELIEF_MAX
       ) {
         continue;
       }
@@ -642,7 +681,7 @@ export function Board({
     // Von oben nach unten, damit die Ueberlappung richtig herum liegt.
     out.sort((a, b) => a.r - b.r || a.q - b.q);
     return out;
-  }, [world, view]);
+  }, [world, zView]);
 
   /**
    * Wer auf welchem Feld steht - Lagerbesatzungen und das Heer.
@@ -877,7 +916,16 @@ export function Board({
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, d.bw, d.bh);
-    ctx.drawImage(unten, 0, 0);
+
+    /*
+     * Der Versatz zwischen dem Ausschnitt, fuer den die Schichten entstanden
+     * sind, und dem, der jetzt gilt. Beim Schieben ist das der ganze Trick:
+     * dasselbe Bild, nur woanders hingelegt. Steht das Brett still, ist der
+     * Versatz genau der Rand.
+     */
+    const vx = Math.round((d.zx - view.x) * scale * dpr);
+    const vy = Math.round((d.zy - view.y) * scale * dpr);
+    ctx.drawImage(unten, vx, vy);
 
     // Gleitende Einheiten: vom alten Feld zum Platz auf dem neuen, mit Hopsern.
     const jetzt = performance.now();
@@ -887,15 +935,16 @@ export function Board({
       const p = Math.min(1, Math.max(0, (jetzt - b.start) / b.dauer));
       const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
       const hops = Math.round(Math.abs(Math.sin(p * Math.PI * 2 * b.schritte)) * 2) * d.f;
-      const x = Math.round(sx + (fx - sx) * e);
-      const y = Math.round(sy + (fy - sy) * e) - hops;
+      // Die Figuren stehen im Raster der Schichten - also mit demselben Versatz.
+      const x = Math.round(sx + (fx - sx) * e) + vx;
+      const y = Math.round(sy + (fy - sy) * e) - hops + vy;
       zeichneFigur(ctx, u.zweig ?? u.kind, x, y, d.f, farbeSeite(seiteVon(u)));
       if (d.fackeln) zeichneFigur(ctx, 'fackel', x + 5 * d.f, y - 2 * d.f, d.f);
       const max = maxLeben(u);
       if (u.leben < max) zeichneLeben(ctx, u.kind, x, y, d.f, u.leben, max);
     }
 
-    ctx.drawImage(oben, 0, 0);
+    ctx.drawImage(oben, vx, vy);
     if (d.tint.alpha > 0) {
       ctx.save();
       ctx.globalCompositeOperation = d.tint.mode;
@@ -904,7 +953,7 @@ export function Board({
       ctx.fillRect(0, 0, d.bw, d.bh);
       ctx.restore();
     }
-  }, [farbeSeite]);
+  }, [farbeSeite, view, scale, dpr]);
 
   /**
    * Gelaende auf die UNTERE Schicht zeichnen, alles Gebaute auf die obere.
@@ -922,8 +971,10 @@ export function Board({
     const cv = canvasRef.current;
     if (!cv || !tilesReady) return;
 
-    const bw = Math.round(size.w * dpr);
-    const bh = Math.round(size.h * dpr);
+    // Die Schichten sind so gross wie der ZEICHEN-Ausschnitt, also groesser als
+    // das Bild. Der Ueberstand ist der Vorrat, aus dem das Schieben lebt.
+    const bw = Math.round(zView.w * scale * dpr);
+    const bh = Math.round(zView.h * scale * dpr);
     const unten = (untenRef.current ??= document.createElement('canvas'));
     const oben = (obenRef.current ??= document.createElement('canvas'));
     for (const s of [unten, oben]) {
@@ -950,8 +1001,8 @@ export function Board({
     const ursprung = (q: number, r: number, lift: number) => {
       const k = kachelEcke(q, r);
       return {
-        x: Math.round((k.x * SCALE - view.x) * scale * dpr),
-        y: Math.round((k.y * SCALE - lift - view.y) * scale * dpr),
+        x: Math.round((k.x * SCALE - zView.x) * scale * dpr),
+        y: Math.round((k.y * SCALE - lift - zView.y) * scale * dpr),
       };
     };
 
@@ -1092,8 +1143,8 @@ export function Board({
         ctx.fillStyle = 'rgba(0,0,0,0.45)';
         ctx.beginPath();
         ctx.ellipse(
-          (c.x - view.x) * scale * dpr,
-          (c.y + LAYOUT.h * 0.42 - liftHex(t.q, t.r) - view.y) * scale * dpr,
+          (c.x - zView.x) * scale * dpr,
+          (c.y + LAYOUT.h * 0.42 - liftHex(t.q, t.r) - zView.y) * scale * dpr,
           LAYOUT.w * 0.34 * scale * dpr,
           LAYOUT.h * 0.09 * scale * dpr,
           0,
@@ -1134,8 +1185,8 @@ export function Board({
      * Mittel ihrer drei Felder - Strassenenden und Haeuser treffen sich so.
      */
     const geraet = (x: number, y: number) => ({
-      x: Math.round((x - view.x) * scale * dpr),
-      y: Math.round((y - view.y) * scale * dpr),
+      x: Math.round((x - zView.x) * scale * dpr),
+      y: Math.round((y - zView.y) * scale * dpr),
     });
     const spielerFarbe = (id: string) =>
       playerColor(state.players.find((pl) => pl.id === id)?.color ?? 0);
@@ -1593,8 +1644,12 @@ export function Board({
      * komponiere() - auf das fertige Bild statt auf eine Schicht.
      */
     schichtenRef.current = {
-      bw,
-      bh,
+      // Das sichtbare Canvas bleibt so gross wie das Bild - nur die Schichten
+      // sind groesser.
+      bw: Math.round(size.w * dpr),
+      bh: Math.round(size.h * dpr),
+      zx: zView.x,
+      zy: zView.y,
       f,
       fackeln,
       tint: SEASON_TINT[seasonOf(state.turn)],
@@ -1603,7 +1658,7 @@ export function Board({
     komponiere();
   }, [
     visible,
-    view,
+    zView,
     scale,
     size,
     hover,
