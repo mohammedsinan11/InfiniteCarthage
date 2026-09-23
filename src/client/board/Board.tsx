@@ -2018,16 +2018,20 @@ export function Board({
           // Was auf dem Feld steht, steht auf seiner Hoehe - sonst schwebt es.
           const lift = liftHex(t.q, t.r) + (hover === hk ? LIFT : 0);
           /*
-           * Stehen Figuren auf dem Feld, rueckt die Zahl klein nach oben ueber
-           * ihre Koepfe - die Figuren stehen dafuer etwas tiefer (aufstellung).
-           * Sonst verdeckt der Marker genau die Einheit, die man sucht.
+           * Stehen Figuren auf dem Feld, wird die Zahl DURCHSICHTIG - sie
+           * behaelt Groesse und Platz.
+           *
+           * Frueher schrumpfte sie auf 55 % und rueckte ueber die Koepfe, und
+           * die Figuren standen dafuer tiefer (units.ts, aufstellung). Zwei
+           * Kruecken, die einander stuetzten: die Zahl war kaum noch zu lesen,
+           * und die Figuren klebten am unteren Kachelrand. Durchsichtig loest
+           * beides - man sieht die Einheit, und die Zahl bleibt dieselbe.
            */
           const besetzt = besatzung.has(hk);
-          const marke = besetzt ? `translate(${c.x} ${c.y - 16}) scale(0.55)` : `translate(${c.x} ${c.y})`;
           return (
             <g key={'n' + hk} pointerEvents="none" transform={`translate(0 ${-lift})`}>
               {showNumber && (
-                <g transform={marke}>
+                <g transform={`translate(${c.x} ${c.y})`} opacity={besetzt ? 0.42 : 1}>
                   <circle cx={0} cy={0} r={9} className="token" />
                   <text x={0} y={1} textAnchor="middle" className={red ? 'token-num red' : 'token-num'}>
                     {t.number}

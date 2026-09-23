@@ -1096,9 +1096,14 @@ export function aufstellung(anzahl: number, lager: boolean): ReadonlyArray<reado
     if (anzahl === 3) return [[-7, 5], [7, 5], [0, 8]];
     return [[-9, 4], [-6, 9], [9, 4], [6, 9], [0, 11]];
   }
-  // Etwas unter der Mitte: darueber sitzt die Zahl, klein (Board, Zahlenmarker).
-  if (anzahl <= 1) return [[0, 7]];
-  if (anzahl === 2) return [[-4, 6], [4, 8]];
-  if (anzahl === 3) return [[-5, 5], [5, 5], [0, 9]];
-  return [[-7, 3], [-5, 8], [7, 3], [5, 8], [0, 11]];
+  /*
+   * Auf der Kachelmitte, nicht am unteren Rand. Frueher standen sie vier
+   * Kunstpixel tiefer, um dem Zahlenmarker auszuweichen - der schrumpfte
+   * dafuer auf 55 %. Seit der Marker stattdessen durchsichtig wird (Board,
+   * Zahlenmarker), braucht es dieses Ausweichen nicht mehr.
+   */
+  if (anzahl <= 1) return [[0, 3]];
+  if (anzahl === 2) return [[-4, 2], [4, 4]];
+  if (anzahl === 3) return [[-5, 1], [5, 1], [0, 5]];
+  return [[-7, 0], [-5, 5], [7, 0], [5, 5], [0, 7]];
 }
