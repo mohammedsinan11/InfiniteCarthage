@@ -461,16 +461,32 @@ Koenigssitz. Danach faellt die Siedler-Mechanik als Nadeloehr weg.
   `angriffVon`/`maxLeben`), eigene Rueckkehr getrennt vom gewoehnlichen
   Helden.
 
-  Offen: seine drei Wirkungen (die Heilerin heilt noch nicht, der Haendler
-  handelt noch nicht), seine Figur und der Knopf in der Leiste.
+  **Was die drei koennen** (`ZWEIG_ZWECK`, alles gebaut):
+  - **Krieger** (4 Angriff, 7 Leben): schlaegt am haertesten zu. Fuehrt wie
+    jeder Held - Ritter auf seinem Feld treffen leichter (`ANFUEHRUNG`).
+  - **Heilerin** (1/4): heilt eigene Einheiten `HEILERIN_RADIUS` Feld weit je
+    Runde, auch ohne Siedlung - ein Tempel, der mitzieht (`army.ts`,
+    Schritt 6). Kaempft dafuer kaum.
+  - **Haendler** (2/4): 2:1 auf alles, solange er auf der Karte steht
+    (`rules/trade.ts`). Seine Wirkung haengt an der Figur, nicht am Reich:
+    faellt er, ist sie weg, bis er zurueckkehrt.
+
+  Figuren: drei eigene Platzhalter zu elf Kunstpixeln Breite (`client/units.ts`;
+  das Brett waehlt sie mit `u.zweig ?? u.kind`). Der Knopf steht in der Leiste
+  und fragt zweimal, weil die Wahl endgueltig ist.
 
   Nicht "Hexe": diesen Namen traegt schon die feindliche Figur auf der Karte
   (`HEXE_FRAKTION`, `core/hexe.ts`). Zwei Hexen mit entgegengesetzter Rolle
   waeren beim Lesen des Bretts nicht auseinanderzuhalten - und "Heilerin"
   sagt ohnehin genauer, was sie am Tempel tut.
-- Noch offen ist allein der Heldenzweig. Die Bauoptionen (Kronen-Knopf mit
-  aufleuchtenden Kacheln), die Kosten (`COST_REICHSBAU`), die Wirkungen und
-  die Weite der Umgebung (`REICH_RADIUS`, `REICH_ERWEITERUNG`) stehen.
+- **Phase 2 steht vollstaendig.** Bauoptionen (Kronen-Knopf mit aufleuchtenden
+  Kacheln), Kosten (`COST_REICHSBAU`), die drei Wirkungen, die Weite der
+  Umgebung (`REICH_RADIUS`, `REICH_ERWEITERUNG`), die Ernennung und die drei
+  ernannten Helden samt Figuren - alles gebaut und mit Tests belegt.
+
+  Was daraus noch folgen kann, ist kein Rest, sondern neue Arbeit: ein zweiter
+  Zweig nach dem ersten, Gegenstaende fuer die Ernannten, oder ein Grund, mehr
+  als einen Koenigssitz zu bauen.
 
 ### Geplant
 
