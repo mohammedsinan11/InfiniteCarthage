@@ -2037,7 +2037,28 @@ export function Board({
       }
     }
     const treffer = best as { art: 'vertex' | 'edge' | 'feuer'; key: string; d: number } | null;
-    if (!treffer) return false;
+    if (!treffer) {
+      /*
+       * Kacheln zuletzt - und nur, wenn sonst nichts getroffen wurde.
+       *
+       * Sie hatten vorher gar keinen Weg fuer den Finger: das onClick der
+       * Kachel (siehe pick) wertet nur die Maus, und hier standen nur Ecken,
+       * Kanten und Feuer. Auf dem Handy erschien damit die gelbe Markierung,
+       * der Tipp darauf verfiel aber lautlos - kein Reichsbau, kein Raeuber.
+       *
+       * Die Kachel UNTER dem Finger, nicht die naechstgelegene Mitte: eine
+       * Kachel ist gross, da ist der Ort des Tipps genauer als die Entfernung
+       * zu ihrem Mittelpunkt. Und ohne Vorschau-Tipp, anders als bei Ecke und
+       * Kante - was man trifft, ist bei einer ganzen Kachel nicht zweifelhaft.
+       */
+      const kachel = hexUnter(wx, wy);
+      const kk = hexKey(kachel.q, kachel.r);
+      if ((targets.hexes ?? []).includes(kk)) {
+        onPick('hex', kk);
+        return true;
+      }
+      return false;
+    }
     if (treffer.art === 'feuer') {
       onFeuer!(treffer.key);
       return true;
