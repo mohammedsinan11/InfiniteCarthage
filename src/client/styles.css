@@ -4047,9 +4047,36 @@ em.off {
   }
   .unten .hand {
     grid-area: hand;
-    /* Aufgeklappt lieber schieben als den Wuerfel verdecken. */
     overflow-x: auto;
     scrollbar-width: none;
+  }
+  /*
+   * AUFGEKLAPPT SCHWEBT DAS BLATT.
+   *
+   * Fuenf Karten brauchen 360 Punkte (je 62,4 plus Luecken und Rand), neben
+   * Wuerfel und Inventar bleiben rund 200. Vorher stand hier "lieber schieben
+   * als verdecken" - dadurch wurden Lehm und Erz einfach abgeschnitten, und
+   * man sah seine eigenen Rohstoffe nicht mehr.
+   *
+   * Jetzt legt es sich ueber die Leiste statt neben sie: nichts wird
+   * geschoben, nichts beschnitten, Wuerfel und Baumenue bleiben an ihrem
+   * Platz. Ein Tipp schliesst es wieder. Seine Rasterspalte bleibt so lange
+   * leer - ein kurzer, selbst herbeigefuehrter Zustand.
+   */
+  .unten .hand.hand-breit {
+    position: absolute;
+    left: 0;
+    bottom: calc(100% + 6px);
+    width: max-content;
+    max-width: calc(100vw - 20px);
+    z-index: 12;
+    /*
+     * Gemessen: mit der gewohnten Luecke von 6 braucht das Blatt 360 Punkte,
+     * erlaubt sind 355 - es scrollte also um fuenf. Mit 4 sind es 352. Die
+     * Karten bleiben dabei in voller Groesse; kleiner duerfen sie nicht
+     * werden, sonst sind Getreide und Erz nicht mehr zu unterscheiden.
+     */
+    gap: 4px;
   }
   .unten .inventar {
     grid-area: inventar;
@@ -4073,13 +4100,38 @@ em.off {
   }
   .dock-reihe {
     flex-wrap: nowrap;
+    /* Bleibt als Netz: falls je ein neunter Knopf dazukommt, laesst er sich
+       weiterhin heranschieben, statt unerreichbar zu sein. */
     overflow-x: auto;
+    gap: 2px;
+  }
+  /*
+   * Gemessen: "STRASSE" ist bei 7 Punkten 35 breit, im Knopf sind nach
+   * Innenabstand UND Rahmen nur 32 frei. Die Beschriftung ragte damit schon
+   * vorher leicht heraus - bei der alten Luecke von 4 fiel es nur nicht auf.
+   * Mit 6 Punkten bleibt sie drin.
+   */
+  .dock-titel {
+    font-size: 6px;
   }
   .dock-trenner {
     display: none;
   }
+  /*
+   * Am Geraet gemessen, nicht geschaetzt (375 Punkte Fensterbreite):
+   *
+   *   Leiste hat innen        339
+   *   42 + Luecke 4 braucht   364   -> 25 zu viel, der letzte Knopf zerschnitten
+   *   40 + Luecke 2 braucht   334   -> passt, fuenf Punkte Luft
+   *   39 + Luecke 3 braucht   333   -> passt auch, aber siehe unten
+   *
+   * Nicht 39: die breiteste Beschriftung ("STRASSE") ist 35 Punkte breit, und
+   * bei 39 bleiben nach dem Innenabstand genau 35 - also null Spielraum. Auf
+   * einem echten Geraet mit leicht anderer Schriftdarstellung raegte sie
+   * heraus. 40 gibt einen Punkt Luft.
+   */
   .dock-knopf {
-    width: 42px;
+    width: 40px;
     min-height: 48px;
     flex-shrink: 0;
   }
