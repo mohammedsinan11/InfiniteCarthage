@@ -969,7 +969,20 @@ export type Strassenstueck = {
   verbrannt?: boolean;
   /** Ohne Wimpel - etwa im Ring einer Residenz, wo Burg und Staedte schon Farbe zeigen. */
   ohneWimpel?: boolean;
+  /**
+   * Endet die Strasse hier frei, ohne dass eine andere anschliesst? Dann hoert
+   * sie KUERZEN Kunstpixel vor der Ecke auf, statt darueber hinauszuragen.
+   *
+   * Je Ende einzeln, weil der Ueberstand an einer Kreuzung erwuenscht ist: dort
+   * fliessen die Wege ineinander. Nur das freie Ende soll sauber aufhoeren
+   * (Board, freiesEnde).
+   */
+  kuerzenA?: boolean;
+  kuerzenB?: boolean;
 };
+
+/** Um so viel wird ein frei endender Weg vor der Ecke gestutzt. */
+const KUERZEN = 2;
 
 /**
  * Strassen als Feldweg entlang der Feldkante, in Geraetepixeln.
@@ -983,6 +996,11 @@ export type Strassenstueck = {
  *
  * Erst alle Raender, dann alle Wege: wo Strassen sich treffen, fliessen sie
  * ineinander. PLATZHALTER (ASSETS.md).
+ *
+ * Das Band liegt MITTIG um die Kante: Rand von -2 bis +2, Weg von -1 bis +1.
+ * Frueher lief es von -1 bis +3 und war damit um einen Kunstpixel nach unten
+ * rechts versetzt - am Ende ragte es drei Pixel ueber die Ecke hinaus und
+ * schnitt durch das Haus, das dort steht.
  */
 export function zeichneStrassen(
   ctx: CanvasRenderingContext2D,
@@ -990,12 +1008,18 @@ export function zeichneStrassen(
   f: number,
 ): void {
   const punkte = (s: Strassenstueck) => {
-    const n = Math.max(1, Math.ceil(Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y) / f));
+    // Freie Enden vor der Ecke stutzen; hoechstens bis zur Mitte, damit ein
+    // sehr kurzes Stueck nicht ganz verschwindet.
+    const laenge = Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y) || 1;
+    const t = Math.min(0.4, (KUERZEN * f) / laenge);
+    const a = s.kuerzenA ? { x: s.a.x + (s.b.x - s.a.x) * t, y: s.a.y + (s.b.y - s.a.y) * t } : s.a;
+    const b = s.kuerzenB ? { x: s.b.x - (s.b.x - s.a.x) * t, y: s.b.y - (s.b.y - s.a.y) * t } : s.b;
+    const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / f));
     const out: { x: number; y: number }[] = [];
     for (let i = 0; i <= n; i++) {
       out.push({
-        x: Math.round((s.a.x + ((s.b.x - s.a.x) * i) / n) / f) * f,
-        y: Math.round((s.a.y + ((s.b.y - s.a.y) * i) / n) / f) * f,
+        x: Math.round((a.x + ((b.x - a.x) * i) / n) / f) * f,
+        y: Math.round((a.y + ((b.y - a.y) * i) / n) / f) * f,
       });
     }
     return out;
@@ -1004,24 +1028,25 @@ export function zeichneStrassen(
 
   for (const { s, p } of alle) {
     ctx.fillStyle = s.verbrannt ? '#1f1813' : '#3a2a1e';
-    for (const q of p) ctx.fillRect(q.x - f, q.y - f, 4 * f, 4 * f);
+    for (const q of p) ctx.fillRect(q.x - 2 * f, q.y - 2 * f, 4 * f, 4 * f);
   }
   for (const { s, p } of alle) {
     ctx.fillStyle = s.verbrannt ? '#3d342d' : '#9a7b52';
-    for (const q of p) ctx.fillRect(q.x, q.y, 2 * f, 2 * f);
+    for (const q of p) ctx.fillRect(q.x - f, q.y - f, 2 * f, 2 * f);
   }
   for (const { s, p } of alle) {
     p.forEach((q, i) => {
       // Asche: hier und da Glut. Sonst jeder vierte Stein heller.
       if (s.verbrannt ? i % 6 !== 3 : i % 4 !== 0) return;
       ctx.fillStyle = s.verbrannt ? '#b8481f' : '#c8ad7f';
-      ctx.fillRect(q.x + (i % 8 === 0 ? f : 0), q.y, f, f);
+      ctx.fillRect(q.x - f + (i % 8 === 0 ? f : 0), q.y - f, f, f);
     });
   }
   for (const { s, p } of alle) {
     if (s.verbrannt || s.ohneWimpel) continue;
     const m = p[Math.floor(p.length / 2)]!;
-    zeichneFigur(ctx, 'wimpel', m.x + 3 * f, m.y + f, f, s.farbe);
+    // Mit dem Band um einen Kunstpixel nach oben links gerueckt.
+    zeichneFigur(ctx, 'wimpel', m.x + 2 * f, m.y, f, s.farbe);
   }
 }
 

@@ -1147,35 +1147,74 @@ export function Board({
     }
     const gebaeudeTiefe = (vk: string) => burgTiefe.get(vk) ?? eckTiefe(parseVertexKey(vk));
 
+    /*
+     * Wie viele Wege an einer Ecke zusammenlaufen. Eine Kante, die dort als
+     * einzige endet, hoert kurz davor auf (units.ts, KUERZEN) - sonst raegte
+     * ihr Band ueber die Ecke hinaus. An Kreuzungen bleibt der Ueberstand:
+     * dort ist er es, der die Wege ineinander fliessen laesst.
+     */
+    const eckenGrad = new Map<string, number>();
+    for (const ek of [...Object.keys(state.roads), ...asche.map(([e]) => e)]) {
+      for (const v of edgeEndpoints(parseEdgeKey(ek))) {
+        const k = vertexKey(v);
+        eckenGrad.set(k, (eckenGrad.get(k) ?? 0) + 1);
+      }
+    }
+    const freiesEnde = (ek: string): [boolean, boolean] => {
+      const [a, b] = edgeEndpoints(parseEdgeKey(ek)).map((v) => (eckenGrad.get(vertexKey(v)) ?? 0) <= 1);
+      return [a!, b!];
+    };
+
     /**
      * Strassen, Mauern, Gebaeude und Hauptstaedte auf g. nur: welche Reihen -
      * die Probe "voll" zeichnet Reihe fuer Reihe, sonst kommt alles auf einmal.
+     *
+     * was: 'wege' malt nur Strassen, Asche und Mauern, 'bauten' nur Haeuser,
+     * Tuerme und Hauptstaedte. Die Baender-Schleife unten laeuft damit ZWEIMAL
+     * durch alle Tiefen - erst alle Wege, dann alle Bauten. Sonst deckte eine
+     * Strasse das Haus an ihrer oberen Ecke zu: kantenTiefe ist das Maximum
+     * beider Eckentiefen, die Kante liegt also ein Band spaeter als das Haus
+     * und wurde danach gemalt. Jedes Band behaelt dabei seine eigene
+     * Ausstanzung durch Wald und Berg - die Verdeckung bleibt unangetastet.
      */
-    const zeichneBauten = (g: CanvasRenderingContext2D, nur: (tiefe: number) => boolean = () => true) => {
+    const zeichneBauten = (
+      g: CanvasRenderingContext2D,
+      nur: (tiefe: number) => boolean = () => true,
+      was: 'wege' | 'bauten' | 'alles' = 'alles',
+    ) => {
       zeichneStrassen(
         g,
         asche
-          .filter(([ek]) => nur(kantenTiefe(ek)))
+          .filter(([ek]) => was !== 'bauten' && nur(kantenTiefe(ek)))
           .map(([ek, owner]) => {
             const [a, b] = kantePixel(ek);
-            return { a: a!, b: b!, farbe: spielerFarbe(owner), verbrannt: true };
+            const [ka, kb] = freiesEnde(ek);
+            return { a: a!, b: b!, farbe: spielerFarbe(owner), verbrannt: true, kuerzenA: ka, kuerzenB: kb };
           }),
         f,
       );
       zeichneStrassen(
         g,
         Object.entries(state.roads)
-          .filter(([ek]) => !mauerKanten.has(ek) && nur(kantenTiefe(ek)))
+          .filter(([ek]) => was !== 'bauten' && !mauerKanten.has(ek) && nur(kantenTiefe(ek)))
           .map(([ek, owner]) => {
             const [a, b] = kantePixel(ek);
-            return { a: a!, b: b!, farbe: spielerFarbe(owner), ohneWimpel: ringOhneWimpel.has(ek) || !wimpelKante(ek) };
+            const [ka, kb] = freiesEnde(ek);
+            return {
+              a: a!,
+              b: b!,
+              farbe: spielerFarbe(owner),
+              ohneWimpel: ringOhneWimpel.has(ek) || !wimpelKante(ek),
+              kuerzenA: ka,
+              kuerzenB: kb,
+            };
           }),
         f,
       );
       zeichneMauern(
         g,
         [...mauerKanten]
-          .filter(([ek]) => nur(kantenTiefe(ek)))
+          .filter(([ek]) => was !== 'bauten' && nur(kantenTiefe(ek)))
           .map(([ek, sorte]) => {
             const [a, b] = kantePixel(ek);
             const stein = steinFuer(sorte);
@@ -1193,6 +1232,7 @@ export function Board({
           }),
         f,
       );
+      if (was === 'wege') return;
       const gebaeude = Object.entries(state.buildings)
         .filter(([vk]) => nur(gebaeudeTiefe(vk)) && !ohneBastion.has(vk))
         .map(([vk, b]) => {
@@ -1288,22 +1328,26 @@ export function Board({
           if (liste) liste.push(t);
           else hoheJeReihe.set(t.r, [t]);
         }
-        for (const tiefe of [...tiefen].sort((a, b) => a - b)) {
-          g.clearRect(0, 0, bw, bh);
-          zeichneBauten(g, (x) => x === tiefe);
-          g.globalCompositeOperation = 'destination-out';
-          for (const t of [...(hoheJeReihe.get(tiefe) ?? []), ...(hoheJeReihe.get(tiefe + 1) ?? [])]) {
-            const url = tileUrl(state.worldSeed, t.terrain, t.q, t.r);
-            const bild = url === null ? undefined : tileImage(url);
-            if (!bild || url === null) continue;
-            const stanze = maskenModus ? hoehenMaske(bild, url) : bild;
-            if (!stanze) continue;
-            const k = hexKey(t.q, t.r);
-            const { x, y } = ursprung(t.q, t.r, liftHex(t.q, t.r) + (k === hover ? LIFT : 0));
-            g.drawImage(stanze, x, y, w, h);
+        // Erst alle Wege durch alle Tiefen, dann alle Bauten: so liegt kein
+        // Weg mehr ueber einem Haus, ohne dass die Ausstanzung leidet.
+        for (const was of ['wege', 'bauten'] as const) {
+          for (const tiefe of [...tiefen].sort((a, b) => a - b)) {
+            g.clearRect(0, 0, bw, bh);
+            zeichneBauten(g, (x) => x === tiefe, was);
+            g.globalCompositeOperation = 'destination-out';
+            for (const t of [...(hoheJeReihe.get(tiefe) ?? []), ...(hoheJeReihe.get(tiefe + 1) ?? [])]) {
+              const url = tileUrl(state.worldSeed, t.terrain, t.q, t.r);
+              const bild = url === null ? undefined : tileImage(url);
+              if (!bild || url === null) continue;
+              const stanze = maskenModus ? hoehenMaske(bild, url) : bild;
+              if (!stanze) continue;
+              const k = hexKey(t.q, t.r);
+              const { x, y } = ursprung(t.q, t.r, liftHex(t.q, t.r) + (k === hover ? LIFT : 0));
+              g.drawImage(stanze, x, y, w, h);
+            }
+            g.globalCompositeOperation = 'source-over';
+            ctx.drawImage(schicht, 0, 0);
           }
-          g.globalCompositeOperation = 'source-over';
-          ctx.drawImage(schicht, 0, 0);
         }
       }
     }

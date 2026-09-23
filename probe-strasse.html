@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<title>Probe: Strasse, Haus und Anhebung</title>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; padding: 20px 24px; background: #16110b; color: #f2e7d0;
+         font: 13px/1.45 -apple-system, system-ui, sans-serif; width: 1400px; }
+  h1 { font-family: 'Silkscreen', monospace; font-size: 20px; color: #ffd76a; margin: 0 0 4px; }
+  h2 { font-family: 'Silkscreen', monospace; font-size: 14px; color: #d9a441; margin: 24px 0 6px; }
+  p.lead { margin: 0 0 12px; color: #a8987c; max-width: 1340px; }
+  .reihe { display: flex; gap: 14px; flex-wrap: nowrap; align-items: flex-start; }
+  figure { margin: 0; width: 320px; }
+  figcaption { font-size: 11.5px; color: #cdbd9c; margin-bottom: 4px; min-height: 58px; }
+  figcaption b { display: block; font-family: 'Silkscreen', monospace; font-size: 11px; color: #f2e7d0; }
+  figcaption b.gut { color: #7fd48a; }
+  figcaption b.schlecht { color: #e88b7a; }
+  canvas { display: block; image-rendering: pixelated; border: 2px solid #3a2c1c; background: #0f0c08; }
+</style></head>
+<body>
+<div id="inhalt"></div>
+<script type="module">
+// Die echten Zeichenfunktionen des Spiels - nicht nachgebaut, dieselben.
+import { zeichneGebaeude, zeichneStrassen } from '/src/client/units.ts';
+
+/*
+ * HERANGEZOOMT: zwoelf Geraetepixel je Kunstpixel, Ausschnitt nur um die Ecke.
+ * Bei Spielgroesse ueberlappen sich Strassenband und Hausfuss nur auf vier
+ * Pixeln - der Fehler ist da, aber nicht zu sehen. Darum hier gross.
+ */
+const S = 12;
+const OX = 0, OY = -20, W = 24, H = 32;
+const BLAU = '#3a7ac2';
+const KACHEL = '/src/assets/tiles/grass_1_tile.png';
+
+const NACHBARN = [[1,0],[0,1],[-1,1],[-1,0],[0,-1],[1,-1]];
+const mitteVon = (q, r) => ({ x: 23 * q + Math.ceil(11.5 * r), y: 17 * r });
+const ECKEN = NACHBARN.map(([q, r], i) => {
+  const a = mitteVon(q, r), [q2, r2] = NACHBARN[(i + 1) % 6], b = mitteVon(q2, r2);
+  return { x: Math.round((a.x + b.x) / 3), y: (a.y + b.y) / 3 };
+});
+
+const bild = (src) => new Promise((ok) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src; });
+const grass = await bild(KACHEL);
+
+function punkte(a, b, f) {
+  const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / f));
+  const out = [];
+  for (let i = 0; i <= n; i++) {
+    out.push({ x: Math.round((a.x + ((b.x - a.x) * i) / n) / f) * f,
+               y: Math.round((a.y + ((b.y - a.y) * i) / n) / f) * f });
+  }
+  return out;
+}
+
+/** Wie HEUTE: Rand von -1 bis +3, Weg von 0 bis +2 Kunstpixeln um jeden Punkt. */
+function strasseHeute(g, a, b, f) {
+  const p = punkte(a, b, f);
+  g.fillStyle = '#3a2a1e'; for (const q of p) g.fillRect(q.x - f, q.y - f, 4 * f, 4 * f);
+  g.fillStyle = '#9a7b52'; for (const q of p) g.fillRect(q.x, q.y, 2 * f, 2 * f);
+  g.fillStyle = '#c8ad7f';
+  p.forEach((q, i) => { if (i % 4 === 0) g.fillRect(q.x + (i % 8 === 0 ? f : 0), q.y, f, f); });
+}
+
+/**
+ * NEU = die ECHTE Funktion des Spiels, nicht nachgebaut. Sie traegt die
+ * Aenderung bereits: Band mittig, freie Enden gestutzt. Das untere Ende ist
+ * frei (dort haengt keine weitere Strasse), das obere traegt das Haus.
+ */
+function strasseNeu(g, a, b, f) {
+  zeichneStrassen(g, [{ a, b, farbe: BLAU, ohneWimpel: true, kuerzenA: true, kuerzenB: true }], f);
+}
+
+/**
+ * Haus auf Ecke 5, Strasse von dort senkrecht nach unten zu Ecke 0.
+ *
+ * reihenfolge 'heute': Haus zuerst, Strasse danach - so macht es das Brett,
+ * weil kantenTiefe das MAXIMUM beider Eckentiefen ist und die Kante damit im
+ * naechsten Tiefenband liegt (Board, zeichneBauten mit nur()).
+ */
+function szene({ art = 'dorf', reihenfolge = 'heute', geometrie = 'heute', anheben = 0, marke = false }) {
+  const c = document.createElement('canvas');
+  c.width = W * S; c.height = H * S;
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = false;
+
+  const hebt = (q, r) => (q === 1 && r === 0 ? anheben : 0);
+  const felder = [[0, 0], ...NACHBARN].sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+  for (const [q, r] of felder) {
+    const m = mitteVon(q, r);
+    if (grass) g.drawImage(grass, (m.x - 13 - OX) * S, (m.y - 19 - hebt(q, r) - OY) * S, 26 * S, 32 * S);
+  }
+
+  const eckPx = (i) => {
+    const [q1, r1] = NACHBARN[i], [q2, r2] = NACHBARN[(i + 1) % 6];
+    const lift = (hebt(0, 0) + hebt(q1, r1) + hebt(q2, r2)) / 3;
+    return { x: (ECKEN[i].x - OX) * S, y: (ECKEN[i].y - lift - OY) * S };
+  };
+  const oben = eckPx(5), unten = eckPx(0);
+
+  const malStrasse = () => (geometrie === 'neu' ? strasseNeu : strasseHeute)(g, oben, unten, S);
+  const malHaus = () => zeichneGebaeude(g, art, oben.x, oben.y, S, BLAU);
+  if (reihenfolge === 'heute') { malHaus(); malStrasse(); } else { malStrasse(); malHaus(); }
+
+  // Duenne Linien: wo die Kante WIRKLICH endet. Alles darunter ist Ueberstand.
+  if (marke) {
+    g.fillStyle = 'rgba(255,90,90,0.85)';
+    g.fillRect(0, unten.y, c.width, 1);
+    g.fillStyle = 'rgba(120,200,255,0.85)';
+    g.fillRect(0, oben.y, c.width, 1);
+  }
+  return c;
+}
+
+const inhalt = document.getElementById('inhalt');
+const h = (tag, text, klasse) => { const e = document.createElement(tag); e.textContent = text; if (klasse) e.className = klasse; return e; };
+
+function reihe(titel, lead, tafeln) {
+  inhalt.append(h('h2', titel));
+  if (lead) inhalt.append(h('p', lead, 'lead'));
+  const r = document.createElement('div');
+  r.className = 'reihe';
+  for (const t of tafeln) {
+    const f = document.createElement('figure');
+    const cap = document.createElement('figcaption');
+    cap.innerHTML = t.titel + t.text;
+    f.append(cap, szene(t));
+    r.append(f);
+  }
+  inhalt.append(r);
+}
+
+inhalt.append(h('h1', 'Strasse, Haus und Anhebung'));
+inhalt.append(h('p', 'Zwoelffach vergroessert. Blaue Linie: die obere Ecke, auf der das Haus steht. Rote Linie: die untere Ecke, wo die Kante endet - alles darunter ist Ueberstand. Die Spalten mit der neuen Geometrie rufen die ECHTE zeichneStrassen auf; "HEUTE" ist eine Kopie des alten Codes, den es so nicht mehr gibt.', 'lead'));
+
+reihe('Dorf: die vier Faelle', null, [
+  { art: 'dorf', reihenfolge: 'heute', geometrie: 'heute', marke: true,
+    titel: '<b class="schlecht">HEUTE</b>', text: 'Das Strassenband laeuft ueber den Hausfuss und ragt drei Pixel unter die rote Linie.' },
+  { art: 'dorf', reihenfolge: 'bauten', geometrie: 'heute', marke: true,
+    titel: '<b>LOESUNG 1 — Bauten zuletzt</b>', text: 'Haeuser nach allen Strassen, ueber alle Tiefenbaender hinweg. Der Ueberstand bleibt.' },
+  { art: 'dorf', reihenfolge: 'heute', geometrie: 'neu', marke: true,
+    titel: '<b>LOESUNG 2 — Band mittig, Ende kurz</b>', text: 'Band mittig um die Kante, zwei Pixel vor der Ecke Schluss. Die Ueberdeckung bleibt.' },
+  { art: 'dorf', reihenfolge: 'bauten', geometrie: 'neu', marke: true,
+    titel: '<b class="gut">BEIDES</b>', text: 'So wuerde ich es bauen.' },
+]);
+
+reihe('Stadt', null, [
+  { art: 'stadt', reihenfolge: 'heute', geometrie: 'heute', marke: true,
+    titel: '<b class="schlecht">HEUTE</b>', text: 'Dasselbe, nur breiter: die Strasse schneidet in die Stadt.' },
+  { art: 'stadt', reihenfolge: 'bauten', geometrie: 'neu', marke: true,
+    titel: '<b class="gut">BEIDES</b>', text: 'Die Stadt steht sauber auf ihrer Ecke.' },
+]);
+
+/*
+ * Der entscheidende Nachweis: DIESELBE Kante, einmal ungekuerzt, einmal
+ * gekuerzt - sonst alles gleich, ohne Haus. Aendert sich hier nichts, ist der
+ * Parameter wirkungslos.
+ */
+{
+  inhalt.append(h('h2', 'Wirkt das Kuerzen ueberhaupt?'));
+  inhalt.append(h('p', 'Dieselbe Kante, nur der Parameter unterscheidet sich. Die rote Linie ist die Ecke: rechts muss das Band davor aufhoeren, links darueber hinausragen.', 'lead'));
+  const r = document.createElement('div');
+  r.className = 'reihe';
+  for (const [kuerzen, titel] of [[false, 'OHNE kuerzen'], [true, 'MIT kuerzen']]) {
+    const c = document.createElement('canvas');
+    c.width = W * S; c.height = H * S;
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    g.fillStyle = '#4a7a2a';
+    g.fillRect(0, 0, c.width, c.height);
+    const eckPx = (i) => ({ x: (ECKEN[i].x - OX) * S, y: (ECKEN[i].y - OY) * S });
+    const a = eckPx(5), b = eckPx(0);
+    zeichneStrassen(g, [{ a, b, farbe: BLAU, ohneWimpel: true, kuerzenA: kuerzen, kuerzenB: kuerzen }], S);
+    g.fillStyle = 'rgba(255,60,60,0.95)';
+    g.fillRect(0, b.y, c.width, 1);
+    g.fillStyle = 'rgba(120,200,255,0.95)';
+    g.fillRect(0, a.y, c.width, 1);
+    const f = document.createElement('figure');
+    const cap = document.createElement('figcaption');
+    cap.innerHTML = '<b>' + titel + '</b>';
+    cap.style.minHeight = '0';
+    f.append(cap, c);
+    r.append(f);
+  }
+  inhalt.append(r);
+}
+
+reihe('Angehobene Kachel', 'Das Feld rechts steht vier Kunstpixel hoeher. Die Kachel springt um vier, die Ecke nur um 1,33 - sie ist das Mittel ihrer drei Felder.', [
+  { art: 'dorf', reihenfolge: 'heute', geometrie: 'heute', anheben: 4, marke: true,
+    titel: '<b class="schlecht">HEUTE</b>', text: 'Haus und Strasse sitzen zwischen den Hoehen.' },
+  { art: 'dorf', reihenfolge: 'bauten', geometrie: 'neu', anheben: 4, marke: true,
+    titel: '<b>BEIDES</b>', text: 'Besser - der Hoehenversatz bleibt aber, das ist der dritte, eigene Fehler.' },
+  { art: 'dorf', reihenfolge: 'bauten', geometrie: 'neu', anheben: 0, marke: true,
+    titel: '<b class="gut">ZUM VERGLEICH — flach</b>', text: 'Dieselbe Stelle ohne Anhebung.' },
+]);
+</script>
+</body></html>
