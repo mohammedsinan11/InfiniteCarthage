@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<title>Probe: Schichten fuer die Bewegung</title>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; padding: 20px 24px; background: #16110b; color: #f2e7d0;
+         font: 13px/1.45 -apple-system, system-ui, sans-serif; width: 1320px; }
+  h1 { font-family: 'Silkscreen', monospace; font-size: 20px; color: #ffd76a; margin: 0 0 4px; }
+  h2 { font-family: 'Silkscreen', monospace; font-size: 14px; color: #d9a441; margin: 24px 0 6px; }
+  p.lead { margin: 0 0 12px; color: #a8987c; max-width: 1260px; }
+  .reihe { display: flex; gap: 14px; flex-wrap: nowrap; align-items: flex-start; }
+  figure { margin: 0; width: 416px; }
+  figcaption { font-size: 11.5px; color: #cdbd9c; margin-bottom: 4px; min-height: 48px; }
+  figcaption b { display: block; font-family: 'Silkscreen', monospace; font-size: 11px; color: #f2e7d0; }
+  canvas { display: block; image-rendering: pixelated; border: 2px solid #3a2c1c; background: #0f0c08; }
+  #urteil { font-family: 'Silkscreen', monospace; font-size: 15px; padding: 12px 14px; margin: 16px 0 0;
+            border: 2px solid #3a2c1c; background: #1d1710; }
+  .ja { color: #7fd48a; } .nein { color: #e88b7a; }
+</style></head>
+<body>
+<div id="inhalt"></div>
+<script type="module">
+import { zeichneFigur, zeichneGebaeude, zeichneStrassen } from '/src/client/units.ts';
+import { SEASON_TINT } from '/src/client/theme.ts';
+
+const S = 7;
+const OX = -30, OY = -26, W = 60, H = 50;
+const BLAU = '#3a7ac2', ROT = '#c94f3a';
+const KACHEL = '/src/assets/tiles/grass_1_tile.png';
+const TINT = SEASON_TINT.autumn;   // die kraeftigste - faellt am ehesten auf
+
+const NACHBARN = [[1,0],[0,1],[-1,1],[-1,0],[0,-1],[1,-1]];
+const mitteVon = (q, r) => ({ x: 23 * q + Math.ceil(11.5 * r), y: 17 * r });
+const ECKEN = NACHBARN.map(([q, r], i) => {
+  const a = mitteVon(q, r), [q2, r2] = NACHBARN[(i + 1) % 6], b = mitteVon(q2, r2);
+  return { x: Math.round((a.x + b.x) / 3), y: (a.y + b.y) / 3 };
+});
+const px = (p) => ({ x: (p.x - OX) * S, y: (p.y - OY) * S });
+
+const bild = (src) => new Promise((ok) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src; });
+const grass = await bild(KACHEL);
+
+const leinwand = () => {
+  const c = document.createElement('canvas');
+  c.width = W * S; c.height = H * S;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  g.imageSmoothingEnabled = false;
+  return { c, g };
+};
+
+/* --- Die einzelnen Schritte, genau in der Reihenfolge des Bretts ---------- */
+
+/** UNTEN: Kacheln und stehende Figuren. */
+function unten(g) {
+  const felder = [[0, 0], ...NACHBARN].sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+  for (const [q, r] of felder) {
+    const m = mitteVon(q, r);
+    if (grass) g.drawImage(grass, (m.x - 13 - OX) * S, (m.y - 19 - OY) * S, 26 * S, 32 * S);
+  }
+  // Eine stehende Figur links, damit man sieht, dass die auf der unteren Schicht bleibt.
+  const steht = px({ x: mitteVon(-1, 0).x, y: mitteVon(-1, 0).y + 3 });
+  zeichneFigur(g, 'ritter', steht.x, steht.y, S, ROT);
+}
+
+/** DIE GLEITENDE FIGUR: auf halbem Weg zwischen Mitte und rechtem Nachbarn. */
+function gleitend(g) {
+  const a = mitteVon(0, 0), b = mitteVon(1, 0);
+  const p = px({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 + 3 });
+  zeichneFigur(g, 'ritter', p.x, p.y, S, BLAU);
+}
+
+/** OBEN: Strasse und Haus - OHNE Faerbung. */
+function oben(g) {
+  const o = px(ECKEN[5]), u = px(ECKEN[0]);
+  zeichneStrassen(g, [{ a: o, b: u, farbe: BLAU, ohneWimpel: true, kuerzenB: true }], S);
+  zeichneGebaeude(g, 'dorf', o.x, o.y, S, BLAU);
+}
+
+/** Die Jahreszeit ueber ALLES, was darunter liegt. */
+function faerben(g, breite, hoehe) {
+  if (TINT.alpha <= 0) return;
+  g.save();
+  g.globalCompositeOperation = TINT.mode;
+  g.globalAlpha = TINT.alpha;
+  g.fillStyle = TINT.color;
+  g.fillRect(0, 0, breite, hoehe);
+  g.restore();
+}
+
+/* --- Weg A: ein Durchgang, wie heute ------------------------------------- */
+const A = leinwand();
+unten(A.g); gleitend(A.g); oben(A.g); faerben(A.g, A.c.width, A.c.height);
+
+/* --- Weg B: zwei Zwischenleinwaende, Faerbung zuletzt --------------------- */
+const U = leinwand(); unten(U.g);          // einmal gezeichnet, dann nur kopiert
+const O = leinwand(); oben(O.g);           // ebenso - ohne Faerbung!
+const B = leinwand();
+B.g.drawImage(U.c, 0, 0);
+gleitend(B.g);
+B.g.drawImage(O.c, 0, 0);
+faerben(B.g, B.c.width, B.c.height);
+
+/* --- Der Vergleich: Pixel gegen Pixel ------------------------------------ */
+const da = A.g.getImageData(0, 0, A.c.width, A.c.height).data;
+const db = B.g.getImageData(0, 0, B.c.width, B.c.height).data;
+const D = leinwand();
+const diff = D.g.createImageData(D.c.width, D.c.height);
+let anders = 0, groesste = 0;
+for (let i = 0; i < da.length; i += 4) {
+  const d = Math.max(Math.abs(da[i] - db[i]), Math.abs(da[i+1] - db[i+1]), Math.abs(da[i+2] - db[i+2]), Math.abs(da[i+3] - db[i+3]));
+  if (d > 0) { anders++; groesste = Math.max(groesste, d); }
+  // Unterschiede in Magenta, alles Gleiche dunkel.
+  diff.data[i] = d > 0 ? 255 : 20;
+  diff.data[i+1] = d > 0 ? 0 : 16;
+  diff.data[i+2] = d > 0 ? 255 : 12;
+  diff.data[i+3] = 255;
+}
+D.g.putImageData(diff, 0, 0);
+
+const inhalt = document.getElementById('inhalt');
+const h = (tag, text, klasse) => { const e = document.createElement(tag); e.textContent = text; if (klasse) e.className = klasse; return e; };
+
+inhalt.append(h('h1', 'Schichten fuer die Bewegung'));
+inhalt.append(h('p', 'Links, wie das Brett es heute macht: alles in EINEM Durchgang. In der Mitte der geplante Umbau: untere Schicht kopieren, gleitende Figur malen, obere Schicht kopieren, zuletzt faerben. Rechts der Unterschied, Pixel gegen Pixel. Der rote Ritter steht (untere Schicht), der blaue gleitet - er muss in beiden Bildern HINTER dem Haus liegen und von der Jahreszeit mitgefaerbt sein.', 'lead'));
+
+const r = document.createElement('div');
+r.className = 'reihe';
+for (const [c, titel, text] of [
+  [A.c, 'WEG A — heute', 'Ein Durchgang: Kacheln, stehende Figur, gleitende Figur, Strasse und Haus, Faerbung.'],
+  [B.c, 'WEG B — drei Schichten', 'Untere Schicht, gleitende Figur, obere Schicht, Faerbung zuletzt aufs Ergebnis.'],
+  [D.c, 'UNTERSCHIED', 'Magenta = abweichendes Pixel. Ganz dunkel heisst: identisch.'],
+]) {
+  const f = document.createElement('figure');
+  const cap = document.createElement('figcaption');
+  cap.innerHTML = '<b>' + titel + '</b>' + text;
+  f.append(cap, c);
+  r.append(f);
+}
+inhalt.append(r);
+
+const urteil = document.createElement('p');
+urteil.id = 'urteil';
+const gesamt = (A.c.width * A.c.height);
+urteil.innerHTML = anders === 0
+  ? '<span class="ja">IDENTISCH — 0 von ' + gesamt + ' Pixeln weichen ab. Der Umbau ist verlustfrei.</span>'
+  : '<span class="nein">NICHT IDENTISCH — ' + anders + ' von ' + gesamt + ' Pixeln weichen ab, groesste Abweichung ' + groesste + '. So darf es nicht gebaut werden.</span>';
+inhalt.append(urteil);
+</script>
+</body></html>

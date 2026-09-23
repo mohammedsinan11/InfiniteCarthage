@@ -462,6 +462,31 @@ export function Board({
   const ueberhangRef = useRef<HTMLCanvasElement | null>(null);
   /** Schicht fuer die Probe "voll" - Bauten Reihe fuer Reihe, ausgestanzt von Wald und Bergen. */
   const vollRef = useRef<HTMLCanvasElement | null>(null);
+  /*
+   * ZWEI SCHICHTEN FUER DIE BEWEGUNG.
+   *
+   * Die untere traegt Kacheln und stehende Figuren, die obere Strassen,
+   * Bauten, Baender und Gipfel. Dazwischen gehoeren die gleitenden Einheiten -
+   * deshalb zwei Leinwaende und nicht eine: ein ziehender Ritter laeuft HINTER
+   * Haeusern durch, und das soll er weiter tun.
+   *
+   * Der grosse Zeichen-Effekt fuellt beide einmal je Zustandsaenderung. Das
+   * Einzelbild kopiert danach nur noch und malt die Gleitenden neu. Vorher
+   * stand animZeit in seiner Abhaengigkeitsliste - bei jeder Bewegung wurde
+   * das ganze Brett in jedem Einzelbild neu gemalt, Kacheln und Lichter und
+   * Nebel inbegriffen. Genau das war das Ruckeln auf dem Handy.
+   */
+  const untenRef = useRef<HTMLCanvasElement | null>(null);
+  const obenRef = useRef<HTMLCanvasElement | null>(null);
+  /** Was ein Einzelbild zum Zusammensetzen braucht - ohne den Kacheldurchlauf. */
+  const schichtenRef = useRef<{
+    bw: number;
+    bh: number;
+    f: number;
+    fackeln: boolean;
+    tint: (typeof SEASON_TINT)[keyof typeof SEASON_TINT];
+    leute: { u: Unit; fx: number; fy: number; sx: number; sy: number }[];
+  } | null>(null);
   /**
    * Aufgelaufene Raddrehung.
    *
@@ -824,28 +849,95 @@ export function Board({
   }, [hover, state, sicht, du, kampf, farbeSeite]);
 
   /**
-   * Gelaende auf das Canvas zeichnen.
+   * Das sichtbare Canvas aus den beiden Schichten zusammensetzen.
    *
-   * Der Speicher hinter dem Canvas ist um devicePixelRatio groesser als die
-   * angezeigte Flaeche, sonst waere schon die Aufloesung zu grob. Danach wird
-   * jede Kachel auf ganze Geraetepixel gerundet gezeichnet - Bruchteile
+   * Untere Schicht, gleitende Einheiten, obere Schicht - und ganz zuletzt die
+   * Jahreszeit ueber alles. Die Faerbung darf NICHT auf einer der Schichten
+   * liegen: sie ist ein multiply ueber das gesamte Bild darunter, auf einer
+   * eigenen durchsichtigen Leinwand faerbte sie nur deren eigene Pixel.
+   *
+   * Nachgewiesen in probe-schichten.html: derselbe Aufbau wie frueher, bis auf
+   * 272 von 147000 Pixeln mit Abweichung 1 - der halbdurchsichtige Schatten
+   * unter den Haeusern wird zweimal zusammengesetzt und dabei zweimal
+   * gerundet. Unsichtbar, und bei jeder Schichtloesung unvermeidlich.
+   */
+  const komponiere = useCallback(() => {
+    const cv = canvasRef.current;
+    const unten = untenRef.current;
+    const oben = obenRef.current;
+    const d = schichtenRef.current;
+    if (!cv || !unten || !oben || !d) return;
+    const ctx = cv.getContext('2d');
+    if (!ctx) return;
+    if (cv.width !== d.bw) cv.width = d.bw;
+    if (cv.height !== d.bh) cv.height = d.bh;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, d.bw, d.bh);
+    ctx.drawImage(unten, 0, 0);
+
+    // Gleitende Einheiten: vom alten Feld zum Platz auf dem neuen, mit Hopsern.
+    const jetzt = performance.now();
+    for (const { u, fx, fy, sx, sy } of d.leute) {
+      const b = bewegung.current.get(u.id);
+      if (!b) continue;
+      const p = Math.min(1, Math.max(0, (jetzt - b.start) / b.dauer));
+      const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+      const hops = Math.round(Math.abs(Math.sin(p * Math.PI * 2 * b.schritte)) * 2) * d.f;
+      const x = Math.round(sx + (fx - sx) * e);
+      const y = Math.round(sy + (fy - sy) * e) - hops;
+      zeichneFigur(ctx, u.zweig ?? u.kind, x, y, d.f, farbeSeite(seiteVon(u)));
+      if (d.fackeln) zeichneFigur(ctx, 'fackel', x + 5 * d.f, y - 2 * d.f, d.f);
+      const max = maxLeben(u);
+      if (u.leben < max) zeichneLeben(ctx, u.kind, x, y, d.f, u.leben, max);
+    }
+
+    ctx.drawImage(oben, 0, 0);
+    if (d.tint.alpha > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = d.tint.mode;
+      ctx.globalAlpha = d.tint.alpha;
+      ctx.fillStyle = d.tint.color;
+      ctx.fillRect(0, 0, d.bw, d.bh);
+      ctx.restore();
+    }
+  }, [farbeSeite]);
+
+  /**
+   * Gelaende auf die UNTERE Schicht zeichnen, alles Gebaute auf die obere.
+   *
+   * Der Speicher hinter den Leinwaenden ist um devicePixelRatio groesser als
+   * die angezeigte Flaeche, sonst waere schon die Aufloesung zu grob. Danach
+   * wird jede Kachel auf ganze Geraetepixel gerundet gezeichnet - Bruchteile
    * fuehren selbst mit abgeschalteter Glaettung zu weichen Kanten.
+   *
+   * ctx ist bewusst ein let: an der Nahtstelle (bei den gleitenden Einheiten)
+   * zeigt es auf die obere Schicht um. So wandert alles Nachfolgende dorthin,
+   * ohne dass sechshundert Zeichenaufrufe angefasst werden mussten.
    */
   useEffect(() => {
     const cv = canvasRef.current;
     if (!cv || !tilesReady) return;
-    const ctx = cv.getContext('2d');
-    if (!ctx) return;
 
     const bw = Math.round(size.w * dpr);
     const bh = Math.round(size.h * dpr);
-    if (cv.width !== bw) cv.width = bw;
-    if (cv.height !== bh) cv.height = bh;
+    const unten = (untenRef.current ??= document.createElement('canvas'));
+    const oben = (obenRef.current ??= document.createElement('canvas'));
+    for (const s of [unten, oben]) {
+      if (s.width !== bw) s.width = bw;
+      if (s.height !== bh) s.height = bh;
+    }
+    const gUnten = unten.getContext('2d');
+    const gOben = oben.getContext('2d');
+    if (!gUnten || !gOben) return;
+    let ctx = gUnten;
 
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, bw, bh);
-    // Das eine, worum es hier geht.
-    ctx.imageSmoothingEnabled = false;
+    for (const g of [gUnten, gOben]) {
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.clearRect(0, 0, bw, bh);
+      // Das eine, worum es hier geht.
+      g.imageSmoothingEnabled = false;
+    }
 
     /**
      * Wo das Kachelbild eines Feldes beginnt, in Geraetepixeln - auf ganzen
@@ -880,7 +972,8 @@ export function Board({
     const fackeln = tageszeit === 'nacht' || tageszeit === 'abend';
     /** Wer gerade gleitet - wird nach allen Kacheln an seiner Zwischenposition gezeichnet. */
     const unterwegs: { u: Unit; fx: number; fy: number }[] = [];
-    const jetzt = performance.now();
+    /** Dieselben, fertig fuer das Einzelbild: Start- und Zielpunkt in Geraetepixeln. */
+    let gleitende: { u: Unit; fx: number; fy: number; sx: number; sy: number }[] = [];
 
     /**
      * Was auf dem Feld steht: erst das Lager, dann die Figuren von hinten nach
@@ -1011,23 +1104,24 @@ export function Board({
       }
     }
 
-    // Gleitende Einheiten: vom alten Feld zum Platz auf dem neuen, mit Hopsern.
-    for (const { u, fx, fy } of unterwegs) {
+    /*
+     * DIE NAHTSTELLE. Hier wurden die gleitenden Einheiten gemalt; jetzt wird
+     * nur noch festgehalten, WO sie herkommen und wo sie hinwollen - gezeichnet
+     * werden sie je Einzelbild in komponiere(). Ab hier zeigt ctx auf die obere
+     * Schicht, alles Folgende landet also ueber den Gleitenden.
+     */
+    gleitende = unterwegs.map(({ u, fx, fy }) => {
       const b = bewegung.current.get(u.id);
-      if (!b) continue;
-      const p = Math.min(1, Math.max(0, (jetzt - b.start) / b.dauer));
-      const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
-      const von = ursprung(b.von.q, b.von.r, liftHex(b.von.q, b.von.r));
-      const sx = von.x + Math.round(HEX_CX) * f;
-      const sy = von.y + Math.round(HEX_CY) * f + 4 * f;
-      const hops = Math.round(Math.abs(Math.sin(p * Math.PI * 2 * b.schritte)) * 2) * f;
-      const x = Math.round(sx + (fx - sx) * e);
-      const y = Math.round(sy + (fy - sy) * e) - hops;
-      zeichneFigur(ctx, u.zweig ?? u.kind, x, y, f, farbeSeite(seiteVon(u)));
-      if (fackeln) zeichneFigur(ctx, 'fackel', x + 5 * f, y - 2 * f, f);
-      const max = maxLeben(u);
-      if (u.leben < max) zeichneLeben(ctx, u.kind, x, y, f, u.leben, max);
-    }
+      const von = b ? ursprung(b.von.q, b.von.r, liftHex(b.von.q, b.von.r)) : { x: fx, y: fy };
+      return {
+        u,
+        fx,
+        fy,
+        sx: von.x + (b ? Math.round(HEX_CX) * f : 0),
+        sy: von.y + (b ? Math.round(HEX_CY) * f + 4 * f : 0),
+      };
+    });
+    ctx = gOben;
 
     /*
      * Strassen, Doerfer und Staedte als Pixelgrafik (units.ts). Frueher glatte
@@ -1490,15 +1584,20 @@ export function Board({
      * Ganz zuletzt, damit auch das angehobene Feld mitgefaerbt wird - sonst
      * leuchtete ausgerechnet das Feld unter dem Zeiger aus der Reihe.
      */
-    const tint = SEASON_TINT[seasonOf(state.turn)];
-    if (tint.alpha > 0) {
-      ctx.save();
-      ctx.globalCompositeOperation = tint.mode;
-      ctx.globalAlpha = tint.alpha;
-      ctx.fillStyle = tint.color;
-      ctx.fillRect(0, 0, bw, bh);
-      ctx.restore();
-    }
+    /*
+     * Die Jahreszeit wird NICHT mehr hier gemalt: sie liegt ueber allem, auch
+     * ueber den gleitenden Einheiten, und gehoert deshalb ans Ende von
+     * komponiere() - auf das fertige Bild statt auf eine Schicht.
+     */
+    schichtenRef.current = {
+      bw,
+      bh,
+      f,
+      fackeln,
+      tint: SEASON_TINT[seasonOf(state.turn)],
+      leute: gleitende,
+    };
+    komponiere();
   }, [
     visible,
     view,
@@ -1520,9 +1619,18 @@ export function Board({
     geisterBau,
     tageszeit,
     dpr,
-    animZeit,
     kampf,
+    komponiere,
   ]);
+
+  /*
+   * Das Einzelbild waehrend einer Bewegung: nur zusammensetzen, nicht neu
+   * zeichnen. Drei drawImage und eine Handvoll Figuren statt des ganzen
+   * Bretts - deshalb darf animZeit hier haengen und nicht oben.
+   */
+  useEffect(() => {
+    komponiere();
+  }, [animZeit, komponiere]);
 
   /** Eine Stufe naeher (+1) oder weiter weg (-1); der Punkt unter x/y bleibt stehen. */
   const zoomUm = useCallback((richtung: number, mausX: number, mausY: number) => {
