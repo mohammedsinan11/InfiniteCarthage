@@ -13,6 +13,7 @@
 import type { GameState } from '../state';
 import { GESTALTEN } from '../lore';
 import { Rng } from '../rng';
+import { ersteAktiveReichskarten } from '../cards/loadout';
 
 export function migriereStand(state: GameState): GameState {
   // Wachtuerme standen frueher neben einem Haus (Building.turm), heute stehen
@@ -43,6 +44,23 @@ export function migriereStand(state: GameState): GameState {
   // Der ernannte Held kam danach dazu. Wer schon spielt, hat noch keinen und
   // darf ihn nachholen, sobald sein Koenigssitz steht (rules/zweig.ts).
   for (const p of state.players) if (p.ernannt === undefined) p.ernannt = null;
+  // Die Kartensammlung wurde in Reich, Taktik und Ausruestung getrennt. Alte
+  // Dauerwirkungen fuellen die neuen Plaetze in ihrer bisherigen Reihenfolge.
+  for (const p of state.players) {
+    if (!p.activeCards) p.activeCards = ersteAktiveReichskarten(state, p);
+    if (!p.tactics) p.tactics = [];
+    if (!p.equipment) p.equipment = [];
+    if (p.ruhm === undefined) p.ruhm = 0;
+  }
+  if (!state.tacticBuffs) state.tacticBuffs = [];
+  if (state.ruhmreichster === undefined) {
+    // Den alten Zwei-Punkte-Titel erhalten, ohne alle ausgespielten Ritter
+    // nachtraeglich zu Ruhmestaten umzudeuten.
+    const alt = state.largestArmy ?? null;
+    state.ruhmreichster = alt;
+    const traeger = state.players.find((p) => p.id === alt);
+    if (traeger) traeger.ruhm = Math.max(5, traeger.ruhm);
+  }
   // Siege und Stufe kamen mit dem Levelsystem dazu: wer schon auf der Karte
   // steht, faengt bei null an (DESIGN.md, Stufen).
   for (const u of state.units) {

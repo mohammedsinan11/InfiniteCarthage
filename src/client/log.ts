@@ -307,8 +307,10 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
       return `${who(state, e.from)} gibt ${bundleText(e.give)} an ${who(state, e.to)} und erhaelt ${bundleText(e.want)}.`;
     case 'tradeCancelled':
       return `${who(state, e.player)} zieht das Angebot zurueck.`;
-    case 'largestArmy':
-      return `${who(state, e.player)} hat die Groesste Rittermacht.`;
+    case 'glory':
+      return `${who(state, e.player)} gewinnt ${e.amount} Ruhm.`;
+    case 'tacticPlayed':
+      return `${who(state, e.player)} spielt ${cardById(e.card)?.name ?? 'eine Taktik'}.`;
     case 'chunks':
       return e.coords.length === 1
         ? 'Die Karte waechst um ein Gebiet.'

@@ -83,7 +83,13 @@ import { nextStep } from '../units';
 import { bigRoundChangedAt } from '../season';
 import { draftOptions } from '../cards/draft';
 import { cardById } from '../cards/catalog';
+import { cardKind, dauerwirkungen, istEinzigartig } from '../cards/types';
 import type { DraftSource } from '../cards/types';
+import { aktiviereNeueReichskarte } from '../cards/loadout';
+import { playTactic } from './tactics';
+import type { TacticEvent } from './tactics';
+import { ruhmAusEreignissen } from './ruhm';
+import type { RuhmEvent } from './ruhm';
 import {
   canAcceptTrade,
   canBankTrade,
@@ -92,7 +98,7 @@ import {
   moveBundle,
   tradeRatio,
 } from './trade';
-import { drawDevCard, largestArmyHolder } from './dev';
+import { drawDevCard } from './dev';
 
 export type Action =
   | { t: 'placeSettlement'; vertex: string }
@@ -116,7 +122,9 @@ export type Action =
   /** Anbieter zieht sein Angebot zurueck. */
   | { t: 'cancelTrade' }
   /** Eine der drei angebotenen Karten nehmen. */
-  | { t: 'chooseCard'; card: string }
+  | { t: 'chooseCard'; card: string; resources?: Bundle }
+  /** Eine ausspielbare Taktikkarte auf eine eigene Einheit oder deren Feld anwenden. */
+  | { t: 'playTactic'; card: string; unit: number }
   /** Einen Ritter anwerben - er tritt an einer eigenen Siedlung an. */
   | { t: 'recruitKnight' }
   | { t: 'recruitArcher' }
@@ -183,7 +191,6 @@ export type GameEvent =
   | { t: 'tradeResponse'; player: PlayerId; accept: boolean }
   | { t: 'tradeSettled'; from: PlayerId; to: PlayerId; give: Bundle; want: Bundle }
   | { t: 'tradeCancelled'; player: PlayerId }
-  | { t: 'largestArmy'; player: PlayerId }
   | { t: 'draftOffered'; player: PlayerId; source: DraftSource; options: string[] }
   | { t: 'cardTaken'; player: PlayerId; card: string }
   | { t: 'chunks'; coords: ChunkCoord[] }
@@ -192,7 +199,9 @@ export type GameEvent =
   /** Heer, Raubzuege, Gefechte, Lager, Ruinen, Held und Feuer - siehe rules/army.ts. */
   | ArmyEvent
   | DiplomatieEvent
-  | AuftragEvent;
+  | AuftragEvent
+  | TacticEvent
+  | RuhmEvent;
 
 export type Game = { state: GameState; world: World };
 
@@ -254,7 +263,11 @@ export function createGame(
       hand: emptyHand(),
       dev: [],
       playedKnights: 0,
+      ruhm: 0,
       cards: [],
+      activeCards: [],
+      tactics: [],
+      equipment: [],
       loot: 0,
       connected: true,
       heldZurueck: null,
@@ -274,11 +287,12 @@ export function createGame(
     turn: 0,
     lastRoll: null,
     targetPoints,
-    largestArmy: null,
+    ruhmreichster: null,
     trade: null,
     draft: null,
     chunks: added,
     units: [],
+    tacticBuffs: [],
     nextUnitId: 1,
     destroyedNests: [],
     nestGarrison: {},
@@ -378,7 +392,9 @@ function enterDraft(
   // Mit salt zeigen mehrere Wahlen derselben Runde verschiedene Karten - etwa
   // zwei eingeloeste Beuten hintereinander. Ohne salt bleibt alles wie gehabt.
   const runde = salt === 0 ? state.turn : state.turn * 64 + salt;
-  const options = draftOptions(state.secretSeed, runde, source);
+  const spieler = playerById(state, state.order[state.current]!);
+  const owned = spieler ? [...spieler.cards, ...spieler.equipment] : [];
+  const options = draftOptions(state.secretSeed, runde, source, owned);
   state.draft = { source, options };
   state.phase = { t: 'draft' };
   events.push({
@@ -518,24 +534,34 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       const karte = cardById(action.card);
       if (!karte) return fail('Unbekannte Karte.');
 
-      actorPlayer.cards.push(karte.id);
+      if (istEinzigartig(karte) && [...actorPlayer.cards, ...actorPlayer.equipment].includes(karte.id)) {
+        return fail('Diese einzigartige Karte besitzt du bereits.');
+      }
+
+      // Eine echte Wahl: Anzahl, Ganzzahligkeit und alle fuenf Sorten werden
+      // serverseitig geprueft, nicht nur in der Oberflaeche.
+      if (karte.instant?.t === 'gainAny') {
+        const wahl = action.resources ?? {};
+        const anzahl = RESOURCES.reduce((n, r) => n + (wahl[r] ?? 0), 0);
+        const ungueltig = RESOURCES.some((r) => !Number.isInteger(wahl[r] ?? 0) || (wahl[r] ?? 0) < 0);
+        if (ungueltig || anzahl !== karte.instant.count) {
+          return fail(`Waehle genau ${karte.instant.count} Rohstoffe.`);
+        }
+      }
+
+      if (cardKind(karte) === 'taktik') actorPlayer.tactics.push(karte.id);
+      else if (cardKind(karte) === 'ausruestung') actorPlayer.equipment.push(karte.id);
+      else {
+        actorPlayer.cards.push(karte.id);
+        if (dauerwirkungen(karte).length > 0) aktiviereNeueReichskarte(s, actorPlayer, karte.id);
+      }
 
       // Sofortwirkung - die Bank ist unendlich.
       if (karte.instant) {
         if (karte.instant.t === 'gain') {
           for (const r of RESOURCES) actorPlayer.hand[r] += karte.instant.resources[r] ?? 0;
         } else {
-          // "Beliebige" Rohstoffe: gleichmaessig verteilt, damit die Regel
-          // ohne Rueckfrage auskommt. Eine echte Wahl waere eine eigene
-          // Phase - das lohnt erst, wenn es mehr solcher Karten gibt.
-          let offen = karte.instant.count;
-          for (let runde = 0; runde < karte.instant.count && offen > 0; runde++) {
-            for (const r of RESOURCES) {
-              if (offen <= 0) break;
-              actorPlayer.hand[r] += 1;
-              offen -= 1;
-            }
-          }
+          for (const r of RESOURCES) actorPlayer.hand[r] += action.resources?.[r] ?? 0;
         }
       }
 
@@ -543,6 +569,13 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       s.phase = { t: 'main' };
       events.push({ t: 'cardTaken', player: actor, card: karte.id });
       checkWin(s, events);
+      break;
+    }
+
+    case 'playTactic': {
+      if (phase.t !== 'main') return fail('Taktiken werden in der Bauphase vorbereitet.');
+      const why = playTactic(s, actor, action.card, action.unit, events);
+      if (why) return fail(why);
       break;
     }
 
@@ -639,16 +672,10 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       actorPlayer.playedKnights += 1;
       events.push({ t: 'playDev', player: actor, card: 'knight' });
       spawnKnight(s, actor, events);
-
-      const holder = largestArmyHolder(s);
-      if (holder !== s.largestArmy && holder !== null) {
-        s.largestArmy = holder;
-        events.push({ t: 'largestArmy', player: holder });
-      }
       /*
        * Der Ritter tritt als Einheit an einer eigenen Siedlung an (rules/army.ts)
-       * und zieht von dort, wohin man ihn schickt. Fuer die Groesste Rittermacht
-       * zaehlt er weiter - auch wenn er spaeter faellt.
+       * und zieht von dort, wohin man ihn schickt. Ruhm entsteht erst durch
+       * Taten auf der Karte, nicht schon durch das Ausspielen.
        */
       checkWin(s, events);
       break;
@@ -1109,6 +1136,11 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       return fail('Unbekannte Aktion: ' + JSON.stringify(never));
     }
   }
+
+  // Kampf, Lager, Auftraege und Veteranen laufen in verschiedenen Regeln.
+  // Ihre bereits erzeugten Ereignisse bilden an einer Stelle den Ruhm.
+  const geschehen = [...events] as Array<{ t: string } & Record<string, unknown>>;
+  ruhmAusEreignissen(s, geschehen, events);
 
   game.state = s;
   return { ok: true, events };

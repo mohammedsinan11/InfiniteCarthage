@@ -22,6 +22,7 @@ import { productionSources } from '../src/core/rules/production';
 import { dauerwirkungen } from '../src/core/cards/types';
 import { tradeRatio } from '../src/core/rules/trade';
 import { RESOURCES } from '../src/core/types';
+import { aktiviereNeueReichskarte, reichskartenPlaetze } from '../src/core/cards/loadout';
 
 const QUELLEN: DraftSource[] = ['fund', 'belohnung', 'markt'];
 
@@ -29,6 +30,13 @@ function must(game: Game, action: Action, actor: PlayerId) {
   const r = applyAction(game, action, actor);
   if (!r.ok) throw new Error(`${action.t} scheiterte: ${r.error}`);
   return r;
+}
+
+function kartenwahl(id: string): Action {
+  const sofort = cardById(id)?.instant;
+  return sofort?.t === 'gainAny'
+    ? { t: 'chooseCard', card: id, resources: { lumber: sofort.count } }
+    : { t: 'chooseCard', card: id };
 }
 
 const phaseOf = (game: Game): string => game.state.phase.t;
@@ -84,6 +92,21 @@ describe('Auswahl', () => {
     }
   });
 
+  it('zeigt drei Karten derselben Seltenheit, damit die Wahl vergleichbar bleibt', () => {
+    for (const q of QUELLEN) {
+      for (let runde = 1; runde <= 40; runde++) {
+        const stufen = draftOptions(8128, runde, q).map((id) => cardById(id)!.rarity);
+        expect(new Set(stufen).size).toBe(1);
+      }
+    }
+  });
+
+  it('bietet eine bereits besessene Dauerkarte nicht erneut an', () => {
+    for (let runde = 1; runde <= 100; runde++) {
+      expect(draftOptions(17, runde, 'fund', ['holzlager'])).not.toContain('holzlager');
+    }
+  });
+
   it('haengt an Seed, Runde und Quelle', () => {
     expect(draftOptions(1, 5, 'fund')).not.toEqual(draftOptions(2, 5, 'fund'));
     expect(draftOptions(1, 5, 'fund')).not.toEqual(draftOptions(1, 6, 'fund'));
@@ -124,15 +147,25 @@ describe('Auswahl', () => {
 });
 
 describe('Dauerwirkungen', () => {
-  it('summiert gleichartige Boni', () => {
-    const m = modifiersOf(['holzlager', 'der_fund']);
-    expect(m.terrainBonus.forest).toBe(3); // 1 + 2
+  it('hat anfangs zwei aktive Plaetze und ersetzt bei einer neuen Wahl die aelteste Karte', () => {
+    const game = solo();
+    const p = playerById(game.state, 'p0')!;
+    expect(reichskartenPlaetze(game.state, 'p0')).toBe(2);
+    aktiviereNeueReichskarte(game.state, p, 'holzlager');
+    aktiviereNeueReichskarte(game.state, p, 'steinbruch');
+    aktiviereNeueReichskarte(game.state, p, 'schafzucht');
+    expect(p.activeCards).toEqual(['steinbruch', 'schafzucht']);
   });
 
-  it('rechnet Handelsrabatt und Handkartengrenze zusammen', () => {
+  it('begrenzt gleichartige Ertragsboni', () => {
+    const m = modifiersOf(['holzlager', 'der_fund']);
+    expect(m.terrainBonus.forest).toBe(2);
+  });
+
+  it('laesst Handelsrabatt nicht stapeln und nimmt den besten Vorrat', () => {
     const m = modifiersOf(['handelsposten', 'markttag', 'vorratskammer']);
-    expect(m.tradeDiscount).toBe(3);
-    expect(m.handLimitBonus).toBe(3);
+    expect(m.tradeDiscount).toBe(1);
+    expect(m.handLimitBonus).toBe(2);
   });
 
   it('laesst einen Ertrag nie ins Negative kippen', () => {
@@ -165,9 +198,10 @@ describe('Der Fund', () => {
     expect(wuerfelBisSieben(game)).toBe(true);
     const wahl = game.state.draft!.options[1]!;
 
-    must(game, { t: 'chooseCard', card: wahl }, 'p0');
+    must(game, kartenwahl(wahl), 'p0');
 
-    expect(playerById(game.state, 'p0')!.cards).toContain(wahl);
+    const p = playerById(game.state, 'p0')!;
+    expect([...p.cards, ...p.tactics, ...p.equipment]).toContain(wahl);
     expect(game.state.draft).toBeNull();
     expect(phaseOf(game)).toBe('main');
   });
@@ -191,7 +225,7 @@ describe('Der Fund', () => {
     const vorher = { ...playerById(game.state, 'p0')!.hand };
     const wahl = game.state.draft!.options[0]!;
     const karte = cardById(wahl)!;
-    must(game, { t: 'chooseCard', card: wahl }, 'p0');
+    must(game, kartenwahl(wahl), 'p0');
 
     const nachher = playerById(game.state, 'p0')!.hand;
     const zugewinn = RESOURCES.reduce((n, r) => n + (nachher[r] - vorher[r]), 0);
@@ -199,6 +233,21 @@ describe('Der Fund', () => {
     else if (karte.instant.t === 'gain') {
       expect(zugewinn).toBe(RESOURCES.reduce((n, r) => n + ((karte.instant as { resources: Partial<Record<string, number>> }).resources[r] ?? 0), 0));
     } else expect(zugewinn).toBe(karte.instant.count);
+  });
+
+  it('fordert bei beliebigen Rohstoffen eine exakte, echte Wahl', () => {
+    const game = solo();
+    runSetup(game);
+    game.state.phase = { t: 'draft' };
+    game.state.draft = { source: 'fund', options: ['wanderhaendler', 'baumeister', 'muehlen'] };
+
+    expect(applyAction(game, { t: 'chooseCard', card: 'wanderhaendler' }, 'p0')).toEqual({
+      ok: false,
+      error: 'Waehle genau 5 Rohstoffe.',
+    });
+    must(game, { t: 'chooseCard', card: 'wanderhaendler', resources: { wool: 2, ore: 3 } }, 'p0');
+    expect(playerById(game.state, 'p0')!.hand.wool).toBeGreaterThanOrEqual(2);
+    expect(playerById(game.state, 'p0')!.hand.ore).toBeGreaterThanOrEqual(3);
   });
 });
 
@@ -223,6 +272,7 @@ describe('Karten wirken auf die Regeln', () => {
     );
     if (!karte) return; // fuer dieses Gelaende gibt es keine Karte - kein Fehler
     p.cards.push(karte.id);
+    p.activeCards.push(karte.id);
 
     const nachher = productionSources(game.state, game.world, wurf!);
     const summe = (q: typeof vorher) =>
@@ -238,11 +288,13 @@ describe('Karten wirken auf die Regeln', () => {
 
     const ohne = tradeRatio(game.state, game.world, 'p0', 'lumber');
     p.cards.push('handelsposten');
+    p.activeCards.push('handelsposten');
     expect(tradeRatio(game.state, game.world, 'p0', 'lumber')).toBe(ohne - 1);
 
-    // Genug Rabatt fuer eine 1:1 - die Grenze muss halten.
-    p.cards.push('markttag', 'markttag', 'markttag');
-    expect(tradeRatio(game.state, game.world, 'p0', 'lumber')).toBe(2);
+    // Eine zweite Rabattkarte stapelt sich nicht.
+    p.cards.push('markttag');
+    p.activeCards.push('markttag');
+    expect(tradeRatio(game.state, game.world, 'p0', 'lumber')).toBe(ohne - 1);
   });
 
   it('heben die Handkartengrenze', () => {
@@ -251,7 +303,8 @@ describe('Karten wirken auf die Regeln', () => {
     const p = playerById(game.state, 'p0')!;
     const vorher = limitFor(game.state, 'p0');
     p.cards.push('vorratskammer');
-    expect(limitFor(game.state, 'p0')).toBe(vorher + 3);
+    p.activeCards.push('vorratskammer');
+    expect(limitFor(game.state, 'p0')).toBe(vorher + 2);
   });
 });
 
@@ -276,7 +329,7 @@ describe('Der Spielstand ueberlebt den Schlaf', () => {
     expect(sicht.draft?.options).toHaveLength(3);
 
     // Und die Partie muss weiterlaufen.
-    must(wieder, { t: 'chooseCard', card: wieder.state.draft!.options[0]! }, 'p0');
+    must(wieder, kartenwahl(wieder.state.draft!.options[0]!), 'p0');
     expect(phaseOf(wieder)).toBe('main');
   });
 

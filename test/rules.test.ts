@@ -13,6 +13,7 @@ import { redactStateFor, redactEventsFor } from '../src/core/redact';
 import { tradeRatio } from '../src/core/rules/trade';
 import { RESOURCES } from '../src/core/types';
 import { vertexNeighborVertices, parseVertexKey, vertexKey, hexEdges, edgeKey } from '../src/core/coords';
+import { cardById } from '../src/core/cards/catalog';
 
 const NAMES = ['Anna', 'Bert', 'Cem', 'Dana'];
 
@@ -28,6 +29,13 @@ function must(game: Game, action: Action, actor: PlayerId) {
   const r = applyAction(game, action, actor);
   if (!r.ok) throw new Error(`${action.t} scheiterte: ${r.error}`);
   return r;
+}
+
+function kartenwahl(id: string): Action {
+  const sofort = cardById(id)?.instant;
+  return sofort?.t === 'gainAny'
+    ? { t: 'chooseCard', card: id, resources: { lumber: sofort.count } }
+    : { t: 'chooseCard', card: id };
 }
 
 /** Aufbauphase automatisch durchspielen: immer der erste legale Zug. */
@@ -221,7 +229,7 @@ function resolveSeven(game: Game): void {
     if (guard++ > 20) throw new Error('Fund-Phase endet nicht');
     // Der Fund: die erste angebotene Karte nehmen.
     const cur = currentPlayerId(game.state);
-    must(game, { t: 'chooseCard', card: game.state.draft!.options[0]! }, cur);
+    must(game, kartenwahl(game.state.draft!.options[0]!), cur);
   }
 }
 
@@ -385,7 +393,7 @@ describe('Entwicklungskarten', () => {
     expect(r).toEqual({ ok: false, error: 'Diese Karte ist erst im naechsten Zug spielbar.' });
   });
 
-  it('vergibt die Groesste Rittermacht ab drei Rittern', () => {
+  it('vergibt fuer das blosse Ausspielen eines Ritters keinen Ruhm', () => {
     const game = newGame(3);
     runSetup(game);
     const p = playerById(game.state, 'p0')!;
@@ -393,9 +401,10 @@ describe('Entwicklungskarten', () => {
     p.dev.push({ type: 'knight', boughtTurn: 0, played: false });
 
     toMain(game, 'p0');
-    expect(game.state.largestArmy).toBeNull();
+    expect(p.ruhm).toBe(0);
     must(game, { t: 'playKnight' }, 'p0');
-    expect(game.state.largestArmy).toBe('p0');
+    expect(p.ruhm).toBe(0);
+    expect(game.state.ruhmreichster).toBeNull();
   });
 
   it('Monopol zieht allen denselben Rohstoff ab', () => {
@@ -461,7 +470,7 @@ describe('Entwicklungskarten', () => {
 function resolveDraft(game: Game): void {
   if (game.state.phase.t !== 'draft') return;
   const cur = currentPlayerId(game.state);
-  must(game, { t: 'chooseCard', card: game.state.draft!.options[0]! }, cur);
+  must(game, kartenwahl(game.state.draft!.options[0]!), cur);
 }
 
 describe('Sieg', () => {

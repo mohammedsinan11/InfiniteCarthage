@@ -47,25 +47,3 @@ export function drawDevCard(state: GameState): DevCardType {
   }
   return state.deck.pop()!;
 }
-
-/** Wie viele Ritter fuer die Groesste Rittermacht noetig sind. */
-export const LARGEST_ARMY_MIN = 3;
-
-/**
- * Wer haelt nach diesem Zug die Groesste Rittermacht?
- * Gleichstand aendert nichts - der bisherige Halter behaelt sie.
- */
-export function largestArmyHolder(state: GameState): string | null {
-  let best = state.largestArmy;
-  let bestCount = best
-    ? (state.players.find((p) => p.id === best)?.playedKnights ?? 0)
-    : LARGEST_ARMY_MIN - 1;
-
-  for (const p of state.players) {
-    if (p.playedKnights >= LARGEST_ARMY_MIN && p.playedKnights > bestCount) {
-      best = p.id;
-      bestCount = p.playedKnights;
-    }
-  }
-  return best;
-}

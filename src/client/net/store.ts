@@ -506,8 +506,10 @@ function meldungenAus(
       });
     } else if (e.t === 'monopoly') {
       out.push({ id: naechsteId++, text: `Monopol: ${e.taken} Karten`, kind: 'info' });
-    } else if (e.t === 'largestArmy') {
-      out.push({ id: naechsteId++, text: `${wer(e.player)}: Groesste Rittermacht`, kind: 'info' });
+    } else if (e.t === 'glory') {
+      out.push({ id: naechsteId++, text: `${wer(e.player)} gewinnt ${e.amount} Ruhm`, kind: 'gain' });
+    } else if (e.t === 'tacticPlayed') {
+      out.push({ id: naechsteId++, text: `${wer(e.player)} spielt eine Taktik`, kind: 'info' });
     } else if (e.t === 'win') {
       out.push({ id: naechsteId++, text: `${wer(e.player)} gewinnt`, kind: 'info' });
     }

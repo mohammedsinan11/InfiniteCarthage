@@ -32,7 +32,7 @@ export function haefenZu(state: { worldSeed?: number; turn?: number }): boolean 
  */
 export function tradeRatio(
   state: BoardView & {
-    players?: ReadonlyArray<{ id: PlayerId; cards: string[] }>;
+    players?: ReadonlyArray<{ id: PlayerId; activeCards: string[] }>;
     worldSeed?: number;
     turn?: number;
     reichsbauten?: GameState['reichsbauten'];
@@ -43,7 +43,9 @@ export function tradeRatio(
   give: Resource,
 ): number {
   let ratio = DEFAULT_RATIO;
-  const zu = haefenZu(state);
+  const karten = state.players?.find((p) => p.id === player)?.activeCards ?? [];
+  const mods = modifiersOf(karten);
+  const zu = haefenZu(state) && !mods.stormPorts;
   for (const [vk, b] of Object.entries(state.buildings)) {
     if (zu) break;
     if (b.owner !== player) continue;
@@ -71,8 +73,7 @@ export function tradeRatio(
   }
   // Karten koennen den Handel guenstiger machen - aber nie unter zwei, sonst
   // waere Tauschen kein Handel mehr, sondern eine Umbenennung.
-  const karten = state.players?.find((p) => p.id === player)?.cards ?? [];
-  return Math.max(2, ratio - modifiersOf(karten).tradeDiscount);
+  return Math.max(2, ratio - mods.tradeDiscount);
 }
 
 /** Alle Haefen, an denen dieser Spieler sitzt - fuer die Anzeige. */

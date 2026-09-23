@@ -20,7 +20,7 @@ import type { Hand, PlayerId } from '../state';
  * eigene Hand, fremde nicht.
  */
 export type HandView = {
-  players: ReadonlyArray<{ id: PlayerId; cards: readonly string[]; hand?: Hand }>;
+  players: ReadonlyArray<{ id: PlayerId; activeCards: readonly string[]; hand?: Hand }>;
 };
 
 /** Ab dieser Handgrosse gilt man als hortend - vor Kartenboni. */
@@ -30,7 +30,7 @@ export const HAND_LIMIT = 7;
 export function limitFor(state: HandView, id: PlayerId): number {
   const p = state.players.find((x) => x.id === id);
   if (!p) return HAND_LIMIT;
-  return HAND_LIMIT + modifiersOf(p.cards).handLimitBonus;
+  return HAND_LIMIT + modifiersOf(p.activeCards).handLimitBonus;
 }
 
 /** Haelt dieser Spieler mehr, als ihm zusteht? */

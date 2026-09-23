@@ -17,7 +17,7 @@
  */
 
 import type { ReactElement } from 'react';
-import { dauerwirkungen } from '../../core/cards/types';
+import { dauerwirkungen, taktikwirkungen } from '../../core/cards/types';
 import type { Card } from '../../core/cards/types';
 import { RESOURCES } from '../../core/types';
 import { kachelFuer } from '../tiles';
@@ -94,6 +94,28 @@ export function KartenBild({ karte, klein = false }: { karte: Card; klein?: bool
   const px = klein ? 1 : 2;
   const teile: ReactElement[] = [];
   const wirkungen = dauerwirkungen(karte);
+  const taktiken = taktikwirkungen(karte);
+
+  if (taktiken.length > 0) {
+    const heilung = taktiken.some((t) => t.t === 'healUnit' || t.t === 'healField');
+    const schutz = taktiken.some((t) => t.t === 'cover' || t.t === 'morale');
+    const fern = taktiken.some((t) => t.t === 'rangedAttack');
+    teile.push(
+      <span key="kampf" className="karten-teil">
+        <svg viewBox="0 0 48 48" width={24 * px} height={24 * px} shapeRendering="crispEdges">
+          {heilung ? (
+            <path d="M8 18h10V8h12v10h10v12H30v10H18V30H8z" fill="#b23a32" stroke="#2a1f16" strokeWidth="3" />
+          ) : schutz ? (
+            <path d="M24 5l15 6v12c0 10-6 16-15 20C15 39 9 33 9 23V11z" fill="#b9b3a6" stroke="#2a1f16" strokeWidth="3" />
+          ) : fern ? (
+            <><path d="M11 7q25 17 0 34" fill="none" stroke="#c9a46a" strokeWidth="5"/><path d="M10 7v34M6 24h34m-8-7 8 7-8 7" fill="none" stroke="#eee0bd" strokeWidth="2"/></>
+          ) : (
+            <><path d="M10 39L36 8m-5 1 6-2-2 6M38 39L12 8m5 1-6-2 2 6" fill="none" stroke="#c9ccd6" strokeWidth="5"/><path d="M7 36h12M29 36h12" stroke="#8a5a2b" strokeWidth="5"/></>
+          )}
+        </svg>
+      </span>,
+    );
+  }
 
   wirkungen.forEach((l, i) => {
     if (l.t !== 'terrainBonus') return;

@@ -50,6 +50,8 @@ export type Player = {
   hand: Hand;
   dev: DevCard[];
   playedKnights: number;
+  /** Ruhm aus einmaligen Kampf-, Auftrags- und Veteranenmeilensteinen. */
+  ruhm: number;
   /**
    * Genommene Karten, als Kennungen.
    *
@@ -58,6 +60,12 @@ export type Player = {
    * abweichen.
    */
   cards: string[];
+  /** Die wenigen Reichskarten, deren Dauerwirkung gerade aktiv ist. */
+  activeCards: string[];
+  /** Ausspielbare und danach verbrauchte Kampf- und Heldenkarten. */
+  tactics: string[];
+  /** Fuer die kommenden Gegenstaende des Abenteuerzweigs. */
+  equipment: string[];
   /**
    * Beute aus zerstoerten Lagern und Ruinen, die noch nicht eingeloest ist.
    * Jede ist eine Kartenwahl; eingeloest wird in der eigenen Bauphase.
@@ -242,6 +250,16 @@ export type UnitState = {
   name?: string;
 };
 
+/** Eine vorbereitete Taktik wirkt genau in der naechsten Heeresrunde. */
+export type TacticBuff = {
+  player: PlayerId;
+  kind: 'attack' | 'cover' | 'morale' | 'siege' | 'heroReroll' | 'rangedAttack';
+  /** Die Wirkung folgt den Einheiten, auch wenn sie vor dem Kampf ziehen. */
+  units: number[];
+  amount: number;
+  expiresTurn: number;
+};
+
 /**
  * Ein Feuer, das Pluenderer gelegt haben (rules/feuer.ts).
  *
@@ -395,7 +413,10 @@ export type GameState = {
   lastRoll: [number, number] | null;
 
   targetPoints: number;
-  largestArmy: PlayerId | null;
+  /** Wer mindestens fuenf Ruhm und mehr als alle Herausforderer hat. */
+  ruhmreichster: PlayerId | null;
+  /** VERALTET: nur fuer die Migration alter Staende. */
+  largestArmy?: PlayerId | null;
   chunks: ChunkCoord[];
   /** Offenes Angebot, oder null. Hoechstens eines gleichzeitig. */
   trade: TradeOffer | null;
@@ -407,6 +428,8 @@ export type GameState = {
   draft: { source: DraftSource; options: string[] } | null;
   /** Alle Einheiten auf der Karte. */
   units: UnitState[];
+  /** Vorbereitete, kurzlebige Taktiken fuer die naechste Heeresrunde. */
+  tacticBuffs: TacticBuff[];
   /** Naechste freie Einheitennummer - Nummern werden nie wiederverwendet. */
   nextUnitId: number;
   /** Zerstoerte Lager, als Feldschluessel "q:r". */
@@ -479,7 +502,7 @@ export function publicPoints(state: GameState, id: PlayerId): number {
   for (const b of Object.values(state.buildings)) {
     if (b.owner === id) pts += b.type === 'city' ? 2 : 1;
   }
-  if (state.largestArmy === id) pts += 2;
+  if (state.ruhmreichster === id) pts += 2;
   for (const h of Object.values(state.hauptstaedte ?? {})) {
     if (h.owner === id) pts += HAUPTSTADT_PUNKTE + (h.stufe - 1) * STUFE_PUNKTE;
   }

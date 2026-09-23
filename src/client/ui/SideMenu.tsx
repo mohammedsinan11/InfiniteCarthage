@@ -18,7 +18,7 @@ import type { ReactNode } from 'react';
 import { SEASON_NAME, bigRoundOf, ROUNDS_PER_BIG_ROUND, roundOf, seasonOf, yearOf } from '../../core/season';
 import { cardById } from '../../core/cards/catalog';
 import { modifiersOf } from '../../core/cards/effects';
-import { RARITY_ORDER } from '../../core/cards/types';
+import { RARITY_ORDER, dauerwirkungen } from '../../core/cards/types';
 import type { Resource, Terrain } from '../../core/types';
 import type { Abkommen, Brand, UnitState, WandererAuftrag } from '../../core/state';
 import { hexDistance } from '../../core/coords';
@@ -230,6 +230,9 @@ function Regler({ name, wert, setzen }: { name: string; wert: number; setzen: (v
 export function SideMenu({
   turn,
   cards,
+  activeCards,
+  tactics,
+  equipment,
   log,
   welt,
   einheiten,
@@ -281,6 +284,12 @@ export function SideMenu({
   turn: number;
   /** Die eigenen genommenen Karten, in der Reihenfolge der Wahl. */
   cards: readonly string[];
+  /** Reichskarten, deren Dauerwirkung in die begrenzten Plaetze gelegt ist. */
+  activeCards: readonly string[];
+  /** Verbrauchbare Taktikkarten auf der eigenen Hand. */
+  tactics: readonly string[];
+  /** Getrennte Ausruestungssammlung fuer den Abenteuerzweig. */
+  equipment: readonly string[];
   /** Das Protokoll: wer was getan hat. */
   log: string[];
   /** Was der Welt geschehen ist - Pluenderungen, Zeitenwechsel. */
@@ -527,8 +536,8 @@ export function SideMenu({
               titel="Siegpunkte"
               hilfe={
                 punkte.ziel > 0
-                  ? `Wer zuerst ${punkte.ziel} Punkte hat, gewinnt. Dorf 1, Stadt 2, Hauptstadt 2 und je Ausbaustufe 1 mehr, Siegpunktkarten 1, Groesste Rittermacht 2.`
-                  : 'Endlosspiel: kein Siegpunktziel. Dorf 1, Stadt 2, Hauptstadt 2 und je Ausbaustufe 1 mehr, Siegpunktkarten 1, Groesste Rittermacht 2.'
+                  ? `Wer zuerst ${punkte.ziel} Punkte hat, gewinnt. Dorf 1, Stadt 2, Hauptstadt 2 und je Ausbaustufe 1 mehr, Siegpunktkarten 1, Ruhmreichster ab 5 Ruhm 2.`
+                  : 'Endlosspiel: kein Siegpunktziel. Dorf 1, Stadt 2, Hauptstadt 2 und je Ausbaustufe 1 mehr, Siegpunktkarten 1, Ruhmreichster ab 5 Ruhm 2.'
               }
             />
             <div className="menu-box">
@@ -795,8 +804,8 @@ export function SideMenu({
         {reiter === 'karten' && (
           <>
             <Kopf
-              titel={`Karten${cards.length > 0 ? ` · ${cards.length}` : ''}`}
-              hilfe="Karten wirken dauerhaft. Bei einer Sieben, aus Beute und aus Auftraegen waehlst du eine von drei. Tippe eine Karte an, um ihren Text zu lesen."
+              titel={`Reichskarten${cards.length > 0 ? ` · ${cards.length}` : ''}`}
+              hilfe="Nur Karten mit dem Siegel Aktiv liefern eine Dauerwirkung. Anfangs hast du zwei Plaetze; eine Hauptstadt erweitert sie. Eine neue Dauerkarte ersetzt bei vollen Plaetzen die aelteste aktive."
             />
             {cards.length === 0 ? (
               <p className="menu-leer">Noch keine.</p>
@@ -806,7 +815,7 @@ export function SideMenu({
                   {kartenStapel(cards).map(({ karte, anzahl }) => (
                     <li key={karte.id}>
                       <button
-                        className={[`menu-karte-kachel selt-${karte.rarity}`, karteOffen === karte.id ? 'aktiv' : '']
+                        className={[`menu-karte-kachel selt-${karte.rarity}`, karteOffen === karte.id ? 'aktiv' : '', dauerwirkungen(karte).length > 0 && !activeCards.includes(karte.id) ? 'inaktiv' : '']
                           .filter(Boolean)
                           .join(' ')}
                         title={karte.text}
@@ -814,6 +823,7 @@ export function SideMenu({
                       >
                         <KartenBild karte={karte} klein />
                         <span className="menu-karte-kachel-name">{karte.name}</span>
+                        {dauerwirkungen(karte).length > 0 && activeCards.includes(karte.id) && <span className="menu-karte-status">Aktiv</span>}
                         {anzahl > 1 && <span className="menu-karte-anzahl">×{anzahl}</span>}
                       </button>
                     </li>
@@ -828,17 +838,51 @@ export function SideMenu({
                       </p>
                     ) : null;
                   })()}
-                {wirkungen(cards).length > 0 && (
+                {wirkungen(activeCards).length > 0 && (
                   <>
                     <Kopf titel="Zusammen" />
                     <div className="menu-chips">
-                      {wirkungen(cards).map((z) => (
+                      {wirkungen(activeCards).map((z) => (
                         <span key={z}>{z}</span>
                       ))}
                     </div>
                   </>
                 )}
               </>
+            )}
+
+            <Kopf titel={`Taktiken${tactics.length > 0 ? ` · ${tactics.length}` : ''}`} hilfe="Taktiken liegen auf deiner Hand. Spiele sie im Kartenknopf der Aktionsleiste auf eine Einheit oder ein Feld; danach sind sie verbraucht." />
+            {tactics.length === 0 ? (
+              <p className="menu-leer">Keine spielbereit.</p>
+            ) : (
+              <ul className="menu-kartenraster">
+                {kartenStapel(tactics).map(({ karte, anzahl }) => (
+                  <li key={karte.id}>
+                    <button className={`menu-karte-kachel selt-${karte.rarity}`} title={karte.text}>
+                      <KartenBild karte={karte} klein />
+                      <span className="menu-karte-kachel-name">{karte.name}</span>
+                      {anzahl > 1 && <span className="menu-karte-anzahl">×{anzahl}</span>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <Kopf titel={`Ausruestung${equipment.length > 0 ? ` · ${equipment.length}` : ''}`} hilfe="Ausruestung ist ein eigener Kartenbereich fuer den kuenftigen Abenteuer- und Heldenzweig." />
+            {equipment.length === 0 ? (
+              <p className="menu-leer">Noch keine.</p>
+            ) : (
+              <ul className="menu-kartenraster">
+                {kartenStapel(equipment).map(({ karte, anzahl }) => (
+                  <li key={karte.id}>
+                    <button className={`menu-karte-kachel selt-${karte.rarity}`} title={karte.text}>
+                      <KartenBild karte={karte} klein />
+                      <span className="menu-karte-kachel-name">{karte.name}</span>
+                      {anzahl > 1 && <span className="menu-karte-anzahl">×{anzahl}</span>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
             )}
 
             <Kopf titel="Technologie" />

@@ -121,6 +121,7 @@ import { roundOf } from '../season';
 import { einheitenRasten } from '../zeit';
 import { feuerLegen } from './feuer';
 import type { FeuerEvent } from './feuer';
+import { clearExpiredTactics, hasTactic, tacticBonus } from './tactics';
 
 /**
  * Lager bis zu dieser Entfernung von einer Siedlung schicken Raubzuege.
@@ -1321,8 +1322,12 @@ function schlacht(
     if (anzahl === 0) return;
     const i = rng.int(anzahl);
     const ziel = i < einheiten.length ? einheiten[i]! : null;
-    const deckung = ziel ? deckungFuer(s, gelaende, ziel) : 0;
-    if (!trifft(wurf(rng), angriff, aufschlag - deckung)) return;
+    const deckung = ziel ? deckungFuer(s, gelaende, ziel) + tacticBonus(s, 'cover', ziel) : 0;
+    let sitzt = trifft(wurf(rng), angriff, aufschlag - deckung);
+    if (!sitzt && von && hasTactic(s, 'heroReroll', von)) {
+      sitzt = trifft(wurf(rng), angriff, aufschlag - deckung);
+    }
+    if (!sitzt) return;
     if (ziel) {
       schaden.set(ziel.id, (schaden.get(ziel.id) ?? 0) + 1);
       if (von) letzterTreffer.set(ziel.id, von);
@@ -1338,8 +1343,8 @@ function schlacht(
       seite,
       // Art oder - beim Ernannten - sein Zweig, dazu was der Rang gibt
       // (core/combat.ts, angriffVon).
-      angriffVon(u) + angefuehrt,
-      (lagerSeite !== null && seite !== lagerSeite ? -PALISADE : 0) + nahkampf,
+      angriffVon(u) + angefuehrt + tacticBonus(s, 'attack', u),
+      (lagerSeite !== null && seite !== lagerSeite && !hasTactic(s, 'siege', u) ? -PALISADE : 0) + nahkampf,
       u,
     );
   }
@@ -1396,7 +1401,7 @@ function schlacht(
     const tot = gefallen.filter((x) => seiteVon(x) === seite).length;
     if (vorher === 0 || tot === 0 || tot / vorher < MORAL_ANTEIL) continue;
     const rest = stehen.filter((x) => seiteVon(x) === seite);
-    if (rest.length === 0 || rest.some((x) => x.kind === 'held')) continue;
+    if (rest.length === 0 || rest.some((x) => x.kind === 'held' || hasTactic(s, 'morale', x))) continue;
     const weg = neighbors(q, r).find(
       (h) =>
         isLandAt(s.worldSeed, h.q, h.r) &&
@@ -1516,7 +1521,7 @@ export function beschuss(s: GameState, rng: Rng, events: Ereignisse): void {
       salven.set(key, salve);
     }
     salve.schuesse += 1;
-    if (!trifft(wurf(rng), WERTE.bogen.angriff)) continue;
+    if (!trifft(wurf(rng), WERTE.bogen.angriff + tacticBonus(s, 'rangedAttack', u))) continue;
     salve.treffer += 1;
     const opfer = ziel.feinde[rng.int(ziel.feinde.length)]!;
     opfer.leben -= 1;
@@ -1723,4 +1728,5 @@ export function tickArmy(s: GameState, world: World, events: Ereignisse): void {
   }
 
   s.rngState = rng.getState();
+  clearExpiredTactics(s);
 }

@@ -38,6 +38,8 @@ import type { DevCardType, Hand, HeldZweig } from '../../core/state';
 import { ZWEIGE, ZWEIG_NAME, ZWEIG_ZWECK } from '../../core/rules/zweig';
 import { devName, resourceName } from '../log';
 import { ResourceGlyph } from './ResourceIcon';
+import { cardById } from '../../core/cards/catalog';
+import { taktikwirkungen } from '../../core/cards/types';
 
 /**
  * Was gerade gebaut wird. Die Reichsbauten der Phase 2 stehen auf Kacheln,
@@ -354,11 +356,17 @@ function HandelTafel({
 
 function KartenTafel({
   anzahl,
+  taktiken,
+  einheiten,
+  darfTaktik,
   kannSpielen,
   act,
   onZu,
 }: {
   anzahl: Map<DevCardType, number>;
+  taktiken: string[];
+  einheiten: PublicState['units'];
+  darfTaktik: boolean;
   kannSpielen: (t: DevCardType) => boolean;
   act: (a: Action) => void;
   onZu: () => void;
@@ -366,6 +374,7 @@ function KartenTafel({
   const [monopol, setMonopol] = useState<Resource>('lumber');
   const [erfA, setErfA] = useState<Resource>('lumber');
   const [erfB, setErfB] = useState<Resource>('brick');
+  const [ziel, setZiel] = useState<Record<string, number>>({});
 
   const zeile = (t: DevCardType, aktion?: () => void, extra?: ReactNode) => (
     <div key={t} className="dock-karte">
@@ -382,7 +391,7 @@ function KartenTafel({
   );
 
   return (
-    <Tafel titel="Entwicklungskarten" onZu={onZu}>
+    <Tafel titel="Karten" onZu={onZu}>
       {[...anzahl.keys()].map((t) => {
         switch (t) {
           case 'knight':
@@ -408,8 +417,42 @@ function KartenTafel({
             return zeile(t);
         }
       })}
+      {taktiken.map((id, index) => {
+        const karte = cardById(id);
+        if (!karte) return null;
+        const effekte = taktikwirkungen(karte);
+        const brauchtHeld = effekte.some((e) => e.t === 'heroReroll' || (e.t === 'healUnit' && e.heroOnly));
+        const brauchtBogen = effekte.some((e) => e.t === 'rangedAttack');
+        const kandidaten = einheiten.filter(
+          (u) => (!brauchtHeld || u.kind === 'held') && (!brauchtBogen || u.kind === 'bogen'),
+        );
+        const gewaehlt = ziel[`${id}-${index}`] ?? kandidaten[0]?.id;
+        return (
+          <div key={`${id}-${index}`} className="dock-karte dock-taktik">
+            <span className="dock-karte-name">{karte.name}</span>
+            <span className="dock-karte-beschreibung">{karte.text}</span>
+            <select
+              aria-label={`Ziel fuer ${karte.name}`}
+              value={gewaehlt ?? ''}
+              onChange={(e) => setZiel((alt) => ({ ...alt, [`${id}-${index}`]: Number(e.target.value) }))}
+            >
+              {kandidaten.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.kind} #{u.id} · Feld {u.q}/{u.r}
+                </option>
+              ))}
+            </select>
+            <button
+              disabled={!darfTaktik || gewaehlt === undefined}
+              onClick={() => act({ t: 'playTactic', card: id, unit: gewaehlt! })}
+            >
+              Ausspielen
+            </button>
+          </div>
+        );
+      })}
       <p className="dock-tafel-klein">
-        Gekaufte Karten sind ab dem naechsten Zug spielbar - dann beliebig viele.
+        Entwicklungskarten gelten ab dem naechsten Zug. Taktiken werden verbraucht und wirken sofort oder in der naechsten Kampfrunde.
       </p>
     </Tafel>
   );
@@ -467,6 +510,8 @@ export function Aktionsleiste({
   }, [tafel, onTafel]);
 
   const offen = (me?.dev ?? []).filter((d) => !d.played);
+  const taktiken = me?.tactics ?? [];
+  const eigeneEinheiten = state.units.filter((u) => u.owner === me?.id);
   const anzahl = new Map<DevCardType, number>();
   for (const d of offen) anzahl.set(d.type, (anzahl.get(d.type) ?? 0) + 1);
   const kannSpielen = (t: DevCardType): boolean =>
@@ -512,7 +557,15 @@ export function Aktionsleiste({
         />
       )}
       {tafel === 'karten' && (
-        <KartenTafel anzahl={anzahl} kannSpielen={kannSpielen} act={act} onZu={() => setTafel(null)} />
+        <KartenTafel
+          anzahl={anzahl}
+          taktiken={taktiken}
+          einheiten={eigeneEinheiten}
+          darfTaktik={isMine && phase.t === 'main'}
+          kannSpielen={kannSpielen}
+          act={act}
+          onZu={() => setTafel(null)}
+        />
       )}
 
       <div className="dock-reihe">
@@ -651,7 +704,7 @@ export function Aktionsleiste({
         <DockKnopf titel="Bogen" symbol={<SymBogen />} kosten={COST_ARCHER} darf={bauen && canAfford(hand, COST_ARCHER)} tip={`Ein Bogenschuetze tritt an einer deiner Siedlungen oder Burgfesten an. Schiesst auf Feinde nebenan, neben einem Wachturm zwei Felder weit: ${kostenText(COST_ARCHER)}`} onClick={() => act({ t: 'recruitArcher' })} />
         <span className="dock-trenner" />
         <DockKnopf titel="Handel" symbol={<SymHandel />} gewaehlt={tafel === 'handel'} darf={bauen} tip="Bankhandel" onClick={umschalten('handel')} />
-        <DockKnopf titel="Karten" symbol={<SymKarten />} zahl={offen.length} gewaehlt={tafel === 'karten'} darf={offen.length > 0} tip="Deine Entwicklungskarten" onClick={umschalten('karten')} />
+        <DockKnopf titel="Karten" symbol={<SymKarten />} zahl={offen.length + taktiken.length} gewaehlt={tafel === 'karten'} darf={offen.length + taktiken.length > 0} tip="Deine Entwicklungs- und Taktikkarten" onClick={umschalten('karten')} />
         {/* Beute rechts neben Handel und Karten - dort, wo Karten ohnehin hingehen. */}
         {(me?.loot ?? 0) > 0 && (
           <DockKnopf titel="Beute" symbol={<SymBeute />} zahl={me?.loot} leuchtet darf={bauen} tip="Beute einloesen: eine Kartenwahl" onClick={() => act({ t: 'claimLoot' })} />

@@ -18,6 +18,7 @@ import {
 import { currentPlayerId, playerById, totalPoints } from '../src/core/state';
 import type { PlayerId } from '../src/core/state';
 import { MIN_PLAYERS, NO_TARGET } from '../src/core/protocol';
+import { cardById } from '../src/core/cards/catalog';
 
 function solo(targetPoints = NO_TARGET): Game {
   return createGame([{ id: 'p0', name: 'Solo' }], 4242, 77, targetPoints);
@@ -27,6 +28,13 @@ function must(game: Game, action: Action, actor: PlayerId) {
   const r = applyAction(game, action, actor);
   if (!r.ok) throw new Error(`${action.t} scheiterte: ${r.error}`);
   return r;
+}
+
+function kartenwahl(id: string): Action {
+  const sofort = cardById(id)?.instant;
+  return sofort?.t === 'gainAny'
+    ? { t: 'chooseCard', card: id, resources: { lumber: sofort.count } }
+    : { t: 'chooseCard', card: id };
 }
 
 const phaseOf = (game: Game): string => game.state.phase.t;
@@ -56,7 +64,7 @@ function resolveSeven(game: Game): void {
     if (guard++ > 20) throw new Error('Fund-Phase endet nicht');
     // Der Fund: die erste angebotene Karte nehmen.
     const cur = currentPlayerId(game.state);
-    must(game, { t: 'chooseCard', card: game.state.draft!.options[0]! }, cur);
+    must(game, kartenwahl(game.state.draft!.options[0]!), cur);
   }
 }
 

@@ -47,7 +47,7 @@ export function productionSources(
    * oeffentlich. So passt auch die redigierte Sicht des Clients hinein und
    * die Ertragsregel bleibt einmalig.
    */
-  state: Pick<GameState, 'buildings'> & { players: ReadonlyArray<{ id: PlayerId; cards: string[] }> },
+  state: Pick<GameState, 'buildings'> & { players: ReadonlyArray<{ id: PlayerId; activeCards: string[] }> },
   world: World,
   roll: number,
   /**
@@ -59,7 +59,7 @@ export function productionSources(
   const out: ProductionSource[] = [];
   const nass = regnet(wetter);
   const cardsOf = (id: PlayerId): string[] =>
-    state.players.find((p) => p.id === id)?.cards ?? [];
+    state.players.find((p) => p.id === id)?.activeCards ?? [];
   for (const tile of world.tiles.values()) {
     if (tile.number !== roll) continue;
     const hk = hexKey(tile.q, tile.r);

@@ -484,7 +484,7 @@ export function Game() {
         { text: `Staedte ${staedte} × 2`, wert: staedte > 0 ? staedte * 2 : null },
         { text: haupt.length > 1 ? `Hauptstaedte ${haupt.length}` : 'Hauptstadt', wert: hauptPunkte > 0 ? hauptPunkte : null },
         { text: 'Siegpunktkarten', wert: karten > 0 ? karten : null },
-        { text: 'Groesste Rittermacht', wert: state.largestArmy === you ? 2 : null },
+        { text: 'Ruhmreichster', wert: state.ruhmreichster === you ? 2 : null },
       ],
     };
   }, [state, you]);
@@ -1012,6 +1012,9 @@ export function Game() {
         <SideMenu
           turn={state.turn}
           cards={me?.cards ?? []}
+          activeCards={me?.activeCards ?? []}
+          tactics={me?.tactics ?? []}
+          equipment={me?.equipment ?? []}
           log={log}
           welt={welt}
           einheiten={meineEinheiten}
@@ -1091,7 +1094,7 @@ export function Game() {
             options={state.draft.options}
             source={state.draft.source}
             darfWaehlen={isMine}
-            onChoose={(card) => act({ t: 'chooseCard', card })}
+            onChoose={(card, resources) => act({ t: 'chooseCard', card, resources })}
           />
         )}
 
@@ -1297,5 +1300,3 @@ function DieIcon() {
     </svg>
   );
 }
-
-

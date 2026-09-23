@@ -265,6 +265,7 @@ describe('Die Handkartengrenze', () => {
     const game = solo();
     expect(limitFor(game.state, 'p0')).toBe(HAND_LIMIT);
     game.state.players[0]!.cards.push('vorratskammer');
+    game.state.players[0]!.activeCards.push('vorratskammer');
     expect(limitFor(game.state, 'p0')).toBeGreaterThan(HAND_LIMIT);
   });
 });

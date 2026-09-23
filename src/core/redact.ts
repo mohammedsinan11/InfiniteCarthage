@@ -27,6 +27,8 @@ export type PublicPlayer = {
   /** Anzahl noch nicht gespielter Entwicklungskarten. */
   devCount: number;
   playedKnights: number;
+  /** Sichtbarer Fortschritt zur Ruhmwertung. */
+  ruhm: number;
   /**
    * Genommene Karten - oeffentlich, im Gegensatz zur Hand.
    *
@@ -35,6 +37,12 @@ export type PublicPlayer = {
    * sondern Verwirrung.
    */
   cards: string[];
+  /** Aktive Reichskarten; nur diese liefern eine Dauerwirkung. */
+  activeCards: string[];
+  /** Taktikkarten bleiben bis zum Ausspielen geheim; nur ihre Zahl ist sichtbar. */
+  tacticCount: number;
+  /** Ausruestung ist wie die Figur, die sie traegt, oeffentlich. */
+  equipment: string[];
   /** Uneingeloeste Beute - oeffentlich: wer ein Lager zerstoert, tut das vor aller Augen. */
   loot: number;
   /** Wann der gefallene Held zurueckkehrt, oder null - oeffentlich wie sein Fall. */
@@ -54,6 +62,8 @@ export type PublicPlayer = {
   /** Nur beim Empfaenger gesetzt. */
   hand?: Hand;
   dev?: DevCard[];
+  /** Nur der Besitzer sieht, welche Taktiken er auf der Hand hat. */
+  tactics?: string[];
 };
 
 export type PublicState = {
@@ -77,7 +87,9 @@ export type PublicState = {
   turn: number;
   lastRoll: [number, number] | null;
   targetPoints: number;
-  largestArmy: PlayerId | null;
+  ruhmreichster: PlayerId | null;
+  /** Offene, bis zur naechsten Heeresrunde vorbereitete Taktiken. */
+  tacticBuffs: GameState['tacticBuffs'];
   /** Die offene Kartenwahl - fuer alle sichtbar, gewaehlt wird vom Spieler am Zug. */
   draft: GameState['draft'];
   /**
@@ -119,7 +131,11 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
       handCount: handSize(p.hand),
       devCount: p.dev.filter((d) => !d.played).length,
       playedKnights: p.playedKnights,
+      ruhm: p.ruhm,
       cards: [...p.cards],
+      activeCards: [...p.activeCards],
+      tacticCount: p.tactics.length,
+      equipment: [...p.equipment],
       loot: p.loot,
       heldZurueck: p.heldZurueck,
       held: p.held ?? null,
@@ -131,6 +147,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     if (p.id === viewer) {
       base.hand = { ...p.hand };
       base.dev = p.dev.map((d) => ({ ...d }));
+      base.tactics = [...p.tactics];
     }
     return base;
   });
@@ -162,7 +179,8 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     turn: state.turn,
     lastRoll: state.lastRoll,
     targetPoints: state.targetPoints,
-    largestArmy: state.largestArmy,
+    ruhmreichster: state.ruhmreichster,
+    tacticBuffs: state.tacticBuffs,
     draft: state.draft,
     trade: state.trade,
     myPoints: (me ? publicPoints(state, viewer) : 0) + hidden,

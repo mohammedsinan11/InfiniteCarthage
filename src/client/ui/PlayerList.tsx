@@ -1,4 +1,4 @@
-/** Mitspieler mit sichtbaren Punkten, Kartenzahl und Rittern. */
+/** Mitspieler mit sichtbaren Punkten, Kartenzahl und Ruhm. */
 
 import type { PublicState } from '../../core/redact';
 import { playerColor } from '../theme';
@@ -22,8 +22,8 @@ export function PlayerList({ state, you }: { state: PublicState; you: string | n
               <b title="Sichtbare Siegpunkte">{p.id === you ? state.myPoints : p.points}</b>
               <span title="Handkarten">{p.handCount} K</span>
               <span title="Entwicklungskarten">{p.devCount} E</span>
-              <span title="Gespielte Ritter">
-                {p.playedKnights} R{state.largestArmy === id ? '+' : ''}
+              <span title="Ruhm aus Lagern, Auftraegen, Veteranen und dem Morast">
+                {p.ruhm} Ruhm{state.ruhmreichster === id ? '+' : ''}
               </span>
             </span>
           </li>

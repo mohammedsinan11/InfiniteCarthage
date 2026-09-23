@@ -261,12 +261,50 @@
       grid-template-columns: repeat(4, 1fr);
       min-height: 70px;
       border-bottom: 2px solid var(--bronze-dark);
-      background: rgba(12,8,6,.28);
+      background:
+        linear-gradient(90deg, transparent 49.8%, rgba(190,146,76,.13) 50%, transparent 50.2%),
+        rgba(12,8,6,.28);
+      overflow: visible;
+    }
+
+    .tabs::before {
+      content: "";
+      position: absolute;
+      z-index: 0;
+      left: 8%;
+      right: 8%;
+      bottom: 5px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #6f512f 8%, #a47a42 50%, #6f512f 92%, transparent);
+      box-shadow: 0 1px 0 rgba(0,0,0,.7);
+    }
+
+    .compass-rose {
+      position: absolute;
+      z-index: 0;
+      left: 50%;
+      top: 50%;
+      width: 54px;
+      height: 54px;
+      transform: translate(-50%, -50%);
+      opacity: .42;
+      background: #b28950;
+      clip-path: polygon(50% 0, 60% 35%, 85% 15%, 65% 40%, 100% 50%, 65% 60%, 85% 85%, 60% 65%, 50% 100%, 40% 65%, 15% 85%, 35% 60%, 0 50%, 35% 40%, 15% 15%, 40% 35%);
+      filter: drop-shadow(0 0 1px #17100b);
+    }
+
+    .compass-rose::before {
+      content: "";
+      position: absolute;
+      inset: 14px;
+      background: #23170f;
+      transform: rotate(45deg);
+      box-shadow: inset 0 0 0 2px #d2a757;
     }
 
     .seal {
       position: absolute;
-      z-index: 0;
+      z-index: 3;
       left: calc((100% / 4) * var(--tab-index) + (100% / 8) - 24px);
       bottom: -10px;
       width: 48px;
@@ -297,6 +335,19 @@
       transition: color .18s, background .18s;
     }
     .tab:last-of-type { border-right: 0; }
+    .tab:not(:last-of-type)::after {
+      content: "";
+      position: absolute;
+      z-index: 2;
+      right: -6px;
+      top: calc(50% - 6px);
+      width: 10px;
+      height: 10px;
+      transform: rotate(45deg);
+      border: 1px solid #765634;
+      background: #2a1b12;
+      box-shadow: inset 1px 1px 0 rgba(255,255,255,.07);
+    }
     .tab:hover { color: var(--ivory); background: rgba(255,255,255,.035); }
     .tab:focus-visible { outline: 3px solid var(--gold); outline-offset: -4px; }
     .tab[aria-selected="true"] { color: var(--sand); background: linear-gradient(180deg, rgba(223,173,69,.12), transparent); }
@@ -355,7 +406,7 @@
     .context-note strong { margin: 3px 0 5px; color: var(--sand); font: 700 17px/1.15 Georgia, serif; }
     .context-note p { margin: 0; color: #b9aa91; font-size: 11px; line-height: 1.35; }
 
-    .panel { display: none; min-width: 0; }
+    .panel { display: none; min-width: 0; position: relative; }
     .panel.active { display: flex; animation: reveal .24s ease-out both; }
     @keyframes reveal { from { opacity: 0; transform: translateY(7px) } to { opacity: 1; transform: none } }
 
@@ -368,6 +419,43 @@
       overflow-x: auto;
       scrollbar-width: thin;
       scrollbar-color: var(--bronze) transparent;
+    }
+
+    .overflow-cue {
+      position: absolute;
+      z-index: 8;
+      top: 50%;
+      width: 25px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      color: #f0c963;
+      font: 700 29px/1 Georgia, serif;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-50%);
+      transition: opacity .18s;
+      text-shadow: 0 1px 0 #1d120b, 0 0 8px rgba(223,173,69,.55);
+    }
+    .overflow-cue.right { right: -2px; background: linear-gradient(90deg, transparent, rgba(30,18,11,.94)); }
+    .overflow-cue.left { left: -2px; background: linear-gradient(90deg, rgba(30,18,11,.94), transparent); }
+    .panel.more-right > .overflow-cue.right,
+    .panel.more-left > .overflow-cue.left { opacity: 1; }
+
+    .panel.more-right:not(.more-left) > .orders,
+    .panel.more-right:not(.more-left) > .card-scroll {
+      -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 34px), transparent 100%);
+      mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 34px), transparent 100%);
+    }
+    .panel.more-left:not(.more-right) > .orders,
+    .panel.more-left:not(.more-right) > .card-scroll {
+      -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 34px, #000 100%);
+      mask-image: linear-gradient(90deg, transparent 0, #000 34px, #000 100%);
+    }
+    .panel.more-left.more-right > .orders,
+    .panel.more-left.more-right > .card-scroll {
+      -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 34px, #000 calc(100% - 34px), transparent 100%);
+      mask-image: linear-gradient(90deg, transparent 0, #000 34px, #000 calc(100% - 34px), transparent 100%);
     }
 
     .order {
@@ -444,7 +532,19 @@
     .hp i { display: block; width: 72%; height: 100%; background: #b34d48; box-shadow: inset 0 1px 0 rgba(255,255,255,.25); }
     .hero-data small { display: block; margin-top: 3px; color: #dbc6b5; font-size: 9px; }
 
-    .card-panel { align-items: center; gap: 14px; width: 100%; }
+    .card-panel { align-items: center; width: 100%; }
+    .card-scroll {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      width: 100%;
+      min-width: 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 2px 12px 4px 1px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--bronze) transparent;
+    }
     .deck {
       flex: 0 0 64px;
       height: 82px;
@@ -511,7 +611,7 @@
       border-color: #f0cb6b;
       background: linear-gradient(180deg,#e1b751,#b87e27);
     }
-    .primary-action svg { width: 34px; }
+    .primary-action svg { width: 34px; height: 34px; }
     .primary-action strong { display:block; font:700 13px Georgia,serif; text-transform:uppercase; letter-spacing:.08em; }
     .primary-action small { font-size:10px; }
     .primary-action:hover { filter: brightness(1.12); }
@@ -534,7 +634,7 @@
     .stroke { fill: none; stroke-width: 1.8; }
 
     @media (max-width: 1040px) {
-      .command-wrap { width: calc(100% - 190px); }
+      .command-wrap { left: 18px; right: 190px; width: auto; transform: none; }
       .context-shell { grid-template-columns: 156px 1fr; }
       .context-note p { display: none; }
       .tab-copy small { display:none; }
@@ -569,7 +669,7 @@
         text-align: center;
       }
       .tab svg { width: 25px; height: 25px; }
-      .tab-copy strong { font-size: 11px; letter-spacing: .06em; }
+      .tab-copy strong { font-size: 12px; letter-spacing: .035em; }
       .tab-copy small { display:none; }
       .badge { top:4px; right:5px; min-width:18px; height:18px; border-width:1px; }
       .seal { width:40px; left:calc((100% / 4) * var(--tab-index) + (100% / 8) - 20px); }
@@ -580,14 +680,14 @@
       .context-note strong { font-size:14px; margin:0; }
       .panel.active { margin-top:8px; }
       .orders { gap:6px; padding-bottom:2px; }
-      .order { flex-basis:82px; min-height:90px; padding:6px 5px; grid-template-rows:30px auto 18px; }
+      .order { flex-basis:94px; min-height:92px; padding:6px 5px; grid-template-rows:30px minmax(27px, auto) 18px; }
       .order svg { width:27px; height:27px; }
-      .order strong { font-size:10px; }
+      .order strong { font-size:12px; line-height:1.05; letter-spacing:.015em; }
       .hero-card { flex-basis:155px; grid-template-columns:47px 1fr; gap:7px; }
       .portrait { width:45px; height:61px; }
       .portrait::before { left:11px; }
       .portrait::after { left:6px; }
-      .card-panel { overflow-x:auto; padding-bottom:4px; }
+      .card-scroll { padding-bottom:4px; }
       .deck { flex-basis:54px; width:54px; height:72px; }
       .tactic { width:82px; height:86px; flex:0 0 82px; }
       .universal {
@@ -600,7 +700,7 @@
         gap:6px;
       }
       .primary-action { grid-column:auto; min-height:54px; grid-template-columns:34px 1fr; padding:5px 10px; }
-      .primary-action svg { width:29px; }
+      .primary-action svg { width:29px; height:29px; }
       .utility { min-height:54px; }
       .map-caption { display:none; }
     }
@@ -608,12 +708,12 @@
     @media (max-width: 390px) {
       .command-wrap { bottom:68px; }
       .context-shell { min-height:138px; }
-      .tab-copy strong { font-size:10px; }
+      .tab-copy strong { font-size:12px; }
       .resource-strip .resource:nth-child(n+3) { display:none; }
       .status-ribbon { gap:6px; }
       .context-note { min-height:30px; }
-      .order { min-height:86px; flex-basis:79px; }
-      .order strong { font-size:9px; }
+      .order { min-height:92px; flex-basis:94px; }
+      .order strong { font-size:12px; }
       .universal { bottom:7px; }
     }
 
@@ -683,6 +783,7 @@
     <section class="command-wrap" aria-label="Kommandotafel">
       <div class="command-board">
         <nav class="tabs" role="tablist" aria-label="Aktionsbereiche">
+          <i class="compass-rose" aria-hidden="true"></i>
           <i class="seal" aria-hidden="true"></i>
           <button class="tab" type="button" role="tab" aria-selected="true" aria-controls="panel-build" data-mode="build">
             <svg><use href="#i-hammer"/></svg><span class="tab-copy"><strong>Bauen</strong><small>Reich &amp; Wege</small></span>
@@ -713,6 +814,7 @@
               <button class="order" style="--mode-color:var(--build)"><svg><use href="#i-tower"/></svg><strong>Turm</strong><span class="cost"><b>2</b><i style="--rc:#b85d3d"></i><b>1</b><i style="--rc:#87909a"></i></span></button>
               <button class="order featured" style="--mode-color:var(--gold)"><svg><use href="#i-palace"/></svg><strong>Reichsbau</strong><span class="cost">3 verfügbar</span></button>
             </div>
+            <span class="overflow-cue left" aria-hidden="true">‹</span><span class="overflow-cue right" aria-hidden="true">›</span>
           </section>
 
           <section class="panel" id="panel-army" role="tabpanel" data-panel="army" hidden>
@@ -722,6 +824,7 @@
               <button class="order featured" style="--mode-color:var(--army)"><svg><use href="#i-group"/></svg><strong>Schar befehligen</strong><span class="cost">3 untätig</span></button>
               <button class="order" style="--mode-color:var(--army)"><svg><use href="#i-shield"/></svg><strong>Haltung</strong><span class="cost">Schildwall</span></button>
             </div>
+            <span class="overflow-cue left" aria-hidden="true">‹</span><span class="overflow-cue right" aria-hidden="true">›</span>
           </section>
 
           <section class="panel hero-panel" id="panel-hero" role="tabpanel" data-panel="hero" hidden>
@@ -735,16 +838,20 @@
               <button class="order featured" style="--mode-color:var(--hero)"><svg><use href="#i-skill"/></svg><strong>Pfadfinder</strong><span class="cost">bereit</span></button>
               <button class="order" style="--mode-color:var(--hero)"><svg><use href="#i-pack"/></svg><strong>Ausrüstung</strong><span class="cost">2 / 3 Plätze</span></button>
             </div>
+            <span class="overflow-cue left" aria-hidden="true">‹</span><span class="overflow-cue right" aria-hidden="true">›</span>
           </section>
 
           <section class="panel card-panel" id="panel-cards" role="tabpanel" data-panel="cards" hidden>
-            <div class="deck" aria-label="Nachziehstapel, 12 Karten">12<span>STAPEL</span></div>
-            <div class="hand-cards" aria-label="Kartenhand">
-              <button class="tactic" style="--tilt:-4deg"><b>Heilkräuter</b><small>Held heilt 2 Leben.</small><svg><use href="#i-rest"/></svg></button>
-              <button class="tactic" style="--tilt:2deg"><b>Schlachtruf</b><small>Eine Schar erhält +1 Angriff.</small><svg><use href="#i-sword"/></svg></button>
-              <button class="tactic" style="--tilt:-1deg"><b>Schildwall</b><small>+1 Deckung, keine Bewegung.</small><svg><use href="#i-shield"/></svg></button>
-              <button class="tactic" style="--tilt:4deg"><b>Späher</b><small>Decke zwei Grenzfelder auf.</small><svg><use href="#i-compass"/></svg></button>
+            <div class="card-scroll">
+              <div class="deck" aria-label="Nachziehstapel, 12 Karten">12<span>STAPEL</span></div>
+              <div class="hand-cards" aria-label="Kartenhand">
+                <button class="tactic" style="--tilt:-4deg"><b>Heilkräuter</b><small>Held heilt 2 Leben.</small><svg><use href="#i-rest"/></svg></button>
+                <button class="tactic" style="--tilt:2deg"><b>Schlachtruf</b><small>Eine Schar erhält +1 Angriff.</small><svg><use href="#i-sword"/></svg></button>
+                <button class="tactic" style="--tilt:-1deg"><b>Schildwall</b><small>+1 Deckung, keine Bewegung.</small><svg><use href="#i-shield"/></svg></button>
+                <button class="tactic" style="--tilt:4deg"><b>Späher</b><small>Decke zwei Grenzfelder auf.</small><svg><use href="#i-compass"/></svg></button>
+              </div>
             </div>
+            <span class="overflow-cue left" aria-hidden="true">‹</span><span class="overflow-cue right" aria-hidden="true">›</span>
           </section>
         </div>
       </div>
@@ -768,6 +875,21 @@
       cards: ['Taktikhand', 'Befehl ausspielen', 'Karten verändern den nächsten Kampf oder stärken deine Expedition.', 'var(--cards)']
     };
 
+    function updateOverflow(panel) {
+      const scroller = panel.querySelector('.orders, .card-scroll');
+      if (!scroller || panel.hidden) {
+        panel.classList.remove('more-left', 'more-right');
+        return;
+      }
+      const remaining = scroller.scrollWidth - scroller.clientWidth - scroller.scrollLeft;
+      panel.classList.toggle('more-left', scroller.scrollLeft > 3);
+      panel.classList.toggle('more-right', remaining > 3);
+    }
+
+    function refreshOverflow() {
+      panels.forEach(updateOverflow);
+    }
+
     function selectTab(tab, focus = false) {
       const mode = tab.dataset.mode;
       const index = tabs.indexOf(tab);
@@ -783,6 +905,7 @@
       document.querySelector('#context-title').textContent = title;
       document.querySelector('#context-copy').textContent = description;
       shell.style.setProperty('--mode-color', color);
+      requestAnimationFrame(refreshOverflow);
       if (focus) tab.focus();
     }
 
@@ -796,6 +919,13 @@
         selectTab(tabs[next], true);
       });
     });
+
+    panels.forEach(panel => {
+      const scroller = panel.querySelector('.orders, .card-scroll');
+      scroller?.addEventListener('scroll', () => updateOverflow(panel), { passive: true });
+    });
+    window.addEventListener('resize', refreshOverflow);
+    requestAnimationFrame(refreshOverflow);
   </script>
 </body>
 </html>
