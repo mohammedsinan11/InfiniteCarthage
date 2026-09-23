@@ -27,6 +27,26 @@ import { ResourceCard, ResourceGlyph } from './ResourceIcon';
 
 const SCHMAL_KEY = 'infinitecarthage.handschmal';
 
+/*
+ * AUF DEM HANDY BLEIBT DAS BLATT OFFEN.
+ *
+ * Eingeklappt wurde es frueher aus Not: aufgeklappt war es 356 Punkte breit
+ * und wuchs ueber Wuerfel und Bauleiste. Seit es in seiner eigenen
+ * Rasterspalte sitzt und mit 183,5 hineinpasst, verdeckt es nichts mehr -
+ * dann ist Zuklappen nur noch ein Weg, sich die eigenen Karten wegzunehmen.
+ *
+ * Die Grenze ist 600 und nicht 700: erst unterhalb von 600 greifen die
+ * Regeln, die die Karten auf 31,5x42 bringen (styles.css). Zwischen 601 und
+ * 700 stuende ein erzwungen offenes Blatt wieder in voller Groesse und liefe
+ * ueber - deshalb dieselbe Grenze wie das Layout, nicht die alte aus
+ * schmalAnfangs.
+ */
+const HANDY = '(max-width: 600px)';
+
+function istHandy(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia(HANDY).matches;
+}
+
 function schmalAnfangs(): boolean {
   try {
     const v = localStorage.getItem(SCHMAL_KEY);
@@ -40,9 +60,24 @@ function schmalAnfangs(): boolean {
 
 export function HandPanel({ hand }: { hand: Hand }) {
   const total = RESOURCES.reduce((n, r) => n + hand[r], 0);
-  const [schmal, setSchmal] = useState(schmalAnfangs);
+  const [schmalGewaehlt, setSchmalGewaehlt] = useState(schmalAnfangs);
+  const [handy, setHandy] = useState(istHandy);
+  /*
+   * Mitlaufend, nicht einmalig beim Einhaengen: Drehen des Geraets und das
+   * Schmalerziehen eines Fensters aendern die Antwort, und ein Blatt, das
+   * danach in der falschen Fassung stehen bleibt, passt nicht mehr in seine
+   * Spalte.
+   */
+  useEffect(() => {
+    const mq = window.matchMedia(HANDY);
+    const auf = () => setHandy(mq.matches);
+    mq.addEventListener('change', auf);
+    return () => mq.removeEventListener('change', auf);
+  }, []);
+  // Die gespeicherte Wahl bleibt erhalten - sie gilt nur wieder am Rechner.
+  const schmal = handy ? false : schmalGewaehlt;
   const umschalten = (neu: boolean) => {
-    setSchmal(neu);
+    setSchmalGewaehlt(neu);
     try {
       localStorage.setItem(SCHMAL_KEY, neu ? 'schmal' : 'breit');
     } catch {
@@ -104,13 +139,18 @@ export function HandPanel({ hand }: { hand: Hand }) {
     */
     <div
       className="hand hand-breit"
-      role="button"
-      tabIndex={0}
-      title={`${total} Karten insgesamt - antippen zum Einklappen`}
-      onClick={() => umschalten(true)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') umschalten(true);
-      }}
+      // Auf dem Handy ist es kein Knopf mehr: es gibt nichts zu schalten.
+      role={handy ? undefined : 'button'}
+      tabIndex={handy ? undefined : 0}
+      title={handy ? `${total} Karten insgesamt` : `${total} Karten insgesamt - antippen zum Einklappen`}
+      onClick={handy ? undefined : () => umschalten(true)}
+      onKeyDown={
+        handy
+          ? undefined
+          : (e) => {
+              if (e.key === 'Enter' || e.key === ' ') umschalten(true);
+            }
+      }
     >
       <button className="hand-zu" title="Hand einklappen" onClick={() => umschalten(true)}>
         –
