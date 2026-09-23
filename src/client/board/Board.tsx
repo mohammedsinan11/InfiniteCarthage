@@ -224,13 +224,6 @@ export type Targets = {
   vertices?: string[];
   edges?: string[];
   hexes?: string[];
-  /**
-   * Wie weit die gewaehlten Einheiten kommen (core/units.ts, reichweite):
-   * Feldschluessel und in wie vielen Runden sie dort ankommen. runden 1 heisst
-   * noch in dieser Runde. Nur zum Zeigen - geklickt wird das Feld wie sonst
-   * auch, auch ausserhalb.
-   */
-  reich?: { key: string; runden: number }[];
 };
 
 /** Eine kleine Tafel am Gebaeude oder an der Krone: was sich dort ausbauen laesst. */
@@ -445,6 +438,35 @@ export function Board({
   const scale = zoomSteps[cam.zi]!;
   const drag = useRef<{ x: number; y: number; cx: number; cy: number } | null>(null);
   const moved = useRef(false);
+  /*
+   * Verschieben wird auf ein Einzelbild gebuendelt.
+   *
+   * setCam lief bisher in JEDEM Zeigerereignis - auf dem Handy gern 120-mal je
+   * Sekunde. Jedes Mal aendert sich view, und daran haengt die grosse
+   * Zeichenroutine: das ganze Brett wurde also oefter neu gemalt, als der
+   * Bildschirm ueberhaupt Bilder zeigt. Jetzt merkt sich der Zug nur sein
+   * Ziel, angewandt wird es einmal je Bild.
+   *
+   * Das deckelt die Last, es beseitigt sie nicht - je Bild wird weiterhin alles
+   * gezeichnet. Der eigentliche Gewinn kommt, wenn die Schichten beim Schieben
+   * nur noch versetzt kopiert werden.
+   */
+  const panZiel = useRef<{ cx: number; cy: number } | null>(null);
+  const panBild = useRef(0);
+  const panAnwenden = useCallback(() => {
+    panBild.current = 0;
+    const z = panZiel.current;
+    if (!z) return;
+    panZiel.current = null;
+    setCam((c) => ({ ...c, cx: z.cx, cy: z.cy }));
+  }, []);
+  const panSchieben = useCallback(
+    (cx: number, cy: number) => {
+      panZiel.current = { cx, cy };
+      if (panBild.current === 0) panBild.current = requestAnimationFrame(panAnwenden);
+    },
+    [panAnwenden],
+  );
   /** Feld unter dem Zeiger - nur dessen Zahl wird eingeblendet. */
   const [hover, setHover] = useState<string | null>(null);
   /** Bauplatz-Ecke unter dem Zeiger - ihre drei Felder zeigen ihre Zahlen. */
@@ -550,25 +572,6 @@ export function Board({
     (e: Edge) => {
       const hs = edgeAdjacentHexes(e);
       return hs.reduce((n, h) => n + liftHex(h.q, h.r), 0) / hs.length;
-    },
-    [liftHex],
-  );
-
-  /**
-   * Das Sechseck eines Feldes als SVG-Punkte, auf seiner eigenen Hoehe.
-   *
-   * Stand dreimal wortgleich im JSX (Aufleuchten, Krone, Zielfeld) - jetzt
-   * einmal hier, damit alle Markierungen deckungsgleich sitzen.
-   */
-  const hexPunkte = useCallback(
-    (q: number, r: number) => {
-      const hoch = liftHex(q, r);
-      return [0, 1, 2, 3, 4, 5]
-        .map((i) => {
-          const p = hexCornerPixel(q, r, i, LAYOUT);
-          return `${p.x.toFixed(1)},${(p.y - hoch).toFixed(1)}`;
-        })
-        .join(' ');
     },
     [liftHex],
   );
@@ -1849,7 +1852,7 @@ export function Board({
           // Zeiger schon fort - dann eben ohne.
         }
       }
-      setCam((c) => ({ ...c, cx: d.cx - dx / scale, cy: d.cy - dy / scale }));
+      panSchieben(d.cx - dx / scale, d.cy - dy / scale);
       return;
     }
     // Welches Feld liegt unter dem Zeiger? Bildschirm- in Weltkoordinaten,
@@ -1907,6 +1910,12 @@ export function Board({
      * Ueber pointerup statt click: das Brett faengt den Zeiger ein, ein click
      * landete dann auf dem Brett statt auf dem Feld.
      */
+    // Das letzte gebuendelte Stueck Weg noch anwenden, sonst bliebe die Karte
+    // um bis zu ein Bild hinter dem Finger zurueck.
+    if (panBild.current !== 0) {
+      cancelAnimationFrame(panBild.current);
+      panAnwenden();
+    }
     finger.current.delete(e.pointerId);
     if (kneifen.current) {
       // Erst wenn alle Finger oben sind, ist die Geste vorbei - der letzte
@@ -2613,30 +2622,6 @@ export function Board({
             );
           });
         })()}
-
-        {/*
-          Wie weit die gewaehlten Einheiten kommen (core/units.ts, reichweite).
-          Diese Runde erreichbar: helles Feld. Spaeter erreichbar: blass, mit
-          der Zahl der Runden - so sieht man, dass ein Ziel zwar zu haben ist,
-          aber dauert. Geklickt werden darf trotzdem ueberallhin.
-        */}
-        {(targets.reich ?? []).map((z) => {
-          const [zq, zr] = z.key.split(':').map(Number) as [number, number];
-          const c = hexToPixel(zq, zr, LAYOUT);
-          return (
-            <g key={'reich' + z.key} pointerEvents="none">
-              <polygon
-                className={z.runden <= 1 ? 'hex-reich' : 'hex-reich spaeter'}
-                points={hexPunkte(zq, zr)}
-              />
-              {z.runden > 1 && (
-                <text x={c.x} y={c.y - liftHex(zq, zr) + 4} className="reich-runden">
-                  {z.runden}
-                </text>
-              )}
-            </g>
-          );
-        })}
 
         {/* Der Weg dorthin, solange ein Befehl sein Ziel sucht. */}
         {wegVorschau !== null && (

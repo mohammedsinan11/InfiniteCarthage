@@ -37,9 +37,7 @@ import { Announcements } from '../ui/Announcements';
 import { CardDraft } from '../ui/CardDraft';
 import { SideMenu } from '../ui/SideMenu';
 import type { FraktionsZeile } from '../ui/SideMenu';
-import { isNestActive, nestFraktionOf, reichweite, sightOf } from '../../core/units';
-import { schritteFuer } from '../../core/rules/army';
-import { einheitenRasten } from '../../core/zeit';
+import { isNestActive, nestFraktionOf, sightOf } from '../../core/units';
 import { abkommenVon, kampfFelder } from '../../core/combat';
 import { fraktionById } from '../../core/factions';
 import { fraktionColor } from '../theme';
@@ -441,32 +439,6 @@ export function Game() {
   };
   const befehleMoeglich = isMine && (phase.t === 'main' || phase.t === 'roll') && mode === null;
 
-  /**
-   * Wie weit die gewaehlten Einheiten kommen - fuer die Anzeige auf dem Brett
-   * (core/units.ts, reichweite).
-   *
-   * Ein Verband ist so schnell wie seine langsamste Einheit. Und im Schnee
-   * rastet in dieser Runde jeder (core/zeit.ts, einheitenRasten) - dann dauert
-   * jedes Ziel eine Runde laenger, und das soll die Zahl auch sagen, statt
-   * eine Reichweite zu zeigen, die es gerade nicht gibt.
-   */
-  const reichZiele = useMemo(() => {
-    if (!zielWahl || auswahl.length === 0) return undefined;
-    /** So viele Runden weit wird vorausgeschaut - weiter wird die Karte unleserlich. */
-    const VORSCHAU_RUNDEN = 4;
-    const dabei = state.units.filter((u) => auswahl.includes(u.id));
-    const start = dabei[0];
-    if (!start) return undefined;
-    const mitHeld = dabei.some((u) => u.kind === 'held');
-    const proRunde = Math.min(...dabei.map((u) => schritteFuer(u.kind, mitHeld)));
-    const rasten = einheitenRasten(state.worldSeed, state.turn) ? 1 : 0;
-    const weite = reichweite(state.worldSeed, { q: start.q, r: start.r }, proRunde * VORSCHAU_RUNDEN);
-    const out: { key: string; runden: number }[] = [];
-    for (const [k, schritte] of weite) {
-      if (schritte > 0) out.push({ key: k, runden: Math.ceil(schritte / proRunde) + rasten });
-    }
-    return out;
-  }, [zielWahl, auswahl, state.units, state.worldSeed, state.turn]);
 
   /** Siegpunkte aufgeschluesselt - fuers Menue (Reich). */
   const punkte = useMemo(() => {
@@ -1109,7 +1081,7 @@ export function Game() {
         <Board
           world={world}
           state={state}
-          targets={reichZiele ? { ...targets, reich: reichZiele } : targets}
+          targets={targets}
           showAllNumbers={pinNumbers}
           flashHexes={flashHexes}
           pfeile={pfeile}
