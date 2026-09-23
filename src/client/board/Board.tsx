@@ -887,11 +887,18 @@ export function Board({
           if (g === ctx) unterwegs.push({ u, fx, fy });
           return;
         }
-        // Der Held traegt die Gestalt seines Hauses - eine von zehn (core/lore.ts).
+        /*
+         * Der Ernannte hat seine eigene Figur (rules/zweig.ts) - er traegt zwar
+         * die Art 'held', sieht aber anders aus. Der gewoehnliche Held traegt
+         * die Gestalt seines Hauses, eine von zehn (core/lore.ts).
+         */
+        const figur = u.zweig ?? u.kind;
         const gestalt =
-          u.kind === 'held' ? state.players.find((p) => p.id === u.owner)?.held?.gestalt : undefined;
+          u.kind === 'held' && !u.zweig
+            ? state.players.find((p) => p.id === u.owner)?.held?.gestalt
+            : undefined;
         // Und wer sich hochgedient hat, traegt seinen Rang: Helm, Feder, Umhang.
-        zeichneFigur(g, u.kind, fx, fy, f, farbeSeite(seiteVon(u)), gestalt, u.stufe ?? 0);
+        zeichneFigur(g, figur, fx, fy, f, farbeSeite(seiteVon(u)), gestalt, u.stufe ?? 0);
         if (fackeln && u.id >= 0) zeichneFigur(g, 'fackel', fx + 5 * f, fy - 2 * f, f);
         // Wer sich hochgedient hat, traegt seine Winkel ueber dem Kopf.
         if (u.id >= 0 && (u.stufe ?? 0) > 0) zeichneStufe(g, u.kind, fx, fy, f, u.stufe ?? 0);
@@ -973,7 +980,7 @@ export function Board({
       const hops = Math.round(Math.abs(Math.sin(p * Math.PI * 2 * b.schritte)) * 2) * f;
       const x = Math.round(sx + (fx - sx) * e);
       const y = Math.round(sy + (fy - sy) * e) - hops;
-      zeichneFigur(ctx, u.kind, x, y, f, farbeSeite(seiteVon(u)));
+      zeichneFigur(ctx, u.zweig ?? u.kind, x, y, f, farbeSeite(seiteVon(u)));
       if (fackeln) zeichneFigur(ctx, 'fackel', x + 5 * f, y - 2 * f, f);
       const max = maxLeben(u);
       if (u.leben < max) zeichneLeben(ctx, u.kind, x, y, f, u.leben, max);

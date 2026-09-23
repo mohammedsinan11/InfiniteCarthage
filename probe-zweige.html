@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<title>Probe: die drei Ernannten</title>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; padding: 20px 24px; background: #16110b; color: #f2e7d0;
+         font: 13px/1.45 -apple-system, system-ui, sans-serif; width: 1180px; }
+  h1 { font-family: 'Silkscreen', monospace; font-size: 20px; color: #ffd76a; margin: 0 0 4px; }
+  h2 { font-family: 'Silkscreen', monospace; font-size: 14px; color: #d9a441; margin: 24px 0 6px; }
+  p.lead { margin: 0 0 12px; color: #a8987c; max-width: 1120px; }
+  .reihe { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+  figure { margin: 0; width: 220px; }
+  figcaption { font-size: 11.5px; color: #cdbd9c; margin-bottom: 4px; min-height: 46px; }
+  figcaption b { color: #f2e7d0; font-family: 'Silkscreen', monospace; font-size: 11px; }
+  canvas { display: block; image-rendering: pixelated; border: 2px solid #3a2c1c; background: #0f0c08; }
+  .klein figure { width: 120px; }
+</style></head>
+<body>
+<div id="inhalt"></div>
+<script type="module">
+// Die echte Zeichenfunktion des Spiels - nicht nachgebaut, dieselbe.
+import { zeichneFigur } from '/src/client/units.ts';
+
+const BLAU = '#3a7ac2';
+const ROT = '#c94f3a';
+
+/** Eine Figur auf eine eigene Leinwand, Fuesse unten mittig. */
+function tafel(art, farbe, S, breite, hoehe) {
+  const c = document.createElement('canvas');
+  c.width = breite; c.height = hoehe;
+  c.style.width = breite + 'px'; c.style.height = hoehe + 'px';
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  // Boden als Anhaltspunkt, damit man sieht, worauf die Figur steht.
+  g.fillStyle = '#241c12';
+  g.fillRect(0, hoehe - 10, breite, 10);
+  zeichneFigur(g, art, Math.round(breite / 2), hoehe - 10, S, farbe);
+  return c;
+}
+
+const DREI = [
+  ['krieger', 'Krieger', 'Geschlossener Helm, Klinge rechts, Schildkante links. Haelt am meisten aus und schlaegt am haertesten zu.'],
+  ['heilerin', 'Heilerin', 'Helles Gewand in Spielerfarbe, Stab mit Licht. Heilt ringsum, kaempft kaum.'],
+  ['haendler', 'Haendler', 'Hut, Kiepe auf dem Ruecken, Waage. Tauscht 2:1, solange er steht.'],
+];
+
+const inhalt = document.getElementById('inhalt');
+const h = (tag, text) => { const e = document.createElement(tag); e.textContent = text; return e; };
+
+inhalt.append(h('h1', 'Die drei Ernannten'));
+const lead = h('p', 'Platzhalter-Figuren fuer Krieger, Heilerin und Haendler (rules/zweig.ts). Zum Vergleich links der gewoehnliche Held, wie er heute aussieht. Alle in Spielerfarbe Blau.');
+lead.className = 'lead';
+inhalt.append(lead);
+
+// --- Gross: acht Geraetepixel je Kunstpixel ---
+inhalt.append(h('h2', 'Gross (8x) - worauf es beim Zeichnen ankommt'));
+const gross = document.createElement('div');
+gross.className = 'reihe';
+for (const [art, name, text] of [['held', 'Held (heute)', 'Die bisherige Heldenfigur - zum Vergleich.'], ...DREI]) {
+  const f = document.createElement('figure');
+  const cap = document.createElement('figcaption');
+  cap.innerHTML = '<b>' + name + '</b><br>' + text;
+  f.append(cap, tafel(art, BLAU, 8, 180, 140));
+  gross.append(f);
+}
+inhalt.append(gross);
+
+// --- Klein: so gross wie im Spiel ---
+inhalt.append(h('h2', 'So gross wie im Spiel (3x und 4x) - erkennt man sie noch?'));
+const lead2 = h('p', 'Der eigentliche Test: auf dem Brett sind die Figuren klein. Jede muss an ihrer Silhouette erkennbar bleiben, nicht an einem Detail.');
+lead2.className = 'lead';
+inhalt.append(lead2);
+for (const S of [4, 3]) {
+  const reihe = document.createElement('div');
+  reihe.className = 'reihe klein';
+  for (const [art, name] of [['held', 'Held'], ...DREI]) {
+    const f = document.createElement('figure');
+    const cap = document.createElement('figcaption');
+    cap.innerHTML = '<b>' + name + '</b> · ' + S + 'x';
+    cap.style.minHeight = '0';
+    f.append(cap, tafel(art, BLAU, S, 110, 70));
+    reihe.append(f);
+  }
+  inhalt.append(reihe);
+}
+
+// --- Zweite Spielerfarbe, damit man sieht, was die Farbe traegt ---
+inhalt.append(h('h2', 'Andere Spielerfarbe (Rot)'));
+const rot = document.createElement('div');
+rot.className = 'reihe';
+for (const [art, name] of DREI) {
+  const f = document.createElement('figure');
+  const cap = document.createElement('figcaption');
+  cap.innerHTML = '<b>' + name + '</b>';
+  cap.style.minHeight = '0';
+  f.append(cap, tafel(art, ROT, 8, 180, 140));
+  rot.append(f);
+}
+inhalt.append(rot);
+</script>
+</body></html>

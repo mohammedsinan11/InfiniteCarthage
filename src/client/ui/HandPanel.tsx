@@ -97,7 +97,21 @@ export function HandPanel({ hand }: { hand: Hand }) {
   }
 
   return (
-    <div className="hand" title={`${total} Karten insgesamt`}>
+    /*
+      Das ganze Blatt klappt ein, nicht nur das kleine Minuszeichen: auf dem
+      Handy war der Knopf kaum zu treffen. Eingeklappt ist es ohnehin schon
+      als Ganzes anzutippen - jetzt in beide Richtungen gleich.
+    */
+    <div
+      className="hand hand-breit"
+      role="button"
+      tabIndex={0}
+      title={`${total} Karten insgesamt - antippen zum Einklappen`}
+      onClick={() => umschalten(true)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') umschalten(true);
+      }}
+    >
       <button className="hand-zu" title="Hand einklappen" onClick={() => umschalten(true)}>
         –
       </button>

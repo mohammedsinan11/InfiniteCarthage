@@ -36,7 +36,15 @@ export type FigurArt =
   | 'turm'
   | 'lichtung'
   | 'fackel'
-  | 'wimpel';
+  | 'wimpel'
+  /*
+   * Die drei Ernannten (rules/zweig.ts). Sie sind keine eigene UnitKind - die
+   * Einheit traegt 'held' und ihren Zweig -, aber eine eigene Figur: das Brett
+   * waehlt sie mit `u.zweig ?? u.kind`.
+   */
+  | 'krieger'
+  | 'heilerin'
+  | 'haendler';
 
 const PALETTE: Record<string, string> = {
   k: '#1b130d', // Umriss
@@ -316,6 +324,59 @@ const ART: Record<FigurArt, readonly string[]> = {
     '..kbkbk..',
     '..kb.bk..',
     '..kk.kk..',
+  ],
+  /*
+   * Die drei Ernannten (rules/zweig.ts), je elf Kunstpixel breit - zwei mehr
+   * als der Held, damit ihr Zeichen danebenpasst. Jeder soll auf den ersten
+   * Blick an EINER Silhouette erkennbar sein, nicht an einem Detail:
+   *
+   *   Krieger   geschlossener Helm, Klinge rechts, Schildkante links
+   *   Heilerin  helles Gewand, Stab mit Licht
+   *   Haendler  Hut, Kiepe auf dem Ruecken, Waage
+   *
+   * PLATZHALTER (ASSETS.md).
+   */
+  krieger: [
+    '....mmm....',
+    '...kmnmk...',
+    '...kmsmk...',
+    '..pkmmmkp.n',
+    '.pppkkkpppn',
+    'MMpmmymmpPn',
+    'MMpmmmmmpPn',
+    'MMpkmmmkpPy',
+    '.Mpkmmmkp..',
+    '..pkbkbkp..',
+    '...kb.bk...',
+    '...kk.kk...',
+  ],
+  heilerin: [
+    '........yyy',
+    '..ccccc.yty',
+    '.kcccck..t.',
+    '.kcsssk..t.',
+    '.cksssk..t.',
+    '.cckkkcc.t.',
+    '.CcqqyqqCt.',
+    '.CcqqqqqCt.',
+    '.CckqqqkCt.',
+    '..ckqqqkct.',
+    '..ckccck.t.',
+    '...kk.kk...',
+  ],
+  haendler: [
+    '...bbbbb...',
+    '..kbbbbbk..',
+    '...kyyyk...',
+    '...ksssk...',
+    '..BkssskP..',
+    '.BBcckkccP.',
+    '.BBccpccPyy',
+    '.BBccpccP.y',
+    '.BBcccccP..',
+    '..Bckbkc...',
+    '..pkbkbkp..',
+    '...kk.kk...',
   ],
   // Kleines Dorf: dasselbe Fachwerkhaus, auf die Ecke zwischen drei Kacheln
   // verkleinert, damit es nicht ueber die Nachbarfelder ragt.

@@ -853,6 +853,15 @@ em.off {
   .heerleiste {
     right: 10px;
   }
+  /*
+   * Der Ziel-Hinweis sass mittig auf 12px und damit genau auf dem Wetter- und
+   * Raumschild (.hud), das man waehrend der Zielwahl sehen will. Er rueckt
+   * unter die Schilder.
+   */
+  .befehl-hinweis {
+    top: 52px;
+    max-width: calc(100vw - 20px);
+  }
 }
 
 /* Befehlstafel an den gewaehlten Einheiten (Game, Board befehlsTafel). PLATZHALTER. */
@@ -1117,7 +1126,12 @@ em.off {
 .meldungen {
   position: absolute;
   left: 0;
-  top: 96px;
+  /*
+   * Unter der Heerleiste, nicht auf ihr. Beide standen auf 96px und lagen
+   * damit auf dem Handy uebereinander. Die Ersatzwerte greifen, falls die
+   * Meldungen einmal ausserhalb von .main haengen.
+   */
+  top: calc(var(--heerleiste-oben, 52px) + var(--heerleiste-hoehe, 43px) + 8px);
   z-index: 12;
   display: flex;
   flex-direction: column;
@@ -3679,6 +3693,10 @@ em.off {
   font-size: 12px;
   line-height: 1;
 }
+/* Aufgeklappt klappt das ganze Blatt wieder ein, nicht nur das Minuszeichen. */
+.hand.hand-breit {
+  cursor: pointer;
+}
 .hand.hand-schmal {
   display: flex;
   gap: 8px;
@@ -3942,10 +3960,17 @@ em.off {
 @media (max-width: 600px) {
   .unten {
     display: grid;
-    grid-template-columns: auto 1fr;
+    /*
+     * Drei Spalten: Hand, Wuerfel, Inventar - alle in der oberen Zeile, die
+     * Leiste darunter. Das Inventar hatte vorher gar keinen Bereich und wurde
+     * deshalb automatisch in eine eigene Zeile gesetzt; die schob die
+     * Bauleiste nach oben. minmax(0,...) laesst die Hand schrumpfen, statt
+     * ueber den Wuerfel zu wachsen.
+     */
+    grid-template-columns: minmax(0, 1fr) auto auto;
     grid-template-areas:
-      'hand wuerfel'
-      'dock dock';
+      'hand wuerfel inventar'
+      'dock dock dock';
     align-items: end;
     gap: 6px;
     bottom: calc(10px + env(safe-area-inset-bottom));
@@ -3953,6 +3978,12 @@ em.off {
   }
   .unten .hand {
     grid-area: hand;
+    /* Aufgeklappt lieber schieben als den Wuerfel verdecken. */
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .unten .inventar {
+    grid-area: inventar;
   }
   .unten .dock {
     grid-area: dock;
