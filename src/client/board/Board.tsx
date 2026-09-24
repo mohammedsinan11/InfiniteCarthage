@@ -353,9 +353,25 @@ function einheitenText(state: PublicState, du: string | null, gruppe: readonly U
   if (VORHABEN[u.auftrag]) teile.push(VORHABEN[u.auftrag]);
   const beute = gruppe.reduce((s, x) => s + x.traegt, 0);
   if (beute > 0) teile.push(`traegt ${beute} ${beute === 1 ? 'Karte' : 'Karten'}`);
-  const max = maxLeben(u);
   if (u.kind !== 'wanderer') {
-    teile.push(n === 1 ? `Leben ${u.leben}/${max}` : `Leben ${gruppe.map((x) => x.leben).join(', ')} von ${max}`);
+    /*
+     * Bei mehreren Einheiten muss auch das Maximum ueber die Gruppe gehen.
+     *
+     * Vorher stand hier maxLeben(u) - das Maximum der ERSTEN Einheit - neben
+     * den einzeln aufgelisteten Leben aller. maxLeben haengt aber am Rang
+     * (core/combat.ts), also hat ein aufgestiegener Bogenschuetze mehr als
+     * ein frischer. Die Zeile las sich dadurch als "Leben 2, 4, 2, 2, 3 von
+     * 2", als waeren drei davon ueberheilt - ein Anzeigefehler, der nach
+     * einem Regelfehler aussah.
+     *
+     * Summiert wie in ui/Heerleiste.tsx und ui/SideMenu.tsx, damit dieselbe
+     * Gruppe ueberall dieselbe Zahl traegt.
+     */
+    teile.push(
+      n === 1
+        ? `Leben ${u.leben}/${maxLeben(u)}`
+        : `Leben ${gruppe.reduce((s, x) => s + x.leben, 0)} von ${gruppe.reduce((s, x) => s + maxLeben(x), 0)}`,
+    );
   }
   return teile.join(' · ');
 }
