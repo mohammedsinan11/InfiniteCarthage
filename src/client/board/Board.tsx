@@ -1230,7 +1230,27 @@ export function Board({
      * Reihe darunter. Eine Kante steht vor der tieferen ihrer beiden Ecken.
      */
     const eckTiefe = (v: Vertex) => (v.d === 'N' ? v.r : v.r + 1);
-    const kantenTiefe = (ek: string) => Math.max(...edgeEndpoints(parseEdgeKey(ek)).map(eckTiefe));
+    /*
+     * Gemerkt, nicht jedes Mal neu gerechnet.
+     *
+     * Die Baender-Schleife ruft zeichneBauten zweimal je Band auf, und dort
+     * laeuft jeder Filter ueber ALLE Kanten - fuer jede wurde der Schluessel
+     * zerlegt und beide Eckentiefen gerechnet. Bei 30 Baendern und einigen
+     * Dutzend Strassen ist das dieselbe Rechnung hundertfach.
+     *
+     * Der Zwischenspeicher lebt nur fuer diesen einen Zeichenvorgang; die
+     * Tiefe einer Kante haengt allein an ihrem Schluessel, ist innerhalb eines
+     * Bildes also unveraenderlich. Die Filterzeilen bleiben unangetastet -
+     * es kann sich damit nicht aendern, WELCHE Bauten gezeichnet werden.
+     */
+    const kantenTiefeMemo = new Map<string, number>();
+    const kantenTiefe = (ek: string): number => {
+      const da = kantenTiefeMemo.get(ek);
+      if (da !== undefined) return da;
+      const t = Math.max(...edgeEndpoints(parseEdgeKey(ek)).map(eckTiefe));
+      kantenTiefeMemo.set(ek, t);
+      return t;
+    };
     // Asche abgebrannter Strassen zuerst - was darauf neu gebaut ist, liegt obenauf.
     const asche = Object.entries(state.asche).filter(([ek]) => state.roads[ek] === undefined);
     /*
@@ -1327,7 +1347,16 @@ export function Board({
       const c = hexToPixel(q, r, LAYOUT);
       for (const v of hexVertices(q, r)) if (vertexToPixel(v, LAYOUT).y < c.y) burgTiefe.set(vertexKey(v), hauptstadtTiefe(hk));
     }
-    const gebaeudeTiefe = (vk: string) => burgTiefe.get(vk) ?? eckTiefe(parseVertexKey(vk));
+    // Ebenso gemerkt wie kantenTiefe: parseVertexKey lief sonst je Band erneut
+    // ueber jedes Gebaeude. burgTiefe ist waehrend eines Bildes unveraenderlich.
+    const gebaeudeTiefeMemo = new Map<string, number>();
+    const gebaeudeTiefe = (vk: string): number => {
+      const da = gebaeudeTiefeMemo.get(vk);
+      if (da !== undefined) return da;
+      const t = burgTiefe.get(vk) ?? eckTiefe(parseVertexKey(vk));
+      gebaeudeTiefeMemo.set(vk, t);
+      return t;
+    };
 
     /*
      * Wie viele Wege an einer Ecke zusammenlaufen. Eine Kante, die dort als
