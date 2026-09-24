@@ -1044,6 +1044,21 @@ export function Board({
     }
   }, [farbeSeite, view, scale, dpr]);
 
+  /*
+   * Immer die JUENGSTE komponiere() griffbereit, ohne dass ihr Wechsel den
+   * grossen Zeichen-Effekt unten erneut anstoesst.
+   *
+   * komponiere haengt an view - und view aendert sich bei jedem Bild waehrend
+   * des Schiebens (panAnwenden). Stuende komponiere selbst in der
+   * Abhaengigkeitsliste des grossen Effekts, buke der beim Verschieben der
+   * Karte in jedem Einzelbild das ganze sichtbare Brett neu - Kacheln, Bauten,
+   * Einheiten, alles - statt nur zu verschieben. Genau das Ruckeln, das der
+   * Kommentar bei den Schichten oben schon fuer animZeit beschreibt, nur
+   * diesmal ausgeloest vom Kartenziehen statt vom Einheitenzug.
+   */
+  const komponiereRef = useRef(komponiere);
+  komponiereRef.current = komponiere;
+
   /**
    * Gelaende auf die UNTERE Schicht zeichnen, alles Gebaute auf die obere.
    *
@@ -1921,7 +1936,9 @@ export function Board({
       tint: SEASON_TINT[seasonOf(state.turn)],
       leute: gleitende,
     };
-    komponiere();
+    komponiereRef.current();
+    // komponiere bewusst NICHT in dieser Liste - siehe komponiereRef oben.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     visible,
     zView,
@@ -1945,7 +1962,6 @@ export function Board({
     dpr,
     kampf,
     roentgen,
-    komponiere,
   ]);
 
   /*
