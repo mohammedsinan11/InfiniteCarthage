@@ -108,7 +108,7 @@ import {
 } from '../../core/rules/placement';
 import { productionSources } from '../../core/rules/production';
 import { tradeRatio } from '../../core/rules/trade';
-import { Aktionsleiste, SymHandel } from '../ui/Aktionsleiste';
+import { Aktionsleiste } from '../ui/Aktionsleiste';
 import type { BuildMode } from '../ui/Aktionsleiste';
 import { reichArtVon } from '../ui/Aktionsleiste';
 import { REICHSBAU_NAME, REICHSBAU_ZWECK, reichsbauHindernis, reichsgebiet } from '../../core/rules/reich';
@@ -1138,23 +1138,12 @@ export function Game() {
             immer da, ausgegraut, solange nichts geht (ui/Aktionsleiste.tsx).
           */}
           <div className="unten" ref={untenRef}>
-            {hand && <HandPanel hand={hand} />}
-            {/*
-              Handel als Karte neben der Hand, nicht mehr als Knopf in der
-              Bauleiste: dort war er einer von neun und ging unter, hier steht
-              er bei den Karten, mit denen gehandelt wird. Die Tafel selbst
-              haengt weiter an .dock (styles.css, .dock-tafel) und sitzt
-              deshalb unveraendert ueber der Bauleiste.
-            */}
             {hand && (
-              <button
-                className={['handel-karte', tafel === 'handel' ? 'gewaehlt' : ''].filter(Boolean).join(' ')}
-                title="Bankhandel"
-                aria-pressed={tafel === 'handel'}
-                onClick={() => setTafel((alt) => (alt === 'handel' ? null : 'handel'))}
-              >
-                <SymHandel />
-              </button>
+              <HandPanel
+                hand={hand}
+                handelOffen={tafel === 'handel'}
+                onHandel={() => setTafel((alt) => (alt === 'handel' ? null : 'handel'))}
+              />
             )}
             {hand && (
               <Aktionsleiste
