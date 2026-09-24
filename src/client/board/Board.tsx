@@ -965,10 +965,30 @@ export function Board({
     const jetzt = performance.now();
     for (const { u, fx, fy, sx, sy } of d.leute) {
       const b = bewegung.current.get(u.id);
-      if (!b) continue;
-      const p = Math.min(1, Math.max(0, (jetzt - b.start) / b.dauer));
+      /*
+       * OHNE EINTRAG AM ZIEL ZEICHNEN, NICHT UEBERSPRINGEN.
+       *
+       * Hier stand "if (!b) continue" - und das liess Einheiten am Ende jeder
+       * Bewegung kurz verschwinden. Die Schleife oben loescht abgelaufene
+       * Eintraege ZUERST und stoesst erst danach das Neuzeichnen an:
+       *
+       *   for (...) if (t - b.start >= b.dauer) bewegung.current.delete(k);
+       *   setAnimZeit(t);
+       *
+       * In diesem Bild ist die Einheit dann nirgends. In die Schicht gebacken
+       * wurde sie nicht, weil der Kacheldurchgang sie uebersprungen hat,
+       * solange sie in bewegung stand (zeichneBesatzung); und hier fiel sie
+       * durch das continue. Die schwere Zeichen-Wirkung haengt nicht an
+       * animZeit, backt die Schicht also nicht sofort neu.
+       *
+       * Mit p = 1 steht sie genau am Ziel - dort, wo sie nach dem naechsten
+       * Backen ohnehin in der Schicht liegt. Doppelt gezeichnet wird sie
+       * nicht: ist der Eintrag weg, ueberspringt der Kacheldurchgang sie auch
+       * nicht mehr, und die Gleitliste ist beim naechsten Backen leer.
+       */
+      const p = b ? Math.min(1, Math.max(0, (jetzt - b.start) / b.dauer)) : 1;
       const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
-      const hops = Math.round(Math.abs(Math.sin(p * Math.PI * 2 * b.schritte)) * 2) * d.f;
+      const hops = b ? Math.round(Math.abs(Math.sin(p * Math.PI * 2 * b.schritte)) * 2) * d.f : 0;
       // Die Figuren stehen im Raster der Schichten - also mit demselben Versatz.
       const x = Math.round(sx + (fx - sx) * e) + vx;
       const y = Math.round(sy + (fy - sy) * e) - hops + vy;
