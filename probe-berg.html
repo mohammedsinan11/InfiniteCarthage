@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<title>Probe: Berg verdeckt das Dorf</title>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; padding: 18px 22px 30px; background: #16110b; color: #f2e7d0;
+         font: 13px/1.45 -apple-system, system-ui, sans-serif; width: 1100px; }
+  h1 { font-family: 'Silkscreen', monospace; font-size: 18px; color: #ffd76a; margin: 0 0 4px; }
+  p.lead { margin: 0 0 12px; color: #a8987c; max-width: 1320px; font-size: 12px; }
+  .reihe { display: flex; gap: 12px; align-items: flex-start; }
+  figure { margin: 0; width: 254px; }
+  figcaption { font-size: 11px; color: #cdbd9c; margin-bottom: 5px; min-height: 100px; }
+  figcaption b { display: block; font-family: 'Silkscreen', monospace; font-size: 10.5px; color: #f2e7d0; }
+  canvas { display: block; image-rendering: pixelated; border: 2px solid #3a2c1c; background: #0f0c08; }
+  #urteil { font-family: 'Silkscreen', monospace; font-size: 13px; padding: 11px 13px; margin: 14px 0 0;
+            border: 2px solid #3a2c1c; background: #1d1710; white-space: pre; line-height: 1.7; }
+</style></head>
+<body>
+<h1>Berg verdeckt das Dorf/die Strasse</h1>
+<p class="lead">Ein Dorf auf der S-Ecke von Feld (0,0), rundum Gebirge - der Fall, den es heute noch nicht gibt.
+Gezeichnet mit den echten Funktionen aus tiles.ts und units.ts, in derselben Bau-Reihenfolge wie das Brett
+(siehe probe-wald.html, das Vorbild fuer dieses Blatt). Vergleich: heutiges Verhalten (nur die Gipfel-Spitzen
+stanzen, wie bei Wald) gegen den Vorschlag (die ganze Bergkachel stanzt, Wald bleibt beim heutigen Verhalten).</p>
+<div class="reihe" id="reihe"></div>
+<div id="urteil">messe ...</div>
+<script type="module">
+import {
+  preloadTiles, tileImage, tileUrl, ueberhangBild,
+  SCHRITT_X, SCHRITT_Y, IMG_W, IMG_H, kachelEcke,
+} from '/src/client/tiles.ts';
+import { zeichneGebaeude } from '/src/client/units.ts';
+
+await preloadTiles();
+
+const SEED = 12345;
+const S = 10;
+const W = 50, H = 40, OX = -25, OY = -15;
+
+const FELDER = [[0,0],[1,0],[-1,0],[0,-1],[1,-1],[0,1],[-1,1],[1,1],[-2,1],[0,2],[-1,2]];
+const px = (x, y) => ({ x: (x - OX) * S, y: (y - OY) * S });
+const LW = SCHRITT_X, LH = SCHRITT_Y / 0.75;
+const eckeS = (q, r) => ({ x: LW * (q + r / 2), y: LH * 0.75 * r + 0.5 * LH });
+
+const bildVon = (q, r) => {
+  const url = tileUrl(SEED, 'mountain', q, r);
+  return url === null ? null : { url, img: tileImage(url) };
+};
+
+function leinwand() {
+  const c = document.createElement('canvas');
+  c.width = W * S; c.height = H * S;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  g.imageSmoothingEnabled = false;
+  return { c, g };
+}
+
+function kachel(g, q, r) {
+  const b = bildVon(q, r);
+  if (!b || !b.img) return;
+  const e = kachelEcke(q, r), p = px(e.x, e.y);
+  g.drawImage(b.img, p.x, p.y, IMG_W * S, IMG_H * S);
+}
+
+const HAUS = (g, hoch) => {
+  const v = eckeS(0, 0), p = px(v.x, v.y);
+  zeichneGebaeude(g, 'dorf', p.x, p.y - hoch * S, S, '#4f9bf0');
+};
+
+const STRASSE = (g) => {
+  // Kante zwischen (0,0) Suedecke und der Ostecke von (0,0)/(1,0)/(0,1) - fest verdrahtet fuers Bild.
+  const a = eckeS(0, 0);
+  const b = { x: LW * (0.5 + 1 / 2), y: LH * 0.75 * 1 };
+  const pa = px(a.x, a.y), pb = px(b.x, b.y);
+  g.strokeStyle = '#caa15a';
+  g.lineWidth = S * 1.4;
+  g.beginPath();
+  g.moveTo(pa.x, pa.y);
+  g.lineTo(pb.x, pb.y);
+  g.stroke();
+};
+
+/**
+ * stanze: 'ueberhang' (heute, Spitzen) | 'voll' (Vorschlag, ganze Kachel) | 'keine'
+ */
+function baue(stanze, mitStrasse = false) {
+  const { c, g } = leinwand();
+  for (const [q, r] of [...FELDER].sort((a, b) => a[1] - b[1] || a[0] - b[0])) kachel(g, q, r);
+
+  const tiefe = 1;
+  const { c: sc, g: sg } = leinwand();
+  HAUS(sg, 0);
+  if (mitStrasse) STRASSE(sg);
+
+  if (stanze !== 'keine') {
+    sg.globalCompositeOperation = 'destination-out';
+    for (const [q, r] of FELDER) {
+      if (r !== tiefe && r !== tiefe + 1) continue;
+      const b = bildVon(q, r);
+      if (!b || !b.img) continue;
+      const stamp = stanze === 'voll' ? b.img : ueberhangBild(b.img);
+      if (!stamp) continue;
+      const e = kachelEcke(q, r), o = px(e.x, e.y);
+      sg.drawImage(stamp, o.x, o.y, IMG_W * S, IMG_H * S);
+    }
+    sg.globalCompositeOperation = 'source-over';
+  }
+  g.drawImage(sc, 0, 0);
+  return { c, schicht: sc };
+}
+
+function sichtbar(schicht) {
+  const d = schicht.getContext('2d').getImageData(0, 0, schicht.width, schicht.height).data;
+  let n = 0;
+  for (let i = 3; i < d.length; i += 4) if (d[i] > 8) n++;
+  return n;
+}
+
+const FAELLE = [
+  ['1 - HEUTE', 'Nur die Gipfel-Spitzen stanzen (ueberhangBild) - dasselbe Verhalten wie bei Wald. Das Dorf steht praktisch frei vor dem Berg.', 'ueberhang', false],
+  ['2 - VORSCHLAG', 'Die ganze Bergkachel stanzt (das komplette Kachelbild als Schablone). Das Dorf verschwindet zu grossen Teilen hinter dem Gebirge.', 'voll', false],
+  ['3 - VORSCHLAG + STRASSE', 'Wie 2, zusaetzlich eine Strasse, die hinter denselben Berg laeuft und ebenso verschwindet.', 'voll', true],
+  ['4 - OHNE STANZE', 'Zum Vergleich: gar nichts verdeckt. So gross ist das Haus ueberhaupt - der Massstab fuer die Prozente unten.', 'keine', false],
+];
+
+const reihe = document.getElementById('reihe');
+const zahlen = [];
+for (const [titel, text, stanze, mitStrasse] of FAELLE) {
+  const { c, schicht } = baue(stanze, mitStrasse);
+  zahlen.push([titel, sichtbar(schicht)]);
+  const f = document.createElement('figure');
+  const cap = document.createElement('figcaption');
+  cap.innerHTML = `<b>${titel}</b>${text}`;
+  f.append(cap, c);
+  reihe.append(f);
+}
+const voll = zahlen[3][1];
+document.getElementById('urteil').textContent = zahlen
+  .map(([t, n]) =>
+    `${t.padEnd(24)} sichtbare Punkte ${String(n).padStart(6)}   ${String((100 * n / voll).toFixed(1)).padStart(5)} % vom ungestanzten Bild`)
+  .join('\n');
+</script>
+</body></html>

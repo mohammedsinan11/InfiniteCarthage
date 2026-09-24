@@ -1743,8 +1743,19 @@ export function Board({
                * Felder, deren Mitte HOEHER liegt als die Ecke, stanzen ohnehin
                * nicht: sie gehoeren zu Reihe tiefe-1 oder darueber und stehen
                * damit schon als Gelaende hinter dem Haus.
+               *
+               * BERG STANZT GANZ, WALD NUR DIE SPITZEN.
+               *
+               * Ein Berg ist schmal und hoch: die volle Kachel als Schablone
+               * laesst ein Haus glaubhaft dahinter verschwinden (probe-berg.html:
+               * 94,9 % sichtbar mit nur den Spitzen, 19,7 % mit der ganzen
+               * Kachel). Bei Wald war genau das schon einmal eingebaut und
+               * wieder zurueckgebaut (siehe Kommentar oben) - ein Dorf zwischen
+               * drei Waldfeldern blieb zu 14,3 % sichtbar und wirkte nicht
+               * verdeckt, sondern verschwunden. Wald bleibt deshalb bei den
+               * Spitzen, Berg bekommt die volle Kachel.
                */
-              const stanze = maskenModus ? ueberhangBild(bild) : bild;
+              const stanze = t.terrain === 'mountain' ? bild : maskenModus ? ueberhangBild(bild) : bild;
               if (!stanze) continue;
               const k = hexKey(t.q, t.r);
               const { x, y } = ursprung(t.q, t.r, liftHex(t.q, t.r) + (k === hover ? LIFT : 0));
