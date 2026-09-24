@@ -108,7 +108,7 @@ import {
 } from '../../core/rules/placement';
 import { productionSources } from '../../core/rules/production';
 import { tradeRatio } from '../../core/rules/trade';
-import { Aktionsleiste } from '../ui/Aktionsleiste';
+import { Aktionsleiste, SymHandel } from '../ui/Aktionsleiste';
 import type { BuildMode } from '../ui/Aktionsleiste';
 import { reichArtVon } from '../ui/Aktionsleiste';
 import { REICHSBAU_NAME, REICHSBAU_ZWECK, reichsbauHindernis, reichsgebiet } from '../../core/rules/reich';
@@ -1138,12 +1138,27 @@ export function Game() {
             immer da, ausgegraut, solange nichts geht (ui/Aktionsleiste.tsx).
           */}
           <div className="unten" ref={untenRef}>
+            {hand && <HandPanel hand={hand} />}
+            {/*
+              Der Handel steht als EIGENES Feld neben dem Rohstoffblatt, mit
+              eigenem Rahmen und eigenem Hintergrund - er gehoert sichtbar
+              nicht zu den Karten.
+
+              Er sass zwischendurch als sechster Platz im Blatt. Dort stimmte
+              zwar die Kante von selbst, aber er las sich als weitere
+              Ressource. Dass es daneben frueher nicht sauber ausgerichtet
+              war, lag am 10-Punkte-Versatz des Blattes - der ist seit
+              f90ae84 weg, deshalb geht es jetzt.
+            */}
             {hand && (
-              <HandPanel
-                hand={hand}
-                handelOffen={tafel === 'handel'}
-                onHandel={() => setTafel((alt) => (alt === 'handel' ? null : 'handel'))}
-              />
+              <button
+                className={['handel-karte', tafel === 'handel' ? 'gewaehlt' : ''].filter(Boolean).join(' ')}
+                title="Bankhandel"
+                aria-pressed={tafel === 'handel'}
+                onClick={() => setTafel((alt) => (alt === 'handel' ? null : 'handel'))}
+              >
+                <SymHandel />
+              </button>
             )}
             {hand && (
               <Aktionsleiste

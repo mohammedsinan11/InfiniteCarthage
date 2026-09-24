@@ -24,8 +24,6 @@ import type { Resource } from '../../core/types';
 import type { Hand } from '../../core/state';
 import { resourceName } from '../log';
 import { ResourceCard, ResourceGlyph } from './ResourceIcon';
-// Dasselbe Symbol wie frueher in der Bauleiste - nicht nachgebaut.
-import { SymHandel } from './Aktionsleiste';
 
 const SCHMAL_KEY = 'infinitecarthage.handschmal';
 
@@ -60,17 +58,7 @@ function schmalAnfangs(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(max-width: 700px)').matches;
 }
 
-export function HandPanel({
-  hand,
-  handelOffen = false,
-  onHandel,
-}: {
-  hand: Hand;
-  /** Ist die Handelstafel gerade offen? Hebt den Knopf im Blatt hervor. */
-  handelOffen?: boolean;
-  /** Handelstafel auf- oder zuklappen. Fehlt sie, erscheint kein Knopf. */
-  onHandel?: () => void;
-}) {
+export function HandPanel({ hand }: { hand: Hand }) {
   const total = RESOURCES.reduce((n, r) => n + hand[r], 0);
   const [schmalGewaehlt, setSchmalGewaehlt] = useState(schmalAnfangs);
   const [handy, setHandy] = useState(istHandy);
@@ -184,32 +172,6 @@ export function HandPanel({
           <span className="hand-zahl">{hand[r]}</span>
         </div>
       ))}
-      {onHandel && (
-        /*
-          Der Handel sitzt als sechster Platz IM Blatt, nicht daneben.
-
-          Daneben lag er ausserhalb des Blattes - und das steht 10 Punkte
-          hoeher als seine Nachbarn (.hand { bottom: 10px }). Er begann
-          dadurch tiefer als die Karten, und jede Korrektur daran war eine
-          gemessene Zahl, die beim naechsten Umbau wieder kippt. In
-          derselben Reihe stimmt die Kante von selbst.
-
-          Nebenbei ist er damit nur sichtbar, wenn das Blatt offen ist, und
-          die untere Leiste verliert ein Feld.
-        */
-        <button
-          className={['hand-card', 'handel-karte', handelOffen ? 'gewaehlt' : ''].filter(Boolean).join(' ')}
-          title="Bankhandel"
-          aria-pressed={handelOffen}
-          onClick={(e) => {
-            // Sonst klappt am Rechner derselbe Klick das ganze Blatt ein.
-            e.stopPropagation();
-            onHandel();
-          }}
-        >
-          <SymHandel />
-        </button>
-      )}
     </div>
   );
 }

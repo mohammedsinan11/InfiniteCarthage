@@ -2757,43 +2757,23 @@ em.off {
  * gefuellt mit hellem Rand, damit er sich von den Rohstoffkarten abhebt und
  * als Knopf lesbar bleibt - gleich hoch wie sie, weil er ihre Zeile teilt.
  */
-/*
- * DER HANDEL IST EIN PLATZ IM BLATT, KEIN KASTEN DANEBEN.
- *
- * Daneben stand er ausserhalb des Blattes - und das liegt 10 Punkte hoeher
- * als seine Nachbarn (.hand { bottom: 10px }). Er begann dadurch tiefer als
- * die Karten, und jeder Versuch, das mit einem Rand auszugleichen, war eine
- * gemessene Zahl, die beim naechsten Umbau wieder kippt. Zwei Anlaeufe mit
- * 20 und 10 Punkten gingen genau so daneben.
- *
- * In derselben Reihe wie die Karten stimmt die Kante von selbst. Und er ist
- * nur zu sehen, wenn das Blatt offen ist - ohne eigene Regel dafuer.
- *
- * Masse wie eine Karte (ResourceCard size 2.6 = 62,4 x 83,2); auf dem Handy
- * teilt er sich den Platz mit ihnen, siehe die gerechnete Breite weiter
- * unten. Dunkel gefuellt mit hellem Rand, damit er zwischen den hellen
- * Rohstoffkarten als Knopf lesbar bleibt.
- */
 .handel-karte {
-  width: 62.4px;
-  height: 83.2px;
   /*
-   * Auf die mittlere Faecherebene, nicht auf die unterste.
+   * Eigenes Feld NEBEN dem Blatt, nicht darin.
    *
-   * Gemessen bei 1400 Punkten: die Karten liegen nicht auf einer Linie -
-   * der Faecher spreizt sie ueber 11 Punkte (Oberkanten 777 / 772 / 777 /
-   * 783 / 783). Das Muster aus .hand-card:nth-child(2)/(3)/(4) landet dabei
-   * auf den Karten 1 bis 3, weil .hand-zu das erste Kind ist; 4 und 5
-   * bleiben flach.
+   * Er sass zwischendurch als sechster Platz im Blatt. Dort stimmte die
+   * Kante von selbst, aber er las sich als weitere Ressource - gleicher
+   * Rahmen, gleiche Reihe, gleiche Masse wie eine Karte.
    *
-   * Der Knopf ist das siebte Kind und bekaeme gar nichts - er laege damit
-   * auf der untersten Ebene und saehe neben den gefaecherten Karten
-   * eingesunken aus. Mit 6 Punkten steht er auf derselben Hoehe wie drei
-   * der fuenf Karten. Auf dem Handy gibt es keinen Faecher, dort bleibt es
-   * bei 0 (siehe Handy-Block), sonst ginge die gemessene Buendigkeit
-   * verloren.
+   * Dass es daneben frueher nicht sauber ausgerichtet war, lag nicht am
+   * Knopf: das Blatt stand durch .hand { bottom: 10px } zehn Punkte hoeher
+   * als seine Nachbarn. Seit das zurueckgesetzt ist, reicht hier ein
+   * schlichtes align-self: stretch - der Knopf wird so hoch wie die Zeile,
+   * ganz ohne gemessene Randwerte. Zwei frueherer Anlaeufe mit 20 und 10
+   * Punkten Rand waren nur Kurieren am Symptom.
    */
-  margin-bottom: 6px;
+  align-self: stretch;
+  width: 74px;
   flex-shrink: 0;
   padding: 3px;
   display: flex;
@@ -4118,10 +4098,10 @@ em.off {
      * Bauleiste nach oben. minmax(0,...) laesst die Hand schrumpfen, statt
      * ueber den Wuerfel zu wachsen.
      */
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
     grid-template-areas:
-      'hand wuerfel inventar'
-      'dock dock dock';
+      'hand handel wuerfel inventar'
+      'dock dock dock dock';
     align-items: end;
     gap: 6px;
     bottom: calc(10px + env(safe-area-inset-bottom));
@@ -4196,20 +4176,19 @@ em.off {
      * die fuenfte Karte abgeschnitten - gemessen: bei 375 blieben nur vier
      * sichtbar. So schrumpfen sie nur so weit wie noetig.
      */
-    width: min(31.5px, (100vw - 212px) / 6);
+    /*
+     * Wieder fuenf Plaetze statt sechs: der Handel hat sein eigenes Feld in
+     * der Zeile und teilt sich den Platz nicht mehr mit den Karten. Er
+     * kostet damit 40 Punkte plus Luecke, die der Hand fehlen - die Karten
+     * fallen von 27,2 auf 24,2 zurueck. Das ist der Preis der Trennung.
+     */
+    width: min(31.5px, (100vw - 254px) / 5);
     height: auto;
   }
-  /*
-   * Der Knopf teilt sich den Platz mit den Karten - dieselbe gerechnete
-   * Breite, das Seitenverhaeltnis einer Karte. Kein eigenes Rasterfeld mehr.
-   */
-  .unten .hand.hand-breit .handel-karte {
-    width: min(31.5px, (100vw - 212px) / 6);
-    height: auto;
-    aspect-ratio: 24 / 32;
-    padding: 2px;
-    /* Kein Faecher auf dem Handy - gemessen buendig mit 0. */
-    margin-bottom: 0;
+  .unten .handel-karte {
+    grid-area: handel;
+    align-self: stretch;
+    width: 40px;
   }
   .unten .hand.hand-breit .handel-karte .dock-sym {
     width: 60%;
