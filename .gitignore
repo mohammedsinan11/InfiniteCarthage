@@ -3,3 +3,9 @@ dist/
 .wrangler/
 .DS_Store
 *.local
+
+# Entwurfsskizzen und Ausgaben manueller Testlaeufe - Material fuer die
+# Entwicklung, nicht Teil des Spiels, deshalb bewusst ausserhalb der
+# Versionskontrolle.
+mockups/
+dogfood-output/
