@@ -77,7 +77,6 @@ import {
   HEX_CX,
   HEX_CY,
   ueberhangBild,
-  hoehenMaske,
   HEX_H,
   HEX_W,
   IMG_H,
@@ -500,6 +499,8 @@ export function Board({
   const ueberhangRef = useRef<HTMLCanvasElement | null>(null);
   /** Schicht fuer die Probe "voll" - Bauten Reihe fuer Reihe, ausgestanzt von Wald und Bergen. */
   const vollRef = useRef<HTMLCanvasElement | null>(null);
+  /** Schicht fuer den Roentgenblick - die Silhouette aller Bauten, eingefaerbt. */
+  const roentgenRef = useRef<HTMLCanvasElement | null>(null);
   /*
    * ZWEI SCHICHTEN FUER DIE BEWEGUNG.
    *
@@ -542,6 +543,40 @@ export function Board({
   const letzterZeiger = useRef<string>('mouse');
   const letzterZoom = useRef(0);
   const [tilesReady, setTilesReady] = useState(false);
+
+  /*
+   * ROENTGENBLICK, solange Umschalt gedrueckt ist (nur am Rechner - ein Handy
+   * hat keine Umschalttaste).
+   *
+   * Auch nach der Wald-Korrektur bleibt ein Rest: Berggipfel decken weiter
+   * ganz, und wer wissen will, was hinter einer Baumreihe steht, soll nicht
+   * die Karte verschieben muessen. Umschalt umrandet ALLE Bauten - nicht nur
+   * die verdeckten. Eine Umrandung, die nur manchmal da ist, liest sich als
+   * Auszeichnung ("dieses Haus ist besonders") statt als Hilfsmittel.
+   */
+  const [roentgen, setRoentgen] = useState(false);
+  useEffect(() => {
+    const ab = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') setRoentgen(true);
+    };
+    const auf = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') setRoentgen(false);
+    };
+    /*
+     * Verliert das Fenster den Fokus, waehrend Umschalt liegt, kommt das
+     * keyup nie an - der Roentgenblick bliebe haengen, bis man die Taste
+     * noch einmal drueckt und loslaesst. Deshalb blur mitnehmen.
+     */
+    const weg = () => setRoentgen(false);
+    window.addEventListener('keydown', ab);
+    window.addEventListener('keyup', auf);
+    window.addEventListener('blur', weg);
+    return () => {
+      window.removeEventListener('keydown', ab);
+      window.removeEventListener('keyup', auf);
+      window.removeEventListener('blur', weg);
+    };
+  }, []);
 
   useEffect(() => {
     let lebt = true;
@@ -1519,7 +1554,19 @@ export function Board({
             male: () =>
               bastion !== undefined
                 ? zeichneBastion(g, p.x, p.y, f, spielerFarbe(b.owner), bastion)
-                : zeichneGebaeude(g, b.type === 'city' ? 'stadt' : 'dorf', p.x, p.y, f, spielerFarbe(b.owner)),
+                : // Drei Kunstpixel ueber der Ecke: so steht das Haus ueber dem
+                  // Baumsaum des Feldes davor statt darin. zeichneFigur nimmt
+                  // den Fusspunkt (y0 = fy - (Hoehe-1)*f), kleineres y ist also
+                  // weiter oben. fuss bleibt unveraendert - das ist nur die
+                  // Reihenfolge der Bauwerke untereinander.
+                  zeichneGebaeude(
+                      g,
+                      b.type === 'city' ? 'stadt' : 'dorf',
+                      p.x,
+                      p.y - 3 * f,
+                      f,
+                      spielerFarbe(b.owner),
+                    ),
           };
         });
       // Wachtuerme stehen fuer sich auf ihrer Ecke (state.tuerme).
@@ -1639,7 +1686,28 @@ export function Board({
               const url = tileUrl(state.worldSeed, t.terrain, t.q, t.r);
               const bild = url === null ? undefined : tileImage(url);
               if (!bild || url === null) continue;
-              const stanze = maskenModus ? hoehenMaske(bild, url) : bild;
+              /*
+               * NUR DIE SPITZEN STANZEN, NICHT DIE GANZE KRONE.
+               *
+               * Vorher stand hier hoehenMaske: alles, was die Flut von der
+               * Erdkante aus nicht erreicht. Bei einer Waldkachel sind das die
+               * Bildzeilen 5 bis 28, ab Zeile 9 durchgehend 20 bis 24 von 26
+               * Punkten breit - praktisch die ganze Kachel. Ein Dorf auf einer
+               * S-Ecke belegt in der Kachel darunter die Zeilen 5 bis 16 und
+               * wurde damit restlos weggeschnitten: das verschwundene Dorf
+               * zwischen drei Waldfeldern.
+               *
+               * ueberhangBild deckt nur, was eine Kachel ueber ihr eigenes
+               * Sechseck hinaus wirft (Zeilen 5 bis 12, auslaufend) - die
+               * Baumwipfel. Die schieben sich vor das Dach, das Haus bleibt
+               * stehen. Fuer Berggipfel tut die Schicht weiter unten seit je
+               * genau das; Wald benutzt jetzt denselben Umriss.
+               *
+               * Felder, deren Mitte HOEHER liegt als die Ecke, stanzen ohnehin
+               * nicht: sie gehoeren zu Reihe tiefe-1 oder darueber und stehen
+               * damit schon als Gelaende hinter dem Haus.
+               */
+              const stanze = maskenModus ? ueberhangBild(bild) : bild;
               if (!stanze) continue;
               const k = hexKey(t.q, t.r);
               const { x, y } = ursprung(t.q, t.r, liftHex(t.q, t.r) + (k === hover ? LIFT : 0));
@@ -1649,6 +1717,52 @@ export function Board({
             ctx.drawImage(schicht, 0, 0);
           }
         }
+      }
+    }
+
+    /*
+     * ROENTGENBLICK (Umschalt): heller Umriss um JEDES Bauwerk, und das
+     * Bauwerk selbst noch einmal ungestanzt darueber.
+     *
+     * Der Umriss allein genuegt nicht: steht ein Dorf ganz hinter einem
+     * Berggipfel, umrandet er eine Flaeche, in der nichts zu sehen ist. Erst
+     * beides zusammen - Ring und Bauwerk - macht aus der Umrandung einen
+     * Blick nach hinten.
+     *
+     * Der Ring entsteht ohne Pfadarbeit: die Silhouette wird eingefaerbt
+     * (source-in auf der eigenen Schicht) und acht Mal um einen halben
+     * Kunstpixel versetzt aufs Brett gelegt. Was in der Mitte liegt, deckt
+     * gleich darauf das Bauwerk selbst zu.
+     */
+    if (roentgen) {
+      const schicht = (roentgenRef.current ??= document.createElement('canvas'));
+      if (schicht.width !== bw || schicht.height !== bh) {
+        schicht.width = bw;
+        schicht.height = bh;
+      }
+      const g = schicht.getContext('2d');
+      if (g) {
+        g.imageSmoothingEnabled = false;
+        g.clearRect(0, 0, bw, bh);
+        zeichneBauten(g, null, 'bauten');
+        g.globalCompositeOperation = 'source-in';
+        g.fillStyle = 'rgba(255, 226, 138, 0.92)';
+        g.fillRect(0, 0, bw, bh);
+        g.globalCompositeOperation = 'source-over';
+        const d = Math.max(1, Math.round(f / 2));
+        for (const [ox, oy] of [
+          [-d, 0],
+          [d, 0],
+          [0, -d],
+          [0, d],
+          [-d, -d],
+          [d, -d],
+          [-d, d],
+          [d, d],
+        ] as const) {
+          ctx.drawImage(schicht, ox, oy);
+        }
+        zeichneBauten(ctx, null, 'bauten');
       }
     }
 
@@ -1830,6 +1944,7 @@ export function Board({
     tageszeit,
     dpr,
     kampf,
+    roentgen,
     komponiere,
   ]);
 

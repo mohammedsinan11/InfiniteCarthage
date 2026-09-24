@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entwurf: Umklapp-Knopf F1 bis F3</title>
+<link rel="stylesheet" href="/src/client/styles.css">
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
+<style>
+  /*
+   * DAS SICHTFENSTER MUSS SCHMAL SEIN, NICHT DIE BUEHNE.
+   *
+   * Erster Anlauf: eine 390 Punkte breite Buehne in einem 1400 Punkte breiten
+   * Fenster. Die Handyregeln haengen aber an @media (max-width: 600px), und das
+   * misst das Fenster - also galten die Rechnermasse (Karte 62x83), und
+   * Handel, Wuerfel und Inventar liefen rechts aus der Buehne heraus.
+   * Deshalb wird diese Seite bei Fensterbreite 390 aufgenommen.
+   */
+  body { margin: 0; padding: 12px 10px 30px; background: #16110b; color: #f2e7d0;
+         font: 12px/1.4 -apple-system, system-ui, sans-serif; }
+  h1 { font-family: 'Silkscreen', monospace; font-size: 13px; color: #ffd76a; margin: 0 0 4px; }
+  h2 { font-family: 'Silkscreen', monospace; font-size: 11px; color: #d9a441; margin: 16px 0 2px; }
+  p.lead { margin: 0 0 5px; color: #a8987c; font-size: 11px; }
+  .buehne { position: relative; width: 100%; height: 138px; margin: 4px 0 0;
+            background: #241c12; border: 2px solid #3a2c1c; overflow: hidden; }
+  .buehne .unten { left: 8px; right: 8px; bottom: 8px; max-width: none; }
+  .dock-attrappe { grid-area: dock; display: flex; gap: 4px; }
+  .dock-attrappe span { flex: 1; height: 24px; background: rgba(18,14,9,.82); border: 2px solid var(--line); }
+  .inv-attrappe { grid-area: inventar; width: 44px; align-self: stretch;
+                  background: rgba(18,14,9,.82); border: 2px solid var(--line); }
+  .wuerfel-attrappe { grid-area: wuerfel; align-self: stretch; min-width: 98px; padding: 8px 10px 12px;
+      display: flex; align-items: center; justify-content: center; font-family: 'Silkscreen', monospace;
+      font-size: 9px; color: #21170a; background: var(--accent-dark); border: 2px solid var(--accent); }
+</style></head>
+<body>
+<h1>Umklapp-Knopf - drei Entwuerfe</h1>
+<p class="lead">Handybreite 390, echtes Stylesheet. Der Umklapp-Knopf schaltet das Rohstoffblatt auf die
+Kampfkarten um und ist in allen drei Entwuerfen <b>getrennt</b> vom Handelsknopf - das ist der dunkle
+Knopf mit den zwei waagerechten Pfeilen rechts neben den Karten. Der Umklapp-Pfeil ist der ringfoermige.</p>
+<div id="ziel"></div>
+
+<script type="module">
+const RES = [['#5b8a3c',3], ['#a8563a',1], ['#cbbf5d',4], ['#d6a13a',2], ['#8a93a0',0]];
+
+const karte = ([farbe, n]) => `
+  <div class="hand-card">
+    <svg class="res-card" viewBox="0 0 24 32" width="62" height="83" aria-hidden="true">
+      <rect x="0" y="0" width="24" height="32" fill="#2a2016"/>
+      <rect x="2" y="2" width="20" height="28" fill="${farbe}"/>
+      <rect x="6" y="11" width="12" height="11" fill="rgba(0,0,0,.25)"/>
+    </svg>
+    <span class="hand-zahl">${n}</span>
+  </div>`;
+
+const handel = `
+  <button class="handel-karte" title="Bankhandel">
+    <svg class="dock-sym" viewBox="0 0 20 20" aria-hidden="true">
+      <path d="M3 7 H15 M12 4 L15 7 L12 10" stroke="#c9a46a" stroke-width="2.2" fill="none"
+            stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M17 13 H5 M8 10 L5 13 L8 16" stroke="#c9a46a" stroke-width="2.2" fill="none"
+            stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>`;
+
+const rest = `
+  <div class="wuerfel-attrappe">WUERFELN</div>
+  <div class="inv-attrappe"></div>
+  <div class="dock-attrappe"><span></span><span></span><span></span><span></span><span></span><span></span></div>`;
+
+const hand = (extra = '') => `<div class="hand hand-breit">${extra}${RES.map(karte).join('')}</div>`;
+
+const pfeil = (gr) => `
+  <svg viewBox="0 0 20 20" width="${gr}" height="${gr}" aria-hidden="true">
+    <path d="M4 8 A6 6 0 0 1 16 8" stroke="#ffd76a" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+    <path d="M16 12 A6 6 0 0 1 4 12" stroke="#ffd76a" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+    <path d="M13 5 L16 8 L13 11" stroke="#ffd76a" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M7 15 L4 12 L7 9" stroke="#ffd76a" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+
+const CSS = `
+  /*
+   * GEMESSEN, NICHT GERATEN: .unten .hand traegt overflow-x: auto, und das
+   * macht aus dem Blatt einen Klippbereich - absolut gesetzte Kinder ausserhalb
+   * seines Kastens verschwinden. Im ersten Anlauf fehlten deshalb die Reiter
+   * von F1 ganz und der Eckknopf von F2 zur Haelfte. Wer F1 oder F2 baut, muss
+   * diese Zeile mitbauen.
+   */
+  .f1 .unten .hand, .f2 .unten .hand { overflow: visible; }
+
+  /* F1 - Reiter */
+  .f1-reiter { position: absolute; left: 0; top: -19px; display: flex; gap: 2px; }
+  .f1-reiter button { font-family: 'Silkscreen', monospace; font-size: 8px; letter-spacing: .5px;
+      padding: 3px 7px 4px; color: #a8987c; background: rgba(18,14,9,.9);
+      border: 2px solid var(--line); border-bottom: none; cursor: pointer; }
+  .f1-reiter button.an { color: #ffd76a; background: rgba(60,46,26,.98); border-color: var(--line-bright); }
+
+  /* F2 - Eckknopf */
+  .f2-ecke { position: absolute; right: -8px; top: -10px; width: 24px; height: 24px; z-index: 3;
+      display: flex; align-items: center; justify-content: center; padding: 0;
+      background: rgba(60,46,26,.98); border: 2px solid var(--line-bright); cursor: pointer; }
+
+  /* F3 - eigenes Feld links. Die Zeile bekommt eine fuenfte Spalte. */
+  .f3 .unten { grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+      grid-template-areas: 'umklapp hand handel wuerfel inventar' 'dock dock dock dock dock'; }
+  .f3-streifen { grid-area: umklapp; align-self: stretch; width: 28px; flex-shrink: 0; padding: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(18,14,9,.82); border: 2px solid var(--line); cursor: pointer; }
+  /*
+   * Ebenfalls gemessen: die Kartenbreite rechnet mit (100vw - 254px) / 5 und
+   * kennt den neuen Streifen nicht - im ersten Anlauf war die fuenfte Karte
+   * abgeschnitten. 28 Punkte Streifen plus 6 Luecke ergeben 288.
+   */
+  .f3 .unten .hand.hand-breit .res-card { width: min(31.5px, (100vw - 288px) / 5); }`;
+
+const ENTWUERFE = [
+  ['F1 - REITER UEBER DEM BLATT',
+   'Zwei Reiter auf der Oberkante des Blattes, wie Karteikarten. Man sieht ohne Antippen, dass es eine zweite Seite gibt UND welche gerade oben liegt. Kostet 19 Punkte Hoehe ueber dem Blatt und verlangt overflow: visible.',
+   'f1', () => hand(`<div class="f1-reiter"><button class="an">ROHSTOFF</button><button>KAMPF</button></div>`) + handel + rest],
+  ['F2 - ECKKNOPF AM BLATT',
+   'Ein Umklapp-Pfeil in der oberen rechten Ecke des Blattes, gegenueber dem vorhandenen Einklapp-Knopf. Kostet keinen Platz in der Zeile, ist aber klein und verraet nicht, was auf der Rueckseite liegt.',
+   'f2', () => hand(`<button class="f2-ecke" title="Auf Kampfkarten umklappen">${pfeil(15)}</button>`) + handel + rest],
+  ['F3 - EIGENES FELD LINKS',
+   'Ein schmaler Streifen links neben den Karten, gleich hoch wie die Zeile - spiegelbildlich zum Handelsknopf rechts. Immer sichtbar, gut zu treffen, klar vom Handel getrennt. Kostet 28 Punkte Breite: die Karten fallen von 27,2 auf 20,4.',
+   'f3', () => `<button class="f3-streifen" title="Auf Kampfkarten umklappen">${pfeil(16)}</button>` + hand() + handel + rest],
+];
+
+const stil = document.createElement('style');
+stil.textContent = CSS;
+document.head.append(stil);
+
+const ziel = document.getElementById('ziel');
+for (const [titel, text, klasse, bau] of ENTWUERFE) {
+  const h = document.createElement('h2'); h.textContent = titel;
+  const p = document.createElement('p'); p.className = 'lead'; p.textContent = text;
+  const b = document.createElement('div'); b.className = 'buehne ' + klasse;
+  b.innerHTML = `<div class="unten">${bau()}</div>`;
+  ziel.append(h, p, b);
+}
+
+/* Nachmessen statt behaupten: wieviele Karten sind wirklich ganz sichtbar? */
+const bericht = [];
+for (const b of document.querySelectorAll('.buehne')) {
+  const blatt = b.querySelector('.hand');
+  const kasten = blatt.getBoundingClientRect();
+  let ganz = 0;
+  for (const k of blatt.querySelectorAll('.hand-card')) {
+    const r = k.getBoundingClientRect();
+    if (r.right <= kasten.right + 0.5 && r.left >= kasten.left - 0.5) ganz++;
+  }
+  const marke = b.querySelector('.f1-reiter, .f2-ecke, .f3-streifen');
+  const m = marke ? marke.getBoundingClientRect() : null;
+  const sichtbar = m ? m.width > 0 && m.height > 0 && m.top >= 0 : false;
+  bericht.push(
+    `${b.className.split(' ')[1].toUpperCase()}: ${ganz} von 5 Karten ganz sichtbar, ` +
+      `Umklapp-Knopf ${sichtbar ? 'sichtbar' : 'NICHT sichtbar'} ` +
+      `(${m ? Math.round(m.width) + 'x' + Math.round(m.height) : '-'})`,
+  );
+}
+const zettel = document.createElement('div');
+zettel.style.cssText =
+  "font-family:'Silkscreen',monospace;font-size:9px;line-height:1.9;color:#cdbd9c;" +
+  'border:2px solid #3a2c1c;background:#1d1710;padding:8px;margin-top:14px;white-space:pre-wrap';
+zettel.textContent = bericht.join('\n');
+document.body.append(zettel);
+</script>
+</body></html>
