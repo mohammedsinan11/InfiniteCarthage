@@ -1388,15 +1388,61 @@ export function Board({
      * und wurde danach gemalt. Jedes Band behaelt dabei seine eigene
      * Ausstanzung durch Wald und Berg - die Verdeckung bleibt unangetastet.
      */
+    /*
+     * EINMAL NACH BAND GRUPPIEREN, NICHT JE BAND NEU FILTERN.
+     *
+     * Die Baender-Schleife ruft zeichneBauten zweimal je Band auf. Jede Quelle
+     * darin lief bisher ueber ALLE Eintraege und warf die fremden Baender weg -
+     * der Aufwand war Baender x Bauten und wuchs damit quadratisch mit der
+     * Groesse des Reichs. Genau das war beim Spielen zu spueren.
+     *
+     * Hier entstehen dieselben Listen ein einziges Mal, nach Band sortiert;
+     * jedes Band liest danach nur noch seinen eigenen Eimer.
+     *
+     * Die Ausschluesse, die nichts mit dem Band zu tun haben - Mauerkanten
+     * unter den Strassen, Bastionen unter den Gebaeuden - passieren schon beim
+     * Gruppieren, die Eimer sind also fertig gefiltert. Die Reihenfolge
+     * innerhalb eines Bandes bleibt die der Quelle, die .map-Rumpfe unten sind
+     * unveraendert, und sortiert wird am Ende weiter nach fuss: gezeichnet
+     * wird dasselbe, nur der Weg zu den Eintraegen ist ein anderer.
+     */
+    const gruppiere = <T,>(eintraege: readonly T[], tiefeVon: (e: T) => number): Map<number, T[]> => {
+      const map = new Map<number, T[]>();
+      for (const e of eintraege) {
+        const t = tiefeVon(e);
+        const liste = map.get(t);
+        if (liste) liste.push(e);
+        else map.set(t, [e]);
+      }
+      return map;
+    };
+    /** Alle Eintraege, oder die eines Bandes - je nachdem, was die Schleife will. */
+    const ausBand = <T,>(alle: readonly T[], map: Map<number, T[]>, tiefe: number | null): readonly T[] =>
+      tiefe === null ? alle : (map.get(tiefe) ?? []);
+
+    const alleAsche = asche;
+    const ascheJeTiefe = gruppiere(alleAsche, ([ek]) => kantenTiefe(ek));
+    const alleStrassen = Object.entries(state.roads).filter(([ek]) => !mauerKanten.has(ek));
+    const strassenJeTiefe = gruppiere(alleStrassen, ([ek]) => kantenTiefe(ek));
+    const alleMauern = [...mauerKanten];
+    const mauernJeTiefe = gruppiere(alleMauern, ([ek]) => kantenTiefe(ek));
+    const alleGebaeude = Object.entries(state.buildings).filter(([vk]) => !ohneBastion.has(vk));
+    const gebaeudeJeTiefe = gruppiere(alleGebaeude, ([vk]) => gebaeudeTiefe(vk));
+    const alleTuerme = Object.entries(state.tuerme ?? {});
+    const tuermeJeTiefe = gruppiere(alleTuerme, ([vk]) => eckTiefe(parseVertexKey(vk)));
+    const alleHauptstaedte = Object.entries(state.hauptstaedte ?? {});
+    const hauptstaedteJeTiefe = gruppiere(alleHauptstaedte, ([hk]) => hauptstadtTiefe(hk));
+    const alleReichsbauten = Object.entries(state.reichsbauten ?? {});
+    const reichsbautenJeTiefe = gruppiere(alleReichsbauten, ([hk]) => hauptstadtTiefe(hk));
+
     const zeichneBauten = (
       g: CanvasRenderingContext2D,
-      nur: (tiefe: number) => boolean = () => true,
+      tiefe: number | null = null,
       was: 'wege' | 'bauten' | 'alles' = 'alles',
     ) => {
       zeichneStrassen(
         g,
-        asche
-          .filter(([ek]) => was !== 'bauten' && nur(kantenTiefe(ek)))
+        (was === 'bauten' ? [] : ausBand(alleAsche, ascheJeTiefe, tiefe))
           .map(([ek, owner]) => {
             const [a, b] = kantePixel(ek);
             const [ka, kb] = freiesEnde(ek);
@@ -1406,8 +1452,7 @@ export function Board({
       );
       zeichneStrassen(
         g,
-        Object.entries(state.roads)
-          .filter(([ek]) => was !== 'bauten' && !mauerKanten.has(ek) && nur(kantenTiefe(ek)))
+        (was === 'bauten' ? [] : ausBand(alleStrassen, strassenJeTiefe, tiefe))
           .map(([ek, owner]) => {
             const [a, b] = kantePixel(ek);
             const [ka, kb] = freiesEnde(ek);
@@ -1424,8 +1469,7 @@ export function Board({
       );
       zeichneMauern(
         g,
-        [...mauerKanten]
-          .filter(([ek]) => was !== 'bauten' && nur(kantenTiefe(ek)))
+        (was === 'bauten' ? [] : ausBand(alleMauern, mauernJeTiefe, tiefe))
           .map(([ek, sorte]) => {
             const [a, b] = kantePixel(ek);
             const stein = steinFuer(sorte);
@@ -1444,8 +1488,7 @@ export function Board({
         f,
       );
       if (was === 'wege') return;
-      const gebaeude = Object.entries(state.buildings)
-        .filter(([vk]) => nur(gebaeudeTiefe(vk)) && !ohneBastion.has(vk))
+      const gebaeude = ausBand(alleGebaeude, gebaeudeJeTiefe, tiefe)
         .map(([vk, b]) => {
           const ecke = parseVertexKey(vk);
           const v = vertexToPixel(ecke, LAYOUT);
@@ -1460,8 +1503,7 @@ export function Board({
           };
         });
       // Wachtuerme stehen fuer sich auf ihrer Ecke (state.tuerme).
-      const tuerme = Object.entries(state.tuerme ?? {})
-        .filter(([vk]) => nur(eckTiefe(parseVertexKey(vk))))
+      const tuerme = ausBand(alleTuerme, tuermeJeTiefe, tiefe)
         .map(([vk, t]) => {
           const ecke = parseVertexKey(vk);
           const v = vertexToPixel(ecke, LAYOUT);
@@ -1472,8 +1514,7 @@ export function Board({
           };
         });
       // Hauptstaedte stehen in der Feldmitte, im Stein ihres Gelaendes (units.ts).
-      const hauptstaedte = Object.entries(state.hauptstaedte ?? {})
-        .filter(([hk]) => nur(hauptstadtTiefe(hk)))
+      const hauptstaedte = ausBand(alleHauptstaedte, hauptstaedteJeTiefe, tiefe)
         .map(([hk, h]) => {
           const [q, r] = hk.split(':').map(Number) as [number, number];
           const c = hexToPixel(q, r, LAYOUT);
@@ -1485,8 +1526,7 @@ export function Board({
           };
         });
       // Reichsbauten der Phase 2 stehen wie Hauptstaedte in der Feldmitte.
-      const reichsbauten = Object.entries(state.reichsbauten ?? {})
-        .filter(([hk]) => nur(hauptstadtTiefe(hk)))
+      const reichsbauten = ausBand(alleReichsbauten, reichsbautenJeTiefe, tiefe)
         .map(([hk, b]) => {
           const [q, r] = hk.split(':').map(Number) as [number, number];
           const c = hexToPixel(q, r, LAYOUT);
@@ -1573,7 +1613,7 @@ export function Board({
         for (const was of ['wege', 'bauten'] as const) {
           for (const tiefe of bandFolge[was]) {
             g.clearRect(0, 0, bw, bh);
-            zeichneBauten(g, (x) => x === tiefe, was);
+            zeichneBauten(g, tiefe, was);
             g.globalCompositeOperation = 'destination-out';
             for (const t of [...(hoheJeReihe.get(tiefe) ?? []), ...(hoheJeReihe.get(tiefe + 1) ?? [])]) {
               const url = tileUrl(state.worldSeed, t.terrain, t.q, t.r);
