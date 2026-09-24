@@ -108,7 +108,7 @@ import {
 } from '../../core/rules/placement';
 import { productionSources } from '../../core/rules/production';
 import { tradeRatio } from '../../core/rules/trade';
-import { Aktionsleiste } from '../ui/Aktionsleiste';
+import { Aktionsleiste, SymHandel } from '../ui/Aktionsleiste';
 import type { BuildMode } from '../ui/Aktionsleiste';
 import { reichArtVon } from '../ui/Aktionsleiste';
 import { REICHSBAU_NAME, REICHSBAU_ZWECK, reichsbauHindernis, reichsgebiet } from '../../core/rules/reich';
@@ -149,6 +149,12 @@ export function Game() {
   const [ausbauOrt, setAusbauOrt] = useState<{ art: 'ecke' | 'feld'; key: string } | null>(null);
   /** Zahlen festpinnen - fuer alle, die sie lieber dauerhaft sehen. */
   const [pinNumbers, setPinNumbers] = useState(false);
+  /*
+   * Welche Tafel der Bauleiste offen ist. Lag frueher in ui/Aktionsleiste.tsx.
+   * Der Handelsknopf sitzt jetzt oben als Karte neben der Hand, also in einem
+   * anderen Rasterfeld der unteren Leiste - beide brauchen denselben Zustand.
+   */
+  const [tafel, setTafel] = useState<null | 'handel' | 'karten'>(null);
 
   /**
    * Ein Wurf ist abgeschickt, das Ergebnis aber noch nicht da.
@@ -1133,6 +1139,23 @@ export function Game() {
           */}
           <div className="unten" ref={untenRef}>
             {hand && <HandPanel hand={hand} />}
+            {/*
+              Handel als Karte neben der Hand, nicht mehr als Knopf in der
+              Bauleiste: dort war er einer von neun und ging unter, hier steht
+              er bei den Karten, mit denen gehandelt wird. Die Tafel selbst
+              haengt weiter an .dock (styles.css, .dock-tafel) und sitzt
+              deshalb unveraendert ueber der Bauleiste.
+            */}
+            {hand && (
+              <button
+                className={['handel-karte', tafel === 'handel' ? 'gewaehlt' : ''].filter(Boolean).join(' ')}
+                title="Bankhandel"
+                aria-pressed={tafel === 'handel'}
+                onClick={() => setTafel((alt) => (alt === 'handel' ? null : 'handel'))}
+              >
+                <SymHandel />
+              </button>
+            )}
             {hand && (
               <Aktionsleiste
                 state={state}
@@ -1144,6 +1167,8 @@ export function Game() {
                 act={act}
                 verhaeltnis={(r) => (you ? tradeRatio(state, world, you, r) : 4)}
                 onTafel={setTafelOffen}
+                tafel={tafel}
+                setTafel={setTafel}
                 hauptstadtBereit={bereiteFelder.length > 0}
                 reichOffen={you !== null && hatKoenigssitz(state, you)}
                 onHauptstadt={() => {

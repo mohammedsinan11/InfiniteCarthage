@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import { RESOURCES } from '../../core/types';
 import type { Resource } from '../../core/types';
 import {
@@ -147,7 +147,7 @@ const SymBogen = () => (
     <path d="M3 10 H16 M13 7.5 L16 10 L13 12.5" fill="none" stroke="#c9ccd6" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
   </Symbol>
 );
-const SymHandel = () => (
+export const SymHandel = () => (
   <Symbol>
     <path d="M3 7 H15 M12 4 L15 7 L12 10" stroke="#c9a46a" strokeWidth={2.2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
     <path d="M17 13 H5 M8 10 L5 13 L8 16" stroke="#c9a46a" strokeWidth={2.2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
@@ -468,6 +468,8 @@ export function Aktionsleiste({
   act,
   verhaeltnis,
   onTafel,
+  tafel,
+  setTafel,
   hauptstadtBereit = false,
   reichOffen = false,
   onHauptstadt,
@@ -482,6 +484,15 @@ export function Aktionsleiste({
   verhaeltnis: (r: Resource) => number;
   /** Meldet, ob gerade eine Tafel offen ist - solange wuerfelt niemand von selbst. */
   onTafel?: (offen: boolean) => void;
+  /*
+   * Welche Tafel offen ist - gesteuert von aussen (scenes/Game.tsx).
+   *
+   * Lag frueher als useState hier drin. Der Handelsknopf sitzt jetzt aber
+   * oben neben der Hand, in einem anderen Rasterfeld der unteren Leiste, und
+   * kann die Tafel von dort nur oeffnen, wenn beide denselben Zustand teilen.
+   */
+  tafel: null | 'handel' | 'karten';
+  setTafel: Dispatch<SetStateAction<null | 'handel' | 'karten'>>;
   /** Ein Feld ist fuer die Hauptstadt geschlossen - der Knopf erscheint in der Bauzeile. */
   hauptstadtBereit?: boolean;
   /** Steht ein Koenigssitz? Dann zeigt die Leiste die Reichsbauten (Phase 2). */
@@ -491,7 +502,7 @@ export function Aktionsleiste({
 }) {
   const phase = state.phase;
   const bauen = isMine && phase.t === 'main';
-  const [tafel, setTafel] = useState<null | 'handel' | 'karten'>(null);
+  // tafel kommt von aussen (siehe oben) - der Handelsknopf steht nicht mehr hier.
   // Welcher Ernannte gerade zur Bestaetigung ansteht (rules/zweig.ts).
   const [ernennen, setErnennen] = useState<HeldZweig | null>(null);
 
@@ -703,7 +714,7 @@ export function Aktionsleiste({
         <DockKnopf titel="Ritter" symbol={<SymRitter />} kosten={COST_KNIGHT} darf={bauen && canAfford(hand, COST_KNIGHT)} tip={`Ein Ritter tritt an einer deiner Siedlungen oder Burgfesten an: ${kostenText(COST_KNIGHT)}`} onClick={() => act({ t: 'recruitKnight' })} />
         <DockKnopf titel="Bogen" symbol={<SymBogen />} kosten={COST_ARCHER} darf={bauen && canAfford(hand, COST_ARCHER)} tip={`Ein Bogenschuetze tritt an einer deiner Siedlungen oder Burgfesten an. Schiesst auf Feinde nebenan, neben einem Wachturm zwei Felder weit: ${kostenText(COST_ARCHER)}`} onClick={() => act({ t: 'recruitArcher' })} />
         <span className="dock-trenner" />
-        <DockKnopf titel="Handel" symbol={<SymHandel />} gewaehlt={tafel === 'handel'} darf={bauen} tip="Bankhandel" onClick={umschalten('handel')} />
+        {/* Handel steht jetzt oben als Karte neben der Hand (scenes/Game.tsx). */}
         <DockKnopf titel="Karten" symbol={<SymKarten />} zahl={offen.length + taktiken.length} gewaehlt={tafel === 'karten'} darf={offen.length + taktiken.length > 0} tip="Deine Entwicklungs- und Taktikkarten" onClick={umschalten('karten')} />
         {/* Beute rechts neben Handel und Karten - dort, wo Karten ohnehin hingehen. */}
         {(me?.loot ?? 0) > 0 && (

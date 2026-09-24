@@ -2732,6 +2732,38 @@ em.off {
   background: rgba(18, 14, 9, 0.82);
   border: 2px solid var(--line);
 }
+
+/*
+ * Der Handelsknopf im Format einer Handkarte, direkt neben der Hand.
+ *
+ * Er stand vorher als einer von neun Knoepfen in der Bauleiste. Dort ging er
+ * unter, obwohl er zu den Karten gehoert, mit denen man handelt. Dunkel
+ * gefuellt mit hellem Rand, damit er sich von den Rohstoffkarten abhebt und
+ * als Knopf lesbar bleibt - gleich hoch wie sie, weil er ihre Zeile teilt.
+ */
+.handel-karte {
+  align-self: stretch;
+  width: 40px;
+  flex-shrink: 0;
+  padding: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(18, 14, 9, 0.82);
+  border: 2px solid var(--line);
+  cursor: pointer;
+}
+.handel-karte:hover {
+  border-color: var(--line-bright);
+}
+.handel-karte.gewaehlt {
+  border-color: var(--line-bright);
+  background: rgba(60, 46, 26, 0.92);
+}
+.handel-karte .dock-sym {
+  width: 26px;
+  height: 26px;
+}
 .dock-reihe {
   display: flex;
   gap: 4px;
@@ -4036,10 +4068,10 @@ em.off {
      * Bauleiste nach oben. minmax(0,...) laesst die Hand schrumpfen, statt
      * ueber den Wuerfel zu wachsen.
      */
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
     grid-template-areas:
-      'hand wuerfel inventar'
-      'dock dock dock';
+      'hand handel wuerfel inventar'
+      'dock dock dock dock';
     align-items: end;
     gap: 6px;
     bottom: calc(10px + env(safe-area-inset-bottom));
@@ -4082,6 +4114,19 @@ em.off {
     bottom: 0;
     padding: 3px;
     gap: 4px;
+    /*
+     * Mitdehnen, nicht nur mitschrumpfen.
+     *
+     * Der Wuerfelknopf hat eine Eigenhoehe von rund 50 (Innenabstand, Rahmen,
+     * 30er Symbol). Sobald die Karten auf schmalen Geraeten darunter fallen,
+     * gibt er die Zeilenhoehe vor; Handelskarte, Wuerfel und Truhe dehnen sich
+     * darauf, das Blatt aber nicht - gemessen 42 gegen 50 bei 375 Punkten.
+     * Damit waere ausgerechnet das kaputt, wofuer die Zeile gebaut wurde:
+     * gleich hohe Felder nebeneinander. Auf breiten Geraeten faellt es nicht
+     * auf, weil dort die Hand selbst die hoechste ist.
+     */
+    align-self: stretch;
+    align-items: center;
   }
   /*
    * Schlaegt die width/height des SVG: das sind Praesentationsattribute und
@@ -4090,8 +4135,22 @@ em.off {
    * (ResourceCard size=1.5) bleiben unberuehrt.
    */
   .unten .hand.hand-breit .res-card {
-    width: 31.5px;
-    height: 42px;
+    /*
+     * Nicht fest, sondern aus dem uebrigen Platz gerechnet und bei 31,5
+     * gedeckelt. Neben der Hand stehen jetzt Handelskarte (40), Wuerfel (106)
+     * und Inventar (44) plus drei Luecken und die Seitenraender - zusammen
+     * 228 Punkte; von der Hand gehen noch Innenabstand, Rahmen und die vier
+     * Luecken ab, macht 254. Fuenf Karten teilen sich den Rest.
+     *
+     * Ein fester Wert haette auf breiten Geraeten gepasst und auf schmalen
+     * die fuenfte Karte abgeschnitten - gemessen: bei 375 blieben nur vier
+     * sichtbar. So schrumpfen sie nur so weit wie noetig.
+     */
+    width: min(31.5px, (100vw - 254px) / 5);
+    height: auto;
+  }
+  .unten .handel-karte {
+    grid-area: handel;
   }
   /*
    * Der Faecher hob die mittleren Karten um 6 bzw. 11 Punkte an und machte
