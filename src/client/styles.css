@@ -2721,6 +2721,22 @@ em.off {
    damit der Knopf zum Einklappen an ihrer Ecke sitzt und nicht am Block. */
 .unten .hand {
   position: relative;
+  /*
+   * left und bottom zurueckstellen, nicht nur die Positionsart.
+   *
+   * Die Grundregel .hand stammt aus der Zeit, als das Blatt allein in der
+   * Ecke sass: position: absolute mit left/bottom 10. Hier steht es im Block,
+   * und "relative" laesst die beiden Werte trotzdem wirken - sie verschieben
+   * es dann rein optisch um 10 Punkte nach rechts und 10 nach oben, ohne dass
+   * das Layout davon weiss.
+   *
+   * Die Luecke zwischen den Feldern betraegt 8. Die 10 nach rechts haben das
+   * Blatt also in das Baumenue hineingeschoben, und die 10 nach oben liessen
+   * es hoeher stehen als Baumenue, Wuerfel und Truhe. Auf dem Handy war das
+   * schon neutralisiert, am Rechner nicht.
+   */
+  left: 0;
+  bottom: 0;
 }
 
 .dock {
