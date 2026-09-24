@@ -1488,20 +1488,35 @@ export function Board({
        * eine Schicht, mit den hohen Kacheln dieser und der naechsten Reihe
        * ausstanzen, aufs Brett. Figuren bleiben, wie sie sind.
        */
-      const tiefen = new Set<number>();
-      for (const ek of Object.keys(state.roads)) tiefen.add(kantenTiefe(ek));
-      for (const [ek] of asche) tiefen.add(kantenTiefe(ek));
-      for (const vk of Object.keys(state.buildings)) tiefen.add(gebaeudeTiefe(vk));
-      for (const hk of Object.keys(state.hauptstaedte ?? {})) tiefen.add(hauptstadtTiefe(hk));
       /*
-       * Reichsbauten gehoeren in dieselbe Menge - ihr Fehlen war ein echter
-       * Fehler, kein Schoenheitsmangel. Die Schleife unten zeichnet
-       * ausschliesslich ueber "tiefen"; stand das Band eines Reichsbaus nicht
-       * darin, wurde er nur gezeichnet, wenn zufaellig eine Strasse oder ein
-       * Haus im selben Band lag. Sonst halb oder gar nicht - was von aussen
-       * wie eine durchsichtige Textur aussah, war ein fehlender Durchgang.
+       * ZWEI MENGEN, NICHT EINE.
+       *
+       * Die Schleife unten laeuft zweimal: erst alle Wege durch ihre Baender,
+       * dann alle Bauten durch ihre. Vorher teilten sich beide Durchgaenge
+       * EINE Menge aus allem - der Wege-Durchgang loeschte und kopierte die
+       * volle Flaeche also auch fuer Baender, in denen nur ein Haus steht, und
+       * der Bauten-Durchgang fuer Baender mit nur einer Strasse. Rund die
+       * Haelfte dieser vollflaechigen Operationen war umsonst, und es sind die
+       * teuersten im ganzen Bild.
+       *
+       * Ein leeres Band zu ueberspringen ist folgenlos: eine leere Schicht per
+       * source-over aufs Brett zu kopieren aendert keinen Bildpunkt.
+       *
+       * Mauern und Wachtuerme standen bisher in KEINER Menge - dieselbe Luecke
+       * wie zuvor bei den Reichsbauten. Ein Turm, in dessen Band sonst nichts
+       * liegt, wurde damit gar nicht gezeichnet; es fiel nur nicht auf, weil
+       * Tuerme meist an eigenen Strassen stehen und deren Band mitbringen.
        */
-      for (const hk of Object.keys(state.reichsbauten ?? {})) tiefen.add(hauptstadtTiefe(hk));
+      const tiefenWege = new Set<number>();
+      for (const ek of Object.keys(state.roads)) tiefenWege.add(kantenTiefe(ek));
+      for (const [ek] of asche) tiefenWege.add(kantenTiefe(ek));
+      for (const [ek] of mauerKanten) tiefenWege.add(kantenTiefe(ek));
+
+      const tiefenBauten = new Set<number>();
+      for (const vk of Object.keys(state.buildings)) tiefenBauten.add(gebaeudeTiefe(vk));
+      for (const vk of Object.keys(state.tuerme ?? {})) tiefenBauten.add(eckTiefe(parseVertexKey(vk)));
+      for (const hk of Object.keys(state.hauptstaedte ?? {})) tiefenBauten.add(hauptstadtTiefe(hk));
+      for (const hk of Object.keys(state.reichsbauten ?? {})) tiefenBauten.add(hauptstadtTiefe(hk));
       const schicht = (vollRef.current ??= document.createElement('canvas'));
       if (schicht.width !== bw || schicht.height !== bh) {
         schicht.width = bw;
@@ -1521,8 +1536,13 @@ export function Board({
         }
         // Erst alle Wege durch alle Tiefen, dann alle Bauten: so liegt kein
         // Weg mehr ueber einem Haus, ohne dass die Ausstanzung leidet.
+        // Einmal sortieren, nicht in jedem Durchgang neu.
+        const bandFolge = {
+          wege: [...tiefenWege].sort((a, b) => a - b),
+          bauten: [...tiefenBauten].sort((a, b) => a - b),
+        };
         for (const was of ['wege', 'bauten'] as const) {
-          for (const tiefe of [...tiefen].sort((a, b) => a - b)) {
+          for (const tiefe of bandFolge[was]) {
             g.clearRect(0, 0, bw, bh);
             zeichneBauten(g, (x) => x === tiefe, was);
             g.globalCompositeOperation = 'destination-out';
