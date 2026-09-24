@@ -134,7 +134,7 @@ const leseDpr = (): number => (typeof window === 'undefined' ? 1 : window.device
 const DPR_START = leseDpr();
 
 /** Geraetepixel je Kunstpixel. Ganze Zahlen, sonst wird interpoliert. */
-const DEVICE_FACTORS = [1, 2, 3, 4, 6, 8, 12] as const;
+const DEVICE_FACTORS = [1, 2, 3, 4, 6, 8, 12, 16] as const;
 
 const zoomStufen = (dpr: number): number[] => DEVICE_FACTORS.map((f) => f / (SCALE * dpr));
 
@@ -699,6 +699,28 @@ export function Board({
     const rand = RAND_PX / (scale * dpr);
     return { x: view.x - rand, y: view.y - rand, w: view.w + 2 * rand, h: view.h + 2 * rand };
   });
+  /*
+   * Fuer welche Skalierung zView zuletzt berechnet wurde.
+   *
+   * Beim Zoomen aendert sich scale sofort, mit demselben Bild wie view - aber
+   * der Effekt unten reagiert erst NACH dem naechsten Bild darauf, weil er
+   * (bewusst, fuers Schieben) an zView selbst haengt. Bis dahin bakt der grosse
+   * Zeichen-Effekt einmal mit dem ALTEN Ausschnitt und der NEUEN Skalierung -
+   * unnoetig, denn beim Zoomen gibt es (anders als beim Schieben) ohnehin
+   * nichts wiederzuverwenden, jede Stufe braucht ihre eigene Bakung. Zwei
+   * Bakungen statt einer je Zoomschritt waren das spuerbare Zoegern.
+   *
+   * Der Vergleich hier laeuft waehrend des Renderns (Reacts eigenes Muster
+   * fuers Nachziehen von State bei geaenderten Werten) und zieht zView beim
+   * Zoomen im selben Bild nach - der Effekt unten bleibt dann fuers Schieben
+   * zustaendig und findet beim Zoomen nichts mehr zu tun vor.
+   */
+  const [zViewFuer, setZViewFuer] = useState({ scale, dpr });
+  if (zViewFuer.scale !== scale || zViewFuer.dpr !== dpr) {
+    const rand = RAND_PX / (scale * dpr);
+    setZView({ x: view.x - rand, y: view.y - rand, w: view.w + 2 * rand, h: view.h + 2 * rand });
+    setZViewFuer({ scale, dpr });
+  }
   useEffect(() => {
     const rand = RAND_PX / (scale * dpr);
     const neu = { x: view.x - rand, y: view.y - rand, w: view.w + 2 * rand, h: view.h + 2 * rand };
