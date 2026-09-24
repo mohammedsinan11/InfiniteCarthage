@@ -718,7 +718,7 @@ export function Game() {
                   }),
                 },
               ],
-        leer: 'Der Geschuetzturm steht - hoeher geht es nicht.',
+        leer: `Der ${TURM_NAME[MAX_TURM_STUFE]} steht - hoeher geht es nicht.`,
       };
     }
     const b = state.buildings[ausbauOrt.key];

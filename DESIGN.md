@@ -526,10 +526,17 @@ Der Turm steht fuer sich, nicht am Haus.
   Felder weit, gerechnet von dem seiner drei Nachbarfelder, das dem Ziel am
   naechsten liegt - von dort fliegt auch der Pfeil (`rules/army.ts`,
   `beschuss`). Er trifft mit `TURM_ANGRIFF`, steht fest und kann nicht
-  zurueckgeschlagen werden.
+  zurueckgeschlagen werden. Gezeichnet hoeher als der Grenzposten, mit
+  demselben Zinnenkranz wie die Bastion der Hauptstadt (`turmGeschuetz`).
+- **Stufe 3, Festungsturm:** derselbe Ausbauweg (Kosten `COST_BEFESTIGTER_TURM`,
+  Platzhalter) - beides staerker statt eines von beidem. Schuss und Reichweite
+  steigen auf `TURM_ANGRIFF_BEFESTIGT`/`TURM_REICHWEITE_BEFESTIGT`, und die
+  Deckung fuer eigene Einheiten auf seinen Nachbarfeldern steigt von
+  `DECKUNG_BAU` auf `DECKUNG_BAU_BEFESTIGT` (`combat.ts`, `deckungFuer`).
+  Gezeichnet noch hoeher und breiter, mit zwei Zinnenkraenzen (`turmBefestigt`).
+  `MAX_TURM_STUFE`, hoeher geht es nicht.
 - **Geplant:** der Grenzposten soll die Umgebung erweitern, in der sich in
-  Phase 2 bauen laesst. Eine dritte Stufe (Signalkette: zwei Tuerme in
-  Sichtweite verbinden sich) liegt als Idee bereit.
+  Phase 2 bauen laesst - noch offen.
 
 ## Kampf sehen
 

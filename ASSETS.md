@@ -215,11 +215,16 @@ Nachbarkacheln ragt (Variante A). Die Lichtung darunter (`lichtung`, 15 x 5,
 Variante B) ist wieder draussen. Die grossen Fassungen bleiben zum Vergleich;
 alle Varianten: `labor.html?art=gebaeude`.
 
-- **Wachturm** (`turm`, 7 x 13): Steinturm mit Feuerschale und Band in
-  Spielerfarbe. Er steht mittig auf seiner eigenen Ecke - frueher rueckte er
-  nach rechts, weil er hinter Dorf oder Stadt gehoerte (DESIGN.md, Wachturm).
-  *Was fehlt:* eine hoehere, weithin sichtbare Fassung, die den Turm als
-  eigenes Bauwerk zeigt, und spaeter Ausbaustufen.
+- **Wachturm**, drei Ausbaustufen (DESIGN.md, Wachturm), alle mittig auf ihrer
+  eigenen Ecke - frueher rueckte der Turm nach rechts, weil er hinter Dorf oder
+  Stadt gehoerte:
+  - **Grenzposten** (`turm`, 7 x 13): Steinturm mit Feuerschale und Band in
+    Spielerfarbe.
+  - **Geschuetzturm** (`turmGeschuetz`, 9 x 15): derselbe Turm, hoeher und mit
+    demselben Zinnenkranz wie die Bastion der Hauptstadt (`BASTION`) statt nur
+    der Feuerschale - zeigt sich als eigenes, wehrhaftes Bauwerk.
+  - **Festungsturm** (`turmBefestigt`, 11 x 17): noch hoeher und breiter, mit
+    zwei Zinnenkraenzen und einem breiteren Band - das wehrhafteste der drei.
 - **Asche:** abgebrannte Strasse als verkohlter Weg mit Glutpunkten, ohne
   Wimpel (`zeichneStrassen`, `verbrannt`).
 
@@ -469,7 +474,7 @@ wuerden.
 | **Fackel und Feuer** | `fackel.png` 2-3 Einzelbilder, Lagerfeuer | Die Fackel an Figuren bei Nacht; das Licht bleibt im Shader. |
 | **Brand** | kurze Einzelbildfolge Flammen und Rauch, dazu Asche | Ersetzt die zwei Pixelflammen (`Marken.tsx`) und die gezeichnete Asche. |
 | **Held** | `held.png`, Portraet fuers Menue, 2 Blickrichtungen | Ersetzt die Pixelfigur mit Krone. |
-| **Wachturm** | `turm.png`, etwa 7 x 13, Feuerschale animiert | Steht rechts hinter Dorf oder Stadt. |
+| **Wachturm** | `turm.png` (7 x 13), `turmGeschuetz.png` (9 x 15), `turmBefestigt.png` (11 x 17), Feuerschale animiert | Je Ausbaustufe ein Bild, steht mittig auf seiner eigenen Ecke. |
 | **Auftragszeichen** | Pergament, Sprechblase, je 2 Bilder | Ueber Ziel und Wanderer. |
 | **Diplomatie** | Siegel fuer Frieden und Tribut, Kriegsbanner | Im Menue neben jeder Fraktion. |
 | **Umgebungsklaenge** | Wind, Regen, Voegel, Grillen, Eule, Feuer, Dorf | Ersetzen die Synthese in `ambiente.ts`. |

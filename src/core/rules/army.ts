@@ -63,7 +63,7 @@ import type { ChunkCoord } from '../chunks';
 import { ruinAt, ruinResultFor } from '../ruins';
 import type { RuinResult } from '../ruins';
 import { RESOURCES } from '../types';
-import { MAX_TURM_STUFE, emptyHand, handSize, playerById } from '../state';
+import { emptyHand, handSize, playerById } from '../state';
 import { HEXE_FRAKTION, NACHT_ID } from '../factions';
 import { hexenhausAt } from '../hexe';
 import type { GameState, Hand, HeldZweig, PlayerId, UnitKind, UnitState } from '../state';
@@ -178,6 +178,11 @@ export const GELEE = 'gelee';
 export const TURM_REICHWEITE = 2;
 /** Womit er trifft: wie ein Bogenschuetze, aber er steht fest und ruhig. */
 export const TURM_ANGRIFF = 3;
+/** Der befestigte Turm (Stufe 3) schiesst weiter und trifft besser. */
+export const TURM_REICHWEITE_BEFESTIGT = 3;
+export const TURM_ANGRIFF_BEFESTIGT = 4;
+/** Ab dieser Stufe schiesst ein Turm mit - der Grenzposten (1) sieht nur. */
+export const TURM_STUFE_BESCHUSS = 2;
 
 /** Nach so vielen Runden kehrt ein gefallener Held zurueck. */
 export const HELD_RUECKKEHR = 10;
@@ -1542,13 +1547,19 @@ export function beschuss(s: GameState, rng: Rng, events: Ereignisse): void {
    * einer Ecke, nicht auf einem Feld - der Schuss geht deshalb von dem ihrer
    * drei Nachbarfelder aus, das dem Ziel am naechsten liegt. So fliegt der
    * Pfeil auf der Karte von Kachel zu Kachel wie bei den Schuetzen.
+   *
+   * Der befestigte Turm (Stufe 3) schiesst genauso, nur weiter und mit
+   * staerkerem Treffer (TURM_REICHWEITE_BEFESTIGT/TURM_ANGRIFF_BEFESTIGT).
    */
   for (const [vk, turm] of Object.entries(s.tuerme ?? {}).sort((a, b) => nachSchluessel(a[0], b[0]))) {
-    if (turm.stufe < MAX_TURM_STUFE) continue;
+    if (turm.stufe < TURM_STUFE_BESCHUSS) continue;
+    const befestigt = turm.stufe >= 3;
+    const reichweite = befestigt ? TURM_REICHWEITE_BEFESTIGT : TURM_REICHWEITE;
+    const angriff = befestigt ? TURM_ANGRIFF_BEFESTIGT : TURM_ANGRIFF;
     const eigene = spielerSeite(turm.owner);
     let bestes: { von: { q: number; r: number }; ziel: { q: number; r: number }; feinde: UnitState[]; d: number } | null = null;
     for (const von of vertexAdjacentHexes(parseVertexKey(vk))) {
-      for (const h of hexesInRange(von, TURM_REICHWEITE)) {
+      for (const h of hexesInRange(von, reichweite)) {
         const feinde = s.units
           .filter((x) => x.q === h.q && x.r === h.r && feindlich(eigene, seiteVon(x), s))
           .sort(nachNummer);
@@ -1573,7 +1584,7 @@ export function beschuss(s: GameState, rng: Rng, events: Ereignisse): void {
       treffer: 0,
       verluste: [],
     };
-    if (trifft(wurf(rng), TURM_ANGRIFF)) {
+    if (trifft(wurf(rng), angriff)) {
       salve.treffer = 1;
       const opfer = bestes.feinde[rng.int(bestes.feinde.length)]!;
       opfer.leben -= 1;

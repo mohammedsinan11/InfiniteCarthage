@@ -121,6 +121,8 @@ export const DECKUNG: Readonly<Record<Terrain, number>> = {
  * Gilt nur fuer Spieler - Lager haben ihre Palisade (PALISADE).
  */
 export const DECKUNG_BAU = 1;
+/** Ein befestigter Turm (Stufe 3) deckt seine Nachbarfelder staerker. */
+export const DECKUNG_BAU_BEFESTIGT = 2;
 
 /**
  * MORAL. Verliert eine Seite in einer Runde mindestens die Haelfte ihrer
@@ -200,12 +202,13 @@ export function deckungFuer(
 ): number {
   let d = DECKUNG[terrain] ?? 0;
   if (ziel.owner === null) return d;
-  const eigeneHauptstadt = view.hauptstaedte?.[hexKey(ziel.q, ziel.r)]?.owner === ziel.owner;
-  const eigenerTurm = hexVertices(ziel.q, ziel.r).some(
-    (v) => view.tuerme?.[vertexKey(v)]?.owner === ziel.owner,
-  );
-  if (eigeneHauptstadt || eigenerTurm) d += DECKUNG_BAU;
-  return d;
+  let bau = view.hauptstaedte?.[hexKey(ziel.q, ziel.r)]?.owner === ziel.owner ? DECKUNG_BAU : 0;
+  for (const v of hexVertices(ziel.q, ziel.r)) {
+    const turm = view.tuerme?.[vertexKey(v)];
+    if (turm?.owner !== ziel.owner) continue;
+    bau = Math.max(bau, turm.stufe >= 3 ? DECKUNG_BAU_BEFESTIGT : DECKUNG_BAU);
+  }
+  return d + bau;
 }
 
 /** Die kaempfenden Seiten auf einem Feld, sortiert - Einheiten und, wenn dort jemand steht, die Besatzung. */

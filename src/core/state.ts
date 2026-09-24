@@ -136,12 +136,22 @@ export type Turm = { owner: PlayerId; stufe: number };
 
 /**
  * Hoechste Turmstufe. 1 ist der Grenzposten, 2 der Geschuetzturm: er schiesst
- * selbst auf Feinde in Reichweite (rules/army.ts, beschuss).
+ * selbst auf Feinde in Reichweite (rules/army.ts, beschuss). 3 ist der
+ * befestigte Turm - derselbe Beschuss, staerker, und mehr Deckung fuer
+ * eigene Einheiten auf seinen Nachbarfeldern (core/combat.ts, deckungFuer).
  */
-export const MAX_TURM_STUFE = 2;
+export const MAX_TURM_STUFE = 3;
 
-/** Namen der Turmstufen. */
-export const TURM_NAME: Record<number, string> = { 1: 'Grenzposten', 2: 'Geschuetzturm' };
+/**
+ * Namen der Turmstufen. Bewusst einzelne Substantive, keine Adjektiv-Phrasen -
+ * an mehreren Stellen steht "Der ${TURM_NAME[stufe]} ..." davor (rules/reducer.ts,
+ * client/scenes/Game.tsx), und "Der Befestigter Turm" waere falsch dekliniert.
+ */
+export const TURM_NAME: Record<number, string> = {
+  1: 'Grenzposten',
+  2: 'Geschuetzturm',
+  3: 'Festungsturm',
+};
 
 /**
  * Ein Reichsbau auf einer Kachel (rules/reich.ts). Die Art steht als Zeichen

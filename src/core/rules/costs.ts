@@ -43,8 +43,16 @@ export const COST_TOWER: Cost = { lumber: 1, brick: 1, ore: 1 };
  */
 export const COST_GESCHUETZTURM: Cost = { lumber: 2, brick: 1, ore: 2 };
 
+/**
+ * Den Geschuetzturm zum befestigten Turm ausbauen (Stufe 3): viel Lehm fuer
+ * den verstaerkten, doppelten Zinnenkranz, dazu Holz und Erz fuer das
+ * schwerere Geschuetz. Staerker im Beschuss UND in der Deckung, deshalb die
+ * teuerste Stufe. PLATZHALTER fuers Balancing.
+ */
+export const COST_BEFESTIGTER_TURM: Cost = { lumber: 2, brick: 3, ore: 2 };
+
 /** Was ein Turm kostet, der auf diese Stufe ausgebaut wird. Stufe 1 ist der Bau selbst. */
-export const COST_TURM_STUFE: Record<number, Cost> = { 2: COST_GESCHUETZTURM };
+export const COST_TURM_STUFE: Record<number, Cost> = { 2: COST_GESCHUETZTURM, 3: COST_BEFESTIGTER_TURM };
 
 /**
  * Die Reichsbauten der Phase 2 (rules/reich.ts). Jeder kostet etwa eine

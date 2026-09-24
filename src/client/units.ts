@@ -34,6 +34,8 @@ export type FigurArt =
   | 'dorfKlein'
   | 'stadtKlein'
   | 'turm'
+  | 'turmGeschuetz'
+  | 'turmBefestigt'
   | 'lichtung'
   | 'fackel'
   | 'wimpel'
@@ -425,6 +427,55 @@ const ART: Record<FigurArt, readonly string[]> = {
     'dmmmMMd',
     'ddddddd',
   ],
+  /*
+   * Geschuetzturm (Stufe 2): derselbe Turm, aber hoeher und mit Zinnenkranz
+   * gekroent statt nur der Feuerschale - dieselben Zinnen wie an der Bastion
+   * der Hauptstadt (BASTION, 'd.d.d.d.d'/'ddddddddd'), damit befestigte
+   * Bauten im ganzen Spiel gleich lesen. ASSETS.md wollte genau das: "eine
+   * hoehere, weithin sichtbare Fassung, die den Turm als eigenes Bauwerk
+   * zeigt". PLATZHALTER (ASSETS.md).
+   */
+  turmGeschuetz: [
+    '....o....',
+    '...oyo...',
+    'd.d.d.d.d',
+    'ddddddddd',
+    '.dmmmmmd.',
+    '.dmmymmd.',
+    '.dmmmmmd.',
+    '.dmmmmmd.',
+    '.dpPPPpd.',
+    '.dmmmmmd.',
+    '.dmmmmmd.',
+    '.dmMMMMd.',
+    '.dmMMMMd.',
+    'dmmmmmMMd',
+    'ddddddddd',
+  ],
+  /*
+   * Befestigter Turm (Stufe 3): noch hoeher und breiter als der Geschuetzturm,
+   * mit einem ZWEITEN Zinnenkranz darunter und einem breiteren Band in
+   * Spielerfarbe - das wehrhafteste der drei Bauwerke. PLATZHALTER (ASSETS.md).
+   */
+  turmBefestigt: [
+    '.....o.....',
+    '....oyo....',
+    '.d.d.d.d.d.',
+    '.ddddddddd.',
+    '.d.d.d.d.d.',
+    '.ddddddddd.',
+    '..dmmmmmd..',
+    '..dmmymmd..',
+    '..dmmmmmd..',
+    '..dpPPPpd..',
+    '..dpPPPpd..',
+    '..dmmmmmd..',
+    '..dmmmmmd..',
+    '..dmMMMMd..',
+    '..dmMMMMd..',
+    '.dmmmmmMMd.',
+    '.ddddddddd.',
+  ],
   // Lichtung unter einem Gebaeude: festgetretene Erde, wie die Wege.
   lichtung: [
     '....EEEEEEE....',
@@ -665,12 +716,15 @@ export function zeichneGebaeude(
   f: number,
   farbe: string,
   turm = false,
+  /** Nur beim Turm: seine Ausbaustufe - waehlt das Sprite (1 Grenzposten, 2 Geschuetzturm, 3 befestigt). */
+  turmStufe = 1,
 ): void {
   const fy = y + 3 * f;
   if (art === 'turm') {
     // Seit er fuer sich steht (state.tuerme), steht er mittig auf seiner Ecke -
     // frueher rueckte er nach rechts, um neben das Haus zu passen.
-    zeichneFigur(ctx, 'turm', x, fy - 2 * f, f, farbe);
+    const sprite = turmStufe >= 3 ? 'turmBefestigt' : turmStufe >= 2 ? 'turmGeschuetz' : 'turm';
+    zeichneFigur(ctx, sprite, x, fy - 2 * f, f, farbe);
     return;
   }
   if (turm) zeichneFigur(ctx, 'turm', x + 8 * f, fy - 2 * f, f, farbe);

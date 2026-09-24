@@ -9,7 +9,7 @@ import { createGame } from '../src/core/rules/reducer';
 import type { Game } from '../src/core/rules/reducer';
 import { tickArmy } from '../src/core/rules/army';
 import type { ArmyEvent } from '../src/core/rules/army';
-import { DECKUNG, DECKUNG_BAU, deckungFuer } from '../src/core/combat';
+import { DECKUNG, DECKUNG_BAU, DECKUNG_BAU_BEFESTIGT, deckungFuer } from '../src/core/combat';
 import { einheitVorlage, isLandAt, isNestActive } from '../src/core/units';
 import { hexDistance, hexKey, hexVertices, hexesInRange, vertexKey } from '../src/core/coords';
 import { ruinAt } from '../src/core/ruins';
@@ -58,6 +58,20 @@ describe('Deckung', () => {
     game.state.tuerme[ecke] = { owner: 'p0', stufe: 1 };
     expect(deckungFuer(game.state, 'pasture', ritter)).toBe(DECKUNG_BAU);
     expect(deckungFuer(game.state, 'forest', ritter)).toBe(DECKUNG.forest + DECKUNG_BAU);
+  });
+
+  it('ein befestigter Turm (Stufe 3) deckt staerker als ein Geschuetzturm', () => {
+    const game = spiel();
+    const h = freiesFeld(game);
+    const ritter = { q: h.q, r: h.r, owner: 'p0' as const };
+    const ecke = vertexKey(hexVertices(h.q, h.r)[0]!);
+
+    game.state.tuerme[ecke] = { owner: 'p0', stufe: 2 };
+    expect(deckungFuer(game.state, 'pasture', ritter)).toBe(DECKUNG_BAU);
+
+    game.state.tuerme[ecke] = { owner: 'p0', stufe: 3 };
+    expect(deckungFuer(game.state, 'pasture', ritter)).toBe(DECKUNG_BAU_BEFESTIGT);
+    expect(DECKUNG_BAU_BEFESTIGT).toBeGreaterThan(DECKUNG_BAU);
   });
 
   it('ein fremder Turm deckt nicht, und Fraktionen deckt kein Mauerwerk', () => {

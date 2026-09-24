@@ -1614,7 +1614,7 @@ export function Board({
           const p = geraet(v.x, v.y - liftVertex(ecke));
           return {
             fuss: p.y + 3 * f,
-            male: () => zeichneGebaeude(g, 'turm', p.x, p.y, f, spielerFarbe(t.owner)),
+            male: () => zeichneGebaeude(g, 'turm', p.x, p.y, f, spielerFarbe(t.owner), false, t.stufe),
           };
         });
       // Hauptstaedte stehen in der Feldmitte, im Stein ihres Gelaendes (units.ts).
