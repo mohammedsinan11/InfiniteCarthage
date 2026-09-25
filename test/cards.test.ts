@@ -141,6 +141,15 @@ describe('Auswahl', () => {
     // Nur der Notnagel darf gewoehnliche Karten durchlassen, und das selten.
     expect(gewoehnlich / gesamt).toBeLessThan(0.05);
   });
+
+  it('zeigt hoechstens eine Taktik je Auslage', () => {
+    for (const q of QUELLEN) {
+      for (let runde = 1; runde <= 200; runde++) {
+        const taktiken = draftOptions(2468, runde, q).filter((id) => cardById(id)!.kind === 'taktik');
+        expect(taktiken.length, `${q} Runde ${runde}: ${taktiken.join(', ')}`).toBeLessThanOrEqual(1);
+      }
+    }
+  });
 });
 
 describe('Dauerwirkungen', () => {

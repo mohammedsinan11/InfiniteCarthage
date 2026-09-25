@@ -237,7 +237,7 @@ export const CARDS: readonly Card[] = [
     name: 'Schildwall',
     rarity: 'ungewoehnlich',
     kind: 'taktik',
-    text: 'Die Truppen auf einem Feld erhalten in der naechsten Kampfrunde +1 Deckung.',
+    text: 'Die Truppen auf einem Feld erhalten in den naechsten Kampfrunden +1 Deckung.',
     tactic: { t: 'cover', amount: 1, value: 8 },
   },
   {
@@ -245,7 +245,7 @@ export const CARDS: readonly Card[] = [
     name: 'Sammeln!',
     rarity: 'ungewoehnlich',
     kind: 'taktik',
-    text: 'Die Truppen auf einem Feld ignorieren in der naechsten Kampfrunde die Moral.',
+    text: 'Die Truppen auf einem Feld ignorieren in den naechsten Kampfrunden die Moral.',
     tactic: { t: 'morale', value: 7 },
   },
   {
@@ -253,7 +253,7 @@ export const CARDS: readonly Card[] = [
     name: 'Schlachtruf',
     rarity: 'selten',
     kind: 'taktik',
-    text: 'Die Truppen auf einem Feld erhalten in der naechsten Kampfrunde +1 Angriff.',
+    text: 'Die Truppen auf einem Feld erhalten in den naechsten Kampfrunden +1 Angriff.',
     tactic: { t: 'attack', amount: 1, value: 11 },
   },
   {
@@ -261,7 +261,7 @@ export const CARDS: readonly Card[] = [
     name: 'Belagerungsplan',
     rarity: 'selten',
     kind: 'taktik',
-    text: 'Die Truppen auf einem Feld ignorieren in der naechsten Kampfrunde eine Palisade.',
+    text: 'Die Truppen auf einem Feld ignorieren in den naechsten Kampfrunden die Palisade eines Lagers - nicht die einer Spielerpartei.',
     tactic: { t: 'siege', value: 10 },
   },
   {
@@ -285,7 +285,7 @@ export const CARDS: readonly Card[] = [
     name: 'Letztes Aufgebot',
     rarity: 'legendaer',
     kind: 'taktik',
-    text: 'Die Truppen auf einem Feld erhalten +1 Angriff und ignorieren in der naechsten Kampfrunde die Moral.',
+    text: 'Die Truppen auf einem Feld erhalten +1 Angriff und ignorieren in den naechsten Kampfrunden die Moral.',
     tactic: [
       { t: 'attack', amount: 1, value: 14 },
       { t: 'morale', value: 8 },

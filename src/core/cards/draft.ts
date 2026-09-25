@@ -21,7 +21,7 @@
 import { Rng } from '../rng';
 import { hash3i } from '../hash';
 import { CARDS } from './catalog';
-import { RARITY_WEIGHTS, istEinzigartig } from './types';
+import { RARITY_WEIGHTS, cardKind, istEinzigartig } from './types';
 import type { Card, DraftSource, Rarity } from './types';
 
 const SALT_DRAFT = 61;
@@ -80,5 +80,39 @@ export function draftOptions(
   const passend: Card[] = stufe === null
     ? verfuegbar
     : verfuegbar.filter((c) => c.rarity === stufe);
-  return rng.shuffle([...passend]).slice(0, DRAFT_SIZE).map((c) => c.id);
+  const gewaehlt = rng.shuffle([...passend]);
+
+  /*
+   * HOECHSTENS EINE TAKTIK JE AUSLAGE.
+   *
+   * Taktiken sind nicht einzigartig (istEinzigartig) und bleiben deshalb nach
+   * jedem Ausspielen wieder im Topf - anders als Reichskarten verschwinden sie
+   * nie aus der Auswahl. Ohne diese Grenze konnte eine Seltenheitsstufe mit
+   * vielen Taktiken (z.B. "selten": drei von acht) leicht eine Auslage aus
+   * zwei oder drei Taktiken auf einmal ergeben - keine echte Wahl, sondern
+   * fast nur Karten aus einer einzigen, engen Schublade.
+   */
+  const genommen: Card[] = [];
+  const genommenIds = new Set<string>();
+  let taktikDrin = false;
+  for (const c of gewaehlt) {
+    if (genommen.length >= DRAFT_SIZE) break;
+    if (cardKind(c) === 'taktik') {
+      if (taktikDrin) continue;
+      taktikDrin = true;
+    }
+    genommen.push(c);
+    genommenIds.add(c.id);
+  }
+  // Reichte das nicht (z.B. fast nur Taktiken in dieser Stufe), lieber eine
+  // zweite Taktik als eine kuerzere Auslage - dieselbe Abwaegung wie oben.
+  if (genommen.length < DRAFT_SIZE) {
+    for (const c of gewaehlt) {
+      if (genommen.length >= DRAFT_SIZE) break;
+      if (genommenIds.has(c.id)) continue;
+      genommen.push(c);
+      genommenIds.add(c.id);
+    }
+  }
+  return genommen.map((c) => c.id);
 }

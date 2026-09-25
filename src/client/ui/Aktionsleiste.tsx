@@ -481,7 +481,7 @@ function KartenTafel({
         );
       })}
       <p className="dock-tafel-klein">
-        Entwicklungskarten gelten ab dem naechsten Zug. Taktiken werden verbraucht und wirken sofort oder in der naechsten Kampfrunde.
+        Entwicklungskarten gelten ab dem naechsten Zug. Taktiken werden verbraucht und wirken sofort oder in den naechsten Kampfrunden.
       </p>
     </Tafel>
   );

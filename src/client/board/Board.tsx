@@ -1701,6 +1701,10 @@ export function Board({
       for (const ek of Object.keys(state.roads)) tiefenWege.add(kantenTiefe(ek));
       for (const [ek] of asche) tiefenWege.add(kantenTiefe(ek));
       for (const [ek] of mauerKanten) tiefenWege.add(kantenTiefe(ek));
+      // Die Palisade (state.mauern) steht oft abseits jeder Strasse, in einem
+      // Band, das sonst leer bliebe - dieselbe Luecke wie oben bei Mauern und
+      // Wachtuermen, nur fuer eine juengere Menge.
+      for (const [ek] of allePalisaden) tiefenWege.add(kantenTiefe(ek));
 
       const tiefenBauten = new Set<number>();
       for (const vk of Object.keys(state.buildings)) tiefenBauten.add(gebaeudeTiefe(vk));

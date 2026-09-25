@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyAction, createGame } from '../src/core/rules/reducer';
 import { einheitVorlage } from '../src/core/units';
-import { tacticBonus } from '../src/core/rules/tactics';
+import { clearExpiredTactics, tacticBonus } from '../src/core/rules/tactics';
 
 function spiel() {
   const game = createGame([{ id: 'p0', name: 'Alyssa' }], 3, 9, 0);
@@ -43,5 +43,41 @@ describe('Taktikkarten', () => {
     expect(tacticBonus(game.state, 'attack', game.state.units[0]!)).toBe(1);
     expect(tacticBonus(game.state, 'attack', game.state.units[1]!)).toBe(1);
     expect(tacticBonus(game.state, 'attack', game.state.units[2]!)).toBe(0);
+  });
+
+  it('wirkt ueber mehrere Kampfrunden, nicht nur die allererste', () => {
+    // tickArmy laeuft bei JEDEM endTurn irgendeines Spielers, nicht einmal je
+    // ganzer Runde - ein Fenster von nur einer Runde traf oft daneben, wenn
+    // die Truppe ausgerechnet in genau diesem einen Zug nicht kaempfte. Das
+    // Fenster deckt jetzt mehrere Runden, bis es tatsaechlich genutzt wird
+    // oder ausblasst.
+    const game = spiel();
+    game.state.players[0]!.tactics.push('schlachtruf');
+    const r = applyAction(game, { t: 'playTactic', card: 'schlachtruf', unit: 1 }, 'p0');
+    expect(r.ok).toBe(true);
+    const start = game.state.turn;
+    game.state.turn = start + 1;
+    expect(tacticBonus(game.state, 'attack', game.state.units[0]!)).toBe(1);
+    game.state.turn = start + 2;
+    expect(tacticBonus(game.state, 'attack', game.state.units[0]!)).toBe(1);
+    game.state.turn = start + 3;
+    expect(tacticBonus(game.state, 'attack', game.state.units[0]!)).toBe(1);
+    // Irgendwann laeuft es ab, sonst waere es keine Vorbereitung mehr, sondern
+    // ein Dauerbonus.
+    game.state.turn = start + 4;
+    expect(tacticBonus(game.state, 'attack', game.state.units[0]!)).toBe(0);
+  });
+
+  it('raeumt einen abgelaufenen Puffer aus dem Spielstand', () => {
+    const game = spiel();
+    game.state.players[0]!.tactics.push('schlachtruf');
+    applyAction(game, { t: 'playTactic', card: 'schlachtruf', unit: 1 }, 'p0');
+    expect(game.state.tacticBuffs).toHaveLength(1);
+    game.state.turn += 1;
+    clearExpiredTactics(game.state);
+    expect(game.state.tacticBuffs).toHaveLength(1);
+    game.state.turn += 10;
+    clearExpiredTactics(game.state);
+    expect(game.state.tacticBuffs).toHaveLength(0);
   });
 });

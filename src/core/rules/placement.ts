@@ -17,6 +17,7 @@ import {
   hexVertices,
   hexesInRange,
   parseEdgeKey,
+  parseHexKey,
   parseVertexKey,
   vertexAdjacentEdges,
   vertexAdjacentHexes,
@@ -300,18 +301,57 @@ export function legalRoadEdges(
     .filter((ek) => canPlaceRoad(state, world, player, ek, mustTouchVertex) === null);
 }
 
+/**
+ * Ecken bzw. Kanten, die ein Feldschluessel-Set beruehren - dieselbe
+ * hexVertices/hexEdges-Kanonisierung wie allVertices/allEdges, nur ueber ein
+ * paar Dutzend eigene Felder statt ueber die ganze aufgedeckte Welt.
+ *
+ * Fuer Turm und Palisade genuegt das: beide duerfen nur im eigenen
+ * Einflussbereich stehen (canPlaceTower zusaetzlich an einer eigenen Strasse -
+ * aber jede eigene Strasse liegt selbst schon in ihrem eigenen Einflussring,
+ * EINFLUSS_STRASSE oben, die anStrasse-Ecke also immer mit im Feldschluessel-
+ * Set). Ein Turm oder eine Palisade weit draussen in unerforschtem Land waeren
+ * ohnehin nie erlaubt - hier fehlen sie nur schon in der Auswahl, nicht erst
+ * an der Pruefung.
+ */
+function feldVertices(felder: ReadonlySet<string>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const hk of felder) {
+    const h = parseHexKey(hk);
+    for (const v of hexVertices(h.q, h.r)) {
+      const vk = vertexKey(v);
+      if (seen.has(vk)) continue;
+      seen.add(vk);
+      out.push(vk);
+    }
+  }
+  return out;
+}
+
+function feldEdges(felder: ReadonlySet<string>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const hk of felder) {
+    const h = parseHexKey(hk);
+    for (const e of hexEdges(h.q, h.r)) {
+      const ek = edgeKey(e);
+      if (seen.has(ek)) continue;
+      seen.add(ek);
+      out.push(ek);
+    }
+  }
+  return out;
+}
+
 export function legalTowerVertices(state: BoardView, world: World, player: PlayerId): string[] {
   const felder = einflussFelder(state, player);
-  return allVertices(world)
-    .map(vertexKey)
-    .filter((vk) => canPlaceTower(state, world, player, vk, felder) === null);
+  return feldVertices(felder).filter((vk) => canPlaceTower(state, world, player, vk, felder) === null);
 }
 
 export function legalMauerEdges(state: BoardView, world: World, player: PlayerId): string[] {
   const felder = einflussFelder(state, player);
-  return allEdges(world)
-    .map(edgeKey)
-    .filter((ek) => canPlaceMauer(state, world, player, ek, felder) === null);
+  return feldEdges(felder).filter((ek) => canPlaceMauer(state, world, player, ek, felder) === null);
 }
 
 export function legalCityVertices(state: BoardView, player: PlayerId): string[] {

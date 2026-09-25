@@ -17,6 +17,18 @@ export type TacticEvent = {
 
 type Ereignisse = { push(...e: TacticEvent[]): number };
 
+/**
+ * Wie viele Runden ein ausgespielter Puffer auf seinen Einsatz wartet.
+ *
+ * s.turn zaehlt jedes endTurn IRGENDEINES Spielers, nicht eine ganze Runde
+ * aller - ein Fenster von nur einer Runde traf den naechsten tickArmy oft
+ * genug, aber nicht sicher: kaempfte das Ziel ausgerechnet in genau diesem
+ * einen Zug nicht, verpuffte die Karte spurlos, obwohl die Truppe kurz danach
+ * durchaus in den Kampf zog. Ein paar Runden Vorlauf geben dem vorbereiteten
+ * Kampf eine echte Chance, ohne den Puffer auf Dauer zu halten.
+ */
+const TAKTIK_FENSTER = 3;
+
 const IST_PUFFER = new Set<TacticBuff['kind']>([
   'attack',
   'cover',
@@ -83,7 +95,7 @@ export function playTactic(
       kind: art,
       units: nurZiel ? [ziel.id] : feld.map((u) => u.id),
       amount: 'amount' in e ? e.amount : 1,
-      expiresTurn: s.turn + 1,
+      expiresTurn: s.turn + TAKTIK_FENSTER,
     });
   }
 
@@ -99,7 +111,7 @@ export function tacticBonus(
 ): number {
   if (unit.owner === null) return 0;
   return s.tacticBuffs
-    .filter((b) => b.expiresTurn === s.turn && b.player === unit.owner && b.kind === kind && b.units.includes(unit.id))
+    .filter((b) => b.expiresTurn >= s.turn && b.player === unit.owner && b.kind === kind && b.units.includes(unit.id))
     .reduce((n, b) => Math.max(n, b.amount), 0);
 }
 
