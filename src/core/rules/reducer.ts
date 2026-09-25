@@ -38,7 +38,7 @@ import {
   setupPlayerId,
   totalPoints,
 } from '../state';
-import type { GameState, Hand, HeldZweig, PlayerId, Player } from '../state';
+import type { GameState, Hand, HeldZweig, MauerArt, PlayerId, Player } from '../state';
 // Turmstufen: 1 Grenzposten, 2 Geschuetzturm (state.ts, Turm).
 import { MAX_TURM_STUFE, TURM_NAME } from '../state';
 import type { DevCardType } from '../state';
@@ -56,6 +56,8 @@ import {
   COST_STUFE,
   COST_TURM_STUFE,
   COST_REICHSBAU,
+  COST_MAUER,
+  COST_TOR,
   canAfford,
   pay,
 } from './costs';
@@ -64,6 +66,7 @@ import type { ReichsbauArt } from './reich';
 import { ZWEIGE, ernennungHindernis } from './zweig';
 import {
   canPlaceCity,
+  canPlaceMauer,
   canPlaceRoad,
   canPlaceSettlement,
   canPlaceTower,
@@ -145,10 +148,12 @@ export type Action =
   | { t: 'claimLoot' }
   /** Ein eigenes Feuer mit einer Rohstoffkarte loeschen (rules/feuer.ts). */
   | { t: 'putOut'; key: string; mit: Resource }
-  /** Einen Wachturm auf eine freie Ecke an einer eigenen Strasse setzen. */
+  /** Einen Wachturm setzen - an einer eigenen Strasse oder im eigenen Einflussbereich. */
   | { t: 'buildTower'; vertex: string }
   /** Den eigenen Wachturm ausbauen - vom Grenzposten zum Geschuetzturm. */
   | { t: 'upgradeTower'; vertex: string }
+  /** Ein Stueck Palisade auf eine eigene Kante im eigenen Einflussbereich setzen. */
+  | { t: 'buildMauer'; edge: string; art: MauerArt }
   /** Einen Reichsbau auf eine Kachel im eigenen Reich setzen (Phase 2, rules/reich.ts). */
   | { t: 'buildReich'; q: number; r: number; art: string }
   /**
@@ -175,7 +180,7 @@ export type Action =
 export type GameEvent =
   | { t: 'roll'; player: PlayerId; dice: [number, number] }
   | { t: 'production'; payout: Record<PlayerId, Hand> }
-  | { t: 'build'; player: PlayerId; kind: 'road' | 'settlement' | 'city' | 'tower'; at: string }
+  | { t: 'build'; player: PlayerId; kind: 'road' | 'settlement' | 'city' | 'tower' | 'mauer' | 'tor'; at: string }
   | { t: 'capital'; player: PlayerId; q: number; r: number }
   | { t: 'capitalUpgrade'; player: PlayerId; q: number; r: number; stufe: number }
   /** Ein Wachturm ist eine Stufe hoeher - Stufe 2 ist der Geschuetzturm. */
@@ -281,6 +286,7 @@ export function createGame(
     buildings: {},
     roads: {},
     tuerme: {},
+    mauern: {},
     reichsbauten: {},
     deck: [],
     packIndex: 0,
@@ -962,6 +968,20 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       // Ein Turm am Rand schiebt die Welt vor sich her, wie jedes Bauteil.
       const added = grow(s, world, vertexAdjacentHexes(parseVertexKey(action.vertex)));
       if (added.length) events.push({ t: 'chunks', coords: added });
+      break;
+    }
+
+    case 'buildMauer': {
+      if (phase.t !== 'main') return fail('Jetzt kann nicht gebaut werden.');
+      const why = canPlaceMauer(s, world, actor, action.edge);
+      if (why) return fail(why);
+      const kosten = action.art === 'tor' ? COST_TOR : COST_MAUER;
+      const name = action.art === 'tor' ? 'ein Tor' : 'eine Palisade';
+      if (!canAfford(actorPlayer.hand, kosten)) return fail(`Zu wenig Rohstoffe fuer ${name}.`);
+      pay(actorPlayer.hand, kosten);
+      if (!s.mauern) s.mauern = {};
+      s.mauern[action.edge] = { owner: actor, art: action.art };
+      events.push({ t: 'build', player: actor, kind: action.art === 'tor' ? 'tor' : 'mauer', at: action.edge });
       break;
     }
 

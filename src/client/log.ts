@@ -34,7 +34,17 @@ const DEV_NAME = {
   monopoly: 'Monopol',
 } as const;
 
-const BUILD_NAME = { road: 'Strasse', settlement: 'Siedlung', city: 'Stadt', tower: 'Wachturm' } as const;
+const BUILD_NAME = {
+  road: 'Strasse',
+  settlement: 'Siedlung',
+  city: 'Stadt',
+  tower: 'Wachturm',
+  // Bewusst mit Artikel, anders als die uebrigen: "baut eine Palisade" liest
+  // sich besser als "baut Palisade" - Strasse/Stadt/Wachturm klingen dagegen
+  // auch ohne Artikel wie ein Eigenname.
+  mauer: 'eine Palisade',
+  tor: 'ein Tor',
+} as const;
 
 const ART_NAME = {
   ritter: 'Ritter',

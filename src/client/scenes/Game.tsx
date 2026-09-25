@@ -102,6 +102,7 @@ function wetterVorschau(): { zeit: Tageszeit | null; wetter: Wetter | null } {
 }
 import {
   legalCityVertices,
+  legalMauerEdges,
   legalRoadEdges,
   legalSettlementVertices,
   legalTowerVertices,
@@ -370,8 +371,13 @@ export function Game() {
           };
         }
         if (mode === 'tower') {
-          // Freie Ecke an einer eigenen Strasse - ohne Abstandsregel (rules/placement.ts).
+          // Freie Ecke an einer eigenen Strasse oder im eigenen Einflussbereich,
+          // ohne Abstandsregel (rules/placement.ts).
           return { vertices: legalTowerVertices(state, world, you) };
+        }
+        if (mode === 'mauer' || mode === 'tor') {
+          // Freie Kante im eigenen Einflussbereich - dieselbe Regel fuer Wand und Tor.
+          return { edges: legalMauerEdges(state, world, you) };
         }
         if (reichArtVon(mode) !== null) {
           // Phase 2: alle Kacheln des eigenen Reichs, auf denen ein Bau erlaubt ist.
@@ -410,6 +416,9 @@ export function Game() {
       if (mode === 'settlement' && kind === 'vertex') act({ t: 'buildSettlement', vertex: key });
       if (mode === 'city' && kind === 'vertex') act({ t: 'buildCity', vertex: key });
       if (mode === 'tower' && kind === 'vertex') act({ t: 'buildTower', vertex: key });
+      if ((mode === 'mauer' || mode === 'tor') && kind === 'edge') {
+        act({ t: 'buildMauer', edge: key, art: mode === 'tor' ? 'tor' : 'wand' });
+      }
       const reichArt = reichArtVon(mode);
       if (reichArt !== null && kind === 'hex') {
         const [q, r] = key.split(':').map(Number) as [number, number];
@@ -764,6 +773,9 @@ export function Game() {
           : mode === 'tower'
             ? 'turm'
             : null;
+
+  /** Was auf einer freien Kante als Vorschau steht - Strasse ist der Normalfall. */
+  const geisterKante: 'strasse' | 'wand' | 'tor' = mode === 'mauer' ? 'wand' : mode === 'tor' ? 'tor' : 'strasse';
 
   /** Loeschen kostet eine Karte - die vom groessten Stapel. */
   const loeschKarte: Resource | null =
@@ -1120,6 +1132,7 @@ export function Game() {
           tageszeit={tageszeit}
           wetter={wetter}
           geisterBau={isMine ? geisterBau : null}
+          geisterKante={isMine ? geisterKante : 'strasse'}
           kronen={kronen}
           onKrone={(q, r) => setAusbauOrt({ art: 'feld', key: hexKey(q, r) })}
           onGebaeude={

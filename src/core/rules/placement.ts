@@ -13,7 +13,9 @@ import {
   edgeEndpoints,
   edgeKey,
   hexEdges,
+  hexKey,
   hexVertices,
+  hexesInRange,
   parseEdgeKey,
   parseVertexKey,
   vertexAdjacentEdges,
@@ -36,7 +38,60 @@ import type { GameState, PlayerId } from '../state';
 export type BoardView = Pick<GameState, 'buildings' | 'roads'> & {
   /** Wachtuerme - optional, damit aeltere Staende und Teilsichten weiter passen. */
   tuerme?: GameState['tuerme'];
+  /** Palisade - optional, aus demselben Grund. */
+  mauern?: GameState['mauern'];
 };
+
+/**
+ * Wie weit der Einflussbereich um ein eigenes Bauteil reicht, in Hex-Abstand
+ * von seinen Nachbarfeldern aus. Eine Stadt zieht am weitesten, eine Strasse
+ * nur ihre eigenen Nachbarfelder.
+ */
+const EINFLUSS_STADT = 3;
+const EINFLUSS_DORF = 2;
+const EINFLUSS_TURM = 2;
+const EINFLUSS_STRASSE = 1;
+
+/**
+ * Alle Felder im eigenen Einflussbereich - dort, wo ausserhalb der eigenen
+ * Strassen noch gebaut werden darf (Wachturm, Palisade). Dieselbe Bauform wie
+ * sightOf (core/units.ts): je eigenem Bauteil ein Ring um seine Nachbarfelder,
+ * alles zusammen ein Feldschluessel-Set.
+ *
+ * Absichtlich keine eigene Fassung je Aufrufer: legalTowerVertices und
+ * legalMauerEdges brauchen dasselbe Set fuer viele Ecken/Kanten hintereinander
+ * und berechnen es deshalb einmal vorab, statt es in canPlaceTower/canPlaceMauer
+ * bei jedem einzelnen Aufruf neu aufzubauen.
+ */
+export function einflussFelder(state: BoardView, player: PlayerId): Set<string> {
+  const out = new Set<string>();
+  const dazu = (hexes: readonly { q: number; r: number }[], radius: number) => {
+    for (const h of hexes) for (const c of hexesInRange(h, radius)) out.add(hexKey(c.q, c.r));
+  };
+  for (const [vk, b] of Object.entries(state.buildings)) {
+    if (b.owner !== player) continue;
+    dazu(vertexAdjacentHexes(parseVertexKey(vk)), b.type === 'city' ? EINFLUSS_STADT : EINFLUSS_DORF);
+  }
+  for (const [vk, t] of Object.entries(state.tuerme ?? {})) {
+    if (t.owner !== player) continue;
+    dazu(vertexAdjacentHexes(parseVertexKey(vk)), EINFLUSS_TURM);
+  }
+  for (const [ek, owner] of Object.entries(state.roads)) {
+    if (owner !== player) continue;
+    dazu(edgeAdjacentHexes(parseEdgeKey(ek)), EINFLUSS_STRASSE);
+  }
+  return out;
+}
+
+/** Beruehrt diese Ecke ein Feld im Einflussbereich? */
+export function vertexInEinfluss(felder: ReadonlySet<string>, v: Vertex): boolean {
+  return vertexAdjacentHexes(v).some((h) => felder.has(hexKey(h.q, h.r)));
+}
+
+/** Beruehrt diese Kante ein Feld im Einflussbereich? */
+export function edgeInEinfluss(felder: ReadonlySet<string>, e: Edge): boolean {
+  return edgeAdjacentHexes(e).some((h) => felder.has(hexKey(h.q, h.r)));
+}
 
 /** Land = erzeugt und kein Wasser. Auf Wasser wird nicht gebaut. */
 export function isLand(world: World, q: number, r: number): boolean {
@@ -141,22 +196,54 @@ export function canPlaceCity(
 /**
  * Ein Wachturm steht fuer sich - auf einer freien Ecke wie ein Dorf, nur ohne
  * Abstandsregel: er darf dicht an Doerfern, Staedten und anderen Tuermen
- * stehen. Eine eigene Strasse muss ihn erreichen, sonst stuende er im
- * Nirgendwo (DESIGN.md, Wachturm).
+ * stehen. Erreicht werden muss er entweder von einer eigenen Strasse aus,
+ * oder er liegt im eigenen Einflussbereich (einflussFelder) - Tuerme muessen
+ * nicht mehr zwingend an der Strasse kleben, sondern duerfen die Grenze des
+ * Reichs selbst markieren. Ein Turm erweitert seinerseits den Einflussbereich,
+ * ein naechster darf sich also an ihm entlanghangeln.
+ *
+ * einfluss: vorab berechnetes einflussFelder(state, player), fuer
+ * legalTowerVertices - sonst wird es hier einmalig berechnet.
  */
 export function canPlaceTower(
   state: BoardView,
   world: World,
   player: PlayerId,
   vk: string,
+  einfluss?: ReadonlySet<string>,
 ): string | null {
   const v = parseVertexKey(vk);
   if (state.buildings[vk] !== undefined) return 'Dort steht schon ein Haus.';
   if (state.tuerme?.[vk] !== undefined) return 'Dort steht schon ein Wachturm.';
   if (!vertexBuildable(world, v)) return 'Dort laesst sich nicht bauen.';
-  if (!vertexAdjacentEdges(v).some((e) => state.roads[edgeKey(e)] === player)) {
-    return 'Keine eigene Strasse an dieser Ecke.';
+  const anStrasse = vertexAdjacentEdges(v).some((e) => state.roads[edgeKey(e)] === player);
+  if (anStrasse) return null;
+  const felder = einfluss ?? einflussFelder(state, player);
+  if (!vertexInEinfluss(felder, v)) {
+    return 'Weder eigene Strasse noch eigener Einflussbereich an dieser Ecke.';
   }
+  return null;
+}
+
+/**
+ * Ein Stueck Palisade auf einer eigenen Kante - Wand oder Tor, dieselbe Regel
+ * fuer beide. Anders als eine Strasse muss sie nicht an das eigene Netz
+ * anschliessen: sie darf ueberall im eigenen Einflussbereich stehen, auch
+ * einzeln vorab, bevor der Ring geschlossen ist.
+ */
+export function canPlaceMauer(
+  state: BoardView,
+  world: World,
+  player: PlayerId,
+  ek: string,
+  einfluss?: ReadonlySet<string>,
+): string | null {
+  const e = parseEdgeKey(ek);
+  if (state.roads[ek] !== undefined) return 'Dort verlaeuft schon eine Strasse.';
+  if (state.mauern?.[ek] !== undefined) return 'Dort steht schon eine Palisade.';
+  if (!edgeBuildable(world, e)) return 'Dort laesst sich nicht bauen.';
+  const felder = einfluss ?? einflussFelder(state, player);
+  if (!edgeInEinfluss(felder, e)) return 'Das liegt ausserhalb deines Einflussbereichs.';
   return null;
 }
 
@@ -214,9 +301,17 @@ export function legalRoadEdges(
 }
 
 export function legalTowerVertices(state: BoardView, world: World, player: PlayerId): string[] {
+  const felder = einflussFelder(state, player);
   return allVertices(world)
     .map(vertexKey)
-    .filter((vk) => canPlaceTower(state, world, player, vk) === null);
+    .filter((vk) => canPlaceTower(state, world, player, vk, felder) === null);
+}
+
+export function legalMauerEdges(state: BoardView, world: World, player: PlayerId): string[] {
+  const felder = einflussFelder(state, player);
+  return allEdges(world)
+    .map(edgeKey)
+    .filter((ek) => canPlaceMauer(state, world, player, ek, felder) === null);
 }
 
 export function legalCityVertices(state: BoardView, player: PlayerId): string[] {

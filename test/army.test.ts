@@ -229,6 +229,45 @@ describe('Ziehen', () => {
     expect(game.state.units.find((x) => x.id === u.id)!.ziel).toBeNull();
   });
 
+  it('eine fremde Palisade haelt einen Ritter auf - die eigene und ein Tor nicht', () => {
+    const zweiSpieler = () => createGame([{ id: 'p0', name: 'A' }, { id: 'p1', name: 'B' }], 2024, 4711, 15);
+    const einschliessen = (game: Game, mitte: { q: number; r: number }, owner: string, art: 'wand' | 'tor') => {
+      game.state.mauern = {};
+      for (const e of hexEdges(mitte.q, mitte.r)) game.state.mauern[edgeKey(e)] = { owner, art };
+    };
+
+    // Rundum eine fremde Wand: keine Bewegung moeglich, egal wohin.
+    let game = zweiSpieler();
+    bauphase(game);
+    let mitte = landFlaeche(game, 1);
+    einschliessen(game, mitte, 'p1', 'wand');
+    const eigen = mitte;
+    const ziel = neighbors(mitte.q, mitte.r).find((n) => isLandAt(game.state.worldSeed, n.q, n.r))!;
+    const u1 = einheit(game, { ...ritter(eigen.q, eigen.r), ziel });
+    tick(game);
+    expect(game.state.units.find((x) => x.id === u1.id)!).toMatchObject(eigen);
+
+    // Dieselbe Wand, aber dem Ritter gehoert sie selbst: keine Sperre.
+    game = zweiSpieler();
+    bauphase(game);
+    mitte = landFlaeche(game, 1);
+    einschliessen(game, mitte, 'p0', 'wand');
+    const ziel2 = neighbors(mitte.q, mitte.r).find((n) => isLandAt(game.state.worldSeed, n.q, n.r))!;
+    const u2 = einheit(game, { ...ritter(mitte.q, mitte.r), ziel: ziel2 });
+    tick(game);
+    expect(game.state.units.find((x) => x.id === u2.id)!).toMatchObject(ziel2);
+
+    // Ein fremdes TOR statt einer Wand: auch keine Sperre.
+    game = zweiSpieler();
+    bauphase(game);
+    mitte = landFlaeche(game, 1);
+    einschliessen(game, mitte, 'p1', 'tor');
+    const ziel3 = neighbors(mitte.q, mitte.r).find((n) => isLandAt(game.state.worldSeed, n.q, n.r))!;
+    const u3 = einheit(game, { ...ritter(mitte.q, mitte.r), ziel: ziel3 });
+    tick(game);
+    expect(game.state.units.find((x) => x.id === u3.id)!).toMatchObject(ziel3);
+  });
+
   it('wer weit hinauszieht, deckt die Karte auf', () => {
     const game = solo();
     const draussen = landFlaeche(game, 2, { q: 24, r: -6 }, 8);

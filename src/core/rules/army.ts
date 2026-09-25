@@ -80,6 +80,7 @@ import {
   isNestActive,
   knightMusterHex,
   lagerArt,
+  mauerSperrt,
   nestFraktionOf,
   nextStep,
   settlementApproaches,
@@ -1109,10 +1110,11 @@ function schreite(
   events: Ereignisse,
 ): boolean {
   const seed = s.worldSeed;
+  const gesperrt = mauerSperrt(s.mauern, u.owner);
   let gezogen = false;
   for (let i = 0; i < schritte && u.ziel; i++) {
     const zk = hexKey(u.ziel.q, u.ziel.r);
-    const weg = nextStep(seed, u, new Set([zk]), SUCHE_RITTER);
+    const weg = nextStep(seed, u, new Set([zk]), SUCHE_RITTER, gesperrt);
     if (weg) {
       u.q = weg.step.q;
       u.r = weg.step.r;

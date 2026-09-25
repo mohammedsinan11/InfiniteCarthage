@@ -9,6 +9,8 @@
 
 import { hash3i } from './hash';
 import {
+  edgeBetween,
+  edgeKey,
   hexDistance,
   hexKey,
   hexesInRange,
@@ -23,7 +25,7 @@ import { terrainAt, tileAtCoord } from './worldgen';
 import { fraktionAt, fraktionById } from './factions';
 import type { FraktionArt } from './factions';
 import type { Hex } from './coords';
-import type { GameState, HeldZweig, PlayerId, UnitKind, UnitState } from './state';
+import type { GameState, HeldZweig, Mauer, PlayerId, UnitKind, UnitState } from './state';
 import type { SichtLage } from './zeit';
 
 export type { UnitKind };
@@ -274,17 +276,40 @@ export function settlementApproaches(
 export type Step = { step: Hex; ziel: Hex };
 
 /**
+ * Baut die "gesperrt"-Pruefung fuer nextStep/wegNach aus dem Mauer-Bestand:
+ * eine fremde Wand haelt auf, ein Tor nie, die eigene Wand die eigenen Leute
+ * nie. Eine Funktion fuer beide Seiten (rules/army.ts, schreite; Board.tsx,
+ * Wegvorschau), damit Server und Client garantiert dieselbe Regel anwenden.
+ */
+export function mauerSperrt(
+  mauern: Record<string, Mauer> | undefined,
+  owner: PlayerId | null,
+): (a: Hex, b: Hex) => boolean {
+  return (a, b) => {
+    const e = edgeBetween(a, b);
+    if (!e) return false;
+    const m = mauern?.[edgeKey(e)];
+    return m !== undefined && m.art === 'wand' && m.owner !== owner;
+  };
+}
+
+/**
  * Der naechste Schritt auf dem kuerzesten Landweg zu einem der Ziele.
  *
  * Breitensuche ueber Landfelder, begrenzt auf maxKnoten - auf einer Karte ohne
  * Rand darf keine Suche unbegrenzt laufen. Wasser ist unpassierbar. null, wenn
  * die Einheit schon an einem Ziel steht oder kein Weg in Reichweite liegt.
+ *
+ * gesperrt: haelt eine fremde Palisade eine Bewegung ueber genau diese Kante
+ * auf (rules/army.ts, schreite baut das aus state.mauern)? Ohne Angabe sperrt
+ * nichts - fuer Raeuber und Goblins, die keine Palisade kennen.
  */
 export function nextStep(
   seed: number,
   from: Hex,
   ziele: ReadonlySet<string>,
   maxKnoten = 2500,
+  gesperrt?: (a: Hex, b: Hex) => boolean,
 ): Step | null {
   const start = hexKey(from.q, from.r);
   if (ziele.has(start)) return null;
@@ -298,6 +323,7 @@ export function nextStep(
       const k = hexKey(n.q, n.r);
       if (herkunft.has(k)) continue;
       if (!isLandAt(seed, n.q, n.r)) continue;
+      if (gesperrt?.(h, n)) continue;
       herkunft.set(k, hk);
       if (ziele.has(k)) {
         // Zurueck bis zu dem Feld, das direkt am Start liegt.
@@ -319,9 +345,16 @@ export function nextStep(
  *
  * Bewusst dieselben Regeln wie nextStep, das der Server zum Ziehen benutzt
  * (rules/army.ts, schreite): der Client zeichnet damit die Wegvorschau, und
- * sie darf nichts versprechen, was der Server danach anders rechnet.
+ * sie darf nichts versprechen, was der Server danach anders rechnet - auch
+ * eine fremde Palisade nicht (gesperrt, wie bei nextStep).
  */
-export function wegNach(seed: number, from: Hex, ziel: Hex, maxKnoten = 2500): Hex[] | null {
+export function wegNach(
+  seed: number,
+  from: Hex,
+  ziel: Hex,
+  maxKnoten = 2500,
+  gesperrt?: (a: Hex, b: Hex) => boolean,
+): Hex[] | null {
   const start = hexKey(from.q, from.r);
   const zk = hexKey(ziel.q, ziel.r);
   if (start === zk) return [];
@@ -337,6 +370,7 @@ export function wegNach(seed: number, from: Hex, ziel: Hex, maxKnoten = 2500): H
       const k = hexKey(n.q, n.r);
       if (herkunft.has(k)) continue;
       if (!isLandAt(seed, n.q, n.r)) continue;
+      if (gesperrt?.(h, n)) continue;
       herkunft.set(k, hk);
       if (k === zk) {
         const weg: Hex[] = [];

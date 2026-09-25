@@ -78,6 +78,8 @@ export type PublicState = {
   roads: GameState['roads'];
   /** Wachtuerme - oeffentlich wie die Gebaeude. */
   tuerme: GameState['tuerme'];
+  /** Palisade - oeffentlich wie Strassen. */
+  mauern: GameState['mauern'];
   /** Reichsbauten der Phase 2 - oeffentlich: sie stehen weithin sichtbar. */
   reichsbauten: GameState['reichsbauten'];
   /** Hauptstaedte - oeffentlich wie die Gebaeude. */
@@ -173,6 +175,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     buildings: state.buildings,
     roads: state.roads,
     tuerme: state.tuerme ?? {},
+    mauern: state.mauern ?? {},
     reichsbauten: state.reichsbauten ?? {},
     hauptstaedte: state.hauptstaedte,
     deckLeft: state.deck.length,

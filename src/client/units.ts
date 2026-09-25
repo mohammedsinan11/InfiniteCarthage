@@ -1121,6 +1121,71 @@ export function zeichneStrassen(
   }
 }
 
+/**
+ * Ein Stueck Palisade auf einer Kante, in Spielerfarbe - anders als die
+ * Festungsmauer der Hauptstadt (zeichneMauern, gelaende-gebunden) und anders
+ * als eine Strasse (zeichneStrassen, flaches Band). Spitze Pfaehle statt
+ * Steinen, damit eine spielerbaubare Palisade auf den ersten Blick von der
+ * Festungsmauer zu unterscheiden ist.
+ */
+export type Palisadenstueck = {
+  a: { x: number; y: number };
+  b: { x: number; y: number };
+  farbe: string;
+  art: 'wand' | 'tor';
+};
+
+export function zeichnePalisade(
+  ctx: CanvasRenderingContext2D,
+  stuecke: readonly Palisadenstueck[],
+  f: number,
+): void {
+  const punkte = (s: Palisadenstueck) => {
+    const n = Math.max(1, Math.ceil(Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y) / f));
+    const out: { x: number; y: number }[] = [];
+    for (let i = 0; i <= n; i++) {
+      out.push({
+        x: Math.round((s.a.x + ((s.b.x - s.a.x) * i) / n) / f) * f,
+        y: Math.round((s.a.y + ((s.b.y - s.a.y) * i) / n) / f) * f,
+      });
+    }
+    return out;
+  };
+  const alle = stuecke.map((s) => ({ s, p: punkte(s) }));
+
+  // Ein Tor laesst die beiden mittleren Pfaehle aus - dort ist der Durchlass.
+  const luecke = (p: { x: number; y: number }[], i: number, art: 'wand' | 'tor') =>
+    art === 'tor' && p.length >= 4 && (i === Math.floor((p.length - 1) / 2) || i === Math.ceil((p.length - 1) / 2));
+
+  for (const { s, p } of alle) {
+    p.forEach((q, i) => {
+      if (luecke(p, i, s.art)) return;
+      // Schatten, dann der Pfahl selbst, jeder zweite einen Kunstpixel kuerzer -
+      // eine gerade Reihe gleich hoher Pfaehle wirkt wie ein Zaun aus dem Baumarkt.
+      const kurz = i % 2 === 1 ? f : 0;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+      ctx.fillRect(q.x - f, q.y - f, 2 * f, f);
+      ctx.fillStyle = '#4f3a28';
+      ctx.fillRect(q.x - f, q.y - 4 * f + kurz, 2 * f, 4 * f - kurz);
+      ctx.fillStyle = '#8a6a45';
+      ctx.fillRect(q.x - f, q.y - 4 * f + kurz, f, 3 * f - kurz);
+      // Spitze.
+      ctx.fillStyle = '#2a2015';
+      ctx.fillRect(q.x - f, q.y - 4 * f + kurz, 2 * f, f);
+    });
+  }
+  // Das Torbogen-Band ueber der Luecke, in Spielerfarbe - markiert, wem es gehoert.
+  for (const { s, p } of alle) {
+    if (s.art !== 'tor' || p.length < 4) continue;
+    const a = p[Math.floor((p.length - 1) / 2)]!;
+    const b = p[Math.ceil((p.length - 1) / 2) + (p.length % 2 === 0 ? 1 : 0)] ?? a;
+    const links = Math.min(a.x, b.x);
+    const rechts = Math.max(a.x, b.x);
+    ctx.fillStyle = s.farbe;
+    ctx.fillRect(links - f, Math.min(a.y, b.y) - 5 * f, rechts - links + 3 * f, f);
+  }
+}
+
 /** Wie hoch eine Figur ist, in Kunstpixeln. */
 export function figurHoehe(art: FigurArt): number {
   const sprite = SPRITES.get(art);

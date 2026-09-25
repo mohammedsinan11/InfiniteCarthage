@@ -220,6 +220,18 @@ export function edgeAdjacentHexes(e: Edge): [Hex, Hex] {
   }
 }
 
+/**
+ * Die Kante zwischen zwei benachbarten Hexes - fuer die Palisade, die eine
+ * Bewegung zwischen genau diesen beiden sperren kann (rules/army.ts, schreite).
+ *
+ * Ueber die sechs Kanten von a gesucht, deren kanonisierte Form auch zu den
+ * sechs Kanten von b gehoert. null, wenn a und b gar nicht benachbart sind.
+ */
+export function edgeBetween(a: Hex, b: Hex): Edge | null {
+  const bKeys = new Set(hexEdges(b.q, b.r).map(edgeKey));
+  return hexEdges(a.q, a.r).find((e) => bKeys.has(edgeKey(e))) ?? null;
+}
+
 // --- Pixel -----------------------------------------------------------------
 
 /**

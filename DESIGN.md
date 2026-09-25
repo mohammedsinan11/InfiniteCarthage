@@ -502,10 +502,12 @@ Koenigssitz. Danach faellt die Siedler-Mechanik als Nadeloehr weg.
 
 Der Turm steht fuer sich, nicht am Haus.
 
-- **Wo:** auf einer freien Ecke, an der eine eigene Strasse anliegt - wie ein
-  Dorf, nur **ohne Abstandsregel** (`rules/placement.ts`, `canPlaceTower`). Er
-  darf also dicht an Doerfern, Staedten und anderen Tuermen stehen. Auf einer
-  Ecke mit Haus geht er nicht, und zweimal auf derselben Ecke auch nicht.
+- **Wo:** auf einer freien Ecke, an der eine eigene Strasse anliegt ODER die im
+  eigenen Einflussbereich liegt (`rules/placement.ts`, `canPlaceTower`,
+  `einflussFelder` - siehe eigener Abschnitt unten) - wie ein Dorf, nur **ohne
+  Abstandsregel**. Er darf also dicht an Doerfern, Staedten und anderen
+  Tuermen stehen. Auf einer Ecke mit Haus geht er nicht, und zweimal auf
+  derselben Ecke auch nicht.
 - **Gesetzt** wird er ueber die Leiste wie Dorf und Stadt: Knopf "Turm", dann
   leuchten die erlaubten Ecken. Aus der Ausbau-Tafel eines Hauses ist er
   verschwunden - er gehoert dort nicht mehr hin.
@@ -537,6 +539,51 @@ Der Turm steht fuer sich, nicht am Haus.
   `MAX_TURM_STUFE`, hoeher geht es nicht.
 - **Geplant:** der Grenzposten soll die Umgebung erweitern, in der sich in
   Phase 2 bauen laesst - noch offen.
+
+## Einflussbereich und Palisade
+
+Bisher regelte jede Bauart ihre Platzierung ganz fuer sich: eine eigene
+Strasse an der Ecke, ein Mindestabstand. Der Einflussbereich ist das erste
+Konzept, das mehrere Bauarten teilen.
+
+- **`einflussFelder(state, player)`** (`rules/placement.ts`) sammelt alle
+  Felder im eigenen Einfluss: um jedes eigene Dorf einen Ring von 2, um jede
+  Stadt 3, um jeden eigenen Turm 2, um jede eigene Strasse 1 - jeweils von den
+  Nachbarfeldern der Ecke/Kante aus gerechnet, genau wie `sightOf`
+  (`core/units.ts`) es fuer die Sicht schon tut. `vertexInEinfluss`/
+  `edgeInEinfluss` pruefen, ob eine bestimmte Ecke/Kante darin liegt.
+- Ein Turm erweitert den Einflussbereich seinerseits - wer einen gesetzt hat,
+  kann von dort aus weiter hinausbauen, auch ohne durchgehende Strasse.
+- **Wo genau das gilt:** Wachturm abseits der Strasse (oben) und die Palisade
+  (unten). Fuer Dorf, Stadt und Strasse selbst aendert sich nichts - die
+  brauchen weiterhin eine eigene Strasse oder ihr eigenes Netz.
+
+**Die Palisade** (`state.mauern`, Kante -> `{ owner, art }`) ist ein
+Wandstueck oder ein Tor, gebaut auf einer freien Kante im eigenen
+Einflussbereich - anders als eine Strasse ohne Pflicht zum Anschluss ans
+eigene Netz, einzelne Stuecke stehen fuer sich.
+
+- **Wand** (`art: 'wand'`, Knopf "Palisade", `COST_MAUER`, Platzhalter): haelt
+  Bewegung auf. Eine fremde Einheit kommt nicht ueber diese Kante - weder der
+  Server beim Ziehen (`rules/army.ts`, `schreite`) noch die Wegvorschau des
+  Clients (`core/units.ts`, `wegNach`) lassen sie durch (`mauerSperrt`,
+  gemeinsame Regel fuer beide, damit die Vorschau nichts verspricht, was der
+  Zug nicht haelt). Die eigenen Einheiten haelt die eigene Wand nie auf.
+- **Tor** (`art: 'tor'`, Knopf "Tor", `COST_TOR`, Platzhalter): derselbe Platz,
+  aber ein bewusster Durchlass - hier kommt jeder durch, auch der Feind. Sonst
+  identisch: dieselbe Platzierungsregel, dasselbe Bauwerk mit anderem Zeichen.
+- Nicht auf eine Strasse und nicht zweimal auf dieselbe Kante
+  (`canPlaceMauer`). Keine Verbindungspflicht zu anderen Palisadenstuecken -
+  ein Ring entsteht Stueck fuer Stueck, wie es passt.
+- **Gezeichnet** als Reihe gespitzter Pfaehle in Spielerfarbe
+  (`zeichnePalisade`, `units.ts`) - bewusst anders als die gelaende-gebundene
+  Festungsmauer der Hauptstadt (`zeichneMauern`) und anders als eine Strasse.
+  Ein Tor laesst die beiden mittleren Pfaehle aus und traegt einen Querbalken
+  in Spielerfarbe ueber der Luecke.
+- **Nicht geregelt (bewusst, fuers Erste):** Raeuber und Goblins kennen keine
+  Palisade - sie pfadfinden weiterhin ungehindert (`nextStep` ohne
+  `gesperrt`-Angabe an den entsprechenden Stellen). Nur Bewegung zwischen
+  Spielern ist betroffen.
 
 ## Kampf sehen
 

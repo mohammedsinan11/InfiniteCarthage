@@ -154,6 +154,16 @@ export const TURM_NAME: Record<number, string> = {
 };
 
 /**
+ * Ein Stueck Palisade auf einer eigenen Kante, innerhalb des eigenen
+ * Einflussbereichs gebaut (rules/placement.ts, einflussFelder). 'wand'
+ * sperrt die Bewegung ueber diese Kante fuer alle fremden Einheiten
+ * (rules/army.ts, schreite); 'tor' ist dieselbe Mauer mit einem bewussten
+ * Durchlass - durch ein Tor kommt jeder (DESIGN.md, Palisade).
+ */
+export type MauerArt = 'wand' | 'tor';
+export type Mauer = { owner: PlayerId; art: MauerArt };
+
+/**
  * Ein Reichsbau auf einer Kachel (rules/reich.ts). Die Art steht als Zeichen
  * da, damit alte Staende nicht brechen, wenn eine vierte dazukommt.
  */
@@ -402,6 +412,8 @@ export type GameState = {
   roads: Record<string, PlayerId>;
   /** Wachtuerme, Ecke -> Besitzer und Stufe. Stehen unabhaengig von Doerfern und Staedten. */
   tuerme: Record<string, Turm>;
+  /** Palisade, Kante -> Besitzer und Art (Wand oder Tor). Nur im eigenen Einflussbereich. */
+  mauern?: Record<string, Mauer>;
   /**
    * Reichsbauten der Phase 2: Feldschluessel -> Besitzer und Art. Sie stehen
    * auf ganzen Kacheln, nicht auf Ecken, und brauchen weder Strasse noch Ring

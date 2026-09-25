@@ -51,6 +51,18 @@ export const COST_GESCHUETZTURM: Cost = { lumber: 2, brick: 1, ore: 2 };
  */
 export const COST_BEFESTIGTER_TURM: Cost = { lumber: 2, brick: 3, ore: 2 };
 
+/**
+ * Ein Stueck Palisade auf einer eigenen Kante: Holz fuer die Pfaehle, etwas
+ * Lehm fuer den festgestampften Fuss. PLATZHALTER fuers Balancing.
+ */
+export const COST_MAUER: Cost = { lumber: 2, brick: 1 };
+
+/**
+ * Ein Tor statt eines Wandstuecks: weniger Holz, dafuer Erz fuer Angeln und
+ * Beschlag. PLATZHALTER fuers Balancing.
+ */
+export const COST_TOR: Cost = { lumber: 1, ore: 1 };
+
 /** Was ein Turm kostet, der auf diese Stufe ausgebaut wird. Stufe 1 ist der Bau selbst. */
 export const COST_TURM_STUFE: Record<number, Cost> = { 2: COST_GESCHUETZTURM, 3: COST_BEFESTIGTER_TURM };
 

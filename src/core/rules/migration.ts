@@ -41,6 +41,8 @@ export function migriereStand(state: GameState): GameState {
   if (!state.feste) state.feste = {};
   // Reichsbauten kamen mit Phase 2 dazu (DESIGN.md, Phase 2).
   if (!state.reichsbauten) state.reichsbauten = {};
+  // Die Palisade kam mit dem Einflussbereich dazu (DESIGN.md, Palisade).
+  if (!state.mauern) state.mauern = {};
   // Der ernannte Held kam danach dazu. Wer schon spielt, hat noch keinen und
   // darf ihn nachholen, sobald sein Koenigssitz steht (rules/zweig.ts).
   for (const p of state.players) if (p.ernannt === undefined) p.ernannt = null;

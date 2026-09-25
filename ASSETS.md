@@ -227,6 +227,10 @@ alle Varianten: `labor.html?art=gebaeude`.
     zwei Zinnenkraenzen und einem breiteren Band - das wehrhafteste der drei.
 - **Asche:** abgebrannte Strasse als verkohlter Weg mit Glutpunkten, ohne
   Wimpel (`zeichneStrassen`, `verbrannt`).
+- **Palisade** (`zeichnePalisade`): Reihe gespitzter Pfaehle in Spielerfarbe -
+  bewusst anders als die Festungsmauer der Hauptstadt (Stein, gelaende-farben)
+  und anders als eine Strasse (flaches Band). Ein Tor laesst die beiden
+  mittleren Pfaehle aus und traegt einen Querbalken in Spielerfarbe darueber.
 
 *Was fehlt:* gezeichnete Gebaeude mit Charakter und eine Strasse, die nach Weg
 aussieht statt nach Band. `dorf.png` und `stadt.png` werden ohne

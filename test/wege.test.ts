@@ -8,9 +8,10 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { isLandAt, nextStep, reichweite, wegNach } from '../src/core/units';
+import { isLandAt, mauerSperrt, nextStep, reichweite, wegNach } from '../src/core/units';
 import { schritteFuer } from '../src/core/rules/army';
-import { hexDistance, hexKey, hexesInRange, neighbors } from '../src/core/coords';
+import { edgeBetween, edgeKey, hexDistance, hexKey, hexesInRange, neighbors } from '../src/core/coords';
+import type { Mauer } from '../src/core/state';
 
 const SEED = 2024;
 
@@ -120,5 +121,51 @@ describe('Anzeige und Zug sind sich einig', () => {
     expect(schritteFuer('bogen')).toBe(1);
     // Wer mit dem Helden geht, haelt Schritt.
     expect(schritteFuer('ritter', true)).toBe(2);
+  });
+});
+
+describe('Palisade sperrt die Bewegung', () => {
+  const start = { q: 0, r: 0 };
+  const nachbar = neighbors(start.q, start.r)[0]!;
+
+  it('mauerSperrt: eine fremde Wand sperrt, das eigene Tor nie, die eigene Wand nie', () => {
+    const ek = edgeKey(edgeBetween(start, nachbar)!);
+    const wand: Record<string, Mauer> = { [ek]: { owner: 'p1', art: 'wand' } };
+    expect(mauerSperrt(wand, 'p0')(start, nachbar)).toBe(true);
+    expect(mauerSperrt(wand, 'p1')(start, nachbar)).toBe(false);
+
+    const tor: Record<string, Mauer> = { [ek]: { owner: 'p1', art: 'tor' } };
+    expect(mauerSperrt(tor, 'p0')(start, nachbar)).toBe(false);
+
+    expect(mauerSperrt(undefined, 'p0')(start, nachbar)).toBe(false);
+  });
+
+  it('gesperrt haelt nextStep und wegNach gleichermassen auf', () => {
+    // Alle sechs Kanten um das Startfeld sperren - unabhaengig vom Gelaende
+    // ringsum kommt eine Einheit dann nirgendwo mehr weg.
+    const alleZu = () => true;
+    const ziel = new Set([hexKey(nachbar.q, nachbar.r)]);
+
+    expect(nextStep(2024, start, ziel, 2500, alleZu)).toBeNull();
+    expect(wegNach(2024, start, nachbar, 2500, alleZu)).toBeNull();
+
+    // Ohne Sperre (Kontrolle) klappt derselbe Schritt.
+    expect(nextStep(2024, start, ziel)).not.toBeNull();
+  });
+
+  it('eine einzelne gesperrte Kante wird umgangen, wenn ein anderer Weg frei ist', () => {
+    const insel = landInsel(2);
+    const [ziel] = neighbors(insel.q, insel.r).filter((n) => isLandAt(2024, n.q, n.r));
+    if (!ziel) return; // Testseed ohne zweiten Landnachbarn hier - dann nichts zu pruefen.
+    const nurDieseKante = (a: { q: number; r: number }, b: { q: number; r: number }) =>
+      edgeKey(edgeBetween(a, b)!) === edgeKey(edgeBetween(insel, ziel)!);
+
+    const direkt = nextStep(2024, insel, new Set([hexKey(ziel.q, ziel.r)]));
+    expect(direkt).toEqual({ step: ziel, ziel });
+
+    const umweg = nextStep(2024, insel, new Set([hexKey(ziel.q, ziel.r)]), 2500, nurDieseKante);
+    // Entweder es gibt einen Umweg (erster Schritt ist NICHT das Ziel direkt),
+    // oder es gibt wirklich keinen anderen Landweg - beides ist eine korrekte Antwort.
+    if (umweg) expect(umweg.step).not.toEqual(ziel);
   });
 });

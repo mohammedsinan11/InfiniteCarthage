@@ -25,6 +25,8 @@ import {
   COST_ROAD,
   COST_SETTLEMENT,
   COST_TOWER,
+  COST_MAUER,
+  COST_TOR,
   COST_CAPITAL,
   canAfford,
 } from '../../core/rules/costs';
@@ -51,6 +53,8 @@ export type BuildMode =
   | 'settlement'
   | 'city'
   | 'tower'
+  | 'mauer'
+  | 'tor'
   | 'reich:burgfeste'
   | 'reich:handelskontor'
   | 'reich:tempel';
@@ -125,6 +129,31 @@ const SymTurm = () => (
     <path d="M6 18 V7 H14 V18 Z" fill="#b9b3a6" stroke="#2a2016" strokeWidth={1.6} />
     <path d="M5 7 V3 H7 V5 H9 V3 H11 V5 H13 V3 H15 V7 Z" fill="#b9b3a6" stroke="#2a2016" strokeWidth={1.4} strokeLinejoin="round" />
     <rect x={9} y={10} width={2} height={3} fill="#f2c94c" />
+  </Symbol>
+);
+/** Drei gespitzte Pfaehle - die Palisade. */
+const SymPalisade = () => (
+  <Symbol>
+    <path
+      d="M3 18 V10 L5.5 5 L8 10 V18 Z M9 18 V10 L11.5 5 L14 10 V18 Z M15 18 V10 L17.5 5 L20 10 V18 Z"
+      fill="#8a6a45"
+      stroke="#2a2016"
+      strokeWidth={1.2}
+      strokeLinejoin="round"
+    />
+  </Symbol>
+);
+/** Dieselben Pfaehle mit einer Luecke und einem Balken darueber - das Tor. */
+const SymTor = () => (
+  <Symbol>
+    <path
+      d="M2 18 V10 L4.5 5 L7 10 V18 Z M15 18 V10 L17.5 5 L20 10 V18 Z"
+      fill="#8a6a45"
+      stroke="#2a2016"
+      strokeWidth={1.2}
+      strokeLinejoin="round"
+    />
+    <rect x={6} y={7} width={10} height={2.4} fill="#c9a46a" stroke="#2a2016" strokeWidth={1} />
   </Symbol>
 );
 const SymKarte = () => (
@@ -551,8 +580,23 @@ export function Aktionsleiste({
   // Auf eigener Asche kostet eine Strasse nur Holz (rules/feuer.ts).
   const eigeneAsche = Object.values(state.asche).some((id) => id === me?.id);
   const strasseGeht = canAfford(hand, COST_ROAD) || (eigeneAsche && canAfford(hand, COST_REBUILD_ROAD));
-  // Ein Turm braucht eine eigene Strasse an seiner Ecke (rules/placement.ts).
-  const turmPlatz = Object.values(state.roads).some((id) => id === me?.id);
+  /**
+   * Ein Turm braucht eine eigene Strasse an seiner Ecke ODER einen eigenen
+   * Einflussbereich (rules/placement.ts, canPlaceTower) - eine Strasse, ein
+   * Dorf/Stadt oder schon ein Turm reichen dafuer alle drei. Grob genug fuers
+   * Freischalten des Knopfes; die genaue Ecke waehlt legalTowerVertices in
+   * Game.tsx.
+   */
+  const turmPlatz =
+    Object.values(state.roads).some((id) => id === me?.id) ||
+    Object.values(state.buildings).some((b) => b.owner === me?.id) ||
+    Object.values(state.tuerme ?? {}).some((t) => t.owner === me?.id);
+  // Eine Palisade braucht nur den eigenen Einflussbereich - dieselbe grobe
+  // Pruefung wie beim Turm reicht auch hier, ohne die Strassen-Bedingung.
+  const palisadenPlatz =
+    Object.values(state.buildings).some((b) => b.owner === me?.id) ||
+    Object.values(state.tuerme ?? {}).some((t) => t.owner === me?.id) ||
+    Object.values(state.roads).some((id) => id === me?.id);
   const umschalten = (t: 'handel' | 'karten') => () => setTafel((alt) => (alt === t ? null : t));
 
   return (
@@ -624,8 +668,26 @@ export function Aktionsleiste({
           kosten={COST_TOWER}
           gewaehlt={mode === 'tower'}
           darf={bauen && turmPlatz && canAfford(hand, COST_TOWER)}
-          tip={`Wachturm auf eine freie Ecke an einer eigenen Strasse - ohne Abstandsregel. Sieht weit, auch nachts, und laesst Brandstifter nicht an Haeuser und Strassen nebenan. ${kostenText(COST_TOWER)}`}
+          tip={`Wachturm auf eine freie Ecke an einer eigenen Strasse oder im eigenen Einflussbereich - ohne Abstandsregel. Sieht weit, auch nachts, und laesst Brandstifter nicht an Haeuser und Strassen nebenan. ${kostenText(COST_TOWER)}`}
           onClick={bau('tower')}
+        />
+        <DockKnopf
+          titel="Palisade"
+          symbol={<SymPalisade />}
+          kosten={COST_MAUER}
+          gewaehlt={mode === 'mauer'}
+          darf={bauen && palisadenPlatz && canAfford(hand, COST_MAUER)}
+          tip={`Palisade auf eine freie Kante im eigenen Einflussbereich. Haelt fremde Einheiten auf - nur durch ein Tor kommen sie durch. ${kostenText(COST_MAUER)}`}
+          onClick={bau('mauer')}
+        />
+        <DockKnopf
+          titel="Tor"
+          symbol={<SymTor />}
+          kosten={COST_TOR}
+          gewaehlt={mode === 'tor'}
+          darf={bauen && palisadenPlatz && canAfford(hand, COST_TOR)}
+          tip={`Ein Tor statt eines Wandstuecks: derselbe Platz, aber jeder kommt durch - auch fremde Einheiten. ${kostenText(COST_TOR)}`}
+          onClick={bau('tor')}
         />
         {hauptstadtBereit && (
           <DockKnopf

@@ -37,7 +37,7 @@ import { hexCornerPixel } from '../../core/coords';
 import { reliefLimitedAt } from '../../core/relief';
 import { edgeAdjacentHexes, vertexAdjacentHexes } from '../../core/coords';
 import { edgeKey, hexEdges, hexVertices, vertexKey } from '../../core/coords';
-import { garrisonOf, garrisonUnits, isNestActive, nestFraktionOf, wegNach } from '../../core/units';
+import { garrisonOf, garrisonUnits, isNestActive, mauerSperrt, nestFraktionOf, wegNach } from '../../core/units';
 import type { Unit } from '../../core/units';
 import { heldKurz, heldVoll } from '../../core/lore';
 import { istSpielerSeite, istKampf, kampfFelder, seiteVon, spielerAus } from '../../core/combat';
@@ -54,6 +54,7 @@ import {
   zeichneReichsbau,
   zeichneBastion,
   zeichneMauern,
+  zeichnePalisade,
   steinFuer,
   zeichneLeben,
   zeichneStufe,
@@ -274,6 +275,8 @@ type Props = {
   wetter?: Wetter;
   /** Was auf freien Bauplaetzen als Vorschau steht - statt einer Marke. */
   geisterBau?: 'dorf' | 'stadt' | 'turm' | null;
+  /** Was auf einer freien Kante als Vorschau steht - Strasse, Palisade oder Tor. */
+  geisterKante?: 'strasse' | 'wand' | 'tor';
   /** Klick auf ein eigenes Feuer: loeschen. Ohne diese Angabe sind Feuer nur zu sehen. */
   onFeuer?: (key: string) => void;
   /** Kronen ueber Feldern, die fuer eine Hauptstadt (fast) geschlossen sind. */
@@ -423,6 +426,7 @@ export function Board({
   tageszeit = 'tag',
   wetter = 'klar',
   geisterBau = null,
+  geisterKante = 'strasse',
   onFeuer,
   kronen = KEINE_KRONEN,
   onKrone,
@@ -930,10 +934,11 @@ export function Board({
     const start = state.units.find((u) => u.id === auswahl[0]);
     if (!start) return null;
     const [hq, hr] = hover.split(':').map(Number) as [number, number];
-    const weg = wegNach(state.worldSeed, { q: start.q, r: start.r }, { q: hq, r: hr });
+    const gesperrt = mauerSperrt(state.mauern, start.owner);
+    const weg = wegNach(state.worldSeed, { q: start.q, r: start.r }, { q: hq, r: hr }, 2500, gesperrt);
     if (weg === null || weg.length === 0) return null;
     return [{ q: start.q, r: start.r }, ...weg];
-  }, [zielWahl, hover, auswahl, state.units, state.worldSeed]);
+  }, [zielWahl, hover, auswahl, state.units, state.worldSeed, state.mauern]);
 
   /**
    * Was auf dem Feld unter dem Zeiger steht, in Worten: Lager, Ruine, Einheiten
@@ -1518,6 +1523,10 @@ export function Board({
     const strassenJeTiefe = gruppiere(alleStrassen, ([ek]) => kantenTiefe(ek));
     const alleMauern = [...mauerKanten];
     const mauernJeTiefe = gruppiere(alleMauern, ([ek]) => kantenTiefe(ek));
+    // Die Palisade (state.mauern) - Wand oder Tor auf einer eigenen Kante,
+    // unabhaengig vom Festungsring der Hauptstadt (alleMauern/mauerKanten oben).
+    const allePalisaden = Object.entries(state.mauern ?? {});
+    const palisadenJeTiefe = gruppiere(allePalisaden, ([ek]) => kantenTiefe(ek));
     const alleGebaeude = Object.entries(state.buildings).filter(([vk]) => !ohneBastion.has(vk));
     const gebaeudeJeTiefe = gruppiere(alleGebaeude, ([vk]) => gebaeudeTiefe(vk));
     const alleTuerme = Object.entries(state.tuerme ?? {});
@@ -1577,6 +1586,14 @@ export function Board({
               stein,
             };
           }),
+        f,
+      );
+      zeichnePalisade(
+        g,
+        (was === 'bauten' ? [] : ausBand(allePalisaden, palisadenJeTiefe, tiefe)).map(([ek, m]) => {
+          const [a, b] = kantePixel(ek);
+          return { a: a!, b: b!, farbe: spielerFarbe(m.owner), art: m.art };
+        }),
         f,
       );
       if (was === 'wege') return;
@@ -1937,7 +1954,11 @@ export function Board({
         return geraet(p.x, p.y - liftVertex(v));
       });
       ctx.globalAlpha = 0.85;
-      zeichneStrassen(ctx, [{ a: a!, b: b!, farbe: eigeneFarbe }], f);
+      if (geisterKante === 'strasse') {
+        zeichneStrassen(ctx, [{ a: a!, b: b!, farbe: eigeneFarbe }], f);
+      } else {
+        zeichnePalisade(ctx, [{ a: a!, b: b!, farbe: eigeneFarbe, art: geisterKante }], f);
+      }
       ctx.globalAlpha = 1;
     }
 
@@ -1991,6 +2012,7 @@ export function Board({
     eckeHover,
     kanteHover,
     geisterBau,
+    geisterKante,
     tageszeit,
     dpr,
     kampf,
