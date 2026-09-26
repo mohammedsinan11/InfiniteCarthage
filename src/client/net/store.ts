@@ -211,6 +211,7 @@ function vervollstaendige(msg: ServerMsg): void {
     room.rundenLimit ??= null;
     room.tagesDatum ??= null;
     room.weltSeed ??= null;
+    room.stufe ??= 0;
   }
   if (msg.t === 'state') {
     msg.state.omens ??= [];
@@ -219,6 +220,7 @@ function vervollstaendige(msg: ServerMsg): void {
     msg.state.chronik ??= null;
     msg.state.hausAngebot ??= {};
     msg.state.ereignis ??= null;
+    msg.state.stufe ??= 0;
     for (const p of msg.state.players) p.haus ??= null;
   }
 }

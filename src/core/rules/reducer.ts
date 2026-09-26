@@ -101,6 +101,7 @@ import { ruhmAusEreignissen } from './ruhm';
 import { gueltigeOmen, siebenerBonus, startBeute } from '../omen';
 import { hausAngebot, hausById, hausWirkung } from '../haus';
 import { mangelHilfe } from './hilfe';
+import { omenMitStufe } from '../stufe';
 import { ereignisById, ereignisFaellig, waehleEreignis } from '../ereignis';
 import type { Folge } from '../ereignis';
 import { seasonOf } from '../season';
@@ -280,6 +281,8 @@ export type PartieOptionen = {
   haeuser?: boolean;
   /** Mit Ereignissen (core/ereignis.ts) - wie die Haeuser nur, wenn gesetzt. */
   ereignisse?: boolean;
+  /** Chronikstufe (core/stufe.ts): legt je Stufe einen Fluch zu den Omen. */
+  stufe?: number;
 };
 
 export function createGame(
@@ -359,7 +362,8 @@ export function createGame(
     auftraege: [],
     nextAuftragId: 1,
     hauptstaedte: {},
-    omens: gueltigeOmen(optionen.omens ?? []),
+    omens: omenMitStufe(gueltigeOmen(optionen.omens ?? []), optionen.stufe ?? 0),
+    stufe: optionen.stufe ?? 0,
     rundenLimit: optionen.rundenLimit ?? null,
     tagesDatum: optionen.tagesDatum ?? null,
     chronik: neueChronik({ players: players.map((p) => ({ id: p.id })) as GameState['players'] }),

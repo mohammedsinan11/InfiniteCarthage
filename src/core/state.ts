@@ -538,6 +538,8 @@ export type GameState = {
   chronik?: Chronik;
   /** Die drei Haeuser, die jeder zur Wahl hat (core/haus.ts). Oeffentlich. */
   hausAngebot?: Record<PlayerId, string[]>;
+  /** Die Chronikstufe (core/stufe.ts): je Stufe ein Fluch mehr. Fehlt: 0. */
+  stufe?: number;
   /** Kommen Ereignisse mit Wahl (core/ereignis.ts)? Fehlt bei alten Staenden: nein. */
   ereignisseAn?: boolean;
   /** Das offene Ereignis (core/ereignis.ts) - wer antwortet und worauf. Oeffentlich. */

@@ -33,6 +33,8 @@ export type RoomInfo = {
   tagesDatum: string | null;
   /** Die Welt einer frueheren Partie ("Diese Welt nochmal"). null: eine neue. */
   weltSeed: number | null;
+  /** Chronikstufe (core/stufe.ts): je Stufe ein Fluch mehr. */
+  stufe: number;
 };
 
 /**
@@ -84,6 +86,8 @@ export type ClientMsg =
       /** Omen neu wuerfeln oder ohne Omen spielen (core/omen.ts). */
       omens?: 'neu' | 'keine';
       rundenLimit?: number | null;
+      /** Chronikstufe (core/stufe.ts). */
+      stufe?: number;
     }
   | { t: 'start' }
   | { t: 'action'; action: Action };

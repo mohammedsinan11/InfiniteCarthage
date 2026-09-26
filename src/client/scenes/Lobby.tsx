@@ -11,6 +11,8 @@ import {
 } from '../../core/protocol';
 import { playerColor } from '../theme';
 import { OmenListe } from '../ui/OmenListe';
+import { MAX_STUFE, STUFE_NAME, omenMitStufe } from '../../core/stufe';
+import { leseProfil } from '../profil';
 
 export function Lobby() {
   const room = useStore((s) => s.room);
@@ -63,7 +65,7 @@ export function Lobby() {
 
         <label>
           Omen
-          <OmenListe omens={room.omens} />
+          <OmenListe omens={omenMitStufe(room.omens, room.stufe)} />
         </label>
         {!tages && isHost && (
           <div className="choices">
@@ -94,6 +96,37 @@ export function Lobby() {
                 ))}
               </div>
             </label>
+
+            {(leseProfil().stufeFrei > 0 || room.stufe > 0) && (
+            <label>
+              Chronikstufe
+              <div className="choices">
+                {Array.from({ length: MAX_STUFE + 1 }, (_, n) => n).map((n) => {
+                  const frei = n <= leseProfil().stufeFrei;
+                  return (
+                    <button
+                      key={n}
+                      className={room.stufe === n ? 'chosen' : ''}
+                      disabled={!isHost || !frei}
+                      title={
+                        frei
+                          ? `${STUFE_NAME[n]}${n > 0 ? ` - ${n} ${n === 1 ? 'Fluch' : 'Flueche'} mehr` : ' - das gewohnte Spiel'}`
+                          : 'Gewinne auf der Stufe davor, um sie freizuschalten'
+                      }
+                      onClick={() => send({ t: 'setOptions', stufe: n })}
+                    >
+                      {frei ? n : '🔒'}
+                    </button>
+                  );
+                })}
+              </div>
+            </label>
+            )}
+            {room.stufe > 0 && (
+              <p className="note">
+                {STUFE_NAME[room.stufe]}: {room.stufe} {room.stufe === 1 ? 'Fluch' : 'Flueche'} mehr auf dieser Partie.
+              </p>
+            )}
 
             <label>
               Laenge

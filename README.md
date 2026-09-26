@@ -228,6 +228,15 @@ im Winter liefern Felder nur die Haelfte. Das Jahr bekommt einen Takt: wer im
 Herbst Getreide zurueckhaelt, baut im Winter weiter. Das Seitenmenue und die
 Meldung beim Wechsel nennen die Wirkung.
 
+**Chronikstufen und Taten** (`src/core/stufe.ts`, `src/client/profil.ts`).
+Wer eine Partie gewinnt, schaltet die naechste von sechs Chronikstufen frei;
+jede legt einen Fluch mehr auf die Partie (Magere Weiden, Dunkle Naechte,
+Zoellner, Unruhige Staemme, Leere Taschen, Blutmond). Dazu 20 Taten - vom
+ersten Sieg ueber "Unversehrt" (ein Jahr ohne Brand) bis "Koenig" (Sieg auf
+Stufe 6). Profil, Taten und Stufen leben im Browser, es gibt keine Konten.
+Die Startseite zeigt sie ab der ersten Partie, die Chronik nennt neue Taten
+und Stufen; die Stufenwahl in der Lobby erscheint erst, wenn eine frei ist.
+
 **Einstieg.** Neue Spieler bekommen beim ersten Auftreten jedes Systems einen
 kurzen Tipp (erster Fund, erstes Feuer, erste Nacht, erste Beute ...,
 `src/client/tipps.ts`), je Browser einmal, und eine Liste "Erste Schritte"

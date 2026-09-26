@@ -4968,3 +4968,57 @@ em.off {
   color: var(--text);
   margin-top: 2px;
 }
+
+/* --- Profil: Taten und Chronikstufen (client/profil.ts) -------------------- */
+
+.deine-chronik {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.deine-chronik h2 {
+  margin: 0;
+  font-family: var(--pixel);
+  font-size: 11px;
+  font-weight: normal;
+  color: var(--accent);
+}
+.deine-chronik .klein {
+  align-self: flex-start;
+}
+.taten-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.taten-liste b {
+  font-family: var(--pixel);
+  font-size: 10px;
+  font-weight: normal;
+  color: var(--text);
+}
+.taten-liste span {
+  color: var(--muted);
+}
+.taten-liste li.erreicht b {
+  color: var(--accent);
+}
+.deine-chronik .taten-liste li:not(.erreicht) {
+  opacity: 0.7;
+}
+.chronik-neu {
+  border: 2px solid var(--accent-dark);
+  padding: 10px 12px;
+  background: var(--panel2);
+}
+.chronik-stufe-frei {
+  margin: 0 0 6px;
+  font-family: var(--pixel);
+  font-size: 11px;
+  color: var(--accent);
+}

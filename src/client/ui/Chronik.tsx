@@ -21,6 +21,8 @@ import { playerColor } from '../theme';
 import { OmenListe } from './OmenListe';
 import { holeTagesInfo } from '../net/socket';
 import { hausById } from '../../core/haus';
+import { werteAus } from '../profil';
+import { STUFE_NAME } from '../../core/stufe';
 import type { BestenEintrag } from '../../core/tages';
 
 type Props = {
@@ -45,6 +47,8 @@ type Zeile = {
 export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
   const [offen, setOffen] = useState(true);
   const [besten, setBesten] = useState<BestenEintrag[] | null>(null);
+  // Einmal je Partie ins Profil dieses Browsers eintragen (client/profil.ts).
+  const [bilanz] = useState(() => (you && code && state.phase.t === 'finished' ? werteAus(state, you, code) : null));
   const phase = state.phase;
   const chronik = state.chronik;
   const tages = state.tagesDatum;
@@ -116,6 +120,7 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
           <h2>{kopf}</h2>
           <p className="note">
             Runde {runde} · {SEASON_NAME[seasonOf(state.turn)]} im Jahr {yearOf(state.turn)}
+            {state.stufe > 0 ? ` · Chronikstufe ${state.stufe}` : ''}
             {phase.durch === 'ziel' && state.targetPoints > 0 ? ` · Ziel ${state.targetPoints} Siegpunkte erreicht` : ''}
           </p>
           {state.players.find((p) => p.id === you)?.besiegt && phase.winner !== null && (
@@ -132,6 +137,28 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
             </p>
           )}
         </header>
+
+        {bilanz && !bilanz.schonGewertet && (bilanz.neueTaten.length > 0 || bilanz.neueStufe !== null) && (
+          <section className="chronik-neu">
+            {bilanz.neueStufe !== null && (
+              <p className="chronik-stufe-frei">
+                Chronikstufe {bilanz.neueStufe} ({STUFE_NAME[bilanz.neueStufe]}) freigeschaltet - waehle sie in der Lobby.
+              </p>
+            )}
+            {bilanz.neueTaten.length > 0 && (
+              <>
+                <h3>Neue Taten</h3>
+                <ul className="taten-liste">
+                  {bilanz.neueTaten.map((t) => (
+                    <li key={t.id}>
+                      <b>{t.name}</b> <span>{t.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </section>
+        )}
 
         <section>
           <h3>Rangliste</h3>

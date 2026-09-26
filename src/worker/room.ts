@@ -42,6 +42,7 @@ import { gueltigeOmen, wuerfleOmen } from '../core/omen';
 import { TAGES_RUNDEN, istTagesDatum, tagesDatum, tagesOmen, tagesWeltSeed } from '../core/tages';
 import type { BestenEintrag } from '../core/tages';
 import { wertung } from '../core/chronik';
+import { istStufe } from '../core/stufe';
 import { totalPoints } from '../core/state';
 
 export type Env = {
@@ -83,6 +84,8 @@ type RoomData = {
   gemeldet?: boolean;
   /** Die Welt einer frueheren Partie ("Diese Welt nochmal"). Sonst eine neue. */
   weltSeed?: number | null;
+  /** Chronikstufe (core/stufe.ts). Fehlt: 0. */
+  stufe?: number;
 };
 
 type Attachment = { playerId: PlayerId | null };
@@ -334,6 +337,13 @@ export class GameRoom implements DurableObject {
         }
         if (msg.omens === 'neu') room.omens = wuerfleOmen(randomSeed());
         else if (msg.omens === 'keine') room.omens = [];
+        if (msg.stufe !== undefined) {
+          if (!istStufe(msg.stufe)) {
+            this.send(ws, { t: 'error', message: 'Ungueltige Stufe.' });
+            return;
+          }
+          room.stufe = msg.stufe;
+        }
         if (msg.rundenLimit !== undefined) {
           if (!(RUNDEN_LIMIT_CHOICES as readonly (number | null)[]).includes(msg.rundenLimit)) {
             this.send(ws, { t: 'error', message: 'Ungueltige Laenge.' });
@@ -382,6 +392,7 @@ export class GameRoom implements DurableObject {
             tagesDatum: tages,
             haeuser: true,
             ereignisse: true,
+            stufe: tages ? 0 : (room.stufe ?? 0),
           },
         );
         room.started = true;
@@ -618,6 +629,7 @@ export class GameRoom implements DurableObject {
       rundenLimit: room.rundenLimit ?? null,
       tagesDatum: room.tagesDatum ?? null,
       weltSeed: room.weltSeed ?? null,
+      stufe: room.stufe ?? 0,
     };
   }
 

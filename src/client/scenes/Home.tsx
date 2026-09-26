@@ -19,6 +19,8 @@ import type { RaumEintrag } from '../../core/lobby';
 import { SERVER_MISSING, holeRaeume, holeTagesInfo, neuerRaumCode as freshCode } from '../net/socket';
 import type { TagesInfo } from '../../core/tages';
 import { OmenListe } from '../ui/OmenListe';
+import { TATEN, leseProfil } from '../profil';
+import { STUFE_NAME } from '../../core/stufe';
 import { lesePartien, lokalerSpeicher, vergissPartie } from '../net/partien';
 import type { Partie } from '../net/partien';
 
@@ -360,6 +362,8 @@ export function Home() {
           </section>
         )}
 
+        <DeineChronik />
+
         <div className="divider">oder</div>
 
         <label>
@@ -410,5 +414,39 @@ export function Home() {
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Was dieser Browser schon erlebt hat (client/profil.ts): Partien, Siege, beste
+ * Wertung, freie Chronikstufe und die Taten. Erst nach der ersten Partie -
+ * davor gibt es nichts zu zeigen, und die Startseite bleibt schlicht.
+ */
+function DeineChronik() {
+  const [offen, setOffen] = useState(false);
+  const p = leseProfil();
+  if (p.partien === 0) return null;
+  const erreicht = TATEN.filter((t) => p.taten[t.id]).length;
+  return (
+    <section className="deine-chronik">
+      <h2>Deine Chronik</h2>
+      <p className="note">
+        {p.partien} {p.partien === 1 ? 'Partie' : 'Partien'} · {p.siege} {p.siege === 1 ? 'Sieg' : 'Siege'} · beste Wertung{' '}
+        {p.besteWertung}
+        {p.stufeFrei > 0 ? ` · Chronikstufe bis ${p.stufeFrei} (${STUFE_NAME[p.stufeFrei]})` : ''}
+      </p>
+      <button className="klein" onClick={() => setOffen((v) => !v)}>
+        Taten {erreicht}/{TATEN.length} {offen ? '▲' : '▼'}
+      </button>
+      {offen && (
+        <ul className="taten-liste">
+          {TATEN.map((t) => (
+            <li key={t.id} className={p.taten[t.id] ? 'erreicht' : ''}>
+              <b>{p.taten[t.id] ? '✓ ' : ''}{t.name}</b> <span>{t.text}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
