@@ -256,6 +256,12 @@ Runde 1 Ruhm). Wer ein Dorf oder eine Stadt daneben hat, errichtet es fuer
 Jede Staette nur einmal: wer zuerst baut, hat es. Das Menue listet die
 bekannten Staetten unter Reich; auch Bots wetteifern darum.
 
+**Gemeinsam gegen die Wildnis.** Spielart in der Lobby: statt gegeneinander
+spielen alle ein Jahr zusammen, und am Ende muss die Summe der Siegpunkte 10
+je Spieler erreichen - alle gewinnen oder keiner. Einzelziele gibt es dann
+nicht; Pluenderer, Horden, Omen und Chronikstufen sind der Gegner. Bots
+spielen als Verbuendete mit.
+
 **Einstieg.** Neue Spieler bekommen beim ersten Auftreten jedes Systems einen
 kurzen Tipp (erster Fund, erstes Feuer, erste Nacht, erste Beute ...,
 `src/client/tipps.ts`), je Browser einmal, und eine Liste "Erste Schritte"

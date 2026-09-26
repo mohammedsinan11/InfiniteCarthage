@@ -88,6 +88,8 @@ type RoomData = {
   weltSeed?: number | null;
   /** Chronikstufe (core/stufe.ts). Fehlt: 0. */
   stufe?: number;
+  /** Gemeinsam gegen die Wildnis. */
+  koop?: boolean;
 };
 
 type Attachment = { playerId: PlayerId | null };
@@ -339,6 +341,11 @@ export class GameRoom implements DurableObject {
         }
         if (msg.omens === 'neu') room.omens = wuerfleOmen(randomSeed());
         else if (msg.omens === 'keine') room.omens = [];
+        if (typeof msg.koop === 'boolean') {
+          room.koop = msg.koop;
+          // Gemeinsam braucht eine Rundengrenze: ein Jahr.
+          if (msg.koop) room.rundenLimit = 60;
+        }
         if (msg.stufe !== undefined) {
           if (!istStufe(msg.stufe)) {
             this.send(ws, { t: 'error', message: 'Ungueltige Stufe.' });
@@ -387,14 +394,15 @@ export class GameRoom implements DurableObject {
           room.members.map((m) => ({ id: m.id, name: m.name })),
           weltSeed,
           geheimSeed,
-          room.targetPoints,
+          room.koop && !tages ? 0 : room.targetPoints,
           {
             omens: gueltigeOmen(room.omens ?? []),
-            rundenLimit: room.rundenLimit ?? null,
+            rundenLimit: room.koop && !tages ? (room.rundenLimit ?? 60) : (room.rundenLimit ?? null),
             tagesDatum: tages,
             haeuser: true,
             ereignisse: true,
             stufe: tages ? 0 : (room.stufe ?? 0),
+            koop: !tages && (room.koop ?? false),
           },
         );
         room.started = true;
@@ -672,6 +680,7 @@ export class GameRoom implements DurableObject {
       tagesDatum: room.tagesDatum ?? null,
       weltSeed: room.weltSeed ?? null,
       stufe: room.stufe ?? 0,
+      koop: room.koop ?? false,
     };
   }
 

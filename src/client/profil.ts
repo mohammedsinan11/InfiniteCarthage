@@ -135,7 +135,10 @@ export function werteAus(state: PublicState, you: string, code: string): Wertung
   const punkte = letzte?.punkte[i] ?? state.myPoints;
   const me = state.players.find((p) => p.id === you);
   const wertung = punkte * 10 + (me?.ruhm ?? 0);
-  const sieg = phase.winner === you && (phase.durch === 'ziel' || state.order.length > 1 || punkte >= 10);
+  // Gemeinsam gewinnen alle oder keiner; sonst wie oben beschrieben.
+  const sieg = state.koop
+    ? state.koopErgebnis?.erfolg === true
+    : phase.winner === you && (phase.durch === 'ziel' || state.order.length > 1 || punkte >= 10);
   if (profil.gewertet.includes(code)) return { neueTaten: [], neueStufe: null, sieg, schonGewertet: true };
 
   profil.partien += 1;

@@ -107,7 +107,11 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
   }
 
   let kopf: string;
-  if (phase.winner === null) kopf = tages ? `Tagesexpedition ${tages} - verloren` : 'Alle Reiche sind gefallen';
+  if (state.koop && state.koopErgebnis)
+    kopf = state.koopErgebnis.erfolg
+      ? `Gemeinsam geschafft - ${state.koopErgebnis.summe} von ${state.koopErgebnis.ziel} Siegpunkten`
+      : `Gemeinsam gescheitert - ${state.koopErgebnis.summe} von ${state.koopErgebnis.ziel} Siegpunkten`;
+  else if (phase.winner === null) kopf = tages ? `Tagesexpedition ${tages} - verloren` : 'Alle Reiche sind gefallen';
   else if (tages) kopf = `Tagesexpedition ${tages}`;
   else if (phase.durch === 'zeit' && state.order.length === 1) kopf = 'Das Jahr ist um';
   else if (phase.durch === 'zeit') kopf = `Das Jahr ist um - ${sieger?.name ?? 'Jemand'} gewinnt`;

@@ -45,7 +45,7 @@ import { ErsteSchritte } from '../ui/ErsteSchritte';
 import { hausById } from '../../core/haus';
 import { kartenPunkte } from '../../core/cards/effects';
 import { COST_WUNDER, WUNDER, wunderAt } from '../../core/wunder';
-import { wunderHindernis } from '../../core/rules/reducer';
+import { KOOP_ZIEL_JE, wunderHindernis } from '../../core/rules/reducer';
 import { OmenListe } from '../ui/OmenListe';
 import { omenById } from '../../core/omen';
 import { neuerRaumCode } from '../net/socket';
@@ -1052,6 +1052,12 @@ export function Game() {
             ★ {state.myPoints}
             {state.targetPoints > 0 ? ` / ${state.targetPoints}` : ''}
           </span>
+          {/* Gemeinsam: wie weit die Summe vom Ziel ist (rules/reducer.ts, koopZiel). */}
+          {state.koop && (
+            <span className="hud-koop" title="Gemeinsam gegen die Wildnis: die Summe eurer Siegpunkte muss am Ende das Ziel erreichen.">
+              Gemeinsam ★ {state.players.reduce((n, p) => n + (p.id === you ? state.myPoints : p.points), 0)} / {KOOP_ZIEL_JE * state.order.length}
+            </span>
+          )}
           {/* Die Rundengrenze: wie viele Runden bleiben (core/chronik.ts). */}
           {state.rundenLimit !== null && (
             <span

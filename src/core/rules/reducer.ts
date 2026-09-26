@@ -291,7 +291,15 @@ export type PartieOptionen = {
   ereignisse?: boolean;
   /** Chronikstufe (core/stufe.ts): legt je Stufe einen Fluch zu den Omen. */
   stufe?: number;
+  /** Gemeinsam gegen die Wildnis: ein Ziel fuer alle (KOOP_ZIEL_JE). */
+  koop?: boolean;
 };
+
+/** Im gemeinsamen Spiel: so viele Siegpunkte je Spieler soll die Summe erreichen. */
+export const KOOP_ZIEL_JE = 10;
+
+/** Das gemeinsame Ziel dieser Partie. */
+export const koopZiel = (s: Pick<GameState, 'order'>): number => KOOP_ZIEL_JE * s.order.length;
 
 export function createGame(
   players: NewPlayer[],
@@ -378,6 +386,10 @@ export function createGame(
   };
 
   if (optionen.ereignisse) state.ereignisseAn = true;
+  if (optionen.koop) {
+    state.koop = true;
+    state.koopErgebnis = null;
+  }
   if (optionen.haeuser) {
     state.phase = { t: 'hauswahl' };
     state.hausAngebot = {};
@@ -446,6 +458,18 @@ export function wuerfelFuer(secretSeed: number, turn: number): [number, number] 
  */
 function zeitAbgelaufen(state: GameState, events: GameEvent[]): void {
   const uebrig = imSpiel(state);
+  if (state.koop) {
+    // Gemeinsam: die Summe aller zaehlt, auch die der Gefallenen.
+    const summe = state.order.reduce((n, id) => n + totalPoints(state, id), 0);
+    const ziel = koopZiel(state);
+    const erfolg = summe >= ziel && uebrig.length > 0;
+    state.koopErgebnis = { erfolg, summe, ziel };
+    let best = state.order[0]!;
+    for (const id of state.order) if (wertung(state, id) > wertung(state, best)) best = id;
+    state.phase = { t: 'finished', winner: erfolg ? best : null, durch: 'zeit' };
+    events.push(erfolg ? { t: 'win', player: best } : { t: 'lost' });
+    return;
+  }
   if (uebrig.length === 0) {
     state.phase = { t: 'finished', winner: null, durch: 'zeit' };
     events.push({ t: 'lost' });
@@ -467,7 +491,8 @@ function zeitAbgelaufen(state: GameState, events: GameEvent[]): void {
  * erreicht wird.
  */
 function checkWin(state: GameState, events: GameEvent[]): void {
-  if (state.targetPoints <= 0) return;
+  // Gemeinsam gibt es kein Einzelziel - nur die Rundengrenze entscheidet.
+  if (state.targetPoints <= 0 || state.koop) return;
   const id = state.order[state.current]!;
   if (totalPoints(state, id) >= state.targetPoints) {
     state.phase = { t: 'finished', winner: id, durch: 'ziel' };

@@ -1,7 +1,7 @@
 /** Bots (core/bot.ts): spielen ohne Blockade, bauen und machen Punkte. */
 
 import { describe, it, expect } from 'vitest';
-import { createGame } from '../src/core/rules/reducer';
+import { applyAction, createGame } from '../src/core/rules/reducer';
 import { botsSpielen } from '../src/core/bot';
 import { totalPoints } from '../src/core/state';
 
@@ -44,5 +44,38 @@ describe('Bots', () => {
     expect(g.state.phase.t).toBe('hauswahl');
     expect(g.state.players.find((p) => p.id === 'b1')!.haus).toBeTruthy();
     expect(g.state.players.find((p) => p.id === 'mensch')!.haus).toBeNull();
+  });
+});
+
+import { koopZiel } from '../src/core/rules/reducer';
+
+describe('Gemeinsam', () => {
+  it('am Ende entscheidet die Summe: alle gewinnen oder keiner', () => {
+    const g = createGame(
+      [
+        { id: 'a', name: 'A' },
+        { id: 'b', name: 'B' },
+      ],
+      31,
+      32,
+      0,
+      { haeuser: true, ereignisse: true, rundenLimit: 60, koop: true },
+    );
+    botsSpielen(g, () => true, 30000);
+    expect(g.state.phase.t).toBe('finished');
+    const e = g.state.koopErgebnis!;
+    expect(e.ziel).toBe(koopZiel(g.state));
+    expect(e.summe).toBe(g.state.order.reduce((n, id) => n + totalPoints(g.state, id), 0));
+    expect(g.state.phase.t === 'finished' && g.state.phase.winner !== null).toBe(e.erfolg);
+  });
+
+  it('kennt kein Einzelziel', () => {
+    const g = createGame([{ id: 'a', name: 'A' }], 1, 2, 3, { koop: true, rundenLimit: 60 });
+    g.state.buildings = { x: { owner: 'a', type: 'city' }, y: { owner: 'a', type: 'city' } };
+    g.state.phase = { t: 'main' };
+    g.state.turn = 5;
+    const r = applyAction(g, { t: 'buyDev' }, 'a');
+    void r;
+    expect(g.state.phase.t).not.toBe('finished');
   });
 });

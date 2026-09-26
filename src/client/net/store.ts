@@ -212,6 +212,7 @@ function vervollstaendige(msg: ServerMsg): void {
     room.tagesDatum ??= null;
     room.weltSeed ??= null;
     room.stufe ??= 0;
+    room.koop ??= false;
   }
   if (msg.t === 'state') {
     msg.state.omens ??= [];
@@ -222,6 +223,8 @@ function vervollstaendige(msg: ServerMsg): void {
     msg.state.ereignis ??= null;
     msg.state.stufe ??= 0;
     msg.state.wunder ??= {};
+    msg.state.koop ??= false;
+    msg.state.koopErgebnis ??= null;
     for (const p of msg.state.players) p.haus ??= null;
   }
 }

@@ -13,6 +13,7 @@ import { playerColor } from '../theme';
 import { OmenListe } from '../ui/OmenListe';
 import { MAX_STUFE, STUFE_NAME, omenMitStufe } from '../../core/stufe';
 import { leseProfil } from '../profil';
+import { KOOP_ZIEL_JE } from '../../core/rules/reducer';
 
 export function Lobby() {
   const room = useStore((s) => s.room);
@@ -93,6 +94,25 @@ export function Lobby() {
         {!tages && (
           <>
             <label>
+              Spielart
+              <div className="choices">
+                <button className={!room.koop ? 'chosen' : ''} disabled={!isHost} onClick={() => send({ t: 'setOptions', koop: false })}>
+                  Gegeneinander
+                </button>
+                <button className={room.koop ? 'chosen' : ''} disabled={!isHost} onClick={() => send({ t: 'setOptions', koop: true })}>
+                  Gemeinsam
+                </button>
+              </div>
+            </label>
+            {room.koop && (
+              <p className="note">
+                Gemeinsam gegen die Wildnis: ein Jahr lang, und am Ende muss die Summe eurer Siegpunkte {KOOP_ZIEL_JE} je Spieler
+                erreichen ({KOOP_ZIEL_JE * room.members.length} bei {room.members.length}). Ihr gewinnt oder verliert zusammen.
+              </p>
+            )}
+
+            {!room.koop && (
+            <label>
               Siegpunkte
               <div className="choices">
                 {TARGET_POINTS_CHOICES.map((n) => (
@@ -107,6 +127,7 @@ export function Lobby() {
                 ))}
               </div>
             </label>
+            )}
 
             {(leseProfil().stufeFrei > 0 || room.stufe > 0) && (
             <label>
@@ -139,6 +160,7 @@ export function Lobby() {
               </p>
             )}
 
+            {!room.koop && (
             <label>
               Laenge
               <div className="choices">
@@ -154,6 +176,7 @@ export function Lobby() {
                 ))}
               </div>
             </label>
+            )}
             {room.rundenLimit !== null && (
               <p className="note">
                 Nach {room.rundenLimit} Runden ist Schluss, dann gewinnt die hoechste Wertung

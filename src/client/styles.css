@@ -5079,3 +5079,8 @@ em.off {
   font-size: 11px;
   color: #e39a86;
 }
+
+.hud > span.hud-koop {
+  color: #9fcb86;
+  white-space: nowrap;
+}

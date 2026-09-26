@@ -40,6 +40,8 @@ export type RoomInfo = {
   weltSeed: number | null;
   /** Chronikstufe (core/stufe.ts): je Stufe ein Fluch mehr. */
   stufe: number;
+  /** Gemeinsam gegen die Wildnis (ein Jahr, ein Ziel fuer alle). */
+  koop: boolean;
 };
 
 /**
@@ -93,6 +95,8 @@ export type ClientMsg =
       rundenLimit?: number | null;
       /** Chronikstufe (core/stufe.ts). */
       stufe?: number;
+      /** Gemeinsam statt gegeneinander. */
+      koop?: boolean;
     }
   | { t: 'start' }
   /** Nur der Gastgeber, nur vor dem Start: einen Bot dazusetzen oder entfernen. */

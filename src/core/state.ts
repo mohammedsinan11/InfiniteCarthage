@@ -540,6 +540,14 @@ export type GameState = {
   chronik?: Chronik;
   /** Die drei Haeuser, die jeder zur Wahl hat (core/haus.ts). Oeffentlich. */
   hausAngebot?: Record<PlayerId, string[]>;
+  /**
+   * Gemeinsames Spiel: alle gegen die Wildnis. Gewonnen wird zusammen, wenn
+   * die Summe der Siegpunkte bei Ablauf der Rundengrenze das Ziel erreicht
+   * (KOOP_ZIEL_JE je Spieler). Fehlt: gegeneinander.
+   */
+  koop?: boolean;
+  /** Das Ergebnis eines gemeinsamen Spiels, sobald es entschieden ist. */
+  koopErgebnis?: { erfolg: boolean; summe: number; ziel: number } | null;
   /** Errichtete Weltwunder: Feldschluessel -> Besitzer und Art (core/wunder.ts). */
   wunder?: Record<string, Wunder>;
   /** Die Chronikstufe (core/stufe.ts): je Stufe ein Fluch mehr. Fehlt: 0. */

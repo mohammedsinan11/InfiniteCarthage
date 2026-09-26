@@ -129,6 +129,9 @@ export type PublicState = {
   auftraege: GameState['auftraege'];
   /** Die Chronikstufe (core/stufe.ts). */
   stufe: number;
+  /** Gemeinsames Spiel und sein Ergebnis (rules/reducer.ts, koopZiel). */
+  koop: boolean;
+  koopErgebnis: { erfolg: boolean; summe: number; ziel: number } | null;
   /** Errichtete Weltwunder (core/wunder.ts) - weithin sichtbar. */
   wunder: NonNullable<GameState['wunder']>;
   /** Das offene Ereignis und wer antwortet (core/ereignis.ts) - oeffentlich. */
@@ -231,6 +234,8 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     ereignis: state.ereignis ?? null,
     stufe: state.stufe ?? 0,
     wunder: state.wunder ?? {},
+    koop: state.koop ?? false,
+    koopErgebnis: state.koopErgebnis ?? null,
     omens: state.omens ?? [],
     rundenLimit: state.rundenLimit ?? null,
     tagesDatum: state.tagesDatum ?? null,
