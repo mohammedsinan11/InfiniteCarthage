@@ -119,6 +119,7 @@ export function Home() {
   const laufend = alleRaeume ? laufendAlle : laufendAlle.slice(0, 4);
   const versteckt = offenAlle.length - offen.length + laufendAlle.length - laufend.length;
   const neuHier = leseProfil().partien === 0 && partien.length === 0;
+  const gewertet = new Set(leseProfil().gewertet);
   const partieVon = (c: string) => partien.find((p) => p.code === c);
 
   const weiterspielen = (p: Partie) => {
@@ -262,11 +263,18 @@ export function Home() {
             <ul>
               {partien.map((p) => {
                 const r = (raeume ?? []).find((x) => x.code === p.code);
+                // Private Raeume (Szenario, Tagesexpedition) stehen nicht in der
+                // Liste - dass sie vorbei sind, weiss das Profil (client/profil.ts).
+                const vorbei = r?.status === 'beendet' || gewertet.has(p.code);
                 return (
                   <li key={p.code} className="raum klickbar" title={`Weiterspielen als ${p.name}`} onClick={() => weiterspielen(p)}>
                     <div className="raum-kopf">
                       <span className="raum-code">{p.code}</span>
-                      {r && <span className={`raum-status ${r.status}`}>{STATUS_TEXT[r.status]}</span>}
+                      {vorbei ? (
+                        <span className="raum-status beendet">{STATUS_TEXT.beendet}</span>
+                      ) : (
+                        r && <span className={`raum-status ${r.status}`}>{STATUS_TEXT[r.status]}</span>
+                      )}
                     </div>
                     <div className="raum-info">
                       als {p.name}
@@ -282,7 +290,7 @@ export function Home() {
                           weiterspielen(p);
                         }}
                       >
-                        Weiterspielen
+                        {vorbei ? 'Chronik ansehen' : 'Weiterspielen'}
                       </button>
                       <button
                         className="klein"

@@ -79,3 +79,23 @@ describe('Gemeinsam', () => {
     expect(g.state.phase.t).not.toBe('finished');
   });
 });
+
+describe('Bots und Handel', () => {
+  it('antworten auf ein Angebot: fair und bezahlbar ja, sonst nein', async () => {
+    const { botNimmtHandel } = await import('../src/core/bot');
+    const g = createGame([{ id: 'm', name: 'Mensch' }, { id: 'b', name: 'Bot' }], 3, 4, 0);
+    g.state.phase = { t: 'main' };
+    const bot = g.state.players[1]!;
+    bot.hand.ore = 3;
+    g.state.trade = { from: 'm', give: { wool: 2 }, want: { ore: 2 }, accepted: [], declined: [] };
+    expect(botNimmtHandel(g.state, 'b')).toBe(true);
+    g.state.trade = { from: 'm', give: { wool: 1 }, want: { ore: 2 }, accepted: [], declined: [] };
+    expect(botNimmtHandel(g.state, 'b')).toBe(false);
+    g.state.trade = { from: 'm', give: { wool: 3 }, want: { ore: 3 }, accepted: [], declined: [] };
+    expect(botNimmtHandel(g.state, 'b')).toBe(false);
+
+    g.state.trade = { from: 'm', give: { wool: 2 }, want: { ore: 2 }, accepted: [], declined: [] };
+    botsSpielen(g, (id) => id === 'b');
+    expect(g.state.trade?.accepted).toEqual(['b']);
+  });
+});

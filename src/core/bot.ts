@@ -297,12 +297,49 @@ export function botAktion(state: GameState, world: World, id: PlayerId, versucht
  * der Bot etwas anderes versucht statt dasselbe noch einmal. Eine Obergrenze
  * je Aufruf haelt einen Fehler davon ab, den Raum festzuhalten.
  */
+/**
+ * Nimmt ein Bot ein Handelsangebot an? Wenn er zahlen kann und mindestens so
+ * viele Karten bekommt, wie er hergibt - und ihm dabei keine Sorte ganz
+ * ausgeht. Kein Feilschen, aber auch kein Verschenken.
+ */
+export function botNimmtHandel(s: GameState, id: PlayerId): boolean {
+  const t = s.trade;
+  const p = s.players.find((x) => x.id === id);
+  if (!t || !p) return false;
+  let gib = 0;
+  let nimm = 0;
+  for (const r of RESOURCES) {
+    const will = t.want[r] ?? 0;
+    if (will > 0 && p.hand[r] - will < 1) return false;
+    gib += will;
+    nimm += t.give[r] ?? 0;
+  }
+  return gib > 0 && nimm >= gib;
+}
+
 export function botsSpielen(game: Game, istBot: (id: PlayerId) => boolean, grenze = 600): GameEvent[][] {
   const alle: GameEvent[][] = [];
   const versucht = new Set<string>();
   for (let i = 0; i < grenze; i++) {
     const s = game.state;
     if (s.phase.t === 'finished') break;
+    // Ein Handelsangebot an alle: die Bots antworten, ehe es weitergeht
+    // (Spieltest: das Angebot eines Menschen blieb sonst ewig offen).
+    if (s.trade) {
+      const offen = s.players.find(
+        (p) => istBot(p.id) && p.id !== s.trade!.from && !s.trade!.accepted.includes(p.id) && !s.trade!.declined.includes(p.id),
+      );
+      if (offen) {
+        const r = applyAction(game, { t: 'respondTrade', accept: botNimmtHandel(s, offen.id) }, offen.id);
+        if (r.ok) alle.push(r.events);
+        else if (!s.trade.declined.includes(offen.id)) {
+          const nein = applyAction(game, { t: 'respondTrade', accept: false }, offen.id);
+          if (nein.ok) alle.push(nein.events);
+          else break;
+        }
+        continue;
+      }
+    }
     let wer: PlayerId | undefined;
     if (s.phase.t === 'hauswahl') wer = s.players.find((p) => istBot(p.id) && !p.haus)?.id;
     else if (s.phase.t === 'setup') {

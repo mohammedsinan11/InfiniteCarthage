@@ -395,7 +395,8 @@ export function Game() {
    * Gegenmitteln, bevor es brennt (Spieltest: Raubzuege kamen ohne Vorwarnung).
    * Nur Truppen ohne Beute - wer schon traegt, zieht heim.
    */
-  const [weggeklickt, setWeggeklickt] = useState<string[]>([]);
+  /** Ausgeblendete Warnungen: Fraktion -> bis zu welcher Runde (Spieltest: kam jede Runde wieder). */
+  const [weggeklickt, setWeggeklickt] = useState<Record<string, number>>({});
   const raubWarnung = useMemo(() => {
     if (!you || meineFelder.length === 0) return null;
     const felder = new Set(meineFelder.map((h) => hexKey(h.q, h.r)));
@@ -406,8 +407,8 @@ export function Game() {
       if (abkommenVon(state, you, u.fraktion)) continue;
       const weg = hexDistance(u, u.ziel);
       if (weg > 12) continue;
-      const schluessel = u.heimat ?? String(u.id);
-      if (weggeklickt.includes(schluessel)) continue;
+      const schluessel = u.fraktion;
+      if ((weggeklickt[schluessel] ?? -1) >= state.turn) continue;
       const anzahl = state.units.filter((x) => x.heimat === u.heimat && x.auftrag === 'raub').length;
       if (!best || weg < best.weg) best = { u, weg, anzahl, schluessel, tribut: tributKarten(state, you, u.fraktion) };
     }
@@ -1234,7 +1235,7 @@ export function Game() {
                 .map((p) => (
                   <span key={p.id} className={p.besiegt ? 'besiegt' : undefined}>
                     <i className="dot" style={{ background: p.color }} />
-                    {p.name} {p.points}
+                    {p.name} ★{p.points}
                   </span>
                 ))}
             </span>
@@ -1684,7 +1685,7 @@ export function Game() {
             </div>
           )}
 
-          {raubWarnung && !zielWahl && (
+          {raubWarnung && !zielWahl && tafel === null && (
             <div className="raub-warnung" role="alert">
               <p>
                 <b>Raubzug!</b> Ein Trupp ({fraktionById(state.worldSeed, raubWarnung.u.fraktion!).name}
@@ -1731,7 +1732,7 @@ export function Game() {
                     Frieden
                   </button>
                 )}
-                <button className="klein" onClick={() => setWeggeklickt((w) => [...w, raubWarnung.schluessel].slice(-20))}>
+                <button className="klein" onClick={() => setWeggeklickt((w) => ({ ...w, [raubWarnung.schluessel]: state.turn + 5 }))}>
                   Ausblenden
                 </button>
               </div>

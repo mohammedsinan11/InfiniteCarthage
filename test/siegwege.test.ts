@@ -37,4 +37,10 @@ describe('Siegwege', () => {
     g.state.koop = true;
     expect(siegwegeAn(g.state)).toBe(false);
   });
+
+  it('sind auch in der Sicht des Clients an (redact) - sonst sieht niemand den Fortschritt', async () => {
+    const { redactStateFor } = await import('../src/core/redact');
+    const g = partie(20);
+    expect(siegwegeAn(redactStateFor(g.state, 'p0'))).toBe(true);
+  });
 });

@@ -646,6 +646,22 @@ function buildWorld(prev: World | null, state: PublicState): World {
   return w;
 }
 
+/**
+ * Gleiche Zeilen hintereinander werden eine: "... (x3)". Im Grenzland zogen
+ * sonst acht Lager nacheinander dieselbe Wache nach (Spieltest).
+ */
+function buendeln(alt: string[], neu: string[]): string[] {
+  const out = [...alt];
+  for (const z of neu) {
+    const letzte = out[out.length - 1];
+    const m = letzte?.match(/^(.*) \(x(\d+)\)$/);
+    const kern = m ? m[1] : letzte;
+    if (kern === z) out[out.length - 1] = `${z} (x${m ? Number(m[2]) + 1 : 2})`;
+    else out.push(z);
+  }
+  return out;
+}
+
 /*
  * Protokoll und Weltgeschehen ueberleben ein Neuladen oder eine kurze
  * Trennung: je Raum im sessionStorage (Spieltest: nach jeder Wiederverbindung
@@ -901,12 +917,10 @@ export const useStore = create<Store>((set, get) => ({
             );
             if (treffer.length > 0) set({ treffer });
             set((s) => ({
-              log: [
-                ...s.log,
-                ...msg.events
-                  .map((e: GameEvent) => describeEvent(e, s.state))
-                  .filter((zeile: string) => zeile !== ''),
-              ].slice(-120),
+              log: buendeln(
+                s.log,
+                msg.events.map((e: GameEvent) => describeEvent(e, s.state)).filter((zeile: string) => zeile !== ''),
+              ).slice(-120),
               welt: [...s.welt, ...weltNeu].slice(-WELT_MAX),
               announcements: [...s.announcements, ...neue].slice(-6),
               // Schon beim Zustand vorgemerkt (7)? Dann dieselbe Referenz lassen,

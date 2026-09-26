@@ -134,6 +134,8 @@ export type PublicState = {
   szenarioErgebnis: { erreicht: boolean; runde: number; sterne: number } | null;
   /** Gemeinsames Spiel und sein Ergebnis (rules/reducer.ts, koopZiel). */
   koop: boolean;
+  /** Neue Regeln an (Ereignisse, Vorhaben, Siegwege) - der Client zeigt sie nur dann. */
+  ereignisseAn: boolean;
   koopErgebnis: { erfolg: boolean; summe: number; ziel: number } | null;
   /** Errichtete Weltwunder (core/wunder.ts) - weithin sichtbar. */
   wunder: NonNullable<GameState['wunder']>;
@@ -241,6 +243,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     wunder: state.wunder ?? {},
     vorhaben: state.vorhaben ?? {},
     koop: state.koop ?? false,
+    ereignisseAn: state.ereignisseAn ?? false,
     szenario: state.szenario ?? null,
     szenarioErgebnis: state.szenarioErgebnis ?? null,
     koopErgebnis: state.koopErgebnis ?? null,

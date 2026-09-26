@@ -118,10 +118,9 @@ export function mitWeltArt(seed: number, art: WeltArt): number {
   return ((MARKE << 24) | (i << 20) | (seed & 0xfffff)) | 0;
 }
 
-/** Eine zufaellige Art aus einer Zufallszahl - Kernland etwas haeufiger, damit es der Normalfall bleibt. */
+/** Eine zufaellige Art aus einer Zufallszahl - alle gleich oft (Spieltest: Kernland kam zu oft). */
 export function zufallsArt(zufall: number): WeltArt {
-  const n = Math.abs(zufall | 0) % (WELTARTEN.length + 2);
-  return n >= WELTARTEN.length ? 'kernland' : WELTARTEN[n]!.art;
+  return WELTARTEN[Math.abs(zufall | 0) % WELTARTEN.length]!.art;
 }
 
 export const istWeltArt = (x: unknown): x is WeltArt => typeof x === 'string' && NACH_ART.has(x as WeltArt);

@@ -71,7 +71,9 @@ export type MomentArt =
   /** Eine Entscheidung in einem Ereignis (core/ereignis.ts). */
   | 'ereignis'
   /** Frieden oder Tribut mit einer Fraktion (rules/diplomatie.ts). */
-  | 'pakt';
+  | 'pakt'
+  /** Ein Anfuehrer schwoert Rache (rules/army.ts, Groll). */
+  | 'rache';
 
 export type Moment = {
   turn: number;
@@ -200,7 +202,7 @@ export function chronikFortschreiben(state: GameState, events: readonly GameEven
         break;
       case 'vendetta': {
         const f = fraktionById(state.worldSeed, e.fraktion);
-        moment(e.player, 'horde', `${f.anfuehrer ?? f.name} schwoert ${nameVon(state, e.player)} Rache.`);
+        moment(e.player, 'rache', `${f.anfuehrer ?? f.name} schwoert ${nameVon(state, e.player)} Rache.`);
         break;
       }
       case 'ruin':
@@ -353,20 +355,31 @@ export function saga(s: SagaSicht, du: PlayerId): string {
   const held = p.held ? `${p.held.vorname} ${p.held.beiname} vom Haus ${p.held.haus}` : null;
   saetze.push(`Im Fruehling des Jahres 1 zog ${p.name}${haus ? ` unter dem Banner ${haus.banner}` : ''} aus, ein Reich zu gruenden.`);
   if (held) saetze.push(`Zur Seite stand ${held}.`);
+  // Dieselbe Jahreszeit zweimal hintereinander liest sich hoelzern - dann die Runde.
+  let zuletzt = 'spring:1';
+  const wann = (turn: number): string => {
+    const k = `${seasonOf(turn)}:${yearOf(turn)}`;
+    if (k === zuletzt) return `in Runde ${roundOf(turn)}`;
+    zuletzt = k;
+    return zeitVon(turn);
+  };
+  const gross = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
   const meine = (s.chronik?.momente ?? []).filter((m) => m.player === du || m.player === null);
   const erste = (art: string) => meine.find((m) => m.art === art);
   const stadt = erste('stadt');
-  if (stadt) saetze.push(`${zeitVon(stadt.turn).replace(/^im/, 'Im')} stand die erste Stadt.`);
+  if (stadt) saetze.push(`${gross(wann(stadt.turn))} stand die erste Stadt.`);
   const horde = erste('horde');
   const brand = erste('brand');
   if (horde && brand) saetze.push(`Horden kamen aus dem Dunkel, und nicht alles ueberstand das Feuer.`);
   else if (horde) saetze.push(`Horden kamen aus dem Dunkel - das Reich hielt stand.`);
   const heldFiel = erste('held');
-  if (heldFiel) saetze.push(`${heldFiel.text.replace(/\.$/, '')} ${zeitVon(heldFiel.turn)}.`);
+  if (heldFiel) saetze.push(`${heldFiel.text.replace(/\.$/, '')} ${wann(heldFiel.turn)}.`);
+  const rache = erste('rache');
+  if (rache) saetze.push(rache.text.replace(' schwoert ', ' schwor '));
   const karte = erste('karte');
   if (karte) saetze.push(karte.text.replace(`${p.name} nimmt`, 'Das Schicksal brachte'));
   const ereignis = erste('ereignis');
-  if (ereignis) saetze.push(`Lange erzaehlte man sich von jenem Tag ${zeitVon(ereignis.turn)}: ${ereignis.text.split(':')[0]}.`);
+  if (ereignis) saetze.push(`Lange erzaehlte man sich von jenem Tag ${wann(ereignis.turn)}: ${ereignis.text.split(':')[0]}.`);
   if (s.phase.t === 'finished') {
     const i = s.order.indexOf(du);
     const pkt = s.chronik?.verlauf[s.chronik.verlauf.length - 1]?.punkte[i];
@@ -378,7 +391,7 @@ export function saga(s: SagaSicht, du: PlayerId): string {
             ? 'ohne das Ziel erreicht zu haben'
             : 'mit dem Fall aller Reiche'
           : '- ein anderes Haus steht vorn';
-    const zeit = zeitVon(s.turn).replace(/^im/, 'Im');
+    const zeit = gross(wann(s.turn));
     saetze.push(`${zeit} schliesst die Chronik ${wie}.${pkt !== undefined ? ` Am Ende: ${pkt} Siegpunkte.` : ''}`);
   }
   return saetze.join(' ');
