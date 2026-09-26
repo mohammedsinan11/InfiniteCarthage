@@ -298,6 +298,14 @@ drei Strassen, ein Lager, fuenf Handel, eine Stadt ... Wer es binnen 15
 Runden schafft, bekommt Ruhm oder eine Kartenwahl. So entscheidet man auf
 mittlere Sicht, statt nur auf die Wuerfel zu reagieren.
 
+**Fraktionsleben und Kunde aus dem Land** (`src/core/fraktionsleben.ts`,
+`src/core/kunde.ts`). Anfuehrer koennen mit ihrem Lager fallen, ein
+Nachfolger mit anderem Wesen tritt an; heimgebrachte Beute macht den
+naechsten Raubzug staerker; jede Fraktion merkt sich, wie ein Haus sie
+behandelt. Zu jedem Wechsel der Jahreszeit schreibt der Chronist auf, was in
+der Welt geschah - Ernte, Raubzuege, Fehden, Feste, eroberte Lager,
+gefallene Anfuehrer.
+
 **Siegwege** (`src/core/siegwege.ts`). Neben dem Siegpunktziel gewinnt auch,
 wer als Eroberer, Entdecker, Wunderbauer oder Handelsfuerst weit genug kommt.
 

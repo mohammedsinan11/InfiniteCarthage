@@ -35,6 +35,16 @@ the feel of the game, with a recommended path at the end.
 
 ## 1. A world that lives without you
 
+> **Built (step 2):** chiefs can fall when their camp is destroyed (35 %) or
+> captured (50 %) and a successor with a different temperament takes over;
+> loot that raiders carry home makes the next raid stronger; every faction
+> remembers each house (destroying camps and declaring war make it hostile,
+> tribute and peace reconcile; a hated house gets no peace); each
+> temperament has a stated goal. The season report "Kunde aus dem Land"
+> (`src/core/kunde.ts`) appears at every season change and is kept in the
+> Chronist's tab and on the end screen. Still open: camps growing into
+> strongholds, factions merging or splitting, population, caravans.
+
 **Idea.** The world simulates a little every big round, whether or not a
 player touches it. Factions are not only raid spawners; they are actors
 with goals.
