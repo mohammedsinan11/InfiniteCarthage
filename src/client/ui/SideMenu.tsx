@@ -37,6 +37,7 @@ import type { MusicMode } from '../music';
 import { getUmgebungVolume, setUmgebungVolume } from '../ambiente';
 import { BRAND_WAS, auftragText, bundleText, resourceName } from '../log';
 import { einheitNamen, gruppenName, heerGruppen, untaetig } from '../heer';
+import { tippsZuruecksetzen } from '../tipps';
 
 type Reiter = 'reich' | 'heer' | 'karten' | 'optionen';
 
@@ -1025,6 +1026,20 @@ export function SideMenu({
               <Schalter an={showNumbers} onClick={onToggleNumbers}>
                 Zahlen immer zeigen
               </Schalter>
+              <button
+                className="klein menu-tipps"
+                title="Die Erklaerungen beim ersten Auftreten und die Erste-Schritte-Liste wieder zeigen"
+                onClick={() => {
+                  tippsZuruecksetzen();
+                  try {
+                    localStorage.removeItem('infinitecarthage.erste-schritte');
+                  } catch {
+                    // nichts zu tun
+                  }
+                }}
+              >
+                Tipps wieder zeigen
+              </button>
             </div>
 
             <Kopf titel="Ton" hilfe="Der Tonknopf oben neben dem Wetter schaltet alles zusammen ab." />

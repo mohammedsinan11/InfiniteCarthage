@@ -5084,3 +5084,30 @@ em.off {
   color: #9fcb86;
   white-space: nowrap;
 }
+
+@media (max-width: 720px) {
+  .haus-wahl,
+  .ereignis-huelle {
+    justify-content: flex-start;
+    overflow-y: auto;
+    padding: 16px 0;
+  }
+  .haus-wahl .draft-karten {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .haus-karte {
+    width: min(340px, calc(100vw - 32px));
+    min-height: 0;
+    padding: 10px 12px;
+    gap: 5px;
+  }
+  .haus-rat {
+    display: none;
+  }
+}
+
+.menu-tipps {
+  margin-top: 6px;
+}
