@@ -61,7 +61,23 @@ export type FraktionsZeile = {
 };
 
 /** Siegpunkte aufgeschluesselt (Game): Summe, Ziel (0 = endlos) und woher sie kommen. */
-export type PunkteSicht = { gesamt: number; ziel: number; zeilen: { text: string; wert: number | null }[] };
+export type PunkteSicht = {
+  gesamt: number;
+  ziel: number;
+  /** Rundengrenze der Partie, null ohne (core/chronik.ts). */
+  rundenLimit: number | null;
+  /** Siegpunkte x 10 + Ruhm - zaehlt, wenn die Rundengrenze erreicht ist. */
+  wertung: number;
+  zeilen: { text: string; wert: number | null }[];
+};
+
+/** Was neben der Punktzahl steht: das Ziel, die Rundengrenze - oder endlos. */
+function zielText(p: PunkteSicht): string {
+  const teile: string[] = [];
+  if (p.ziel > 0) teile.push(`von ${p.ziel}`);
+  if (p.rundenLimit !== null) teile.push(`bis Runde ${p.rundenLimit}`);
+  return teile.length > 0 ? teile.join(' · ') : 'endlos';
+}
 
 /* Symbole der Reiter - kleine SVG-Flaechen. PLATZHALTER (ASSETS.md). */
 const SYMBOL: Record<Reiter, ReactNode> = {
@@ -535,16 +551,30 @@ export function SideMenu({
             <Kopf
               titel="Siegpunkte"
               hilfe={
-                punkte.ziel > 0
-                  ? `Wer zuerst ${punkte.ziel} Punkte hat, gewinnt. Dorf 1, Stadt 2, Hauptstadt 2 und je Ausbaustufe 1 mehr, Siegpunktkarten 1, Ruhmreichster ab 5 Ruhm 2.`
-                  : 'Endlosspiel: kein Siegpunktziel. Dorf 1, Stadt 2, Hauptstadt 2 und je Ausbaustufe 1 mehr, Siegpunktkarten 1, Ruhmreichster ab 5 Ruhm 2.'
+                (punkte.ziel > 0
+                  ? `Wer zuerst ${punkte.ziel} Punkte hat, gewinnt. `
+                  : punkte.rundenLimit === null
+                    ? 'Endlosspiel: kein Siegpunktziel. '
+                    : '') +
+                (punkte.rundenLimit !== null
+                  ? `Nach Runde ${punkte.rundenLimit} gewinnt die hoechste Wertung: Siegpunkte x 10 + Ruhm. `
+                  : '') +
+                'Dorf 1, Stadt 2, Hauptstadt 2 und je Ausbaustufe 1 mehr, Siegpunktkarten 1, Ruhmreichster ab 5 Ruhm 2.'
               }
             />
             <div className="menu-box">
               <div className="menu-punkte">
                 <span className="menu-punkte-zahl">★ {punkte.gesamt}</span>
-                <span className="menu-punkte-ziel">{punkte.ziel > 0 ? `von ${punkte.ziel}` : 'endlos'}</span>
+                <span className="menu-punkte-ziel">{zielText(punkte)}</span>
               </div>
+              {punkte.rundenLimit !== null && (
+                <div className="menu-zeilen">
+                  <span>
+                    <span>Wertung</span>
+                    <b>{punkte.wertung}</b>
+                  </span>
+                </div>
+              )}
               {punkte.ziel > 0 && (
                 <div className="menu-balken">
                   <i style={{ width: `${Math.min(100, Math.round((punkte.gesamt / punkte.ziel) * 100))}%` }} />
@@ -958,7 +988,7 @@ export function SideMenu({
                 Raum <b>{raumcode}</b>
               </span>
               <span>
-                Ziel <b>{punkte.ziel > 0 ? punkte.ziel : 'endlos'}</b>
+                Ziel <b>{zielText(punkte).replace(/^von /, '')}</b>
               </span>
             </div>
 

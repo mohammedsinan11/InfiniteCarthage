@@ -173,6 +173,6 @@ describe('Sandkasten ohne Siegbedingung', () => {
     )!;
     must(game, { t: 'buildCity', vertex: mine[0] }, 'p0');
 
-    expect(game.state.phase).toEqual({ t: 'finished', winner: 'p0' });
+    expect(game.state.phase).toEqual({ t: 'finished', winner: 'p0', durch: 'ziel' });
   });
 });

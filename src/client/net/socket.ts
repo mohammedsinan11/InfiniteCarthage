@@ -7,8 +7,11 @@
  */
 
 import type { ClientMsg, ServerMsg } from '../../core/protocol';
+import { ROOM_CODE_LENGTH, randomRoomCode } from '../../core/protocol';
 import { istRaumEintrag } from '../../core/lobby';
 import type { RaumEintrag } from '../../core/lobby';
+import { istTagesInfo } from '../../core/tages';
+import type { TagesInfo } from '../../core/tages';
 
 /**
  * Serveradresse aus dem Build.
@@ -56,14 +59,30 @@ export type SocketHandlers = {
   onClose: () => void;
 };
 
+/** Ein frischer Raumcode - ohne 0/O und 1/I, die beim Vorlesen verwechselt werden. */
+export function neuerRaumCode(): string {
+  const a = new Uint8Array(ROOM_CODE_LENGTH);
+  crypto.getRandomValues(a);
+  return randomRoomCode(a);
+}
+
+/** Was ein neuer Raum ausser dem Code mitbringt. */
+export type RaumWunsch = { tages?: boolean; welt?: number };
+
 export function openSocket(
   code: string,
   create: boolean,
   oeffentlich: boolean,
   handlers: SocketHandlers,
+  /**
+   * Nur beim Eroeffnen: ein Raum fuer die Tagesexpedition (core/tages.ts),
+   * oder eine Welt aus einer frueheren Partie ("Diese Welt nochmal").
+   */
+  neu: RaumWunsch = {},
 ): WebSocket {
   const base = SERVER_URL.replace(/^http/, 'ws').replace(/\/$/, '');
-  const url = `${base}/room/${code}/ws${create ? `?create=1${oeffentlich ? '' : '&public=0'}` : ''}`;
+  const extra = (neu.tages ? '&tages=1' : '') + (neu.welt !== undefined ? `&welt=${neu.welt | 0}` : '');
+  const url = `${base}/room/${code}/ws${create ? `?create=1${oeffentlich ? '' : '&public=0'}${extra}` : ''}`;
   const ws = new WebSocket(url);
 
   ws.onopen = handlers.onOpen;
@@ -89,6 +108,19 @@ export async function holeRaeume(): Promise<RaumEintrag[]> {
   if (!res.ok) throw new Error(`Raumliste: ${res.status}`);
   const daten = (await res.json()) as unknown;
   return Array.isArray(daten) ? daten.filter(istRaumEintrag) : [];
+}
+
+/**
+ * Die Tagesexpedition vom Worker (GET /daily): Datum, Omen und Bestenliste.
+ * Wirft, wenn er nicht antwortet.
+ */
+export async function holeTagesInfo(): Promise<TagesInfo> {
+  const base = SERVER_URL.replace(/^ws/, 'http').replace(/\/$/, '');
+  const res = await fetch(`${base}/daily`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Tagesexpedition: ${res.status}`);
+  const daten = (await res.json()) as unknown;
+  if (!istTagesInfo(daten)) throw new Error('Tagesexpedition: unlesbar');
+  return daten;
 }
 
 export function sendMsg(ws: WebSocket | null, msg: ClientMsg): void {

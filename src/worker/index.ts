@@ -9,10 +9,13 @@
 import { GameRoom } from './room';
 import type { Env } from './room';
 import { Verzeichnis } from './directory';
+import { Bestenliste } from './bestenliste';
 import { isRoomCode } from '../core/protocol';
 import { VERZEICHNIS_NAME } from '../core/lobby';
+import { TAGES_RUNDEN, istTagesDatum, tagesDatum, tagesOmen } from '../core/tages';
+import type { BestenEintrag, TagesInfo } from '../core/tages';
 
-export { GameRoom, Verzeichnis };
+export { GameRoom, Verzeichnis, Bestenliste };
 
 /**
  * Erlaubte Herkunft. In der Produktion die Pages-Adresse, in der Entwicklung
@@ -57,6 +60,32 @@ export default {
         headers.set('Vary', 'Origin');
       }
       return new Response(antwort.body, { status: antwort.status, headers });
+    }
+
+    // Die Tagesexpedition (core/tages.ts): Datum, Omen und Bestenliste. Der
+    // geheime Seed des Tages bleibt im Objekt - diesen Weg kennt er nicht.
+    if (url.pathname === '/daily' && request.method === 'GET') {
+      const origin = request.headers.get('Origin');
+      if (!originAllowed(origin, env)) {
+        return new Response('Herkunft nicht erlaubt.', { status: 403 });
+      }
+      const gefragt = url.searchParams.get('datum');
+      const datum = istTagesDatum(gefragt) ? gefragt : tagesDatum();
+      let eintraege: BestenEintrag[] = [];
+      try {
+        const stub = env.BESTENLISTE.get(env.BESTENLISTE.idFromName('tag:' + datum));
+        const antwort = await stub.fetch('https://bestenliste/liste');
+        if (antwort.ok) eintraege = (await antwort.json()) as BestenEintrag[];
+      } catch {
+        // Ohne Liste zeigt die Startseite nur Datum und Omen.
+      }
+      const info: TagesInfo = { datum, omens: tagesOmen(datum), runden: TAGES_RUNDEN, eintraege };
+      const headers = new Headers({ 'content-type': 'application/json', 'cache-control': 'no-store' });
+      if (origin !== null) {
+        headers.set('Access-Control-Allow-Origin', origin);
+        headers.set('Vary', 'Origin');
+      }
+      return new Response(JSON.stringify(info), { headers });
     }
 
     // /room/<CODE>/ws

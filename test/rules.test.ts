@@ -490,7 +490,7 @@ describe('Sieg', () => {
     must(game, { t: 'buildCity', vertex: mine[0] }, 'p0');
 
     expect(totalPoints(game.state, 'p0')).toBeGreaterThanOrEqual(3);
-    expect(game.state.phase).toEqual({ t: 'finished', winner: 'p0' });
+    expect(game.state.phase).toEqual({ t: 'finished', winner: 'p0', durch: 'ziel' });
     const r = applyAction(game, { t: 'endTurn' }, 'p0');
     expect(r).toEqual({ ok: false, error: 'Die Partie ist beendet.' });
   });

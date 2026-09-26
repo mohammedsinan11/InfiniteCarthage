@@ -36,6 +36,10 @@ import { DiceOverlay } from '../ui/DiceOverlay';
 import { Announcements } from '../ui/Announcements';
 import { CardDraft } from '../ui/CardDraft';
 import { SideMenu } from '../ui/SideMenu';
+import { Chronik } from '../ui/Chronik';
+import { OmenListe } from '../ui/OmenListe';
+import { omenById } from '../../core/omen';
+import { neuerRaumCode } from '../net/socket';
 import type { FraktionsZeile } from '../ui/SideMenu';
 import { isNestActive, nestFraktionOf, sightOf } from '../../core/units';
 import { abkommenVon, kampfFelder } from '../../core/combat';
@@ -44,7 +48,7 @@ import { fraktionColor } from '../theme';
 import { hexDistance, hexKey, hexVertices, parseVertexKey, vertexAdjacentHexes, vertexKey } from '../../core/coords';
 import { beiStumm, initAudio, istStumm, playBuild, playGain, playTurm, playWurfStart, setStumm } from '../audio';
 import { setAmbiente } from '../ambiente';
-import { seasonOf } from '../../core/season';
+import { roundOf, seasonOf } from '../../core/season';
 import { RESOURCES } from '../../core/types';
 import type { Resource } from '../../core/types';
 import { COST_CAPITAL, COST_CITY, COST_STUFE, COST_ROAD, COST_TURM_STUFE, canAfford } from '../../core/rules/costs';
@@ -120,6 +124,8 @@ export function Game() {
   const you = useStore((s) => s.you);
   const act = useStore((s) => s.act);
   const disconnect = useStore((s) => s.disconnect);
+  const connect = useStore((s) => s.connect);
+  const [omenOffen, setOmenOffen] = useState(false);
   const pendingRoll = useStore((s) => s.pendingRoll);
   const clearPendingRoll = useStore((s) => s.clearPendingRoll);
   const announcements = useStore((s) => s.announcements);
@@ -466,6 +472,8 @@ export function Game() {
     return {
       gesamt: state.myPoints,
       ziel: state.targetPoints,
+      rundenLimit: state.rundenLimit,
+      wertung: state.myPoints * 10 + (state.players.find((p) => p.id === you)?.ruhm ?? 0),
       zeilen: [
         { text: `Doerfer ${doerfer} × 1`, wert: doerfer > 0 ? doerfer : null },
         { text: `Staedte ${staedte} × 2`, wert: staedte > 0 ? staedte * 2 : null },
@@ -1002,6 +1010,24 @@ export function Game() {
             ★ {state.myPoints}
             {state.targetPoints > 0 ? ` / ${state.targetPoints}` : ''}
           </span>
+          {/* Die Rundengrenze: wie viele Runden bleiben (core/chronik.ts). */}
+          {state.rundenLimit !== null && (
+            <span
+              className="hud-runden"
+              title={`Nach Runde ${state.rundenLimit} ist Schluss - dann gewinnt die hoechste Wertung (Siegpunkte x 10 + Ruhm).`}
+            >
+              {state.tagesDatum ? 'Tagesexpedition · ' : ''}Runde {Math.min(roundOf(state.turn), state.rundenLimit)} / {state.rundenLimit}
+            </span>
+          )}
+          {state.omens.length > 0 && (
+            <button
+              className={omenOffen ? 'hud-omen offen' : 'hud-omen'}
+              title={state.omens.map((id) => `${omenById(id)?.name}: ${omenById(id)?.text}`).join('\n')}
+              onClick={() => setOmenOffen((v) => !v)}
+            >
+              Omen {state.omens.length}
+            </button>
+          )}
           {state.lastRoll && (
             <span className="hud-roll">
               {state.lastRoll[0]} + {state.lastRoll[1]} = {state.lastRoll[0] + state.lastRoll[1]}
@@ -1105,10 +1131,20 @@ export function Game() {
 
         <Announcements items={announcements} onDone={dropAnnouncement} />
 
-        {phase.t === 'finished' && (
-          <div className="hud-win">
-            {state.players.find((p) => p.id === phase.winner)?.name} gewinnt!
+        {omenOffen && state.omens.length > 0 && (
+          <div className="hud-omen-tafel">
+            <OmenListe omens={state.omens} />
           </div>
+        )}
+
+        {phase.t === 'finished' && (
+          <Chronik
+            state={state}
+            you={you}
+            code={useStore.getState().code}
+            verlassen={disconnect}
+            nochmal={(neu) => connect(neuerRaumCode(), me?.name ?? 'Spieler', true, !neu.tages, undefined, neu)}
+          />
         )}
 
         <Board

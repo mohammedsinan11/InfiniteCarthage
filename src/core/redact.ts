@@ -122,6 +122,17 @@ export type PublicState = {
   asche: GameState['asche'];
   abkommen: GameState['abkommen'];
   auftraege: GameState['auftraege'];
+  /** Die Omen - oeffentlich, sie gelten fuer alle (core/omen.ts). */
+  omens: string[];
+  /** Nach so vielen Runden endet die Partie; null ohne Grenze. */
+  rundenLimit: number | null;
+  /** Das Datum einer Tagesexpedition, sonst null (core/tages.ts). */
+  tagesDatum: string | null;
+  /**
+   * Punkteverlauf, Zahlen und Momente (core/chronik.ts) - oeffentlich wie das
+   * Protokoll. Verdeckte Siegpunktkarten stehen erst nach dem Ende darin.
+   */
+  chronik: NonNullable<GameState['chronik']> | null;
 };
 
 export function redactStateFor(state: GameState, viewer: PlayerId): PublicState {
@@ -200,6 +211,10 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     asche: state.asche,
     abkommen: state.abkommen,
     auftraege: state.auftraege,
+    omens: state.omens ?? [],
+    rundenLimit: state.rundenLimit ?? null,
+    tagesDatum: state.tagesDatum ?? null,
+    chronik: state.chronik ?? null,
   };
 }
 

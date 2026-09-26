@@ -118,11 +118,12 @@ import { reichsbauFelder, tempelNah } from './reich';
 import { HEILERIN_RADIUS, ZWEIG_BAU } from './zweig';
 import { ZWEIG_WERTE } from '../units';
 import { angriffVon, maxLeben } from '../combat';
-import { roundOf } from '../season';
+import { bigRoundOf, roundOf } from '../season';
 import { einheitenRasten } from '../zeit';
 import { feuerLegen } from './feuer';
 import type { FeuerEvent } from './feuer';
 import { clearExpiredTactics, hasTactic, tacticBonus } from './tactics';
+import { blutmond, mehrRaubzuege, raubzugRunde, schleimFaktor } from '../omen';
 
 /**
  * Lager bis zu dieser Entfernung von einer Siedlung schicken Raubzuege.
@@ -624,7 +625,7 @@ export function sendRaiders(s: GameState, events: Ereignisse): void {
   const unterwegs = new Set(
     s.units.map((u) => u.heimat).filter((h): h is string => h !== null),
   );
-  const grenze = maxAufbrueche(s.order.length);
+  const grenze = maxAufbrueche(s.order.length) + mehrRaubzuege(s.omens);
   const parties: { q: number; r: number; kind: Feind; fraktion: string }[] = [];
   const reihe = [...lager].sort((a, b) => a[1].d - b[1].d || nachSchluessel(a[0], b[0]));
   for (const [k, nest] of reihe) {
@@ -752,7 +753,8 @@ export function beginBigRound(s: GameState, events: Ereignisse): void {
   // Erst das Lagerleben: wer feiert, schickt in dieser Runde niemanden los.
   lagerLeben(s, rng0, events);
   s.rngState = rng0.getState();
-  sendRaiders(s, events);
+  // Ruhige Grenzen (core/omen.ts): nur jede zweite grosse Runde ein Aufbruch.
+  if (raubzugRunde(s.omens, bigRoundOf(s.turn))) sendRaiders(s, events);
   const rng = new Rng(s.rngState);
   sendFeud(s, rng, events);
   sendWanderer(s, rng, events);
@@ -932,7 +934,7 @@ export function nachtVolk(s: GameState, rng: Rng, events: Ereignisse): void {
       }
     }
     const frei = [...plaetze.values()].sort((a, b) => nachSchluessel(hexKey(a.q, a.r), hexKey(b.q, b.r)));
-    for (let i = 0; i < SCHLEIM_JE_NACHT && frei.length > 0; i++) {
+    for (let i = 0; i < SCHLEIM_JE_NACHT * schleimFaktor(s.omens) && frei.length > 0; i++) {
       const h = frei.splice(rng.int(frei.length), 1)[0]!;
       aufstellen(
         s,
@@ -951,7 +953,9 @@ export function nachtVolk(s: GameState, rng: Rng, events: Ereignisse): void {
  * Horde, die ankommt, ist ein Ereignis, kein Nadelstich.
  */
 export function sendHorde(s: GameState, rng: Rng, events: Ereignisse): void {
-  if (rng.next() / UINT >= HORDE_CHANCE) return;
+  // Unter dem Blutmond (core/omen.ts) kommt die Horde jede Nacht. Der Wurf
+  // faellt trotzdem, damit der Zufallsstrom derselbe bleibt.
+  if (rng.next() / UINT >= HORDE_CHANCE && !blutmond(s.omens)) return;
   const ziele = settlementApproaches(s);
   if (ziele.size === 0) return;
 
@@ -976,7 +980,7 @@ export function sendHorde(s: GameState, rng: Rng, events: Ereignisse): void {
     const zielSet = new Set(settlementApproaches(s, undefined, imKriegMit(s, fraktion)).keys());
     const weg = nextStep(s.worldSeed, nest, zielSet, SUCHE_RAEUBER * 2);
     if (!weg) continue;
-    const anzahl = hordeGroesse(s.order.length);
+    const anzahl = hordeGroesse(s.order.length) + (blutmond(s.omens) ? 2 : 0);
     for (let i = 0; i < anzahl; i++) {
       aufstellen(
         s,

@@ -893,6 +893,28 @@ das Geruest schon.
 
 ---
 
+## Omen, Tagesexpedition, Chronik
+
+Gebaut fuer den Wiederspielwert; Begruendung und Fahrplan stehen in
+REPLAYABILITY.md, die Bedienung im README.
+
+- **Omen sind die Regelkarten aus "Was eine Karte ist"**, nur nicht fuer
+  einen, sondern fuer die ganze Partie. Wie dort vorgeschlagen: keine
+  Mechanik fuer beliebige Regeln, sondern eine kleine, geschlossene Liste, und
+  jedes Omen greift an genau einer Stelle (core/omen.ts, Kopf).
+- **Wuerfel je Zug statt aus dem Strom.** Seit Kaempfe, Ruinen und Namen
+  denselben rngState verbrauchen, waren zwei Partien mit gleichem Seed nach
+  dem ersten Kampf auseinander. Die Wuerfel folgen jetzt aus geheimem Seed und
+  Zugnummer wie die Kartenwahl; der Strom bleibt fuer alles andere.
+- **Die Rundengrenze ist kein neuer Ablauf.** Beim Zugende wird geprueft, ob
+  die letzte Runde gespielt ist; dann endet die Partie wie bei einem Sieg, nur
+  mit `durch: 'zeit'` und dem Sieger nach Wertung.
+- **Die Chronik liest nur Ereignisse.** Sie haengt hinter `applyAction` und
+  wertet aus, was die Regeln ohnehin melden. Verdeckte Siegpunktkarten stehen
+  erst im Schlusseintrag, sonst waere der Verlauf ein Blick in fremde Karten.
+
+---
+
 ## Vorschlag zum Vorgehen
 
 1. ~~**Raeuber raus, Sieben wird Fund**~~ — gebaut.

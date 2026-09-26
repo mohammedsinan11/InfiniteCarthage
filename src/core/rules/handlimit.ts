@@ -12,6 +12,7 @@
 
 import { handSize } from '../state';
 import { modifiersOf } from '../cards/effects';
+import { handGrenzeBonus } from '../omen';
 import type { Hand, PlayerId } from '../state';
 
 /**
@@ -21,6 +22,8 @@ import type { Hand, PlayerId } from '../state';
  */
 export type HandView = {
   players: ReadonlyArray<{ id: PlayerId; activeCards: readonly string[]; hand?: Hand }>;
+  /** Volle Speicher, Leere Taschen (core/omen.ts). */
+  omens?: readonly string[];
 };
 
 /** Ab dieser Handgrosse gilt man als hortend - vor Kartenboni. */
@@ -29,8 +32,9 @@ export const HAND_LIMIT = 7;
 /** Die Grenze dieses Spielers, einschliesslich seiner Karten. */
 export function limitFor(state: HandView, id: PlayerId): number {
   const p = state.players.find((x) => x.id === id);
-  if (!p) return HAND_LIMIT;
-  return HAND_LIMIT + modifiersOf(p.activeCards).handLimitBonus;
+  const omen = handGrenzeBonus(state.omens);
+  if (!p) return HAND_LIMIT + omen;
+  return HAND_LIMIT + modifiersOf(p.activeCards).handLimitBonus + omen;
 }
 
 /** Haelt dieser Spieler mehr, als ihm zusteht? */

@@ -4307,3 +4307,370 @@ em.off {
     flex-wrap: wrap;
   }
 }
+
+/* --- Omen (ui/OmenListe.tsx, core/omen.ts) ---------------------------------- */
+
+.omen-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.omen {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--panel2);
+  border: 2px solid var(--line);
+  border-left-width: 5px;
+  padding: 7px 10px;
+}
+.omen.segen {
+  border-left-color: #6fa35a;
+}
+.omen.fluch {
+  border-left-color: var(--danger);
+}
+.omen-kopf {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--pixel);
+  font-size: 11px;
+  color: var(--text);
+}
+.omen-art {
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+.omen-text {
+  font-family: system-ui, sans-serif;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.omen-liste.knapp {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+.omen-liste.knapp .omen {
+  padding: 5px 8px;
+}
+
+/* Die Omen im Spiel: ein Schild oben, das eine Tafel aufklappt. */
+.hud-omen,
+.hud-runden {
+  font-family: var(--pixel);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.hud-omen {
+  pointer-events: auto;
+  background: rgba(23, 18, 12, 0.86);
+  border: 2px solid var(--line);
+  padding: 6px 9px;
+  color: var(--text);
+}
+.hud-omen.offen {
+  border-color: var(--accent);
+}
+.hud > span.hud-runden {
+  color: var(--accent);
+}
+.hud-omen-tafel {
+  position: absolute;
+  top: 52px;
+  left: 10px;
+  z-index: 7;
+  width: min(340px, calc(100% - 20px));
+  background: var(--panel);
+  border: 3px solid var(--line);
+  padding: 10px;
+}
+
+/* --- Tagesexpedition auf der Startseite (core/tages.ts) --------------------- */
+
+.tages {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 2px solid var(--accent-dark);
+  background: var(--panel2);
+  padding: 13px;
+}
+.tages h2 {
+  margin: 0;
+  font-family: var(--pixel);
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: normal;
+}
+.bestenliste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-family: var(--pixel);
+  font-size: 10px;
+}
+.bestenliste li {
+  display: flex;
+  gap: 8px;
+  padding: 4px 6px;
+  background: var(--panel);
+}
+.bestenliste li.du {
+  outline: 2px solid var(--accent-dark);
+}
+.bestenliste .platz-nr {
+  width: 22px;
+  color: var(--muted);
+}
+.bestenliste .besten-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bestenliste .besten-wert {
+  color: var(--accent);
+}
+
+/* --- Chronik: die Schlussseite (ui/Chronik.tsx, core/chronik.ts) ----------- */
+
+.chronik-huelle {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 8, 5, 0.72);
+  padding: 16px;
+  overflow-y: auto;
+}
+.chronik {
+  width: min(640px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  background: var(--panel);
+  border: 3px solid var(--accent-dark);
+  box-shadow:
+    0 0 0 3px var(--bg),
+    0 0 0 5px var(--line);
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.chronik h2 {
+  margin: 4px 0 6px;
+  font-family: var(--pixel);
+  font-size: 17px;
+  line-height: 1.4;
+  color: var(--accent);
+  font-weight: normal;
+}
+.chronik h3 {
+  margin: 0 0 8px;
+  font-family: var(--pixel);
+  font-size: 10px;
+  color: var(--muted);
+  font-weight: normal;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.chronik-titel {
+  font-family: var(--pixel);
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.chronik-wertung {
+  margin: 8px 0 0;
+  font-size: 14px;
+}
+.chronik-wertung b {
+  font-family: var(--pixel);
+  font-size: 20px;
+  color: var(--accent);
+}
+.chronik table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.chronik th,
+.chronik td {
+  text-align: right;
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--panel3);
+  white-space: nowrap;
+}
+.chronik th:first-child,
+.chronik td:first-child,
+.chronik-rang td:nth-child(2),
+.chronik-rang th:nth-child(2) {
+  text-align: left;
+}
+.chronik th {
+  font-family: var(--pixel);
+  font-size: 9px;
+  color: var(--muted);
+  font-weight: normal;
+}
+.chronik tr.du td {
+  background: var(--panel2);
+}
+.chronik .dot {
+  display: inline-block;
+  vertical-align: -1px;
+}
+.chronik-rang b {
+  color: var(--accent);
+}
+.chronik-zahlen td:first-child {
+  color: var(--muted);
+}
+
+.chronik-verlauf {
+  position: relative;
+}
+.chronik-verlauf svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.chronik-verlauf .gitter {
+  stroke: var(--panel3);
+  stroke-width: 1;
+}
+.chronik-verlauf .achse {
+  fill: var(--muted);
+  font-family: var(--pixel);
+  font-size: 9px;
+}
+.chronik-verlauf .achse.ende {
+  fill: var(--text);
+}
+.verlauf-linie {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.chronik-verlauf .zeiger {
+  stroke: var(--line-bright);
+  stroke-width: 1;
+}
+.chronik-verlauf .zeiger-punkt {
+  stroke: var(--panel);
+  stroke-width: 2;
+}
+.chronik-legende {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text);
+}
+.chronik-legende .linie,
+.chronik-tooltip .linie {
+  display: inline-block;
+  width: 14px;
+  height: 3px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.chronik-tooltip {
+  position: absolute;
+  top: 26px;
+  left: 36px;
+  pointer-events: none;
+  background: var(--bg);
+  border: 2px solid var(--line);
+  padding: 6px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--text);
+}
+.chronik-tooltip b {
+  font-family: var(--pixel);
+  font-size: 9px;
+  color: var(--muted);
+  font-weight: normal;
+}
+
+.chronik-momente {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.chronik-momente li {
+  border-left: 3px solid var(--line);
+  padding-left: 9px;
+}
+.chronik-momente .moment-sieg,
+.chronik-momente .moment-ende,
+.chronik-momente .moment-hauptstadt,
+.chronik-momente .moment-karte {
+  border-left-color: var(--accent);
+}
+.chronik-momente .moment-brand,
+.chronik-momente .moment-held,
+.chronik-momente .moment-horde,
+.chronik-momente .moment-morast {
+  border-left-color: var(--danger);
+}
+.moment-runde {
+  font-family: var(--pixel);
+  font-size: 9px;
+  color: var(--muted);
+  margin-right: 4px;
+}
+.chronik-knoepfe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chronik-schild {
+  position: absolute;
+  left: 50%;
+  bottom: 120px;
+  transform: translateX(-50%);
+  z-index: 8;
+}
+
+@media (max-width: 560px) {
+  .chronik {
+    padding: 14px;
+  }
+  .chronik th,
+  .chronik td {
+    padding: 4px 3px;
+    font-size: 11.5px;
+  }
+}
+
+.chronik section {
+  overflow-x: auto;
+}

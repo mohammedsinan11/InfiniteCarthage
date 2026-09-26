@@ -12,6 +12,7 @@
  */
 
 import { Rng } from '../rng';
+import { hash3i } from '../hash';
 import {
   edgeEndpoints,
   hexKey,
@@ -92,6 +93,8 @@ import { aktiviereNeueReichskarte } from '../cards/loadout';
 import { playTactic } from './tactics';
 import type { TacticEvent } from './tactics';
 import { ruhmAusEreignissen } from './ruhm';
+import { gueltigeOmen, siebenerBonus, startBeute } from '../omen';
+import { chronikBeginnen, chronikFortschreiben, neueChronik, wertung } from '../chronik';
 import type { RuhmEvent } from './ruhm';
 import {
   canAcceptTrade,
@@ -237,11 +240,22 @@ const START_REVEAL_RADIUS = 6;
 
 export type NewPlayer = { id: PlayerId; name: string };
 
+/** Was eine Partie ausser Spielern, Seeds und Siegpunktziel mitbringt. */
+export type PartieOptionen = {
+  /** Die Omen (core/omen.ts). Unbekannte Kennungen fallen heraus. */
+  omens?: readonly string[];
+  /** Nach so vielen Runden ist Schluss (core/chronik.ts, wertung). */
+  rundenLimit?: number | null;
+  /** Das Datum einer Tagesexpedition (core/tages.ts). */
+  tagesDatum?: string | null;
+};
+
 export function createGame(
   players: NewPlayer[],
   worldSeed: number,
   secretSeed: number,
   targetPoints = 15,
+  optionen: PartieOptionen = {},
 ): Game {
   /**
    * Ein Spieler genuegt - allein siedeln ist der Sandkasten.
@@ -310,6 +324,10 @@ export function createGame(
     auftraege: [],
     nextAuftragId: 1,
     hauptstaedte: {},
+    omens: gueltigeOmen(optionen.omens ?? []),
+    rundenLimit: optionen.rundenLimit ?? null,
+    tagesDatum: optionen.tagesDatum ?? null,
+    chronik: neueChronik({ players: players.map((p) => ({ id: p.id })) as GameState['players'] }),
   };
 
   return { state, world };
@@ -345,6 +363,37 @@ function nextTurn(state: GameState): void {
 }
 
 /**
+ * Die Wuerfel eines Zuges.
+ *
+ * Aus geheimem Seed und Zugnummer, nicht aus dem fortlaufenden rngState. Der
+ * wird auch von Kaempfen, Ruinen und Namen verbraucht - zwei Spieler auf
+ * derselben Welt haetten sonst verschiedene Wuerfe, sobald einer von ihnen
+ * einen Kampf mehr fuehrt. Fuer die Tagesexpedition (core/tages.ts) muessen
+ * alle dieselben Wuerfe bekommen; vorhersagbar bleiben sie trotzdem nicht,
+ * weil der secretSeed den Server nie verlaesst. Dasselbe Prinzip wie bei der
+ * Kartenwahl (cards/draft.ts).
+ */
+const SALT_WUERFEL = 97;
+
+export function wuerfelFuer(secretSeed: number, turn: number): [number, number] {
+  const rng = new Rng(hash3i(secretSeed, turn, SALT_WUERFEL, 0));
+  return [1 + rng.int(6), 1 + rng.int(6)];
+}
+
+/**
+ * Die Rundengrenze ist erreicht: die Partie endet, und es gewinnt die hoechste
+ * Wertung (core/chronik.ts). Bei Gleichstand, wer in der Reihenfolge vorn sitzt.
+ */
+function zeitAbgelaufen(state: GameState, events: GameEvent[]): void {
+  let best = state.order[0]!;
+  for (const id of state.order) {
+    if (wertung(state, id) > wertung(state, best)) best = id;
+  }
+  state.phase = { t: 'finished', winner: best, durch: 'zeit' };
+  events.push({ t: 'win', player: best });
+}
+
+/**
  * Sieg pruefen. Gewonnen wird nur im eigenen Zug.
  *
  * targetPoints = 0 heisst Sandkasten: die Partie kennt kein Ende. Das ist
@@ -355,7 +404,7 @@ function checkWin(state: GameState, events: GameEvent[]): void {
   if (state.targetPoints <= 0) return;
   const id = state.order[state.current]!;
   if (totalPoints(state, id) >= state.targetPoints) {
-    state.phase = { t: 'finished', winner: id };
+    state.phase = { t: 'finished', winner: id, durch: 'ziel' };
     events.push({ t: 'win', player: id });
   }
 }
@@ -492,6 +541,9 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         s.turn = 1;
         s.phase = { t: 'roll' };
         for (const id of s.order) spawnHeld(s, id, events);
+        // Gruenderzeit: jeder beginnt mit einer Kartenwahl (core/omen.ts).
+        for (const p of s.players) p.loot += startBeute(s.omens);
+        chronikBeginnen(s);
         events.push({ t: 'turn', player: s.order[0]! });
       } else {
         s.phase = { t: 'setup', step, awaiting: 'settlement', lastVertex: null };
@@ -503,9 +555,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
     // --- Wuerfeln und Ertrag ---
     case 'roll': {
       if (phase.t !== 'roll') return fail('Jetzt wird nicht gewuerfelt.');
-      const rng = new Rng(s.rngState);
-      const dice: [number, number] = [1 + rng.int(6), 1 + rng.int(6)];
-      s.rngState = rng.getState();
+      const dice = wuerfelFuer(s.secretSeed, s.turn);
       s.lastRoll = dice;
       const sum = dice[0] + dice[1];
       events.push({ t: 'roll', player: actor, dice });
@@ -515,6 +565,16 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         // dieselbe Zahl zu Geschenk und Strafe zugleich; es haengt jetzt an
         // den Pluenderungen.
         enterDraft(s, 'fund', events);
+        // Glueckliche Sieben (core/omen.ts): dazu ein paar Rohstoffe.
+        const bonus = siebenerBonus(s.omens);
+        if (bonus > 0) {
+          const rng = new Rng(s.rngState);
+          const gain = emptyHand();
+          for (let i = 0; i < bonus; i++) gain[RESOURCES[rng.int(RESOURCES.length)]!] += 1;
+          s.rngState = rng.getState();
+          for (const r of RESOURCES) actorPlayer.hand[r] += gain[r];
+          events.push({ t: 'production', payout: { [actor]: gain } });
+        }
       } else {
         const { payout } = computeProduction(s, world, sum);
         for (const [pid, gain] of Object.entries(payout)) {
@@ -1118,6 +1178,11 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (phase.t !== 'main') return fail('Der Zug laesst sich jetzt nicht beenden.');
       const ender = actor;
       const beendet = s.turn;
+      // Rundengrenze: der letzte Zug ist gespielt (core/chronik.ts, wertung).
+      if (s.rundenLimit && beendet >= s.rundenLimit) {
+        zeitAbgelaufen(s, events);
+        break;
+      }
       nextTurn(s);
 
       // Jede Runde zieht das Heer: Ritter, der Held, Raubzuege, Fehden,
@@ -1164,6 +1229,9 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
   // Ihre bereits erzeugten Ereignisse bilden an einer Stelle den Ruhm.
   const geschehen = [...events] as Array<{ t: string } & Record<string, unknown>>;
   ruhmAusEreignissen(s, geschehen, events);
+  // Die Chronik liest dieselben Ereignisse - fuer die Schlussseite. Der Aufbau
+  // zaehlt nicht mit: er ist fuer alle gleich und kein Teil der Geschichte.
+  if (action.t !== 'placeSettlement' && action.t !== 'placeRoad') chronikFortschreiben(s, events);
 
   game.state = s;
   return { ok: true, events };

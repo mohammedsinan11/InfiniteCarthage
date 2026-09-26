@@ -16,6 +16,7 @@ import type { BoardView } from './placement';
 import { modifiersOf } from '../cards/effects';
 import { sturm, wetterOf } from '../zeit';
 import { hatReichsbau } from './reich';
+import { handelsAufschlag, handelsDeckel } from '../omen';
 
 export const DEFAULT_RATIO = 4;
 
@@ -37,6 +38,8 @@ export function tradeRatio(
     turn?: number;
     reichsbauten?: GameState['reichsbauten'];
     units?: GameState['units'];
+    /** Handelswinde und Zoellner (core/omen.ts). */
+    omens?: readonly string[];
   },
   world: World,
   player: PlayerId,
@@ -73,7 +76,11 @@ export function tradeRatio(
   }
   // Karten koennen den Handel guenstiger machen - aber nie unter zwei, sonst
   // waere Tauschen kein Handel mehr, sondern eine Umbenennung.
-  return Math.max(2, ratio - mods.tradeDiscount);
+  // Omen gelten fuer alle (core/omen.ts): Handelswinde deckelt bei 3:1,
+  // Zoellner schlagen auf alles eine Karte auf - auch auf den besten Hafen.
+  const deckel = handelsDeckel(state.omens);
+  if (deckel !== null) ratio = Math.min(ratio, deckel);
+  return Math.max(2, ratio - mods.tradeDiscount) + handelsAufschlag(state.omens);
 }
 
 /** Alle Haefen, an denen dieser Spieler sitzt - fuer die Anzeige. */

@@ -38,6 +38,11 @@ Recommended order, detailed in section 5:
 | 3 | Online depth | **bots**, **co-op against the horde**, async turns, replays |
 | 4 | Content cadence | scenarios, wonders, seasonal content drops |
 
+> **Built:** the end-of-game chronicle, Omens (14 to start), the "One Year"
+> length with its score, per-turn dice and the Daily Expedition with its
+> leaderboard. The README section "Wiederspielwert" describes what exists;
+> the rest of this document is still a proposal.
+
 The first three items to build are the **end-of-game chronicle**, **Omens**
 and the **Daily Expedition**. Together they are the smallest step that turns
 "one long sandbox" into "a game you want to play again tomorrow". Each fits
@@ -148,6 +153,10 @@ Make the house a real choice.
 
 ### B. Run modifiers: Omens (Variety, Decisions) - S/M
 
+> **Built** (`src/core/omen.ts`): 8 blessings and 6 curses, one of each per
+> game, reroll or "no omens" in the lobby. Not yet: cost, weather and
+> night-length omens, which would need the client to read omens in more places.
+
 The fourth card type in DESIGN.md ("Regel" cards) was never built. Build it
 as **Omens**: rule changes that apply to *the whole game*.
 
@@ -228,6 +237,10 @@ that" possible.
 
 ### E. The end of a game: the Chronicle (Mastery, Social) - S/M
 
+> **Built** (`src/core/chronik.ts`, `src/client/ui/Chronik.tsx`): ranking with
+> score, points-over-time chart, key moments, per-player numbers, omens and
+> "Diese Welt nochmal". Not yet: the generated saga paragraph and a share link.
+
 Replace "X gewinnt!" with a **chronicle screen**:
 
 - VP over time for each player, as a line chart from the log.
@@ -246,6 +259,12 @@ This costs little and is the moment that decides whether a second game
 starts.
 
 ### F. Daily Expedition and leaderboards (Goals, Social) - M
+
+> **Built** (`src/core/tages.ts`, `src/worker/bestenliste.ts`): one world per
+> UTC day, one blessing and two curses, 60 rounds solo, best score per name.
+> Instead of an env secret, the day's secret seed is rolled once and kept in
+> that day's leaderboard object. Not yet: the weekly variant; "one attempt
+> counts" needs accounts.
 
 The world is already a pure function of `worldSeed`. Derive **both seeds
 from the date**, and everyone plays the same world with the same Omens:

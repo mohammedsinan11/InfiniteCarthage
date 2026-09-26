@@ -26,7 +26,9 @@ import {
   DEFAULT_TARGET_POINTS,
   MAX_PLAYERS,
   MIN_PLAYERS,
+  NO_TARGET,
   PIN_LENGTH,
+  RUNDEN_LIMIT_CHOICES,
   TARGET_POINTS_CHOICES,
   normalizePin,
   parseClientMsg,
@@ -36,11 +38,18 @@ import type { ClientMsg, Member, RoomInfo, ServerMsg } from '../core/protocol';
 import { MELDEN_ALLE_MS, VERZEICHNIS_NAME } from '../core/lobby';
 import type { RaumEintrag } from '../core/lobby';
 import { roundOf } from '../core/season';
+import { gueltigeOmen, wuerfleOmen } from '../core/omen';
+import { TAGES_RUNDEN, istTagesDatum, tagesDatum, tagesOmen, tagesWeltSeed } from '../core/tages';
+import type { BestenEintrag } from '../core/tages';
+import { wertung } from '../core/chronik';
+import { totalPoints } from '../core/state';
 
 export type Env = {
   GAME_ROOM: DurableObjectNamespace;
   /** Die oeffentliche Raumliste (worker/directory.ts). */
   VERZEICHNIS: DurableObjectNamespace;
+  /** Bestenliste und geheimer Seed der Tagesexpedition, eines je Tag (worker/bestenliste.ts). */
+  BESTENLISTE: DurableObjectNamespace;
   ALLOWED_ORIGINS?: string;
 };
 
@@ -64,6 +73,16 @@ type RoomData = {
   oeffentlich?: boolean;
   /** Eroeffnet und zuletzt aktiv, in Millisekunden seit 1970. */
   erstellt?: number;
+  /** Die Omen der kommenden Partie (core/omen.ts). Fehlt bei alten Raeumen. */
+  omens?: string[];
+  /** Rundengrenze, null ohne. Fehlt bei alten Raeumen. */
+  rundenLimit?: number | null;
+  /** Tagesexpedition: ihr Datum (core/tages.ts). Sonst fehlt es. */
+  tagesDatum?: string | null;
+  /** Das Ergebnis der Tagesexpedition ist in der Bestenliste. */
+  gemeldet?: boolean;
+  /** Die Welt einer frueheren Partie ("Diese Welt nochmal"). Sonst eine neue. */
+  weltSeed?: number | null;
 };
 
 type Attachment = { playerId: PlayerId | null };
@@ -211,6 +230,24 @@ export class GameRoom implements DurableObject {
       room.code = code;
       room.oeffentlich = url.searchParams.get('public') !== '0';
       room.erstellt = Date.now();
+      if (url.searchParams.get('tages') === '1') {
+        // Das Datum bestimmt der Server, nicht der Client: sonst waehlte sich
+        // jeder den Tag, dessen Welt ihm am besten gefaellt.
+        const datum = tagesDatum();
+        room.tagesDatum = datum;
+        room.omens = tagesOmen(datum);
+        room.rundenLimit = TAGES_RUNDEN;
+        room.targetPoints = NO_TARGET;
+        room.oeffentlich = false;
+      } else {
+        room.tagesDatum = null;
+        room.omens = wuerfleOmen(randomSeed());
+        room.rundenLimit = null;
+        // Der Weltseed ist oeffentlich (er steht in jedem Spielstand) - ihn
+        // wiederzuverwenden verraet nichts. Wuerfel und Karten kommen neu.
+        const welt = Number(url.searchParams.get('welt'));
+        room.weltSeed = url.searchParams.has('welt') && Number.isInteger(welt) ? welt | 0 : null;
+      }
       await this.save();
     }
 
@@ -291,6 +328,19 @@ export class GameRoom implements DurableObject {
           this.send(ws, { t: 'error', message: 'Die Partie laeuft bereits.' });
           return;
         }
+        if (room.tagesDatum) {
+          this.send(ws, { t: 'error', message: 'Die Tagesexpedition hat feste Regeln.' });
+          return;
+        }
+        if (msg.omens === 'neu') room.omens = wuerfleOmen(randomSeed());
+        else if (msg.omens === 'keine') room.omens = [];
+        if (msg.rundenLimit !== undefined) {
+          if (!(RUNDEN_LIMIT_CHOICES as readonly (number | null)[]).includes(msg.rundenLimit)) {
+            this.send(ws, { t: 'error', message: 'Ungueltige Laenge.' });
+            return;
+          }
+          room.rundenLimit = msg.rundenLimit;
+        }
         if (msg.targetPoints !== undefined) {
           if (!(TARGET_POINTS_CHOICES as readonly number[]).includes(msg.targetPoints)) {
             this.send(ws, { t: 'error', message: 'Ungueltige Punktzahl.' });
@@ -318,11 +368,19 @@ export class GameRoom implements DurableObject {
           this.send(ws, { t: 'error', message: `Mindestens ${MIN_PLAYERS} Spieler noetig.` });
           return;
         }
+        const tages = room.tagesDatum ?? null;
+        const weltSeed = tages ? tagesWeltSeed(tages) : (room.weltSeed ?? randomSeed());
+        const geheimSeed = tages ? await this.tagesGeheimSeed(tages) : randomSeed();
         this.game = createGame(
           room.members.map((m) => ({ id: m.id, name: m.name })),
-          randomSeed(),
-          randomSeed(),
+          weltSeed,
+          geheimSeed,
           room.targetPoints,
+          {
+            omens: gueltigeOmen(room.omens ?? []),
+            rundenLimit: room.rundenLimit ?? null,
+            tagesDatum: tages,
+          },
         );
         room.started = true;
         await this.save();
@@ -349,6 +407,7 @@ export class GameRoom implements DurableObject {
         // Zuege gedrosselt - ausser dem letzten: eine beendete Partie soll
         // sofort als beendet in der Liste stehen.
         await this.melden(game.state.phase.t === 'finished');
+        if (game.state.phase.t === 'finished') await this.tagesErgebnis(room, game.state);
         return;
       }
     }
@@ -390,6 +449,10 @@ export class GameRoom implements DurableObject {
       return;
     } else if (room.members.length >= MAX_PLAYERS) {
       this.send(ws, { t: 'error', message: 'Der Raum ist voll.' });
+      return;
+    } else if (room.tagesDatum && room.members.length >= 1) {
+      // Allein, damit die Ergebnisse vergleichbar bleiben.
+      this.send(ws, { t: 'error', message: 'Die Tagesexpedition spielt man allein.' });
       return;
     } else {
       playerId = 'p_' + randomId(8);
@@ -439,6 +502,55 @@ export class GameRoom implements DurableObject {
     this.broadcastRoom();
     if (game) this.sendState(ws, game.state, playerId);
     await this.melden();
+  }
+
+  // --- Tagesexpedition ------------------------------------------------------
+
+  private bestenliste(datum: string): DurableObjectStub {
+    return this.env.BESTENLISTE.get(this.env.BESTENLISTE.idFromName('tag:' + datum));
+  }
+
+  /**
+   * Der geheime Seed des Tages (worker/bestenliste.ts). Faellt die Bestenliste
+   * aus, spielt der Raum mit einem eigenen - die Welt ist dieselbe, nur Wuerfel
+   * und Karten nicht.
+   */
+  private async tagesGeheimSeed(datum: string): Promise<number> {
+    try {
+      const res = await this.bestenliste(datum).fetch('https://bestenliste/seed');
+      const { seed } = (await res.json()) as { seed: unknown };
+      if (typeof seed === 'number') return seed | 0;
+    } catch {
+      // Ohne Bestenliste weiter.
+    }
+    return randomSeed();
+  }
+
+  /** Das Ergebnis einer beendeten Tagesexpedition eintragen - genau einmal. */
+  private async tagesErgebnis(room: RoomData, state: GameState): Promise<void> {
+    const datum = state.tagesDatum;
+    if (!datum || !istTagesDatum(datum) || room.gemeldet) return;
+    const id = state.order[0]!;
+    const p = state.players.find((x) => x.id === id);
+    if (!p) return;
+    const eintrag: BestenEintrag = {
+      name: p.name,
+      wertung: wertung(state, id),
+      punkte: totalPoints(state, id),
+      ruhm: p.ruhm,
+      code: room.code,
+      zeit: Date.now(),
+    };
+    try {
+      await this.bestenliste(datum).fetch('https://bestenliste/eintragen', {
+        method: 'POST',
+        body: JSON.stringify(eintrag),
+      });
+      room.gemeldet = true;
+      await this.save();
+    } catch {
+      // Die Liste ist Beiwerk.
+    }
   }
 
   // --- Raumliste ------------------------------------------------------------
@@ -500,6 +612,10 @@ export class GameRoom implements DurableObject {
       targetPoints: room.targetPoints,
       members: room.members.map((m) => ({ ...m })),
       oeffentlich: room.oeffentlich !== false,
+      omens: room.omens ?? [],
+      rundenLimit: room.rundenLimit ?? null,
+      tagesDatum: room.tagesDatum ?? null,
+      weltSeed: room.weltSeed ?? null,
     };
   }
 
