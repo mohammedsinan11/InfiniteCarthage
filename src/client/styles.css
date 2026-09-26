@@ -5674,3 +5674,43 @@ em.off {
     fill: rgba(255, 215, 106, 0.05);
   }
 }
+
+/* Tafel eines angeklickten Lagers (scenes/Game.tsx, lagerTafel). */
+.lager-tafel {
+  border-color: var(--danger);
+}
+.lager-tafel b {
+  color: var(--danger);
+}
+.lager-tafel p {
+  margin: 4px 0 0;
+}
+.lager-tafel-klein {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+/* Uebersichtskarte (board/Uebersicht.tsx): links neben dem Zoom. */
+.uebersicht {
+  position: absolute;
+  left: 58px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  width: 176px;
+  height: 176px;
+  image-rendering: pixelated;
+  border: 2px solid var(--line);
+  box-shadow: 0 0 0 2px var(--bg);
+  cursor: crosshair;
+}
+.zoom-knopf.aktiv {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+@media (max-width: 700px) {
+  .uebersicht {
+    width: 132px;
+    height: 132px;
+  }
+}

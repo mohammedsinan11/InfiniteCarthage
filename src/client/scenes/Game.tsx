@@ -51,7 +51,7 @@ import { OmenListe } from '../ui/OmenListe';
 import { omenById } from '../../core/omen';
 import { neuerRaumCode } from '../net/socket';
 import type { FraktionsZeile } from '../ui/SideMenu';
-import { isNestActive, nestFraktionOf, sightOf } from '../../core/units';
+import { garrisonOf, isNestActive, nestFraktionOf, sightOf } from '../../core/units';
 import { abkommenVon, kampfFelder } from '../../core/combat';
 import { WESEN, fraktionById } from '../../core/factions';
 import { fraktionColor } from '../theme';
@@ -331,6 +331,8 @@ export function Game() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [you, state.buildings, state.exploredRuins, state.wunder, sicht, state.worldSeed],
   );
+  /** Die Tafel eines angeklickten Lagers - Feldschluessel oder null. */
+  const [lagerTafel, setLagerTafel] = useState<string | null>(null);
   /** Der Rat (client/rat.ts): ein Vorschlag, bis man ihn wegklickt oder der Zug wechselt. */
   const [rat, setRat] = useState<Rat | null>(null);
   useEffect(() => setRat(null), [state.turn, state.current]);
@@ -574,11 +576,17 @@ export function Game() {
     }
     // Ein Klick auf eigene Einheiten oeffnet ihre Tafel: die ganze Schar, wenn
     // alle auf dem Feld zu ihr gehoeren, sonst alle Einheiten des Feldes.
-    const aufFeld = meineEinheiten.filter((u) => u.q === q && u.r === r);
+    const aufFeld = befehleMoeglich ? meineEinheiten.filter((u) => u.q === q && u.r === r) : [];
     if (aufFeld.length === 0) {
       auswahlSchliessen();
+      // Ein Lager: seine Tafel - Anfuehrer, Besatzung, Abkommen (OVERHAUL.md, 2).
+      // Lager stehen auch im Nebel auf der Karte - wer sie sieht, soll sie anklicken koennen.
+      const lagerDa = isNestActive(state, q!, r!);
+      setLagerTafel(lagerDa ? key : null);
+      if (lagerDa) setRat(null);
       return;
     }
+    setLagerTafel(null);
     const schar = heer.find((g) => g.schar !== null && aufFeld.every((u) => g.einheiten.includes(u)));
     // Gleich scharf: der naechste Klick auf die Karte ist das Ziel.
     waehleGruppe((schar ? schar.einheiten : aufFeld).map((u) => u.id), true);
@@ -1453,7 +1461,7 @@ export function Game() {
           onPick={onPick}
           sicht={sicht}
           du={you}
-          onHex={befehleMoeglich && meineEinheiten.length > 0 ? onHex : undefined}
+          onHex={you ? onHex : undefined}
           onFeuer={loeschenMoeglich && loeschKarte ? loeschen : undefined}
           zielWahl={zielWahl}
           auswahl={kandidaten.length > 0 ? auswahl : []}
@@ -1599,6 +1607,70 @@ export function Game() {
               raubIn={raubWarnung ? raubWarnung.weg : null}
             />
           )}
+
+          {lagerTafel &&
+            isNestActive(state, ...(lagerTafel.split(':').map(Number) as [number, number])) &&
+            (() => {
+              const [lq, lr] = lagerTafel.split(':').map(Number) as [number, number];
+              const fid = nestFraktionOf(state, lq, lr);
+              const f = fraktionById(state.worldSeed, fid);
+              const abk = you ? abkommenVon(state, you, fid) : undefined;
+              const tribut = you ? tributKarten(state, you, fid) : 1;
+              const karten = hand ? RESOURCES.reduce((n, r) => n + hand[r], 0) : 0;
+              const darf = isMine && phase.t === 'main';
+              return (
+                <div className="rat-tafel lager-tafel" role="dialog" aria-label={`Lager: ${f.name}`}>
+                  <b>Lager · {f.name}</b>
+                  {f.anfuehrer && (
+                    <p>
+                      {f.anfuehrer}
+                      {f.wesen ? ` - ${WESEN[f.wesen].name}: ${WESEN[f.wesen].text}` : ''}
+                    </p>
+                  )}
+                  <p className="lager-tafel-klein">
+                    Besatzung {garrisonOf(state, lq, lr)} ·{' '}
+                    {abk ? (abk.art === 'frieden' ? `Frieden bis Runde ${abk.bis}` : 'du zahlst Tribut') : 'Krieg'}
+                    {' · '}Zerstoert: +2 Ruhm und eine Kartenwahl.
+                  </p>
+                  <span className="rat-knoepfe">
+                    {meineEinheiten.length > 0 && (
+                      <button
+                        disabled={!befehleMoeglich}
+                        title="Alle Einheiten ohne Auftrag (sonst alle) ziehen zum Lager"
+                        onClick={() => {
+                          const wer = (untaetige.length > 0 ? untaetige : meineEinheiten).map((u) => u.id);
+                          act({ t: 'orderUnits', units: wer, q: lq, r: lr });
+                          setLagerTafel(null);
+                        }}
+                      >
+                        Heer schicken
+                      </button>
+                    )}
+                    {!abk && (
+                      <button
+                        disabled={!darf || karten < tribut}
+                        title={`Tribut: ${tribut} ${tribut === 1 ? 'Karte' : 'Karten'} sofort und je grosser Runde`}
+                        onClick={() => act({ t: 'diplomacy', fraktion: fid, art: 'tribut' })}
+                      >
+                        Tribut ({tribut})
+                      </button>
+                    )}
+                    {!abk && nimmtFrieden(state.worldSeed, fid) && (
+                      <button
+                        disabled={!darf || !hand || !canAfford(hand, FRIEDEN_PREIS)}
+                        title={`Frieden fuer 20 Runden: ${bundleText(FRIEDEN_PREIS)}`}
+                        onClick={() => act({ t: 'diplomacy', fraktion: fid, art: 'frieden' })}
+                      >
+                        Frieden
+                      </button>
+                    )}
+                    <button className="klein" onClick={() => setLagerTafel(null)}>
+                      Schliessen
+                    </button>
+                  </span>
+                </div>
+              );
+            })()}
 
           {rat && (
             <div className="rat-tafel" role="status">

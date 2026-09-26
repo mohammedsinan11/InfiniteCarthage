@@ -14,6 +14,7 @@
  *    in ihre obere Nachbarin.
  */
 
+import { Uebersicht } from './Uebersicht';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   hexToPixel,
@@ -654,6 +655,18 @@ export function Board({
   );
 
   const [fokusPuls, setFokusPuls] = useState<{ q: number; r: number } | null>(null);
+  /** Die Uebersichtskarte (board/Uebersicht.tsx) - an oder aus, je Browser gemerkt. */
+  const [uebersichtAuf, setUebersichtAuf] = useState(() => {
+    try {
+      return localStorage.getItem('infinitecarthage.uebersicht') === 'an';
+    } catch {
+      return false;
+    }
+  });
+  const farbeVonSpieler = useCallback(
+    (id: string) => playerColor(state.players.find((pl) => pl.id === id)?.color ?? 0),
+    [state.players],
+  );
   /** Auf Wunsch zu einem Feld fahren - etwa wenn im Menue ein Ritter gezeigt wird. */
   useEffect(() => {
     if (!fokus) return;
@@ -3301,7 +3314,36 @@ export function Board({
         >
           −
         </button>
+        <button
+          className={uebersichtAuf ? 'zoom-knopf aktiv' : 'zoom-knopf'}
+          title="Uebersichtskarte"
+          aria-pressed={uebersichtAuf}
+          onClick={() => {
+            setUebersichtAuf((v) => {
+              try {
+                localStorage.setItem('infinitecarthage.uebersicht', v ? 'aus' : 'an');
+              } catch {
+                // nur fuer diese Sitzung
+              }
+              return !v;
+            });
+          }}
+        >
+          ▦
+        </button>
       </div>
+      {uebersichtAuf && (
+        <Uebersicht
+          world={world}
+          state={state}
+          you={du}
+          sicht={sicht}
+          layout={LAYOUT}
+          ausschnitt={view}
+          farbeVon={farbeVonSpieler}
+          onGehe={(x, y) => setCam((c) => ({ ...c, cx: x, cy: y }))}
+        />
+      )}
 
       {/*
         Fliegende Karten liegen ueber allem: sie sollen den Weg vom Feld zur
