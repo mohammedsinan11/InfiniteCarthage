@@ -19,6 +19,7 @@
  * sind gedeckelt. Auch eine Endlospartie waechst dadurch nur langsam.
  */
 
+import { siegwegById } from './siegwege';
 import { cardById } from './cards/catalog';
 import { fraktionById } from './factions';
 import { ereignisById } from './ereignis';
@@ -262,8 +263,9 @@ export function chronikFortschreiben(state: GameState, events: readonly GameEven
         break;
       case 'win': {
         const zeit = state.phase.t === 'finished' && state.phase.durch === 'zeit';
+        const weg = state.phase.t === 'finished' ? siegwegById(state.phase.weg) : undefined;
         const text = !zeit
-          ? `${nameVon(state, e.player)} gewinnt in Runde ${roundOf(state.turn)}.`
+          ? `${nameVon(state, e.player)} gewinnt in Runde ${roundOf(state.turn)}${weg ? ` als ${weg.name}` : ''}.`
           : state.order.length === 1
             ? `Nach ${roundOf(state.turn)} Runden ist die Zeit um.`
             : `Nach ${roundOf(state.turn)} Runden ist die Zeit um - ${nameVon(state, e.player)} liegt vorn.`;

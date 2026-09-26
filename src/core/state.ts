@@ -401,7 +401,13 @@ export type Phase =
    * Rundengrenze ist abgelaufen, gewonnen hat die hoechste Wertung
    * (core/chronik.ts, wertung). Fehlt bei alten Staenden und beim Untergang.
    */
-  | { t: 'finished'; winner: PlayerId | null; durch?: 'ziel' | 'zeit' };
+  | {
+      t: 'finished';
+      winner: PlayerId | null;
+      durch?: 'ziel' | 'zeit';
+      /** Gewonnen auf einem Siegweg statt mit Siegpunkten (core/siegwege.ts). */
+      weg?: string;
+    };
 
 /**
  * Ein offenes Handelsangebot des Spielers am Zug.

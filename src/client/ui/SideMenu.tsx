@@ -288,6 +288,7 @@ export function SideMenu({
   diplomatieMoeglich,
   friedenBezahlbar,
   geruechte,
+  siegwege,
   handKarten,
   tributPreis,
   onDiplomatie,
@@ -375,6 +376,8 @@ export function SideMenu({
   friedenBezahlbar: boolean;
   /** Was man sich erzaehlt (client/geruechte.ts). */
   geruechte: Geruecht[];
+  /** Die anderen Wege zum Sieg und wie weit man ist (core/siegwege.ts). Leer, wenn sie nicht gelten. */
+  siegwege: { name: string; text: string; ist: number; soll: number }[];
   /** Wie viele Karten man haelt - reicht es fuer den Tribut? */
   handKarten: number;
   /** Was ein Tribut gerade kostet, in Karten (rules/diplomatie.ts, tributKarten). */
@@ -615,6 +618,27 @@ export function SideMenu({
                 ))}
               </div>
             </div>
+
+            {siegwege.length > 0 && (
+              <>
+                <Kopf
+                  titel="Andere Wege zum Sieg"
+                  hilfe="Gewonnen hat auch, wer einen dieser Wege zu Ende geht - egal, wie viele Siegpunkte er hat."
+                />
+                <div className="menu-box menu-zeilen menu-siegwege">
+                  {siegwege.map((w) => (
+                    <span key={w.name} title={w.text} className={w.ist >= w.soll ? 'fertig' : undefined}>
+                      <span>
+                        {w.name} <i>{w.text}</i>
+                      </span>
+                      <b>
+                        {Math.min(w.ist, w.soll)}/{w.soll}
+                      </b>
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
 
             {wunderListe.length > 0 && (
               <>

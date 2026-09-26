@@ -5373,3 +5373,12 @@ em.off {
   font-style: italic;
   line-height: 1.4;
 }
+
+/* Andere Wege zum Sieg (core/siegwege.ts). */
+.menu-siegwege i {
+  color: var(--muted);
+  font-size: 11px;
+}
+.menu-siegwege .fertig b {
+  color: var(--accent);
+}

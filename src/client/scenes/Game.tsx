@@ -72,6 +72,7 @@ import { bundleText } from '../log';
 import { eckenWert } from '../../core/bot';
 import { weltArtVon } from '../../core/weltart';
 import { geruechte } from '../geruechte';
+import { SIEGWEGE, fortschritt, schwelle, siegwegText, siegwegeAn } from '../../core/siegwege';
 import { limitFor } from '../../core/rules/handlimit';
 import { erzeugteSorten } from '../../core/rules/hilfe';
 import {
@@ -1249,6 +1250,16 @@ export function Game() {
           tributPreis={tributPreis}
           handKarten={hand ? RESOURCES.reduce((n, r) => n + hand[r], 0) : 0}
           geruechte={geruechteListe}
+          siegwege={
+            you && siegwegeAn(state)
+              ? SIEGWEGE.map((w) => ({
+                  name: w.name,
+                  text: siegwegText(w, state.targetPoints),
+                  ist: fortschritt(state, you, w),
+                  soll: schwelle(w, state.targetPoints),
+                }))
+              : []
+          }
           onDiplomatie={(fraktion, art) => act({ t: 'diplomacy', fraktion, art })}
           auftraege={meineAuftraege}
           onAuftrag={(id, annehmen) => act({ t: 'answerQuest', id, accept: annehmen })}

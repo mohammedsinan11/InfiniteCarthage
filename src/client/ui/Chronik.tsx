@@ -12,6 +12,7 @@
  * Schild bringt es zurueck.
  */
 
+import { siegwegById, siegwegText } from '../../core/siegwege';
 import { weltArtVon } from '../../core/weltart';
 import { useEffect, useMemo, useState } from 'react';
 import type { PublicState } from '../../core/redact';
@@ -122,6 +123,7 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
   else if (tages) kopf = `Tagesexpedition ${tages}`;
   else if (phase.durch === 'zeit' && state.order.length === 1) kopf = 'Das Jahr ist um';
   else if (phase.durch === 'zeit') kopf = `Das Jahr ist um - ${sieger?.name ?? 'Jemand'} gewinnt`;
+  else if (siegwegById(phase.weg)) kopf = `${sieger?.name ?? 'Jemand'} gewinnt als ${siegwegById(phase.weg)!.name}`;
   else kopf = `${sieger?.name ?? 'Jemand'} gewinnt`;
 
   return (
@@ -134,7 +136,8 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
             Runde {runde} · {SEASON_NAME[seasonOf(state.turn)]} im Jahr {yearOf(state.turn)} ·{' '}
             {weltArtVon(state.worldSeed).name}
             {state.stufe > 0 ? ` · Chronikstufe ${state.stufe}` : ''}
-            {phase.durch === 'ziel' && state.targetPoints > 0 ? ` · Ziel ${state.targetPoints} Siegpunkte erreicht` : ''}
+            {phase.durch === 'ziel' && state.targetPoints > 0 && !phase.weg ? ` · Ziel ${state.targetPoints} Siegpunkte erreicht` : ''}
+            {siegwegById(phase.weg) ? ` · ${siegwegText(siegwegById(phase.weg)!, state.targetPoints)}` : ''}
           </p>
           {state.players.find((p) => p.id === you)?.besiegt && phase.winner !== null && (
             <p className="note">Dein Reich ist gefallen.</p>

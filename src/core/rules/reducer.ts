@@ -11,6 +11,7 @@
  * Kopie, die nur bei Erfolg uebernommen wird.
  */
 
+import { erfuellterWeg, siegwegeAn } from '../siegwege';
 import { Rng } from '../rng';
 import { hash3i } from '../hash';
 import {
@@ -1504,6 +1505,21 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
   // Die Chronik liest dieselben Ereignisse - fuer die Schlussseite. Der Aufbau
   // zaehlt nicht mit: er ist fuer alle gleich und kein Teil der Geschichte.
   if (action.t !== 'placeSettlement' && action.t !== 'placeRoad') chronikFortschreiben(s, events);
+
+  // Siegwege (core/siegwege.ts): wer auf einem eigenen Weg weit genug kam,
+  // gewinnt wie mit den Siegpunkten - der Spieler am Zug zuerst.
+  if ((s.phase as GameState['phase']).t !== 'finished' && siegwegeAn(s)) {
+    const reihe = [...s.order.slice(s.current), ...s.order.slice(0, s.current)];
+    for (const id of reihe) {
+      const weg = erfuellterWeg(s, id);
+      if (!weg) continue;
+      s.phase = { t: 'finished', winner: id, durch: 'ziel', weg: weg.id };
+      const schluss: GameEvent[] = [{ t: 'win', player: id }];
+      events.push(...schluss);
+      chronikFortschreiben(s, schluss);
+      break;
+    }
+  }
 
   // Szenario: ist das Ziel erreicht? Dann ist es geschafft - je schneller, desto
   // mehr Sterne (core/szenario.ts). Die Chronik bekommt den Schluss nachgereicht.
