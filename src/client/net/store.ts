@@ -218,6 +218,7 @@ function vervollstaendige(msg: ServerMsg): void {
     msg.state.tagesDatum ??= null;
     msg.state.chronik ??= null;
     msg.state.hausAngebot ??= {};
+    msg.state.ereignis ??= null;
     for (const p of msg.state.players) p.haus ??= null;
   }
 }

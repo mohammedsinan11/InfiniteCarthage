@@ -18,6 +18,7 @@ import { REICHSBAU_NAME } from '../core/rules/reich';
 import { ZWEIG_NAME } from '../core/rules/zweig';
 import { heldKurz } from '../core/lore';
 import { hausById } from '../core/haus';
+import { ereignisById } from '../core/ereignis';
 
 const RES_NAME: Record<Resource, string> = {
   lumber: 'Holz',
@@ -344,6 +345,12 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
       return `${who(state, e.player)} ist am Zug.`;
     case 'aid':
       return `Wanderhaendler bringen ${who(state, e.player)} 1x ${resourceName(e.resource)} - das erzeugt das Reich selbst nicht.`;
+    case 'eventOffered':
+      return `${ereignisById(e.id)?.titel ?? 'Ein Ereignis'} - ${who(state, e.player)} muss entscheiden.`;
+    case 'eventResolved': {
+      const wahl = ereignisById(e.id)?.wahlen[e.wahl]?.text ?? '';
+      return `${who(state, e.player)} entscheidet: ${wahl.split(':')[0]!.split('(')[0]!.trim()}.${e.verloren > 0 ? ` ${e.verloren} Karten gehen verloren.` : ''}`;
+    }
     case 'houseChosen':
       return `${who(state, e.player)} fuehrt ${hausById(e.haus)?.name ?? 'ein Haus'}.`;
     case 'draftOffered':

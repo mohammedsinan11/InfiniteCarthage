@@ -101,6 +101,10 @@ import { ruhmAusEreignissen } from './ruhm';
 import { gueltigeOmen, siebenerBonus, startBeute } from '../omen';
 import { hausAngebot, hausById, hausWirkung } from '../haus';
 import { mangelHilfe } from './hilfe';
+import { ereignisById, ereignisFaellig, waehleEreignis } from '../ereignis';
+import type { Folge } from '../ereignis';
+import { seasonOf } from '../season';
+import { takeFromLargest } from './raid';
 import type { HilfeEvent } from './hilfe';
 import { chronikBeginnen, chronikFortschreiben, neueChronik, wertung } from '../chronik';
 import type { RuhmEvent } from './ruhm';
@@ -115,6 +119,8 @@ import {
 import { drawDevCard } from './dev';
 
 export type Action =
+  /** Auf ein Ereignis antworten: die Nummer der Wahl (core/ereignis.ts). */
+  | { t: 'answerEvent'; wahl: number }
   /** Vor dem Aufbau: eines der angebotenen Adelshaeuser waehlen (core/haus.ts). */
   | { t: 'chooseHouse'; haus: string }
   | { t: 'placeSettlement'; vertex: string }
@@ -216,6 +222,8 @@ export type GameEvent =
   | { t: 'chunks'; coords: ChunkCoord[] }
   | { t: 'turn'; player: PlayerId }
   | { t: 'houseChosen'; player: PlayerId; haus: string }
+  | { t: 'eventOffered'; player: PlayerId; id: string }
+  | { t: 'eventResolved'; player: PlayerId; id: string; wahl: number; ruhm: number; verloren: number }
   | { t: 'win'; player: PlayerId }
   /** Heer, Raubzuege, Gefechte, Lager, Ruinen, Held und Feuer - siehe rules/army.ts. */
   | ArmyEvent
@@ -270,6 +278,8 @@ export type PartieOptionen = {
    * sind; der Raum schaltet es ein.
    */
   haeuser?: boolean;
+  /** Mit Ereignissen (core/ereignis.ts) - wie die Haeuser nur, wenn gesetzt. */
+  ereignisse?: boolean;
 };
 
 export function createGame(
@@ -355,6 +365,7 @@ export function createGame(
     chronik: neueChronik({ players: players.map((p) => ({ id: p.id })) as GameState['players'] }),
   };
 
+  if (optionen.ereignisse) state.ereignisseAn = true;
   if (optionen.haeuser) {
     state.phase = { t: 'hauswahl' };
     state.hausAngebot = {};
@@ -453,6 +464,43 @@ function checkWin(state: GameState, events: GameEvent[]): void {
 }
 
 
+/** Warum diese Wahl nicht geht - oder null. Auch fuer die Anzeige (Client). */
+export function wahlHindernis(
+  s: Pick<GameState, 'units'> & { players: ReadonlyArray<{ id: PlayerId; hand?: Hand }> },
+  id: PlayerId,
+  folge: Folge,
+  brauchtHeld: boolean,
+): string | null {
+  if (brauchtHeld && !s.units.some((u) => u.kind === 'held' && u.owner === id)) {
+    return 'Dafuer muss dein Held auf der Karte stehen.';
+  }
+  const hand = s.players.find((p) => p.id === id)?.hand;
+  if (folge.zahle && (!hand || !canAfford(hand, folge.zahle))) return 'Dafuer fehlen dir Rohstoffe.';
+  return null;
+}
+
+/** Die Folge einer Wahl anwenden. Gibt zurueck, wie viele Karten verloren gingen. */
+function wendeFolgeAn(s: GameState, p: Player, folge: Folge, events: GameEvent[]): number {
+  if (folge.zahle) pay(p.hand, folge.zahle);
+  for (const r of RESOURCES) p.hand[r] += folge.gib?.[r] ?? 0;
+  if (folge.zufall) {
+    const rng = new Rng(s.rngState);
+    for (let i = 0; i < folge.zufall; i++) p.hand[RESOURCES[rng.int(RESOURCES.length)]!] += 1;
+    s.rngState = rng.getState();
+  }
+  let verloren = 0;
+  if (folge.verliere) {
+    const weg = takeFromLargest(p.hand, folge.verliere);
+    for (const r of RESOURCES) {
+      p.hand[r] -= weg[r];
+      verloren += weg[r];
+    }
+  }
+  p.loot += folge.beute ?? 0;
+  for (let i = 0; i < (folge.ritter ?? 0); i++) spawnKnight(s, p.id, events);
+  return verloren;
+}
+
 /** Eine spielbare Entwicklungskarte dieses Typs suchen. */
 function findPlayableDev(
   state: GameState,
@@ -533,6 +581,24 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
   const phase = s.phase;
 
   switch (action.t) {
+    // --- Ereignis: eine Wahl nach dem Wurf ---
+    case 'answerEvent': {
+      if (phase.t !== 'ereignis' || !s.ereignis) return fail('Es liegt kein Ereignis vor.');
+      if (s.ereignis.player !== actor) return fail('Das Ereignis gilt einem anderen.');
+      const ereignis = ereignisById(s.ereignis.id);
+      const wahl = ereignis?.wahlen[action.wahl];
+      if (!ereignis || !wahl) return fail('Diese Wahl gibt es nicht.');
+      const why = wahlHindernis(s, actor, wahl.folge, wahl.brauchtHeld ?? false);
+      if (why) return fail(why);
+      const verloren = wendeFolgeAn(s, actorPlayer, wahl.folge, events);
+      s.ereignisseGesehen = [...(s.ereignisseGesehen ?? []), ereignis.id];
+      s.ereignis = null;
+      s.phase = { t: 'main' };
+      events.push({ t: 'eventResolved', player: actor, id: ereignis.id, wahl: action.wahl, ruhm: wahl.folge.ruhm ?? 0, verloren });
+      checkWin(s, events);
+      break;
+    }
+
     // --- Hauswahl: alle gleichzeitig, dann der Aufbau ---
     case 'chooseHouse': {
       if (phase.t !== 'hauswahl') return fail('Die Haeuser sind schon gewaehlt.');
@@ -661,6 +727,14 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         events.push({ t: 'production', payout });
         s.phase = { t: 'main' };
       }
+      // Alle paar eigenen Zuege ein Ereignis mit einer Wahl (core/ereignis.ts) -
+      // bei einer 7 erst nach der Kartenwahl.
+      if (s.ereignisseAn && ereignisFaellig(s.turn, s.order.length)) {
+        const id = waehleEreignis(s.secretSeed, s.turn, seasonOf(s.turn), s.ereignisseGesehen ?? []);
+        s.ereignis = { id, player: actor };
+        events.push({ t: 'eventOffered', player: actor, id });
+        if (s.phase.t === 'main') s.phase = { t: 'ereignis' };
+      }
       break;
     }
 
@@ -716,7 +790,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       }
 
       s.draft = null;
-      s.phase = { t: 'main' };
+      s.phase = s.ereignis ? { t: 'ereignis' } : { t: 'main' };
       events.push({ t: 'cardTaken', player: actor, card: karte.id });
       checkWin(s, events);
       break;

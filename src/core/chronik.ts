@@ -21,6 +21,7 @@
 
 import { cardById } from './cards/catalog';
 import { fraktionById } from './factions';
+import { ereignisById } from './ereignis';
 import { bigRoundChangedAt, roundOf } from './season';
 import { emptyHand, playerById, publicPoints, totalPoints } from './state';
 import type { GameState, Hand, PlayerId } from './state';
@@ -61,7 +62,9 @@ export type MomentArt =
   | 'sieg'
   | 'ende'
   /** Ein Reich verliert sein letztes Gebaeude oder geht unter (rules/untergang.ts). */
-  | 'untergang';
+  | 'untergang'
+  /** Eine Entscheidung in einem Ereignis (core/ereignis.ts). */
+  | 'ereignis';
 
 export type Moment = {
   turn: number;
@@ -229,6 +232,12 @@ export function chronikFortschreiben(state: GameState, events: readonly GameEven
         // Der Verlauf je grosser Runde - dieselbe Stelle, an der die Raubzuege aufbrechen.
         if (bigRoundChangedAt(state.turn)) c.verlauf.push({ turn: state.turn, punkte: punkteZeile(state, false) });
         break;
+      case 'eventResolved': {
+        const ev = ereignisById(e.id);
+        const wahl = ev?.wahlen[e.wahl]?.text.split(':')[0]!.split('(')[0]!.trim();
+        if (ev && wahl) moment(e.player, 'ereignis', `${ev.titel}: ${nameVon(state, e.player)} - ${wahl}.`);
+        break;
+      }
       case 'fall':
         moment(e.player, 'untergang', `Das letzte Gebaeude von ${nameVon(state, e.player)} ist gefallen.`);
         break;

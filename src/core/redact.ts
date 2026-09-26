@@ -127,6 +127,8 @@ export type PublicState = {
   asche: GameState['asche'];
   abkommen: GameState['abkommen'];
   auftraege: GameState['auftraege'];
+  /** Das offene Ereignis und wer antwortet (core/ereignis.ts) - oeffentlich. */
+  ereignis: { id: string; player: PlayerId } | null;
   /** Die Haeuser, die jeder zur Wahl hat (core/haus.ts) - leer ohne Hauswahl. */
   hausAngebot: Record<PlayerId, string[]>;
   /** Die Omen - oeffentlich, sie gelten fuer alle (core/omen.ts). */
@@ -222,6 +224,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     abkommen: state.abkommen,
     auftraege: state.auftraege,
     hausAngebot: state.hausAngebot ?? {},
+    ereignis: state.ereignis ?? null,
     omens: state.omens ?? [],
     rundenLimit: state.rundenLimit ?? null,
     tagesDatum: state.tagesDatum ?? null,

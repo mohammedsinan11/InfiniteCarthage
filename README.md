@@ -213,6 +213,15 @@ wertvoller), Regelkarten ("faellt eine 6, liefern deine 8er mit", "bei 2 und
 Dauerkarten gleichzeitig wirken, ist die Auswahl eine Entscheidung ueber die
 Richtung der Partie.
 
+**Ereignisse** (`src/core/ereignis.ts`, `src/client/ui/EreignisTafel.tsx`).
+Ab dem vierten eigenen Zug und dann alle acht Zuege klopft nach dem Wurf etwas
+an: Fluechtlinge am Tor, ein wandernder Schmied, eine Duerre, Woelfe im
+Winter. 18 kleine Geschichten, ein Drittel an Jahreszeiten gebunden, jede mit
+zwei oder drei Antworten, die Rohstoffe, Ruhm, Kartenwahlen oder Ritter kosten
+oder bringen. Mindestens eine Antwort ist immer frei; gesehene Ereignisse
+kommen erst wieder, wenn alle durch sind. Die Chronik erzaehlt die
+Entscheidungen nach.
+
 **Einstieg.** Neue Spieler bekommen beim ersten Auftreten jedes Systems einen
 kurzen Tipp (erster Fund, erstes Feuer, erste Nacht, erste Beute ...,
 `src/client/tipps.ts`), je Browser einmal, und eine Liste "Erste Schritte"

@@ -40,6 +40,7 @@ import { SideMenu } from '../ui/SideMenu';
 import { Chronik } from '../ui/Chronik';
 import { HausWahl } from '../ui/HausWahl';
 import { TippBox } from '../ui/TippBox';
+import { EreignisTafel } from '../ui/EreignisTafel';
 import { ErsteSchritte } from '../ui/ErsteSchritte';
 import { hausById } from '../../core/haus';
 import { kartenPunkte } from '../../core/cards/effects';
@@ -1180,6 +1181,10 @@ export function Game() {
         )}
         {tipps.length > 0 && phase.t !== 'finished' && phase.t !== 'hauswahl' && state.draft === null && (
           <TippBox tipp={tipps[0]!} mehr={tipps.length - 1} onGelesen={tippGelesen} />
+        )}
+
+        {phase.t === 'ereignis' && pendingRoll === null && (
+          <EreignisTafel state={state} you={you} onWahl={(wahl) => act({ t: 'answerEvent', wahl })} />
         )}
 
         {phase.t === 'hauswahl' && (

@@ -388,6 +388,8 @@ export type Phase =
    * einen Fund statt einer Strafe.
    */
   | { t: 'draft' }
+  /** Nach dem Wurf: ein Ereignis mit einer Wahl (core/ereignis.ts, state.ereignis). */
+  | { t: 'ereignis' }
   | { t: 'main' }
   | { t: 'roadBuilding'; remaining: number }
   /**
@@ -536,6 +538,12 @@ export type GameState = {
   chronik?: Chronik;
   /** Die drei Haeuser, die jeder zur Wahl hat (core/haus.ts). Oeffentlich. */
   hausAngebot?: Record<PlayerId, string[]>;
+  /** Kommen Ereignisse mit Wahl (core/ereignis.ts)? Fehlt bei alten Staenden: nein. */
+  ereignisseAn?: boolean;
+  /** Das offene Ereignis (core/ereignis.ts) - wer antwortet und worauf. Oeffentlich. */
+  ereignis?: { id: string; player: PlayerId } | null;
+  /** Schon erlebte Ereignisse - sie kommen erst wieder, wenn alle durch sind. */
+  ereignisseGesehen?: string[];
 };
 
 /** Eine Hauptstadt auf einem Feld. Die Stufe beginnt bei 1 - weitere folgen (DESIGN.md, Hauptstadt). */

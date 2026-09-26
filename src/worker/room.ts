@@ -381,6 +381,7 @@ export class GameRoom implements DurableObject {
             rundenLimit: room.rundenLimit ?? null,
             tagesDatum: tages,
             haeuser: true,
+            ereignisse: true,
           },
         );
         room.started = true;
