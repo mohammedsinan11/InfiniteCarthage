@@ -2779,7 +2779,7 @@ export function Board({
               <circle cx={p.x} cy={y} r={12} className="vertex-treffer" />
               <circle cx={p.x} cy={y} r={7} className="vertex-ring" />
               {empfohlen.has(vk) && (
-                <text x={p.x} y={y - 13} className="vertex-empfohlen">
+                <text x={p.x} y={y + 5} className="vertex-empfohlen">
                   ★
                 </text>
               )}

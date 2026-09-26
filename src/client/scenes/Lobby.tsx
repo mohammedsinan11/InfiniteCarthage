@@ -1,5 +1,6 @@
 /** Warteraum: Mitspieler sammeln, Zielpunkte, Laenge und Omen waehlen, starten. */
 
+import { botNatur } from '../../core/bot';
 import { WELTARTEN, weltArtInfo } from '../../core/weltart';
 import { useStore } from '../net/store';
 import {
@@ -17,6 +18,9 @@ import { leseProfil } from '../profil';
 import { KOOP_ZIEL_JE } from '../../core/rules/reducer';
 import { szenarioById } from '../../core/szenario';
 
+
+/** Wie ein Bot spielt - in der Lobby, damit man weiss, gegen wen. */
+const NATUR_NAME = { baumeister: 'Baumeister', haendler: 'Haendler', krieger: 'Krieger' } as const;
 export function Lobby() {
   const room = useStore((s) => s.room);
   const you = useStore((s) => s.you);
@@ -64,7 +68,7 @@ export function Lobby() {
             <li key={m.id}>
               <span className="dot" style={{ background: playerColor(i) }} />
               {m.name}
-              {m.bot && <em> Bot</em>}
+              {m.bot && <em title="Wie der Rivale spielt (core/bot.ts)"> Bot · {NATUR_NAME[botNatur(m.id)]}</em>}
               {m.id === room.hostId && <em> Gastgeber</em>}
               {m.id === you && <em> du</em>}
               {!m.connected && <em className="off"> offline</em>}

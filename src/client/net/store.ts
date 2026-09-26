@@ -401,7 +401,7 @@ function meldungenAus(
         playRaid();
         out.push({ id: naechsteId++, text: `${name(e.fraktion)} pluendern dich: ${karten}`, kind: 'raid' });
       } else {
-        out.push({ id: naechsteId++, text: `${wer(e.player)} wird gepluendert: ${e.count}`, kind: 'raid' });
+        out.push({ id: naechsteId++, text: `${wer(e.player)} wird gepluendert: ${karten}`, kind: 'raid' });
       }
     } else if (e.t === 'vendetta') {
       if (e.player === you) {
@@ -885,10 +885,17 @@ export const useStore = create<Store>((set, get) => ({
             speichereLog(get().code, get().log, get().welt);
             break;
           }
-          case 'error':
+          case 'error': {
             if (get().state?.phase.t === 'finished') break;
             set({ error: msg.message });
+            // Eine Absage ist ein Hinweis, kein Dauerzustand: nach einer Weile
+            // raeumt sie sich selbst weg (Spieltest: sie stand zwoelf Runden da).
+            const text = msg.message;
+            window.setTimeout(() => {
+              if (get().error === text) set({ error: null });
+            }, 6000);
             break;
+          }
         }
       },
     }, neu);

@@ -97,6 +97,14 @@ export function CardDraft({
     return !!k && dauerwirkungen(k).length > 0 && !besitz.includes(id);
   };
   const fragtErsetzen = voll && options.some(bringtNeueDauer);
+  /*
+   * Der Bankrabatt zaehlt nur einmal (cards/effects.ts). Wer schon eine
+   * Handelskarte aktiv hat, soll das vor der Wahl wissen - Spieltest: die
+   * zweite belegte stumm einen Platz.
+   */
+  const rabattDa = aktiv.find((a) => dauerwirkungen(cardById(a) ?? {}).some((l) => l.t === 'tradeDiscount'));
+  const rabattDoppelt = (id: string): boolean =>
+    !!rabattDa && id !== rabattDa && dauerwirkungen(cardById(id) ?? {}).some((l) => l.t === 'tradeDiscount');
 
   useEffect(() => {
     playCardDeal();
@@ -167,6 +175,11 @@ export function CardDraft({
                 <span className="draft-text">{karte.text}</span>
                 {istEinzigartig(karte) && besitz.includes(id) && wiederholbar(karte) && (
                   <span className="draft-nochmal">Schon im Besitz - nur die Sofortwirkung</span>
+                )}
+                {rabattDoppelt(id) && (
+                  <span className="draft-nochmal draft-verdraengt">
+                    Bankrabatt zaehlt nur einmal - {cardById(rabattDa!)?.name} gibt ihn schon
+                  </span>
                 )}
                 {voll && bringtNeueDauer(id) && (
                   <span className="draft-nochmal draft-verdraengt">

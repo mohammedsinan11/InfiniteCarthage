@@ -4122,9 +4122,14 @@ em.off {
   stroke: #2a1c0c;
   stroke-width: 3px;
   paint-order: stroke;
-  font-size: 16px;
+  font-size: 14px;
   text-anchor: middle;
   pointer-events: none;
+}
+.vertex-target:hover .vertex-empfohlen,
+.vertex-target.aktiv .vertex-empfohlen {
+  fill: #2a1c0c;
+  stroke: #ffd76a;
 }
 .vertex-ring {
   fill: rgba(217, 164, 65, 0.14);
@@ -5259,7 +5264,8 @@ em.off {
 /* Warnung vor einem nahen Raubzug (scenes/Game.tsx, raubWarnung). */
 .raub-warnung {
   position: absolute;
-  top: 56px;
+  /* Ueber der Bauleiste, nicht oben: dort stehen Heerleiste und Meldungen. */
+  bottom: 124px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 7;
@@ -5389,6 +5395,32 @@ em.off {
 }
 @media (max-width: 700px) {
   .raub-warnung {
-    top: calc(var(--heerleiste-oben, 96px) + var(--heerleiste-hoehe, 43px) + 8px);
+    bottom: 176px;
+    font-size: 12px;
+  }
+}
+
+/* Die Rivalen in der Kopfleiste: Name und Siegpunkte (scenes/Game.tsx). */
+.hud > span.hud-rivalen {
+  display: inline-flex;
+  gap: 10px;
+  white-space: nowrap;
+  font-family: var(--pixel);
+  font-size: 10px;
+}
+.hud-rivalen .dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+}
+.hud-rivalen .besiegt {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+@media (max-width: 700px) {
+  .hud > span.hud-rivalen {
+    gap: 6px;
+    font-size: 9px;
   }
 }

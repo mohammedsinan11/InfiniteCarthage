@@ -35,18 +35,21 @@ export type Szenario = {
   omens: string[];
   /** Bis zu welcher Runde es 3 und 2 Sterne gibt; danach 1. */
   sterne: [number, number];
+  /** So viele Runden bricht kein Raubzug auf - Zeit, sich einzurichten. */
+  schonfrist?: number;
 };
 
 export const SZENARIEN: readonly Szenario[] = [
   {
     id: 'gruendung',
     name: 'Die Gruendung',
-    text: 'Eine Handvoll Siedler, ein Kuestenstreifen, guter Wind fuer Haendler. Aus Doerfern sollen Staedte werden.',
+    text: 'Eine Handvoll Siedler, volle Speicher und ein ruhiger Fruehling. Aus Doerfern sollen Staedte werden - bevor die Banden kommen.',
     aufgabe: 'Besitze 4 Staedte.',
     ziel: { t: 'staedte', n: 4 },
     runden: 45,
-    omens: ['handelswinde'],
+    omens: ['volle_speicher'],
     sterne: [28, 36],
+    schonfrist: 12,
   },
   {
     id: 'wunder',

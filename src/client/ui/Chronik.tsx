@@ -13,6 +13,7 @@
  */
 
 import { siegwegById, siegwegText } from '../../core/siegwege';
+import { szenarioStand } from '../../core/szenario';
 import { weltArtVon } from '../../core/weltart';
 import { useEffect, useMemo, useState } from 'react';
 import type { PublicState } from '../../core/redact';
@@ -114,12 +115,13 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
   if (sz && state.szenarioErgebnis)
     kopf = state.szenarioErgebnis.erreicht
       ? `${sz.name}: geschafft in Runde ${state.szenarioErgebnis.runde} ${'★'.repeat(state.szenarioErgebnis.sterne)}${'☆'.repeat(3 - state.szenarioErgebnis.sterne)}`
-      : `${sz.name}: verfehlt`;
+      : `${sz.name}: verfehlt${sz.ziel.t !== 'unversehrt' ? ` - ${szenarioStand(state, state.order[0]!, sz.ziel).join(' von ')}` : ''}`;
   else if (state.koop && state.koopErgebnis)
     kopf = state.koopErgebnis.erfolg
       ? `Gemeinsam geschafft - ${state.koopErgebnis.summe} von ${state.koopErgebnis.ziel} Siegpunkten`
       : `Gemeinsam gescheitert - ${state.koopErgebnis.summe} von ${state.koopErgebnis.ziel} Siegpunkten`;
-  else if (phase.winner === null) kopf = tages ? `Tagesexpedition ${tages} - verloren` : 'Alle Reiche sind gefallen';
+  else if (phase.winner === null)
+    kopf = tages ? `Tagesexpedition ${tages} - verloren` : phase.durch === 'zeit' ? 'Die Zeit ist um' : 'Alle Reiche sind gefallen';
   else if (tages) kopf = `Tagesexpedition ${tages}`;
   else if (phase.durch === 'zeit' && state.order.length === 1) kopf = 'Das Jahr ist um';
   else if (phase.durch === 'zeit') kopf = `Das Jahr ist um - ${sieger?.name ?? 'Jemand'} gewinnt`;

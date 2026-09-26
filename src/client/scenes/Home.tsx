@@ -315,7 +315,7 @@ export function Home() {
             }}
           />
         </label>
-        {nameFehlt && <p className="note">Erst einen Namen eingeben, dann beitreten.</p>}
+        {nameFehlt && <p className="note warn-name">Wie heisst du? Erst einen Namen eingeben, dann geht es los.</p>}
 
         {neuHier && !SERVER_MISSING && (
           <section className="neu-hier">
@@ -326,8 +326,15 @@ export function Home() {
             </p>
             <button
               className="primary"
-              disabled={!ready || verbindet}
-              onClick={() => connect(freshCode(), name.trim(), true, false, undefined, { szenario: 'gruendung' })}
+              disabled={SERVER_MISSING || verbindet}
+              onClick={() => {
+                if (name.trim().length === 0) {
+                  setNameFehlt(true);
+                  nameFeld.current?.focus();
+                  return;
+                }
+                connect(freshCode(), name.trim(), true, false, undefined, { szenario: 'gruendung' });
+              }}
             >
               Erste Partie beginnen
             </button>
@@ -344,8 +351,15 @@ export function Home() {
         </label>
         <button
           className="primary"
-          disabled={!ready || verbindet}
-          onClick={() => connect(freshCode(), name.trim(), true, oeffentlich)}
+          disabled={SERVER_MISSING || verbindet}
+          onClick={() => {
+            if (name.trim().length === 0) {
+              setNameFehlt(true);
+              nameFeld.current?.focus();
+              return;
+            }
+            connect(freshCode(), name.trim(), true, oeffentlich);
+          }}
         >
           Neuen Raum eroeffnen
         </button>
@@ -363,7 +377,7 @@ export function Home() {
             <OmenListe omens={tages.omens} />
             <button
               className="primary"
-              disabled={!ready || verbindet}
+              disabled={SERVER_MISSING || verbindet}
               onClick={() => {
                 if (name.trim().length === 0) {
                   setNameFehlt(true);
@@ -394,7 +408,7 @@ export function Home() {
         )}
 
         <SzenarienListe
-          bereit={ready && !verbindet}
+          bereit={!SERVER_MISSING && !verbindet}
           onSpielen={(id) => {
             if (name.trim().length === 0) {
               setNameFehlt(true);

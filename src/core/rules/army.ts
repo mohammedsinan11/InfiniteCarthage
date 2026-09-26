@@ -54,6 +54,7 @@
  * ihre Raubzuege kein Ziel (feindlich mit dem Spielstand, rules/diplomatie.ts).
  */
 
+import { szenarioById } from '../szenario';
 import { Rng } from '../rng';
 import { hexDistance, hexKey, hexesInRange, neighbors, parseVertexKey, vertexAdjacentHexes } from '../coords';
 import type { Hex } from '../coords';
@@ -793,7 +794,9 @@ export function beginBigRound(s: GameState, events: Ereignisse): void {
   lagerLeben(s, rng0, events);
   s.rngState = rng0.getState();
   // Ruhige Grenzen (core/omen.ts): nur jede zweite grosse Runde ein Aufbruch.
-  if (raubzugRunde(s.omens, bigRoundOf(s.turn))) sendRaiders(s, events);
+  // Schonfrist im Szenario (core/szenario.ts): die ersten Runden bleibt es ruhig.
+  const frist = szenarioById(s.szenario)?.schonfrist ?? 0;
+  if (raubzugRunde(s.omens, bigRoundOf(s.turn)) && roundOf(s.turn) > frist) sendRaiders(s, events);
   const rng = new Rng(s.rngState);
   sendFeud(s, rng, events);
   sendWanderer(s, rng, events);

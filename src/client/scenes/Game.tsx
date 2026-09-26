@@ -55,7 +55,7 @@ import { isNestActive, nestFraktionOf, sightOf } from '../../core/units';
 import { abkommenVon, kampfFelder } from '../../core/combat';
 import { WESEN, fraktionById } from '../../core/factions';
 import { fraktionColor } from '../theme';
-import { hexDistance, hexKey, hexVertices, parseVertexKey, vertexAdjacentHexes, vertexKey } from '../../core/coords';
+import { hexDistance, hexKey, hexVertices, hexesInRange, parseVertexKey, vertexAdjacentHexes, vertexKey } from '../../core/coords';
 import { beiStumm, initAudio, istStumm, playBuild, playGain, playTurm, playWurfStart, setStumm } from '../audio';
 import { setAmbiente } from '../ambiente';
 import { roundOf, seasonOf } from '../../core/season';
@@ -173,6 +173,14 @@ export function Game() {
   const [mode, setMode] = useState<BuildMode>(null);
   /** Wo die Ausbau-Tafel offen ist: an einem eigenen Gebaeude oder an einer Krone. */
   const [ausbauOrt, setAusbauOrt] = useState<{ art: 'ecke' | 'feld'; key: string } | null>(null);
+  /*
+   * Auf Touch-Geraeten gibt es kein Darueberfahren: im Aufbau stehen dort alle
+   * Zahlen, sonst waehlt man den Startplatz blind (Spieltest am Handy).
+   */
+  const grobZeiger = useMemo(
+    () => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches === true,
+    [],
+  );
   /** Zahlen festpinnen - fuer alle, die sie lieber dauerhaft sehen. */
   const [pinNumbers, setPinNumbers] = useState(() => {
     try {
@@ -368,7 +376,7 @@ export function Game() {
       if (!felder.has(hexKey(u.ziel.q, u.ziel.r))) continue;
       if (abkommenVon(state, you, u.fraktion)) continue;
       const weg = hexDistance(u, u.ziel);
-      if (weg > 6) continue;
+      if (weg > 12) continue;
       const schluessel = u.heimat ?? String(u.id);
       if (weggeklickt.includes(schluessel)) continue;
       const anzahl = state.units.filter((x) => x.heimat === u.heimat && x.auftrag === 'raub').length;
@@ -437,8 +445,11 @@ export function Game() {
     const belegt = new Set<string>();
     for (const vk of [...vertices].sort((a, b) => wert.get(b)! - wert.get(a)!)) {
       if (empfohlen.length >= n) break;
-      const felder = vertexAdjacentHexes(parseVertexKey(vk)).map((h) => hexKey(h.q, h.r));
+      const nachbarn = vertexAdjacentHexes(parseVertexKey(vk));
+      const felder = nachbarn.map((h) => hexKey(h.q, h.r));
       if (felder.some((k) => belegt.has(k))) continue;
+      // Nicht neben ein Lager empfehlen - dort brennt das erste Dorf (Spieltest).
+      if (nachbarn.some((h) => hexesInRange(h, 1).some((n) => isNestActive(state, n.q, n.r)))) continue;
       empfohlen.push(vk);
       for (const k of felder) belegt.add(k);
     }
@@ -1175,6 +1186,18 @@ export function Game() {
               {state.tagesDatum ? 'Tagesexpedition · ' : ''}Runde {Math.min(roundOf(state.turn), state.rundenLimit)} / {state.rundenLimit}
             </span>
           )}
+          {state.order.length > 1 && !state.koop && (
+            <span className="hud-rivalen" title="Siegpunkte der anderen">
+              {state.players
+                .filter((p) => p.id !== you)
+                .map((p) => (
+                  <span key={p.id} className={p.besiegt ? 'besiegt' : undefined}>
+                    <i className="dot" style={{ background: p.color }} />
+                    {p.name} {p.points}
+                  </span>
+                ))}
+            </span>
+          )}
           {weltArtVon(state.worldSeed).art !== 'kernland' && (
             <span className="hud-haus hud-welt" title={weltArtVon(state.worldSeed).text}>
               {weltArtVon(state.worldSeed).name}
@@ -1372,7 +1395,7 @@ export function Game() {
           world={world}
           state={state}
           targets={targets}
-          showAllNumbers={pinNumbers}
+          showAllNumbers={pinNumbers || (phase.t === 'setup' && grobZeiger)}
           flashHexes={flashHexes}
           pfeile={pfeile}
           treffer={treffer}
@@ -1521,8 +1544,8 @@ export function Game() {
           {raubWarnung && !zielWahl && (
             <div className="raub-warnung" role="alert">
               <p>
-                <b>Raubzug!</b> {raubWarnung.anzahl > 1 ? `${raubWarnung.anzahl} ` : ''}
-                {fraktionById(state.worldSeed, raubWarnung.u.fraktion!).name} ziehen auf dich zu - noch{' '}
+                <b>Raubzug!</b> Ein Trupp ({fraktionById(state.worldSeed, raubWarnung.u.fraktion!).name}
+                {raubWarnung.anzahl > 1 ? `, ${raubWarnung.anzahl} Mann` : ''}) zieht auf dich zu - noch{' '}
                 {raubWarnung.weg} {raubWarnung.weg === 1 ? 'Feld' : 'Felder'}.
               </p>
               {(() => {

@@ -147,21 +147,36 @@ function nameFuer(seed: number, cx: number, cy: number, art: FraktionArt): strin
     : `Bande von ${eins(RAEUBER_ORT)}`;
 }
 
-const HAUPTMANN_NAME = ['Ulf', 'Brandt', 'Grete', 'Harm', 'Wolfram', 'Ida', 'Kuno', 'Mechthild', 'Radulf', 'Sieghild', 'Tanko', 'Berta'];
-const HAUPTMANN_BEI = ['der Einaeugige', 'die Rote', 'der Lange', 'Eisenfaust', 'die Schlaue', 'der Stumme', 'Krummbein', 'die Wilde', 'der Schoene', 'Aschebart'];
-const HAEUPTLING_SILBE = ['Gnork', 'Zagg', 'Muffl', 'Skrit', 'Borb', 'Wizz', 'Grot', 'Nubb'];
-const HAEUPTLING_BEI = ['der Grosse', 'Dreizahn', 'Pilzkoenig', 'Knochenbrecher', 'der Laute', 'Schlammfuss', 'Langfinger'];
+/*
+ * Anfuehrer: Name und Beiname passen im Geschlecht zusammen - "Ida die
+ * Schlaue", nicht "Ida der Schoene". Titel ebenso: Hauptmann oder Hauptfrau.
+ */
+const HAUPTLEUTE: Record<'m' | 'w', { namen: readonly string[]; bei: readonly string[]; titel: string }> = {
+  m: {
+    namen: ['Ulf', 'Brandt', 'Harm', 'Wolfram', 'Kuno', 'Radulf', 'Tanko', 'Egbert', 'Gisbert', 'Hartwig'],
+    bei: ['der Einaeugige', 'der Rote', 'der Lange', 'Eisenfaust', 'der Schlaue', 'der Stumme', 'Krummbein', 'der Wilde', 'der Schoene', 'Aschebart'],
+    titel: 'Hauptmann',
+  },
+  w: {
+    namen: ['Grete', 'Ida', 'Mechthild', 'Sieghild', 'Berta', 'Adelheid', 'Walburga', 'Irmgard', 'Hedwig', 'Kunigunde'],
+    bei: ['die Einaeugige', 'die Rote', 'die Lange', 'Eisenfaust', 'die Schlaue', 'die Stumme', 'Krummbein', 'die Wilde', 'die Schoene', 'Rabenhaar'],
+    titel: 'Hauptfrau',
+  },
+};
+const HAEUPTLING_SILBE = ['Gnork', 'Zagg', 'Muffl', 'Skrit', 'Borb', 'Wizz', 'Grot', 'Nubb', 'Knatz', 'Plork', 'Rutz', 'Schnagg'];
+const HAEUPTLING_BEI = ['der Grosse', 'Dreizahn', 'Pilzkoenig', 'Knochenbrecher', 'der Laute', 'Schlammfuss', 'Langfinger', 'Warzennase', 'der Gierige'];
 
 /** Wesen und Anfuehrer - aus einer eigenen Zahlenfolge, damit Namen und Arten gleich bleiben. */
 function wesenFuer(seed: number, cx: number, cy: number, art: FraktionArt): { wesen: FraktionsWesen; anfuehrer: string } {
   const rng = new Rng(hash3i(seed, cx, cy, SALT_WESEN));
   const eins = (liste: readonly string[]) => liste[rng.int(liste.length)]!;
   const wesen = WESEN_LISTE[rng.int(WESEN_LISTE.length)]!;
-  const anfuehrer =
-    art === 'goblin'
-      ? `Haeuptling ${eins(HAEUPTLING_SILBE)} ${eins(HAEUPTLING_BEI)}`
-      : `Hauptmann ${eins(HAUPTMANN_NAME)} ${eins(HAUPTMANN_BEI)}`;
-  return { wesen, anfuehrer };
+  if (art === 'goblin') return { wesen, anfuehrer: `Haeuptling ${eins(HAEUPTLING_SILBE)} ${eins(HAEUPTLING_BEI)}` };
+  const h = HAUPTLEUTE[rng.int(2) === 0 ? 'm' : 'w'];
+  // Der Name haengt an der Zelle, nicht am Zufall: benachbarte Zellen
+  // bekommen verschiedene Namen, so heissen zwei Nachbarn nie gleich.
+  const name = h.namen[mod(cx * 3 + cy, h.namen.length)]!;
+  return { wesen, anfuehrer: `${h.titel} ${name} ${eins(h.bei)}` };
 }
 
 /** Das Wesen einer Fraktion, oder null (Nacht, Hexe). */

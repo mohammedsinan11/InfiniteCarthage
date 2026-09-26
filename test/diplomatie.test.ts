@@ -207,7 +207,7 @@ describe('Fraktionen mit Wesen', () => {
     const a = fraktionById(4242, 'f:1:2');
     const b = fraktionById(4242, 'f:1:2');
     expect(a.wesen).toBeDefined();
-    expect(a.anfuehrer).toMatch(/^(Hauptmann|Haeuptling) /);
+    expect(a.anfuehrer).toMatch(/^(Hauptmann|Hauptfrau|Haeuptling) /);
     expect(b).toEqual(a);
     const wesen = new Set<string>();
     for (let x = -6; x <= 6; x++) for (let y = -6; y <= 6; y++) wesen.add(fraktionById(99, `f:${x}:${y}`).wesen!);

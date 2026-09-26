@@ -19,6 +19,7 @@
  * sind gedeckelt. Auch eine Endlospartie waechst dadurch nur langsam.
  */
 
+import { szenarioById, szenarioStand } from './szenario';
 import { siegwegById } from './siegwege';
 import { cardById } from './cards/catalog';
 import { fraktionById } from './factions';
@@ -67,7 +68,9 @@ export type MomentArt =
   /** Ein Reich verliert sein letztes Gebaeude oder geht unter (rules/untergang.ts). */
   | 'untergang'
   /** Eine Entscheidung in einem Ereignis (core/ereignis.ts). */
-  | 'ereignis';
+  | 'ereignis'
+  /** Frieden oder Tribut mit einer Fraktion (rules/diplomatie.ts). */
+  | 'pakt';
 
 export type Moment = {
   turn: number;
@@ -203,9 +206,28 @@ export function chronikFortschreiben(state: GameState, events: readonly GameEven
         stats(e.player).auftraege += 1;
         moment(e.player, 'auftrag', `${nameVon(state, e.player)} erfuellt einen Auftrag eines Wanderers.`);
         break;
-      case 'plunder':
+      case 'plunder': {
         stats(e.player).gepluendert += e.count;
+        // Nur die grossen Raubzuege gehoeren in die Chronik - die Staemme
+        // versuchen es oft, meist mit wenig Erfolg.
+        if (e.count >= 4) {
+          const f = fraktionById(state.worldSeed, e.fraktion);
+          moment(e.player, 'brand', `${f.name} pluendern ${nameVon(state, e.player)} aus: ${e.count} Karten.`);
+        }
         break;
+      }
+      case 'pact': {
+        const f = fraktionById(state.worldSeed, e.fraktion);
+        const mit = f.anfuehrer ? `${f.anfuehrer} (${f.name})` : f.name;
+        moment(
+          e.player,
+          'pakt',
+          e.art === 'frieden'
+            ? `${nameVon(state, e.player)} schliesst Frieden mit ${mit}.`
+            : `${nameVon(state, e.player)} zahlt ${mit} Tribut.`,
+        );
+        break;
+      }
       case 'horde': {
         // Nur die erste Horde je Stamm - unter dem Blutmond kaeme sonst jede
         // Nacht dieselbe Zeile und verdraengte alles andere.
@@ -258,9 +280,22 @@ export function chronikFortschreiben(state: GameState, events: readonly GameEven
       case 'defeated':
         moment(e.player, 'untergang', `Das Reich von ${nameVon(state, e.player)} geht unter.`);
         break;
-      case 'lost':
-        moment(null, 'ende', 'Alle Reiche sind gefallen - die Partie ist verloren.');
+      case 'lost': {
+        // Verloren heisst nicht immer untergegangen: meist ist nur die Zeit um.
+        const zeit = state.phase.t === 'finished' && state.phase.durch === 'zeit';
+        const sz = szenarioById(state.szenario);
+        const stand = sz && sz.ziel.t !== 'unversehrt' ? szenarioStand(state, state.order[0]!, sz.ziel) : null;
+        moment(
+          null,
+          'ende',
+          !zeit
+            ? 'Alle Reiche sind gefallen - die Partie ist verloren.'
+            : stand
+              ? `Die Zeit ist um - das Ziel ist verfehlt (${stand[0]} von ${stand[1]}).`
+              : 'Die Zeit ist um - das Ziel ist verfehlt.',
+        );
         break;
+      }
       case 'win': {
         const zeit = state.phase.t === 'finished' && state.phase.durch === 'zeit';
         const weg = state.phase.t === 'finished' ? siegwegById(state.phase.weg) : undefined;
@@ -335,7 +370,9 @@ export function saga(s: SagaSicht, du: PlayerId): string {
       s.phase.winner === du
         ? 'mit einem Sieg'
         : s.phase.winner === null
-          ? 'mit dem Fall aller Reiche'
+          ? s.phase.durch === 'zeit'
+            ? 'ohne das Ziel erreicht zu haben'
+            : 'mit dem Fall aller Reiche'
           : '- ein anderes Haus steht vorn';
     const zeit = zeitVon(s.turn).replace(/^im/, 'Im');
     saetze.push(`${zeit} schliesst die Chronik ${wie}.${pkt !== undefined ? ` Am Ende: ${pkt} Siegpunkte.` : ''}`);

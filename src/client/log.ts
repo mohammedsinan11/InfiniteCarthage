@@ -196,7 +196,9 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
     case 'defeated':
       return `${who(state, e.player)} ist gefallen und scheidet aus.`;
     case 'lost':
-      return 'Alle Reiche sind gefallen. Die Partie ist verloren.';
+      return state?.phase.t === 'finished' && state.phase.durch === 'zeit'
+        ? 'Die Zeit ist um - das Ziel ist verfehlt.'
+        : 'Alle Reiche sind gefallen. Die Partie ist verloren.';
     case 'feud':
       return `Fehde: ${fraktionName(state, e.fraktion)} gegen ${fraktionName(state, e.gegen)}.`;
     case 'wanderer':
@@ -237,7 +239,8 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
       return tote ? `Im Kampf gefallen: ${tote}.` : '';
     }
     case 'plunder':
-      return `${fraktionName(state, e.fraktion)} pluendern ${who(state, e.player)}: ${karten(e.count)}.`;
+      // Nichts geholt ist keine Zeile wert - Goblins versuchen es oft.
+      return e.count > 0 ? `${fraktionName(state, e.fraktion)} pluendern ${who(state, e.player)}: ${karten(e.count)}.` : '';
     case 'homecoming':
       return e.count > 0
         ? `${fraktionName(state, e.fraktion)} bringen ${karten(e.count)} Beute heim.`
@@ -348,9 +351,8 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
     case 'tacticPlayed':
       return `${who(state, e.player)} spielt ${cardById(e.card)?.name ?? 'eine Taktik'}.`;
     case 'chunks':
-      return e.coords.length === 1
-        ? 'Die Karte waechst um ein Gebiet.'
-        : `Die Karte waechst um ${e.coords.length} Gebiete.`;
+      // Die Karte waechst staendig - das sieht man, im Protokoll ist es nur Rauschen.
+      return '';
     case 'turn':
       return `${who(state, e.player)} ist am Zug.`;
     case 'aid':
