@@ -38,10 +38,13 @@ Recommended order, detailed in section 5:
 | 3 | Online depth | **bots**, **co-op against the horde**, async turns, replays |
 | 4 | Content cadence | scenarios, wonders, seasonal content drops |
 
-> **Built:** the end-of-game chronicle, Omens (14 to start), the "One Year"
-> length with its score, per-turn dice and the Daily Expedition with its
-> leaderboard. The README section "Wiederspielwert" describes what exists;
-> the rest of this document is still a proposal.
+> **Built (status 26.09.2026):** nearly all of it - chronicle, omens, "One
+> Year", daily expedition, houses, card archetypes and rule cards, market,
+> events, season effects, wonders, scenarios, chronicle levels and deeds,
+> bots, co-op, world types, faction chiefs with temperaments and grudges,
+> alternative victory paths, seasonal ambitions, rumours, Ahnenhalle and
+> dynasty. The README section "Wiederspielwert" lists them; OVERHAUL.md
+> proposes what comes next.
 
 The first three items to build are the **end-of-game chronicle**, **Omens**
 and the **Daily Expedition**. Together they are the smallest step that turns
