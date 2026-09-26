@@ -42,7 +42,9 @@ function fraktionDerArt(game: Game, art: 'raeuber' | 'goblin'): string {
   for (const h of hexesInRange(ORIGIN, 60)) {
     if (!isNestActive(s, h.q, h.r)) continue;
     const id = nestFraktionOf(s, h.q, h.r);
-    if (fraktionById(s.worldSeed, id).art === art) return id;
+    const f = fraktionById(s.worldSeed, id);
+    // Kraemerische Fraktionen haben eigene Regeln (eigener Test) - hier die gewoehnlichen.
+    if (f.art === art && f.wesen !== 'kraemerisch') return id;
   }
   throw new Error(`keine Fraktion der Art ${art}`);
 }
@@ -69,7 +71,7 @@ describe('Abkommen', () => {
     expect(feindlich(spielerSeite('p0'), raeuber)).toBe(true);
 
     for (const [r, n] of Object.entries(FRIEDEN_PREIS)) s.players[0]!.hand[r as 'grain'] = n!;
-    expect(verhandeln(s, 'p0', goblins, 'frieden', [])).toMatch(/Goblins/);
+    expect(verhandeln(s, 'p0', goblins, 'frieden', [])).toMatch(/keinen Frieden|Goblins/);
   });
 
   it('Tribut kostet sofort und je grosser Runde eine Karte - wer nicht zahlt, hat Krieg', () => {
@@ -197,5 +199,32 @@ describe('Mit Abkommen', () => {
       geprueft = true;
     }
     expect(geprueft).toBe(true);
+  });
+});
+
+describe('Fraktionen mit Wesen', () => {
+  it('jede Fraktion hat ein Wesen und einen Anfuehrer, fest aus dem Seed', () => {
+    const a = fraktionById(4242, 'f:1:2');
+    const b = fraktionById(4242, 'f:1:2');
+    expect(a.wesen).toBeDefined();
+    expect(a.anfuehrer).toMatch(/^(Hauptmann|Haeuptling) /);
+    expect(b).toEqual(a);
+    const wesen = new Set<string>();
+    for (let x = -6; x <= 6; x++) for (let y = -6; y <= 6; y++) wesen.add(fraktionById(99, `f:${x}:${y}`).wesen!);
+    expect(wesen.size).toBe(4);
+  });
+
+  it('kraemerische nehmen einen Tribut weniger', async () => {
+    const { tributKarten } = await import('../src/core/rules/diplomatie');
+    let kraemer: string | null = null;
+    let anderer: string | null = null;
+    for (let x = -6; x <= 6 && (!kraemer || !anderer); x++) {
+      const id = `f:${x}:0`;
+      if (fraktionById(7, id).wesen === 'kraemerisch') kraemer ??= id;
+      else anderer ??= id;
+    }
+    const s = { worldSeed: 7, buildings: { a: { owner: 'p0', type: 'city' as const }, b: { owner: 'p0', type: 'city' as const } }, ruhmreichster: null, hauptstaedte: {} };
+    expect(tributKarten(s as never, 'p0', anderer!)).toBe(4);
+    expect(tributKarten(s as never, 'p0', kraemer!)).toBe(3);
   });
 });

@@ -38,10 +38,28 @@ const GOBLIN_ANTEIL = 0.35;
 const SALT_MITTE = 81;
 const SALT_ART = 82;
 const SALT_NAME = 83;
+const SALT_WESEN = 84;
 
 const UINT = 4294967296;
 
 export type FraktionArt = 'raeuber' | 'goblin' | 'nacht';
+
+/**
+ * Das Wesen einer Fraktion: jede Bande und jeder Stamm hat einen Charakter,
+ * der sich im Spiel bemerkbar macht (REPLAYABILITY.md, J - Fraktionen mit
+ * Persoenlichkeit). So ist der Nachbar in jeder Welt ein anderer: mit den
+ * Gierigen verhandelt man anders als mit den Zaudernden.
+ */
+export type FraktionsWesen = 'gierig' | 'kriegerisch' | 'zaudernd' | 'kraemerisch';
+
+export const WESEN: Record<FraktionsWesen, { name: string; text: string }> = {
+  gierig: { name: 'gierig', text: 'Pluendern 1 Karte mehr.' },
+  kriegerisch: { name: 'kriegerisch', text: 'Ziehen mit einem Mann mehr los.' },
+  zaudernd: { name: 'zaudernd', text: 'Brechen nur jede zweite grosse Runde auf.' },
+  kraemerisch: { name: 'kraemerisch', text: 'Tribut kostet 1 Karte weniger; auch als Goblins nehmen sie Frieden.' },
+};
+
+const WESEN_LISTE = Object.keys(WESEN) as FraktionsWesen[];
 
 export type Fraktion = {
   /** "f:cx:cy" - die Zelle, aus der sie stammt. Die Nacht hat keine. */
@@ -50,6 +68,10 @@ export type Fraktion = {
   name: string;
   /** Nummer der Farbe, 0 bis FRAKTION_FARBEN-1. */
   farbe: number;
+  /** Ihr Wesen - Nacht und Hexe haben keins. */
+  wesen?: FraktionsWesen;
+  /** Wer sie anfuehrt, mit Titel. Nacht und Hexe haben niemanden. */
+  anfuehrer?: string;
 };
 
 /**
@@ -125,6 +147,26 @@ function nameFuer(seed: number, cx: number, cy: number, art: FraktionArt): strin
     : `Bande von ${eins(RAEUBER_ORT)}`;
 }
 
+const HAUPTMANN_NAME = ['Ulf', 'Brandt', 'Grete', 'Harm', 'Wolfram', 'Ida', 'Kuno', 'Mechthild', 'Radulf', 'Sieghild', 'Tanko', 'Berta'];
+const HAUPTMANN_BEI = ['der Einaeugige', 'die Rote', 'der Lange', 'Eisenfaust', 'die Schlaue', 'der Stumme', 'Krummbein', 'die Wilde', 'der Schoene', 'Aschebart'];
+const HAEUPTLING_SILBE = ['Gnork', 'Zagg', 'Muffl', 'Skrit', 'Borb', 'Wizz', 'Grot', 'Nubb'];
+const HAEUPTLING_BEI = ['der Grosse', 'Dreizahn', 'Pilzkoenig', 'Knochenbrecher', 'der Laute', 'Schlammfuss', 'Langfinger'];
+
+/** Wesen und Anfuehrer - aus einer eigenen Zahlenfolge, damit Namen und Arten gleich bleiben. */
+function wesenFuer(seed: number, cx: number, cy: number, art: FraktionArt): { wesen: FraktionsWesen; anfuehrer: string } {
+  const rng = new Rng(hash3i(seed, cx, cy, SALT_WESEN));
+  const eins = (liste: readonly string[]) => liste[rng.int(liste.length)]!;
+  const wesen = WESEN_LISTE[rng.int(WESEN_LISTE.length)]!;
+  const anfuehrer =
+    art === 'goblin'
+      ? `Haeuptling ${eins(HAEUPTLING_SILBE)} ${eins(HAEUPTLING_BEI)}`
+      : `Hauptmann ${eins(HAUPTMANN_NAME)} ${eins(HAUPTMANN_BEI)}`;
+  return { wesen, anfuehrer };
+}
+
+/** Das Wesen einer Fraktion, oder null (Nacht, Hexe). */
+export const wesenVon = (seed: number, id: string): FraktionsWesen | null => fraktionById(seed, id).wesen ?? null;
+
 const MERK_MAX = 4000;
 const merkId = new Map<string, Fraktion>();
 const merkFeld = new Map<string, string>();
@@ -160,6 +202,7 @@ export function fraktionById(seed: number, id: string): Fraktion {
     art,
     name: nameFuer(seed, cx, cy, art),
     farbe: mod(cx, 3) + 3 * mod(cy, 3),
+    ...wesenFuer(seed, cx, cy, art),
   };
   if (merkId.size >= MERK_MAX) merkId.clear();
   merkId.set(id, f);

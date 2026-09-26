@@ -111,7 +111,7 @@ import {
   stufeFuer,
 } from '../combat';
 import { terrainAt } from '../worldgen';
-import { fraktionById } from '../factions';
+import { fraktionById, wesenVon } from '../factions';
 import type { FraktionArt } from '../factions';
 import { raidLoss, takeFromLargest } from './raid';
 import { reichsbauFelder, tempelNah } from './reich';
@@ -636,6 +636,9 @@ export function sendRaiders(s: GameState, events: Ereignisse): void {
     // Wer feiert, bleibt im Lager (lagerLeben).
     if (feiert(s, k)) continue;
     const fraktion = nestFraktionOf(s, nest.q, nest.r);
+    // Zaudernde Fraktionen (core/factions.ts) brechen nur jede zweite grosse Runde auf.
+    const wesen = wesenVon(s.worldSeed, fraktion);
+    if (wesen === 'zaudernd' && bigRoundOf(s.turn) % 2 === 1) continue;
     const zielSet = new Set(settlementApproaches(s, undefined, imKriegMit(s, fraktion)).keys());
     const schonDa = zielSet.has(k);
     const weg = schonDa ? null : nextStep(s.worldSeed, nest, zielSet, SUCHE_RAEUBER);
@@ -645,7 +648,7 @@ export function sendRaiders(s: GameState, events: Ereignisse): void {
     // Der Zug richtet sich nach dem, was es beim Ziel zu holen gibt
     // (rules/bedrohung.ts): mehr Punkte, mehr und erfahrenere Raeuber.
     const stufe = bedrohungVon(s, nest.owner);
-    const anzahl = raubzugGroesse(stufe);
+    const anzahl = raubzugGroesse(stufe) + (wesen === 'kriegerisch' ? 1 : 0);
     const rang = raeuberRang(stufe);
     for (let i = 0; i < anzahl; i++) {
       const vorlage = einheitVorlage(lagerArt(art), nest.q, nest.r, {
@@ -1714,7 +1717,8 @@ export function tickArmy(s: GameState, world: World, events: Ereignisse): void {
     if (owner === undefined || imKampf(s, u)) continue;
     const p = playerById(s, owner);
     if (!p) continue;
-    const menge = raidLoss(s, owner, 1);
+    // Gierige Fraktionen (core/factions.ts) nehmen eine Karte mehr.
+    const menge = raidLoss(s, owner, u.fraktion !== null && wesenVon(s.worldSeed, u.fraktion) === 'gierig' ? 2 : 1);
     const taken = takeFromLargest(p.hand, menge);
     for (const r of RESOURCES) p.hand[r] -= taken[r];
     ladeAuf(u, taken, owner);

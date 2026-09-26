@@ -365,7 +365,10 @@ fair.
 - **Landmarks and wonders:** rare, seed-placed sites (a volcano, a sunken
   city, a dragon hoard) with a unique effect for whoever claims them first.
   They give races on the map.
-- **Faction personalities:** each bandit or goblin faction rolls a trait
+- **Faction personalities** (built, `src/core/factions.ts`: every faction
+  has a named chief and one of four temperaments - greedy, warlike,
+  hesitant, mercantile - that change plunder, raid size, raid frequency,
+  tribute and peace). Original idea: each bandit or goblin faction rolls a trait
   (greedy, zealous, cowardly, mercantile) that changes how raids, peace and
   tribute behave, plus a named chief with a grudge memory.
 

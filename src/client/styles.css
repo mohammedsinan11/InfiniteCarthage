@@ -1678,6 +1678,13 @@ em.off {
   color: var(--muted);
   font-size: 10px;
 }
+.menu-frak-wesen {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-style: italic;
+}
 .menu-chip {
   font-family: var(--pixel);
   font-size: 7px;

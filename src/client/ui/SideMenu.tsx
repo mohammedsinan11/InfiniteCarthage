@@ -35,6 +35,8 @@ import type { WeltEintrag } from '../net/store';
 import { TRACKS, getMusicMode, getMusicVolume, setMusicMode, setMusicVolume } from '../music';
 import type { MusicMode } from '../music';
 import { getUmgebungVolume, setUmgebungVolume } from '../ambiente';
+import { WESEN } from '../../core/factions';
+import type { FraktionsWesen } from '../../core/factions';
 import { BRAND_WAS, auftragText, bundleText, resourceName } from '../log';
 import { einheitNamen, gruppenName, heerGruppen, untaetig } from '../heer';
 import { tippsZuruecksetzen } from '../tipps';
@@ -59,6 +61,11 @@ export type FraktionsZeile = {
   abkommen: Abkommen | null;
   /** Schliesst sie Frieden? Nur Raeuberbanden (rules/diplomatie.ts). */
   nimmtFrieden: boolean;
+  /** Anfuehrer und Wesen (core/factions.ts). */
+  anfuehrer?: string;
+  wesen?: FraktionsWesen;
+  /** Was ein Tribut an sie kostet. */
+  tribut: number;
 };
 
 /** Siegpunkte aufgeschluesselt (Game): Summe, Ziel (0 = endlos) und woher sie kommen. */
@@ -279,7 +286,7 @@ export function SideMenu({
   onFolgen,
   diplomatieMoeglich,
   friedenBezahlbar,
-  tributBezahlbar,
+  handKarten,
   tributPreis,
   onDiplomatie,
   auftraege,
@@ -364,7 +371,8 @@ export function SideMenu({
   /** Darf gerade verhandelt werden (eigene Bauphase)? */
   diplomatieMoeglich: boolean;
   friedenBezahlbar: boolean;
-  tributBezahlbar: boolean;
+  /** Wie viele Karten man haelt - reicht es fuer den Tribut? */
+  handKarten: number;
   /** Was ein Tribut gerade kostet, in Karten (rules/diplomatie.ts, tributKarten). */
   tributPreis: number;
   onDiplomatie: (fraktion: string, art: Verhandlung) => void;
@@ -772,7 +780,7 @@ export function SideMenu({
             {/* Fraktionen: wem die Lager ringsum gehoeren, und das Abkommen mit ihnen (rules/diplomatie.ts). */}
             <Kopf
               titel="Fraktionen"
-              hilfe={`Frieden (nur Raeuberbanden) haelt 20 Runden und kostet ${bundleText(FRIEDEN_PREIS)}. Tribut: eine Karte je Siegpunkt (derzeit ${tributPreis}), sofort und zu Beginn jeder grossen Runde - wer nicht zahlen kann, hat wieder Krieg. Solange ein Abkommen gilt, ziehen ihre Raubzuege an dir vorbei.`}
+              hilfe={`Jede Fraktion hat einen Anfuehrer und ein Wesen, das ihr Verhalten praegt. Frieden (Raeuberbanden und kraemerische Staemme) haelt 20 Runden und kostet ${bundleText(FRIEDEN_PREIS)}. Tribut: eine Karte je Siegpunkt (derzeit ${tributPreis}), sofort und zu Beginn jeder grossen Runde - wer nicht zahlen kann, hat wieder Krieg. Solange ein Abkommen gilt, ziehen ihre Raubzuege an dir vorbei.`}
             />
             {fraktionen.length === 0 ? (
               <p className="menu-leer">Noch keine entdeckt.</p>
@@ -788,6 +796,12 @@ export function SideMenu({
                           {' '}
                           · {f.lager} Lager{f.unterwegs > 0 ? ` · ${f.unterwegs} unterwegs` : ''}
                         </span>
+                        {f.anfuehrer && (
+                          <span className="menu-frak-wesen" title={f.wesen ? WESEN[f.wesen].text : undefined}>
+                            {f.anfuehrer}
+                            {f.wesen ? ` · ${WESEN[f.wesen].name}: ${WESEN[f.wesen].text}` : ''}
+                          </span>
+                        )}
                       </span>
                       <span className={f.abkommen ? 'menu-chip frieden' : 'menu-chip krieg'}>
                         {f.abkommen === null ? 'Krieg' : f.abkommen.art === 'tribut' ? 'Tribut' : `Frieden R${f.abkommen.bis}`}
@@ -806,11 +820,11 @@ export function SideMenu({
                             </button>
                           )}
                           <button
-                            disabled={!diplomatieMoeglich || !tributBezahlbar}
-                            title={`Tribut: ${tributPreis} ${tributPreis === 1 ? 'Karte' : 'Karten'} sofort und je grosser Runde`}
+                            disabled={!diplomatieMoeglich || handKarten < f.tribut}
+                            title={`Tribut: ${f.tribut} ${f.tribut === 1 ? 'Karte' : 'Karten'} sofort und je grosser Runde`}
                             onClick={() => onDiplomatie(f.id, 'tribut')}
                           >
-                            Tribut
+                            Tribut ({f.tribut})
                           </button>
                         </>
                       ) : (

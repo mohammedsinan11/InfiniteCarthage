@@ -20,7 +20,7 @@
  */
 
 import { abkommenVon } from '../combat';
-import { fraktionById, istFraktion } from '../factions';
+import { fraktionById, istFraktion, wesenVon } from '../factions';
 import { handSize, playerById, publicPoints } from '../state';
 import type { Abkommen, GameState, PlayerId } from '../state';
 import { RESOURCES } from '../types';
@@ -43,9 +43,14 @@ export const TRIBUT_KARTEN = 1;
  * Steuer, gegen die sich ein Heer wieder rechnen kann.
  */
 export const tributKarten = (
-  s: Pick<GameState, 'buildings' | 'ruhmreichster' | 'hauptstaedte'>,
+  s: Pick<GameState, 'buildings' | 'ruhmreichster' | 'hauptstaedte'> & { worldSeed?: number },
   player: PlayerId,
-): number => Math.max(TRIBUT_KARTEN, publicPoints(s, player));
+  fraktion?: string,
+): number => {
+  // Kraemerische Fraktionen (core/factions.ts) nehmen eine Karte weniger.
+  const rabatt = fraktion && s.worldSeed !== undefined && wesenVon(s.worldSeed, fraktion) === 'kraemerisch' ? 1 : 0;
+  return Math.max(TRIBUT_KARTEN, publicPoints(s, player) - rabatt);
+};
 
 export type Verhandlung = 'frieden' | 'tribut' | 'krieg';
 
@@ -62,13 +67,15 @@ export type DiplomatieEvent =
 type Ereignisse = { push(...e: DiplomatieEvent[]): number };
 
 /** Nimmt diese Fraktion Frieden an? Nur Raeuberbanden. */
-export const nimmtFrieden = (seed: number, fraktion: string): boolean =>
-  fraktionById(seed, fraktion).art === 'raeuber';
+export const nimmtFrieden = (seed: number, fraktion: string): boolean => {
+  const f = fraktionById(seed, fraktion);
+  return f.art === 'raeuber' || (f.art === 'goblin' && f.wesen === 'kraemerisch');
+};
 
 /** Tribut vom groessten Stapel an die Bank. Liefert die Kartenzahl, 0 wenn die Hand nicht reicht. */
-function zahleTribut(s: GameState, player: PlayerId): number {
+function zahleTribut(s: GameState, player: PlayerId, fraktion: string): number {
   const p = playerById(s, player);
-  const preis = tributKarten(s, player);
+  const preis = tributKarten(s, player, fraktion);
   if (!p || handSize(p.hand) < preis) return 0;
   const genommen = takeFromLargest(p.hand, preis);
   for (const r of RESOURCES) {
@@ -100,11 +107,11 @@ export function verhandeln(
   if (bisher?.art === art) return art === 'frieden' ? 'Es herrscht schon Frieden.' : 'Du zahlst schon Tribut.';
 
   if (art === 'frieden') {
-    if (!nimmtFrieden(s.worldSeed, fraktion)) return 'Goblins schliessen keinen Frieden - sie nehmen nur Tribut.';
+    if (!nimmtFrieden(s.worldSeed, fraktion)) return 'Dieser Stamm schliesst keinen Frieden - er nimmt nur Tribut.';
     if (!canAfford(p.hand, FRIEDEN_PREIS)) return 'Fuer den Frieden fehlen dir die Gaben.';
     pay(p.hand, FRIEDEN_PREIS);
-  } else if (zahleTribut(s, actor) === 0) {
-    return `Fuer den Tribut fehlen dir Karten (${tributKarten(s, actor)} noetig).`;
+  } else if (zahleTribut(s, actor, fraktion) === 0) {
+    return `Fuer den Tribut fehlen dir Karten (${tributKarten(s, actor, fraktion)} noetig).`;
   }
 
   s.abkommen = s.abkommen.filter((a) => a !== bisher);
@@ -134,7 +141,7 @@ export function abkommenRunde(s: GameState, events: Ereignisse): void {
 export function tributRunde(s: GameState, events: Ereignisse): void {
   s.abkommen = s.abkommen.filter((a) => {
     if (a.art !== 'tribut') return true;
-    const gezahlt = zahleTribut(s, a.player);
+    const gezahlt = zahleTribut(s, a.player, a.fraktion);
     if (gezahlt > 0) {
       events.push({ t: 'tribute', player: a.player, fraktion: a.fraktion, count: gezahlt });
       return true;

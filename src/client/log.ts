@@ -174,9 +174,13 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
         (p.anzahl ?? 1) > 1 || (p.rang ?? 0) > 0
           ? ` (${p.anzahl ?? 1} Mann${(p.rang ?? 0) > 0 ? `, Rang ${p.rang}` : ''})`
           : '';
-      return e.parties.length === 1
-        ? `Raubzug bricht auf: ${fraktionName(state, e.parties[0]!.fraktion)}${staerke(e.parties[0]!)}.`
-        : `${e.parties.length} Raubzuege brechen auf.`;
+      if (e.parties.length !== 1) return `${e.parties.length} Raubzuege brechen auf.`;
+      const zug = e.parties[0]!;
+      // Mit Anfuehrer (core/factions.ts): die Welt hat Gesichter, nicht nur Farben.
+      const chef = state && istFraktion(zug.fraktion) ? fraktionById(state.worldSeed, zug.fraktion).anfuehrer : undefined;
+      return chef
+        ? `${chef} fuehrt ${fraktionName(state, zug.fraktion).replace(/^Die /, 'die ')} auf Raubzug${staerke(zug)}.`
+        : `Raubzug bricht auf: ${fraktionName(state, zug.fraktion)}${staerke(zug)}.`;
     }
     case 'nestRevived':
       return `${fraktionName(state, e.fraktion)} beziehen ein verlassenes Lager neu.`;

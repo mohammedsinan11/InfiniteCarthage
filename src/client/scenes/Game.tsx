@@ -53,7 +53,7 @@ import { neuerRaumCode } from '../net/socket';
 import type { FraktionsZeile } from '../ui/SideMenu';
 import { isNestActive, nestFraktionOf, sightOf } from '../../core/units';
 import { abkommenVon, kampfFelder } from '../../core/combat';
-import { fraktionById } from '../../core/factions';
+import { WESEN, fraktionById } from '../../core/factions';
 import { fraktionColor } from '../theme';
 import { hexDistance, hexKey, hexVertices, parseVertexKey, vertexAdjacentHexes, vertexKey } from '../../core/coords';
 import { beiStumm, initAudio, istStumm, playBuild, playGain, playTurm, playWurfStart, setStumm } from '../audio';
@@ -353,7 +353,7 @@ export function Game() {
   const raubWarnung = useMemo(() => {
     if (!you || meineFelder.length === 0) return null;
     const felder = new Set(meineFelder.map((h) => hexKey(h.q, h.r)));
-    let best: { u: HeerEinheit; weg: number; anzahl: number; schluessel: string } | null = null;
+    let best: { u: HeerEinheit; weg: number; anzahl: number; schluessel: string; tribut: number } | null = null;
     for (const u of state.units) {
       if (u.auftrag !== 'raub' || u.fraktion === null || u.ziel === null || u.traegt > 0) continue;
       if (!felder.has(hexKey(u.ziel.q, u.ziel.r))) continue;
@@ -363,7 +363,7 @@ export function Game() {
       const schluessel = u.heimat ?? String(u.id);
       if (weggeklickt.includes(schluessel)) continue;
       const anzahl = state.units.filter((x) => x.heimat === u.heimat && x.auftrag === 'raub').length;
-      if (!best || weg < best.weg) best = { u, weg, anzahl, schluessel };
+      if (!best || weg < best.weg) best = { u, weg, anzahl, schluessel, tribut: tributKarten(state, you, u.fraktion) };
     }
     return best;
   }, [state, you, meineFelder, weggeklickt]);
@@ -391,6 +391,9 @@ export function Game() {
           naechster: null,
           abkommen: you ? (abkommenVon(state, you, id) ?? null) : null,
           nimmtFrieden: nimmtFrieden(state.worldSeed, id),
+          anfuehrer: f.anfuehrer,
+          wesen: f.wesen,
+          tribut: you ? tributKarten(state, you, id) : 1,
         };
         m.set(id, zeile);
       }
@@ -1231,7 +1234,7 @@ export function Game() {
           diplomatieMoeglich={isMine && phase.t === 'main'}
           friedenBezahlbar={!!hand && canAfford(hand, FRIEDEN_PREIS)}
           tributPreis={tributPreis}
-          tributBezahlbar={!!hand && RESOURCES.reduce((n, r) => n + hand[r], 0) >= tributPreis}
+          handKarten={hand ? RESOURCES.reduce((n, r) => n + hand[r], 0) : 0}
           onDiplomatie={(fraktion, art) => act({ t: 'diplomacy', fraktion, art })}
           auftraege={meineAuftraege}
           onAuftrag={(id, annehmen) => act({ t: 'answerQuest', id, accept: annehmen })}
@@ -1476,6 +1479,15 @@ export function Game() {
                 {fraktionById(state.worldSeed, raubWarnung.u.fraktion!).name} ziehen auf dich zu - noch{' '}
                 {raubWarnung.weg} {raubWarnung.weg === 1 ? 'Feld' : 'Felder'}.
               </p>
+              {(() => {
+                const f = fraktionById(state.worldSeed, raubWarnung.u.fraktion!);
+                return f.anfuehrer ? (
+                  <p className="raub-warnung-klein">
+                    Angefuehrt von {f.anfuehrer}
+                    {f.wesen ? ` - ${WESEN[f.wesen].name}: ${WESEN[f.wesen].text}` : ''}
+                  </p>
+                ) : null;
+              })()}
               <p className="raub-warnung-klein">Ritter und Bogenschuetzen halten sie auf; ein Abkommen laesst sie vorbeiziehen.</p>
               <div className="raub-warnung-knoepfe">
                 <button onClick={() => zeigeFeld(raubWarnung.u.q, raubWarnung.u.r)}>Zeigen</button>
@@ -1492,11 +1504,11 @@ export function Game() {
                   </button>
                 )}
                 <button
-                  disabled={!(isMine && phase.t === 'main') || !hand || RESOURCES.reduce((n, r) => n + hand[r], 0) < tributPreis}
-                  title={`Tribut: ${tributPreis} ${tributPreis === 1 ? 'Karte' : 'Karten'} sofort und je grosser Runde`}
+                  disabled={!(isMine && phase.t === 'main') || !hand || RESOURCES.reduce((n, r) => n + hand[r], 0) < raubWarnung.tribut}
+                  title={`Tribut: ${raubWarnung.tribut} ${raubWarnung.tribut === 1 ? 'Karte' : 'Karten'} sofort und je grosser Runde`}
                   onClick={() => act({ t: 'diplomacy', fraktion: raubWarnung.u.fraktion!, art: 'tribut' })}
                 >
-                  Tribut ({tributPreis})
+                  Tribut ({raubWarnung.tribut})
                 </button>
                 {nimmtFrieden(state.worldSeed, raubWarnung.u.fraktion!) && (
                   <button
