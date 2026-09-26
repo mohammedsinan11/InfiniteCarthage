@@ -88,6 +88,10 @@ export type Announcement = {
 
 let naechsteId = 1;
 
+/** Wiederverbinden nach einer Trennung: so oft, mit wachsender Pause. */
+const WIEDER_MAX = 6;
+let wiederVersuche = 0;
+
 const gleicherWurf = (a: [number, number] | null, b: [number, number]): boolean =>
   a !== null && a[0] === b[0] && a[1] === b[1];
 
@@ -106,7 +110,7 @@ const NAME_KEY = 'infinitecarthage.name';
  */
 
 /** platzwahl: die Partie laeuft, dieser Browser hat keinen Platz - welcher bist du (Home)? */
-type Status = 'idle' | 'connecting' | 'platzwahl' | 'lobby' | 'playing' | 'closed';
+type Status = 'idle' | 'connecting' | 'platzwahl' | 'lobby' | 'playing' | 'closed' | 'reconnecting';
 
 /** Ein Pfeil auf dem Brett: von welchem Feld auf welches, der wievielte der Salve, und ob die Salve traf. */
 export type Pfeil = { id: number; von: { q: number; r: number }; nach: { q: number; r: number }; nr: number; trifft: boolean };
@@ -707,8 +711,14 @@ export const useStore = create<Store>((set, get) => ({
       alt.onmessage = null;
       alt.close();
     }
-    const alterLog = ladeLog(code);
-    set({ status: 'connecting', error: null, code, log: alterLog.log, welt: alterLog.welt, state: null, world: null, pin: null, platzWahl: null });
+    if (neu.wieder) {
+      // Die Partie bleibt sichtbar, bis die neue Verbindung steht.
+      set({ status: 'reconnecting', error: null });
+    } else {
+      wiederVersuche = 0;
+      const alterLog = ladeLog(code);
+      set({ status: 'connecting', error: null, code, log: alterLog.log, welt: alterLog.welt, state: null, world: null, pin: null, platzWahl: null });
+    }
 
     const ws = openSocket(code, create, oeffentlich, {
       onOpen: () => {
@@ -718,6 +728,22 @@ export const useStore = create<Store>((set, get) => ({
       onClose: () => {
         // Nur die AKTUELLE Verbindung darf den Zustand aendern.
         if (get().ws !== ws) return;
+        /*
+         * Mitten in Partie oder Lobby getrennt - ein Funkloch, ein Deploy, ein
+         * schlafendes Handy: erst ein paar Mal selbst wiederverbinden, statt
+         * wortlos auf die Startseite zu fallen (Spieltest).
+         */
+        const war = get().status;
+        if ((war === 'playing' || war === 'lobby' || war === 'reconnecting') && wiederVersuche < WIEDER_MAX) {
+          const warte = Math.min(8000, 1000 * 2 ** wiederVersuche);
+          wiederVersuche += 1;
+          set({ status: 'reconnecting' });
+          window.setTimeout(() => {
+            if (get().ws !== ws || get().status !== 'reconnecting') return;
+            get().connect(code, beitrittsName, false, oeffentlich, undefined, { wieder: true });
+          }, warte);
+          return;
+        }
         set({ status: 'closed' });
       },
       onMessage: (msg: ServerMsg) => {
@@ -725,6 +751,7 @@ export const useStore = create<Store>((set, get) => ({
         vervollstaendige(msg);
         switch (msg.t) {
           case 'welcome':
+            wiederVersuche = 0;
             saveToken(code, msg.token);
             // Fuer "Deine Partien": auch nach dem Schliessen des Browsers weiterspielen.
             merkePartie(

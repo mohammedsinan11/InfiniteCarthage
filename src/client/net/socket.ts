@@ -67,7 +67,13 @@ export function neuerRaumCode(): string {
 }
 
 /** Was ein neuer Raum ausser dem Code mitbringt. */
-export type RaumWunsch = { tages?: boolean; welt?: number; szenario?: string };
+export type RaumWunsch = {
+  tages?: boolean;
+  welt?: number;
+  szenario?: string;
+  /** Wiederverbinden nach einer Trennung: Spielstand und Protokoll bleiben stehen. */
+  wieder?: boolean;
+};
 
 export function openSocket(
   code: string,

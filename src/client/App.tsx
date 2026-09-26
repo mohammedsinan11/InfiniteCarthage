@@ -10,6 +10,8 @@ export function App() {
   const dismissError = useStore((s) => s.dismissError);
   const state = useStore((s) => s.state);
   const resume = useStore((s) => s.resume);
+  const room = useStore((s) => s.room);
+  const wieder = status === 'reconnecting';
 
   // Beim Laden pruefen, ob dieser Tab noch einen Platz in einer Partie hat.
   useEffect(() => {
@@ -18,7 +20,18 @@ export function App() {
 
   return (
     <>
-      {status === 'playing' && state ? <Game /> : status === 'lobby' ? <Lobby /> : <Home />}
+      {(status === 'playing' || wieder) && state ? (
+        <Game />
+      ) : status === 'lobby' || (wieder && room) ? (
+        <Lobby />
+      ) : (
+        <Home />
+      )}
+      {wieder && (
+        <div className="wieder-banner" role="status">
+          Verbindung unterbrochen - wird wiederhergestellt...
+        </div>
+      )}
       {error !== null && (
         <div className="toast" role="alert" onClick={dismissError}>
           {error}

@@ -5424,3 +5424,19 @@ em.off {
     font-size: 9px;
   }
 }
+
+/* Wiederverbinden (net/store.ts): die Partie bleibt stehen, oben ein Hinweis. */
+.wieder-banner {
+  position: fixed;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  padding: 7px 14px;
+  font-family: var(--pixel);
+  font-size: 10px;
+  color: var(--accent);
+  background: rgba(23, 18, 12, 0.96);
+  border: 2px solid var(--accent);
+  animation: untaetig-puls 1.6s ease-in-out infinite;
+}
