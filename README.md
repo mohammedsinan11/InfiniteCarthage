@@ -24,7 +24,7 @@ weitergeben und zu mehreren spielen.
 | --- | --- |
 | `npm run dev` | Vite-Entwicklungsserver |
 | `npm run dev:worker` | Cloudflare Worker lokal (wrangler) |
-| `npm test` | Testsuite (90 Tests, ohne Browser und ohne Worker) |
+| `npm test` | Testsuite (ueber 400 Tests, ohne Browser und ohne Worker) |
 | `npm run test:e2e` | End-to-End gegen einen laufenden Worker (lokal, oder mit `CATAN_SERVER=<url>` gegen den veroeffentlichten) |
 | `npm run typecheck` | TypeScript fuer Client und Worker |
 | `npm run build` | Typecheck plus Produktionsbuild nach `dist/` |
@@ -123,6 +123,12 @@ Zwei Seeds, nicht einer:
 - `secretSeed` verlaesst das Objekt nie. Sonst waeren Wuerfe und Kartenreihenfolge
   vorausberechenbar.
 
+Die Wuerfel eines Zuges folgen aus `secretSeed` und Zugnummer
+(`wuerfelFuer` in `rules/reducer.ts`), nicht aus dem fortlaufenden
+Zufallsstrom, den auch Kaempfe und Ruinen verbrauchen. Zwei Partien mit
+demselben Seed wuerfeln deshalb gleich, egal wie sie verlaufen - die
+Grundlage der Tagesexpedition.
+
 ## Bereitstellen
 
 **Worker** (einmalig Cloudflare-Konto und `npx wrangler login`):
@@ -131,7 +137,10 @@ Zwei Seeds, nicht einer:
 npm run deploy:worker
 ```
 
-In `wrangler.toml` unter `ALLOWED_ORIGINS` die Pages-Adresse eintragen.
+In `wrangler.toml` unter `ALLOWED_ORIGINS` die Pages-Adresse eintragen. Die
+Bestenliste der Tagesexpedition ist ein drittes Durable Object (`Bestenliste`,
+Migration `v3`); es wird mit dem Worker angelegt, weitere Schritte braucht es
+nicht.
 
 **Oberflaeche**: Der Workflow in `.github/workflows/deploy.yml` testet, baut
 und veroeffentlicht bei jedem Push auf `main` nach GitHub Pages. Vorher unter
@@ -152,8 +161,45 @@ Raeuber mit Abwerfen und Klauen, Bank- und Hafenhandel, Handel zwischen
 Spielern, alle Entwicklungskarten, Groesste Rittermacht, 30/60/unendlich Siegpunkte,
 2 bis 6 Spieler.
 
-Noch nicht enthalten: Laengste Handelsstrasse, Accounts und Statistiken,
-KI-Gegner.
+Noch nicht enthalten: Laengste Handelsstrasse, Accounts, KI-Gegner.
+
+### Wiederspielwert: Omen, Tagesexpedition, Chronik
+
+Warum und was als Naechstes kommen koennte, steht in
+[REPLAYABILITY.md](REPLAYABILITY.md). Gebaut sind die ersten drei Punkte:
+
+**Omen** (`src/core/omen.ts`). Jede Partie steht unter zwei Vorzeichen, meist
+einem Segen und einem Fluch - etwa *Reiche Adern* (Berge +1 Erz) und
+*Blutmond* (jede Nacht eine staerkere Horde). Sie gelten fuer alle und stehen
+schon in der Lobby; der Gastgeber kann neu wuerfeln oder ohne Omen spielen.
+Jedes Omen greift an genau einer Stelle, die es schon gab: Ertrag,
+Bankhandel, Handkartengrenze, Raubzuege, Horden, Schleime, Aufbau oder Fund.
+
+**Laenge "ein Jahr".** In der Lobby neben dem Siegpunktziel: nach 60 Runden
+ist Schluss, und es gewinnt die hoechste **Wertung** - Siegpunkte mal 10 plus
+Ruhm (`wertung` in `src/core/chronik.ts`).
+
+**Tagesexpedition** (`src/core/tages.ts`, `src/worker/bestenliste.ts`). Jeden
+Tag (UTC) eine Welt fuer alle: dieselbe Landschaft, dieselben Omen (ein Segen,
+zwei Flueche), dieselben Wuerfel. Allein, ein Jahr lang, gewertet wird wie
+oben. Die Startseite zeigt die Omen und die Bestenliste des Tages (je Name das
+beste Ergebnis). Der Weltseed folgt oeffentlich aus dem Datum; der geheime
+Seed wird im Tagesobjekt der Bestenliste gewuerfelt und verlaesst es nur
+Richtung Raumobjekt - aus dem Quelltext laesst sich nichts vorausrechnen. Das
+Ergebnis traegt das Raumobjekt selbst ein, der Client meldet nichts.
+
+**Chronik** (`src/core/chronik.ts`, `src/client/ui/Chronik.tsx`). Statt
+"X gewinnt!" zeigt das Ende eine Schlussseite: Rangliste mit Wertung,
+Siegpunkte im Verlauf, die Momente der Partie (erste Stadt, Horden,
+niedergebrannte Doerfer, gefallene Helden, epische Karten ...), Zahlen je
+Spieler und die Omen. Dazu "Diese Welt nochmal" (dieselbe Landschaft, neue
+Wuerfel) oder bei der Tagesexpedition "Nochmal versuchen". Die Chronik wird
+aus den Ereignissen fortgeschrieben, die `applyAction` ohnehin erzeugt; keine
+Regel muss von ihr wissen.
+
+Alle neuen Felder im Spielstand sind optional und werden fuer laufende
+Partien nachgetragen (`rules/migration.ts`) - ein Deploy wirft keine Partie
+weg.
 
 ### Handel zwischen Spielern
 

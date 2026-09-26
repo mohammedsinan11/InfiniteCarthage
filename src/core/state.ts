@@ -12,6 +12,7 @@ import type { Bundle, Resource } from './types';
 import type { ChunkCoord } from './chunks';
 import type { DraftSource } from './cards/types';
 import type { HeldLore } from './lore';
+import type { Chronik } from './chronik';
 
 export type PlayerId = string;
 
@@ -378,8 +379,14 @@ export type Phase =
   | { t: 'draft' }
   | { t: 'main' }
   | { t: 'roadBuilding'; remaining: number }
-  /** winner null: alle sind gefallen - die Partie ist verloren. */
-  | { t: 'finished'; winner: PlayerId | null };
+  /**
+   * winner null: alle sind gefallen - die Partie ist verloren.
+   *
+   * durch: 'ziel' - jemand hat die Siegpunkte erreicht; 'zeit' - die
+   * Rundengrenze ist abgelaufen, gewonnen hat die hoechste Wertung
+   * (core/chronik.ts, wertung). Fehlt bei alten Staenden und beim Untergang.
+   */
+  | { t: 'finished'; winner: PlayerId | null; durch?: 'ziel' | 'zeit' };
 
 /**
  * Ein offenes Handelsangebot des Spielers am Zug.
@@ -498,6 +505,24 @@ export type GameState = {
    * Spieler (rules/hauptstadt.ts).
    */
   hauptstaedte: Record<string, Hauptstadt>;
+  /**
+   * Die Omen der Partie (core/omen.ts): Regeln, die fuer alle gelten.
+   * Oeffentlich. Fehlt bei alten Staenden - dann gilt keines.
+   */
+  omens?: string[];
+  /**
+   * Nach so vielen Runden endet die Partie, und die hoechste Wertung gewinnt
+   * (core/chronik.ts). null: kein Zeitlimit, nur das Siegpunktziel zaehlt.
+   */
+  rundenLimit?: number | null;
+  /**
+   * Das Datum der Tagesexpedition (core/tages.ts), etwa "2026-09-26". null bei
+   * einer gewoehnlichen Partie. Oeffentlich - die Welt ist ohnehin fuer alle
+   * dieselbe.
+   */
+  tagesDatum?: string | null;
+  /** Punkteverlauf, Zahlen und Momente fuer die Schlussseite (core/chronik.ts). */
+  chronik?: Chronik;
 };
 
 /** Eine Hauptstadt auf einem Feld. Die Stufe beginnt bei 1 - weitere folgen (DESIGN.md, Hauptstadt). */

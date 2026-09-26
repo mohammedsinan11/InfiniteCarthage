@@ -25,6 +25,14 @@ export type RoomInfo = {
   members: Member[];
   /** In der oeffentlichen Raumliste sichtbar (core/lobby.ts). */
   oeffentlich: boolean;
+  /** Die Omen der kommenden Partie (core/omen.ts) - schon in der Lobby sichtbar. */
+  omens: string[];
+  /** Rundengrenze der Partie, null ohne (core/chronik.ts, wertung). */
+  rundenLimit: number | null;
+  /** Tagesexpedition: ihr Datum. null bei einem gewoehnlichen Raum (core/tages.ts). */
+  tagesDatum: string | null;
+  /** Die Welt einer frueheren Partie ("Diese Welt nochmal"). null: eine neue. */
+  weltSeed: number | null;
 };
 
 /**
@@ -52,6 +60,16 @@ export const DEFAULT_TARGET_POINTS = 30;
 export const targetPointsLabel = (n: number): string =>
   n === NO_TARGET ? 'unendlich' : String(n);
 
+/**
+ * Die Laenge einer Partie: offen (nur das Siegpunktziel zaehlt) oder ein Jahr
+ * zu 60 Runden, nach dem die hoechste Wertung gewinnt. Das Jahr macht eine
+ * Partie planbar - und Ergebnisse vergleichbar.
+ */
+export const RUNDEN_LIMIT_CHOICES = [null, 60] as const;
+
+export const rundenLimitLabel = (n: number | null): string =>
+  n === null ? 'offen' : n === 60 ? 'ein Jahr' : `${n} Runden`;
+
 export type ClientMsg =
   /**
    * token stammt aus einer frueheren Sitzung und holt den Platz zurueck. Auf
@@ -59,7 +77,14 @@ export type ClientMsg =
    */
   | { t: 'join'; name: string; token?: string; seat?: PlayerId; pin?: string }
   /** Nur der Gastgeber, nur vor dem Start. Was fehlt, bleibt, wie es ist. */
-  | { t: 'setOptions'; targetPoints?: number; oeffentlich?: boolean }
+  | {
+      t: 'setOptions';
+      targetPoints?: number;
+      oeffentlich?: boolean;
+      /** Omen neu wuerfeln oder ohne Omen spielen (core/omen.ts). */
+      omens?: 'neu' | 'keine';
+      rundenLimit?: number | null;
+    }
   | { t: 'start' }
   | { t: 'action'; action: Action };
 

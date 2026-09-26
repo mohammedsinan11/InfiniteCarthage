@@ -15,6 +15,7 @@ import { modifiersOf, terrainBonusFor } from '../cards/effects';
 import { emptyHand } from '../state';
 import type { Hand } from '../state';
 import { regnet, wetterOf } from '../zeit';
+import { ertragsBonus } from '../omen';
 import type { Wetter } from '../zeit';
 
 export type Payout = Record<PlayerId, Hand>;
@@ -47,7 +48,11 @@ export function productionSources(
    * oeffentlich. So passt auch die redigierte Sicht des Clients hinein und
    * die Ertragsregel bleibt einmalig.
    */
-  state: Pick<GameState, 'buildings'> & { players: ReadonlyArray<{ id: PlayerId; activeCards: string[] }> },
+  state: Pick<GameState, 'buildings'> & {
+    players: ReadonlyArray<{ id: PlayerId; activeCards: string[] }>;
+    /** Die Omen der Partie (core/omen.ts) - sie gelten fuer alle. */
+    omens?: readonly string[];
+  },
   world: World,
   roll: number,
   /**
@@ -72,7 +77,8 @@ export function productionSources(
       const grund = b.type === 'city' ? 2 : 1;
       // Karten koennen den Ertrag heben oder senken, aber nie unter null.
       const mods = modifiersOf(cardsOf(b.owner));
-      const voll = terrainBonusFor(mods, tile.terrain, grund);
+      const omen = ertragsBonus(state.omens, tile.terrain);
+      const voll = Math.max(0, terrainBonusFor(mods, tile.terrain, grund) + omen);
       const amount = nass && tile.terrain === 'field' ? Math.floor(voll / 2) : voll;
       if (amount > 0) out.push({ hex: hk, owner: b.owner, resource, amount });
     }

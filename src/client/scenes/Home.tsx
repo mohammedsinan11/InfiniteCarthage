@@ -16,21 +16,14 @@ import { useStore } from '../net/store';
 import { PIN_LENGTH, ROOM_CODE_LENGTH, isPin, isRoomCode, normalizePin, targetPointsLabel } from '../../core/protocol';
 import { VERFALL_TAGE, zuletztText } from '../../core/lobby';
 import type { RaumEintrag } from '../../core/lobby';
-import { SERVER_MISSING, holeRaeume } from '../net/socket';
+import { SERVER_MISSING, holeRaeume, holeTagesInfo, neuerRaumCode as freshCode } from '../net/socket';
+import type { TagesInfo } from '../../core/tages';
+import { OmenListe } from '../ui/OmenListe';
 import { lesePartien, lokalerSpeicher, vergissPartie } from '../net/partien';
 import type { Partie } from '../net/partien';
 
-const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-
 /** Wie oft die Raumliste neu geholt wird. */
 const LISTE_ALLE_MS = 15_000;
-
-/** Raumcode ohne 0/O und 1/I - die werden beim Vorlesen zu oft verwechselt. */
-function freshCode(): string {
-  const a = new Uint8Array(ROOM_CODE_LENGTH);
-  crypto.getRandomValues(a);
-  return [...a].map((b) => ALPHABET[b % ALPHABET.length]).join('');
-}
 
 const STATUS_TEXT = { lobby: 'wartet', laeuft: 'laeuft', beendet: 'beendet' } as const;
 
@@ -57,11 +50,19 @@ export function Home() {
   const [partien, setPartien] = useState<Partie[]>(() => lesePartien(lokalerSpeicher(), Date.now()));
   const [platz, setPlatz] = useState<string | null>(null);
   const [pin, setPin] = useState('');
+  const [tages, setTages] = useState<TagesInfo | null>(null);
 
   useEffect(() => {
     if (SERVER_MISSING) return;
     let lebt = true;
     const laden = () => {
+      holeTagesInfo()
+        .then((t) => {
+          if (lebt) setTages(t);
+        })
+        .catch(() => {
+          // Ohne Tagesexpedition bleibt der Rest der Seite, wie er ist.
+        });
       holeRaeume()
         .then((r) => {
           if (!lebt) return;
@@ -318,6 +319,46 @@ export function Home() {
         >
           Neuen Raum eroeffnen
         </button>
+
+        {tages && (
+          <section className="tages">
+            <h2>Tagesexpedition · {tages.datum}</h2>
+            <p className="note">
+              Heute spielen alle dieselbe Welt mit denselben Wuerfeln: ein Jahr ({tages.runden} Runden),
+              allein. Es zaehlt die Wertung - Siegpunkte mal 10 plus Ruhm.
+            </p>
+            <OmenListe omens={tages.omens} />
+            <button
+              className="primary"
+              disabled={!ready || verbindet}
+              onClick={() => {
+                if (name.trim().length === 0) {
+                  setNameFehlt(true);
+                  nameFeld.current?.focus();
+                  return;
+                }
+                connect(freshCode(), name.trim(), true, false, undefined, { tages: true });
+              }}
+            >
+              Expedition antreten
+            </button>
+            {tages.eintraege.length > 0 ? (
+              <ol className="bestenliste">
+                {tages.eintraege.slice(0, 10).map((e, i) => (
+                  <li key={e.code} className={e.name.trim().toLowerCase() === name.trim().toLowerCase() ? 'du' : ''}>
+                    <span className="platz-nr">{i + 1}.</span>
+                    <span className="besten-name">{e.name}</span>
+                    <span className="besten-wert" title={`${e.punkte} Siegpunkte, ${e.ruhm} Ruhm`}>
+                      {e.wertung}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="note">Noch niemand ist heute zurueckgekehrt. Sei die erste Zeile der Bestenliste.</p>
+            )}
+          </section>
+        )}
 
         <div className="divider">oder</div>
 

@@ -9,6 +9,7 @@
 
 import { create } from 'zustand';
 import { openSocket, sendMsg } from './socket';
+import type { RaumWunsch } from './socket';
 import { lokalerSpeicher, merkePartie } from './partien';
 import { normalizePin } from '../../core/protocol';
 import type { ClientMsg, RoomInfo, ServerMsg } from '../../core/protocol';
@@ -173,7 +174,7 @@ export type Store = {
    * oeffentlich gilt nur beim Eroeffnen: erscheint der Raum in der Raumliste?
    * token: aus "Deine Partien" (net/partien.ts) - sonst nur das Token dieses Tabs.
    */
-  connect: (code: string, name: string, create: boolean, oeffentlich?: boolean, token?: string) => void;
+  connect: (code: string, name: string, create: boolean, oeffentlich?: boolean, token?: string, neu?: RaumWunsch) => void;
   /** In einer laufenden Partie ohne Token: diesen Platz nehmen, mit seiner PIN. */
   waehlePlatz: (seat: PlayerId, pin: string) => void;
   /** Nach einem Neuladen zurueck in die laufende Partie, falls moeglich. */
@@ -188,6 +189,31 @@ export type Store = {
   clearPfeile: () => void;
   clearTreffer: () => void;
 };
+
+/**
+ * Felder nachtragen, die ein aelterer Worker noch nicht schickt.
+ *
+ * Oberflaeche und Worker werden getrennt veroeffentlicht (README,
+ * Bereitstellen): die Seite geht mit jedem Push live, der Worker von Hand.
+ * Dazwischen spricht eine neue Seite mit einem alten Worker - ohne Omen,
+ * Rundengrenze und Chronik. Dann gilt eben keines davon, statt dass die Seite
+ * an einem fehlenden Feld zerbricht.
+ */
+function vervollstaendige(msg: ServerMsg): void {
+  const room = 'room' in msg ? msg.room : null;
+  if (room) {
+    room.omens ??= [];
+    room.rundenLimit ??= null;
+    room.tagesDatum ??= null;
+    room.weltSeed ??= null;
+  }
+  if (msg.t === 'state') {
+    msg.state.omens ??= [];
+    msg.state.rundenLimit ??= null;
+    msg.state.tagesDatum ??= null;
+    msg.state.chronik ??= null;
+  }
+}
 
 /** Wie viele Weltereignisse das Menue behaelt. */
 const WELT_MAX = 60;
@@ -589,7 +615,7 @@ export const useStore = create<Store>((set, get) => ({
   pfeile: [],
   treffer: [],
 
-  connect:(code, name, create, oeffentlich = true, token) => {
+  connect:(code, name, create, oeffentlich = true, token, neu = {}) => {
     beitrittsName = name;
     const alt = get().ws;
     if (alt) {
@@ -620,6 +646,7 @@ export const useStore = create<Store>((set, get) => ({
       },
       onMessage: (msg: ServerMsg) => {
         if (get().ws !== ws) return;
+        vervollstaendige(msg);
         switch (msg.t) {
           case 'welcome':
             saveToken(code, msg.token);
@@ -784,7 +811,7 @@ export const useStore = create<Store>((set, get) => ({
             break;
         }
       },
-    });
+    }, neu);
 
     set({ ws });
   },

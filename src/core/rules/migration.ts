@@ -11,9 +11,11 @@
  */
 
 import type { GameState } from '../state';
+import { publicPoints } from '../state';
 import { GESTALTEN } from '../lore';
 import { Rng } from '../rng';
 import { ersteAktiveReichskarten } from '../cards/loadout';
+import { neueChronik } from '../chronik';
 
 export function migriereStand(state: GameState): GameState {
   // Wachtuerme standen frueher neben einem Haus (Building.turm), heute stehen
@@ -74,6 +76,16 @@ export function migriereStand(state: GameState): GameState {
   for (const u of state.units) {
     if (u.siege === undefined) u.siege = 0;
     if (u.stufe === undefined) u.stufe = 0;
+  }
+  // Omen, Rundengrenze, Tagesexpedition und Chronik kamen fuer den
+  // Wiederspielwert dazu (REPLAYABILITY.md). Laufende Partien spielen ohne Omen
+  // und ohne Grenze weiter; ihre Chronik beginnt jetzt.
+  if (!state.omens) state.omens = [];
+  if (state.rundenLimit === undefined) state.rundenLimit = null;
+  if (state.tagesDatum === undefined) state.tagesDatum = null;
+  if (!state.chronik) {
+    state.chronik = neueChronik(state);
+    if (state.phase.t !== 'setup') state.chronik.verlauf.push({ turn: state.turn, punkte: state.order.map((id) => publicPoints(state, id)) });
   }
   return state;
 }
