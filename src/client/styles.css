@@ -5264,8 +5264,8 @@ em.off {
 /* Warnung vor einem nahen Raubzug (scenes/Game.tsx, raubWarnung). */
 .raub-warnung {
   position: absolute;
-  /* Ueber der Bauleiste, nicht oben: dort stehen Heerleiste und Meldungen. */
-  bottom: 124px;
+  /* Ueber Bauleiste und Zeitleiste, nicht oben: dort stehen Heerleiste und Meldungen. */
+  bottom: calc(var(--unten-oben, 118px) + 46px);
   left: 50%;
   transform: translateX(-50%);
   z-index: 7;
@@ -5395,7 +5395,6 @@ em.off {
 }
 @media (max-width: 700px) {
   .raub-warnung {
-    bottom: 176px;
     font-size: 12px;
   }
 }
@@ -5494,29 +5493,6 @@ em.off {
   align-items: center;
 }
 
-/* Demnaechst (ui/SideMenu.tsx): die naechsten Runden auf einen Blick. */
-.menu-demnaechst {
-  list-style: none;
-  margin: 6px 0 0;
-  padding: 6px 0 0;
-  border-top: 1px solid var(--line);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 11px;
-  line-height: 1.35;
-  color: var(--muted);
-  text-align: left;
-}
-.menu-demnaechst b {
-  display: inline-block;
-  min-width: 38px;
-  font-family: var(--pixel);
-  font-size: 9px;
-  font-weight: normal;
-  color: var(--accent);
-}
-
 /* Der Rat (client/rat.ts): ein Satz, was jetzt sinnvoll waere. */
 .hud > button.hud-rat {
   color: var(--accent);
@@ -5550,7 +5526,7 @@ em.off {
 @media (max-width: 700px) {
   .rat-tafel {
     top: auto;
-    bottom: 176px;
+    bottom: calc(var(--unten-oben, 150px) + 46px);
     font-size: 12px;
   }
 }
@@ -5610,4 +5586,77 @@ em.off {
   font-style: normal;
   font-weight: normal;
   color: var(--accent);
+}
+
+/* Zeitleiste (ui/Zeitleiste.tsx): die naechsten sechs Runden ueber der Bauleiste. */
+.zeitleiste {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--unten-oben, 118px) + 6px);
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  gap: 2px;
+  pointer-events: auto;
+}
+.zl-feld {
+  width: 44px;
+  height: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  background: rgba(23, 18, 12, 0.86);
+  border: 1px solid var(--line);
+  cursor: help;
+}
+.zl-feld.nacht {
+  background: rgba(20, 22, 44, 0.9);
+}
+.zl-feld.jetzt {
+  border-color: var(--accent);
+}
+.zl-runde {
+  font-family: var(--pixel);
+  font-size: 7px;
+  color: var(--muted);
+}
+.zl-feld.jetzt .zl-runde {
+  color: var(--accent);
+}
+.zl-marken {
+  display: flex;
+  gap: 3px;
+  min-height: 14px;
+  font-size: 12px;
+  line-height: 1;
+  font-style: normal;
+}
+.zl-marken i {
+  font-style: normal;
+}
+.zl-gross,
+.zl-raub {
+  color: var(--danger);
+}
+.zl-nacht {
+  color: #9ab0ff;
+}
+.zl-saison {
+  color: #8fcf6a;
+}
+.zl-vorhaben,
+.zl-ende {
+  color: var(--accent);
+}
+.zl-raub {
+  font-family: var(--pixel);
+  font-weight: bold;
+}
+@media (max-width: 700px) {
+  .zl-feld {
+    width: 38px;
+    height: 28px;
+  }
 }

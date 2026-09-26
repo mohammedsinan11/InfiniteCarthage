@@ -72,6 +72,7 @@ import { bundleText } from '../log';
 import { eckenWert } from '../../core/bot';
 import { weltArtVon } from '../../core/weltart';
 import { geruechte } from '../geruechte';
+import { Zeitleiste } from '../ui/Zeitleiste';
 import { ratschlag } from '../rat';
 import type { Rat } from '../rat';
 import { vorhabenById, vorhabenFortschritt } from '../../core/vorhaben';
@@ -1047,6 +1048,12 @@ export function Game() {
       const rechts = menu ? menu.getBoundingClientRect().left - 12 : window.innerWidth - 36;
       const skala = Math.min(1, Math.max(0.5, (rechts - links) / natur));
       el.style.setProperty('--unten-skala', skala.toFixed(3));
+      // Wie hoch der Block unten reicht - Zeitleiste, Warnung und Rat stehen darueber.
+      const main = el.closest('.main') as HTMLElement | null;
+      if (main) {
+        const hoch = main.getBoundingClientRect().bottom - el.getBoundingClientRect().top;
+        main.style.setProperty('--unten-oben', `${Math.round(hoch)}px`);
+      }
     };
     passen();
     const ro = new ResizeObserver(passen);
@@ -1583,6 +1590,15 @@ export function Game() {
                 <TradePanel state={state} you={you} hand={hand} act={act} />
               </div>
             )}
+
+          {you && phase.t !== 'setup' && phase.t !== 'hauswahl' && (
+            <Zeitleiste
+              turn={state.turn}
+              rundenLimit={state.rundenLimit ?? null}
+              vorhabenBis={state.vorhaben?.[you]?.aktiv?.bis ?? null}
+              raubIn={raubWarnung ? raubWarnung.weg : null}
+            />
+          )}
 
           {rat && (
             <div className="rat-tafel" role="status">
