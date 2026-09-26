@@ -11,6 +11,8 @@
  * Kopie, die nur bei Erfolg uebernommen wird.
  */
 
+import { EINWOHNER_FUER_STADT, bevoelkerungRunde, einwohnerAbgleichen, einwohnerNehmen, einwohnerVerlieren, einwohnerVon } from '../bevoelkerung';
+import type { BevoelkerungEvent } from '../bevoelkerung';
 import { erbstueckById, istErbstueck } from '../erbe';
 import { kundeFortschreiben, kundeSchreiben } from '../kunde';
 import type { KundeEvent } from '../kunde';
@@ -262,6 +264,7 @@ export type GameEvent =
   | VorhabenEvent
   | FraktionsEvent
   | KundeEvent
+  | BevoelkerungEvent
   | BedrohungEvent
   | DiplomatieEvent
   | AuftragEvent
@@ -1006,6 +1009,10 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (!canAfford(actorPlayer.hand, COST_CITY)) {
         return fail('Zu wenig Rohstoffe fuer eine Stadt.');
       }
+      // Eine Stadt braucht Menschen (core/bevoelkerung.ts).
+      if (s.ereignisseAn && einwohnerVon(s, action.vertex) < EINWOHNER_FUER_STADT) {
+        return fail(`Fuer eine Stadt braucht das Dorf ${EINWOHNER_FUER_STADT} Einwohner - es waechst jede grosse Runde.`);
+      }
 
       pay(actorPlayer.hand, COST_CITY);
       s.buildings[action.vertex] = { owner: actor, type: 'city' };
@@ -1199,6 +1206,8 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (!canAfford(actorPlayer.hand, COST_KNIGHT)) {
         return fail('Zu wenig Rohstoffe fuer einen Ritter.');
       }
+      // Ein Ritter kommt aus einer Siedlung mit wenigstens zwei Einwohnern.
+      if (!einwohnerNehmen(s, actor)) return fail('Keine Siedlung hat Einwohner uebrig - sie wachsen jede grosse Runde.');
       pay(actorPlayer.hand, COST_KNIGHT);
       if (!spawnKnight(s, actor, events)) {
         return fail('Keine Siedlung, an der ein Ritter antreten koennte.');
@@ -1530,6 +1539,8 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         tributRunde(s, events);
         // Vorhaben (core/vorhaben.ts): verfallen lassen, neue anbieten.
         vorhabenRunde(s, events);
+        // Die Siedlungen wachsen (core/bevoelkerung.ts).
+        bevoelkerungRunde(s, world, events);
         // Wer eine Sorte gar nicht erzeugt, bekommt sie ab und zu (rules/hilfe.ts).
         mangelHilfe(s, world, events);
         // Sternwarte und Sonnentempel geben je grosser Runde (core/wunder.ts).
@@ -1574,6 +1585,13 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
   ruhmAusEreignissen(s, geschehen, events);
   // Die Fraktionen reagieren: Nachfolger, Beute, Stimmung (core/fraktionsleben.ts).
   fraktionsLeben(s, geschehen, events);
+  // Einwohner: Pluenderungen kosten einen, neue Siedlungen bekommen ihren ersten.
+  for (const e of geschehen) {
+    if (e.t === 'plunder' && (e.count as number) > 0) {
+      einwohnerVerlieren(s, e.player as PlayerId, e.q as number, e.r as number, 1, events);
+    }
+  }
+  einwohnerAbgleichen(s);
   // Ins Saisonbuch - und zum Wechsel der Jahreszeit die Kunde aus dem Land (core/kunde.ts).
   kundeFortschreiben(s, events as never);
   if (action.t === 'endTurn' && seasonChangedAt(s.turn) && (s.phase as GameState['phase']).t !== 'finished') {

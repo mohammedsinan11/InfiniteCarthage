@@ -71,6 +71,7 @@ import type { UnitState as HeerEinheit } from '../../core/state';
 import { bundleText } from '../log';
 import { eckenWert } from '../../core/bot';
 import { weltArtVon } from '../../core/weltart';
+import { stadtReif } from '../../core/bevoelkerung';
 import { erstarkt, fraktionIn, stimmungText, stimmungVon } from '../../core/fraktionsleben';
 import { geruechte } from '../geruechte';
 import { Zeitleiste } from '../ui/Zeitleiste';
@@ -558,7 +559,7 @@ export function Game() {
         if (mode === 'settlement') {
           return mitEmpfehlung(legalSettlementVertices(state, world, you, { setup: notbau }), 3);
         }
-        if (mode === 'city') return { vertices: legalCityVertices(state, you) };
+        if (mode === 'city') return { vertices: legalCityVertices(state, you).filter((vk) => stadtReif(state, vk)) };
         return {};
       default:
         return {};

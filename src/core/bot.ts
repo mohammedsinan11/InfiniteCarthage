@@ -17,6 +17,7 @@
  * Rein und ohne Zufall: dieselbe Lage ergibt denselben Zug.
  */
 
+import { stadtReif } from './bevoelkerung';
 import { parseVertexKey, vertexAdjacentHexes, edgeEndpoints, parseEdgeKey, vertexKey } from './coords';
 import { tileAt } from './world';
 import type { World } from './world';
@@ -231,7 +232,7 @@ export function botAktion(state: GameState, world: World, id: PlayerId, versucht
 
   // Stadt, dann Dorf, dann Strasse - jeweils der beste Platz.
   if (canAfford(p.hand, COST_CITY)) {
-    const vk = beste(legalCityVertices(state, id), (v) => eckenWert(world, v));
+    const vk = beste(legalCityVertices(state, id).filter((v) => stadtReif(state, v)), (v) => eckenWert(world, v));
     if (vk) {
       const a = neu({ t: 'buildCity', vertex: vk });
       if (a) return a;
@@ -259,7 +260,7 @@ export function botAktion(state: GameState, world: World, id: PlayerId, versucht
   }
 
   // Ueberzaehliges tauschen - gegen das, was dem naechsten Ziel fehlt.
-  const ziel = legalCityVertices(state, id).length > 0 ? COST_CITY : COST_SETTLEMENT;
+  const ziel = legalCityVertices(state, id).some((v) => stadtReif(state, v)) ? COST_CITY : COST_SETTLEMENT;
   const braucht = fehlt(p.hand, ziel) ?? fehlt(p.hand, COST_ROAD) ?? (natur === 'haendler' ? fehlt(p.hand, COST_CITY) : null);
   if (braucht) {
     const geben = beste(

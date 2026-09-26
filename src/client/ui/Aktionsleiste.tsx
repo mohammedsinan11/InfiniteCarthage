@@ -704,7 +704,7 @@ export function Aktionsleiste({
           onClick={bau('road')}
         />
         <DockKnopf titel="Dorf" symbol={<SymSiedlung />} kosten={COST_SETTLEMENT} gewaehlt={mode === 'settlement'} darf={bauen && canAfford(hand, COST_SETTLEMENT)} onClick={bau('settlement')} />
-        <DockKnopf titel="Stadt" symbol={<SymStadt />} kosten={COST_CITY} gewaehlt={mode === 'city'} darf={bauen && canAfford(hand, COST_CITY)} onClick={bau('city')} />
+        <DockKnopf titel="Stadt" symbol={<SymStadt />} kosten={COST_CITY} gewaehlt={mode === 'city'} darf={bauen && canAfford(hand, COST_CITY)} tip={`Ein Dorf zur Stadt ausbauen: doppelter Ertrag, 2 Siegpunkte. ${kostenText(COST_CITY)}${state.ereignisseAn ? ' - das Dorf braucht 2 Einwohner.' : ''}`} onClick={bau('city')} />
         <DockKnopf
           titel="Turm"
           symbol={<SymTurm />}

@@ -5852,3 +5852,17 @@ em.off {
 .spur-kreuz {
   fill: #3a342a;
 }
+
+/* Einwohner unter den Siedlungen (board/Board.tsx). */
+.einwohner {
+  pointer-events: visiblePainted;
+  cursor: help;
+}
+.ew-da rect {
+  fill: #f2e2b8;
+  stroke: #2a1c0c;
+  stroke-width: 0.6;
+}
+.ew-frei rect {
+  fill: rgba(20, 14, 8, 0.55);
+}

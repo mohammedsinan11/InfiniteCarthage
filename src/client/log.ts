@@ -198,6 +198,10 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
     }
     case 'ambitionFailed':
       return `${who(state, e.player)} laesst das Vorhaben "${vorhabenById(e.id)?.name ?? e.id}" fallen - die Zeit ist um.`;
+    case 'growth':
+      return `Die Siedlungen von ${who(state, e.player)} wachsen: +${e.zuwachs} Einwohner (jetzt ${e.gesamt}).`;
+    case 'peopleLost':
+      return `${who(state, e.player)} verliert ${e.count === 1 ? 'einen Einwohner' : `${e.count} Einwohner`} an die Pluenderer.`;
     case 'market':
       return `${who(state, e.player)} geht auf den Markt (${bundleText(e.paid)}).`;
     case 'seasonReport':

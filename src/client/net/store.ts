@@ -240,6 +240,7 @@ function vervollstaendige(msg: ServerMsg): void {
     msg.state.fraktionen ??= {};
     msg.state.berichte ??= [];
     msg.state.bankZug ??= {};
+    msg.state.einwohner ??= {};
     msg.state.marktZug ??= {};
     msg.state.koop ??= false;
     msg.state.szenario ??= null;
@@ -422,6 +423,8 @@ function meldungenAus(
       if (e.player === you) meldung('Neue Vorhaben zur Wahl - beim Kanzler im Menue', 'info');
     } else if (e.t === 'ambitionDone') {
       if (e.player === you) meldung(`Vorhaben vollendet: ${vorhabenById(e.id)?.name ?? e.id}`, 'gain');
+    } else if (e.t === 'peopleLost') {
+      if (e.player === you) meldung(`Die Pluenderer verschleppen ${e.count === 1 ? 'einen Einwohner' : `${e.count} Einwohner`}`, 'raid');
     } else if (e.t === 'chiefChanged') {
       meldung(`${e.alt} ist gefallen - ${e.neu} fuehrt nun ${name(e.fraktion)}`, 'info');
     } else if (e.t === 'vendetta') {

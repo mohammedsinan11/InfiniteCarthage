@@ -578,6 +578,8 @@ export type GameState = {
   ereignisseGesehen?: string[];
   /** Wuerfe in Folge ohne Ertrag je Spieler (rules/hilfe.ts, durstLindern). */
   durst?: Record<PlayerId, number>;
+  /** Einwohner je Siedlung, Eckschluessel -> Zahl (core/bevoelkerung.ts). */
+  einwohner?: Record<string, number>;
   /** Bankgeschaefte je Spieler im laufenden Zug (rules/trade.ts, bankAufschlag). */
   bankZug?: Record<PlayerId, { turn: number; n: number }>;
   /** Wann jeder zuletzt auf dem Markt war - einmal je Zug (MARKT_PREIS). */
