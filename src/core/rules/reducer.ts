@@ -134,11 +134,16 @@ import {
 } from './trade';
 import { drawDevCard } from './dev';
 
+/** Was der Markt kostet, in Karten. */
+export const MARKT_PREIS = 3;
+
 export type Action =
   /** Ein Weltwunder auf einer Staette errichten, an der ein eigenes Gebaeude steht (core/wunder.ts). */
   | { t: 'buildWonder'; q: number; r: number }
   /** Auf ein Ereignis antworten: die Nummer der Wahl (core/ereignis.ts). */
   | { t: 'answerEvent'; wahl: number }
+  /** Drei Karten vom groessten Stapel gegen eine Kartenwahl - einmal je Zug. */
+  | { t: 'visitMarket' }
   /** Ein Vorhaben aus der Auswahl annehmen, null verwirft die Auswahl (core/vorhaben.ts). */
   | { t: 'chooseAmbition'; id: string | null }
   /** Vor dem Aufbau: eines der angebotenen Adelshaeuser waehlen (core/haus.ts). */
@@ -244,6 +249,8 @@ export type GameEvent =
   | { t: 'houseChosen'; player: PlayerId; haus: string }
   | { t: 'eventOffered'; player: PlayerId; id: string }
   | { t: 'wonder'; player: PlayerId; q: number; r: number; art: WunderArt }
+  /** Auf dem Markt bezahlt - danach folgt die Kartenwahl (visitMarket). */
+  | { t: 'market'; player: PlayerId; paid: Hand }
   | { t: 'wonderGift'; player: PlayerId; art: WunderArt; ruhm: number; beute: number }
   | { t: 'eventResolved'; player: PlayerId; id: string; wahl: number; ruhm: number; verloren: number }
   | { t: 'win'; player: PlayerId }
@@ -1084,7 +1091,26 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       const ratio = tradeRatio(s, world, actor, action.give);
       actorPlayer.hand[action.give] -= ratio;
       actorPlayer.hand[action.receive] += 1;
+      if (s.ereignisseAn) {
+        const z = s.bankZug?.[actor];
+        s.bankZug = { ...(s.bankZug ?? {}), [actor]: { turn: s.turn, n: z && z.turn === s.turn ? z.n + 1 : 1 } };
+      }
       events.push({ t: 'trade', player: actor, give: action.give, receive: action.receive, ratio });
+      break;
+    }
+
+    case 'visitMarket': {
+      // Der Markt: drei Karten vom groessten Stapel gegen eine Kartenwahl, einmal
+      // je Zug. So hat Ueberschuss einen Zweck, der mehr ist als 4:1 (Spieltest).
+      if (!s.ereignisseAn) return fail('Einen Markt gibt es in dieser Partie nicht.');
+      if (phase.t !== 'main') return fail('Der Markt hat nur in der Bauphase offen.');
+      if (s.marktZug?.[actor] === s.turn) return fail('Auf dem Markt warst du in diesem Zug schon.');
+      if (handSize(actorPlayer.hand) < MARKT_PREIS) return fail(`Fuer den Markt brauchst du ${MARKT_PREIS} Karten.`);
+      const genommen = takeFromLargest(actorPlayer.hand, MARKT_PREIS);
+      for (const r of RESOURCES) actorPlayer.hand[r] -= genommen[r];
+      s.marktZug = { ...(s.marktZug ?? {}), [actor]: s.turn };
+      events.push({ t: 'market', player: actor, paid: genommen });
+      enterDraft(s, 'markt', events);
       break;
     }
 

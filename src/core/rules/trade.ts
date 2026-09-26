@@ -44,6 +44,9 @@ export function tradeRatioErklaert(
     omens?: readonly string[];
     /** Der Kothon (core/wunder.ts) handelt 3:1. */
     wunder?: GameState['wunder'];
+    /** Wie oft in diesem Zug schon mit der Bank getauscht wurde (bankAufschlag). */
+    bankZug?: GameState['bankZug'];
+    ereignisseAn?: boolean;
   },
   world: World,
   player: PlayerId,
@@ -105,7 +108,25 @@ export function tradeRatioErklaert(
   if (omenPlus > 0) gruende.push(`Zoellner: +${omenPlus}`);
   const hausPlus = hausHandelsAufschlag(haus);
   if (hausPlus > 0) gruende.push(`Dein Haus: +${hausPlus}`);
-  return { ratio: Math.max(2, ratio - mods.tradeDiscount) + omenPlus + hausPlus, gruende };
+  const heute = bankAufschlag(state, player);
+  if (heute > 0) gruende.push(`${heute === 1 ? '2.' : 'weiterer'} Tausch in diesem Zug: +${heute}`);
+  return { ratio: Math.max(2, ratio - mods.tradeDiscount) + omenPlus + hausPlus + heute, gruende };
+}
+
+/**
+ * Der Aufschlag fuer weitere Bankgeschaefte im selben Zug: der zweite kostet
+ * eine Karte mehr, jeder weitere zwei. Spieltest: die Haelfte aller Aktionen
+ * war 4:1-Tausch - Handel soll eine Entscheidung sein, kein Zwischenschritt
+ * vor jedem Bau. Nur in Partien mit Ereignissen (die neuen Raeume).
+ */
+export function bankAufschlag(
+  state: { bankZug?: GameState['bankZug']; ereignisseAn?: boolean; turn?: number },
+  player: PlayerId,
+): number {
+  if (!state.ereignisseAn) return 0;
+  const z = state.bankZug?.[player];
+  if (!z || z.turn !== state.turn) return 0;
+  return Math.min(2, z.n);
 }
 
 /** Wie tradeRatioErklaert, nur die Zahl. */

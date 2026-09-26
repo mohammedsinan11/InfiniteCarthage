@@ -33,8 +33,9 @@ export function ratschlag(state: PublicState, world: World, you: string): Rat | 
     const karten = Object.values(me.hand).reduce((n, x) => n + x, 0);
     const grenze = limitFor(state, you);
     if (karten > grenze) {
+      const markt = state.ereignisseAn && state.marktZug[you] !== state.turn;
       return {
-        text: `Du haeltst ${karten} Karten, erlaubt sind ${grenze}: baue oder tausche, sonst nehmen Pluenderer die Haelfte.`,
+        text: `Du haeltst ${karten} Karten, erlaubt sind ${grenze}: baue${markt ? ', geh auf den Markt (im Bankhandel)' : ''} oder tausche, sonst nehmen Pluenderer die Haelfte.`,
       };
     }
     if (me.loot > 0) return { text: 'Loese deine Beute ein: eine Kartenwahl (Knopf Beute unten).' };

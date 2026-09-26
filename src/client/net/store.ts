@@ -239,6 +239,8 @@ function vervollstaendige(msg: ServerMsg): void {
     msg.state.vorhaben ??= {};
     msg.state.fraktionen ??= {};
     msg.state.berichte ??= [];
+    msg.state.bankZug ??= {};
+    msg.state.marktZug ??= {};
     msg.state.koop ??= false;
     msg.state.szenario ??= null;
     msg.state.szenarioErgebnis ??= null;

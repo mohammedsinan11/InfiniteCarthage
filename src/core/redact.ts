@@ -139,6 +139,9 @@ export type PublicState = {
   koopErgebnis: { erfolg: boolean; summe: number; ziel: number } | null;
   /** Errichtete Weltwunder (core/wunder.ts) - weithin sichtbar. */
   wunder: NonNullable<GameState['wunder']>;
+  /** Bankgeschaefte im laufenden Zug und Marktbesuche (rules/trade.ts) - fuer den angezeigten Kurs. */
+  bankZug: NonNullable<GameState['bankZug']>;
+  marktZug: NonNullable<GameState['marktZug']>;
   /** Die Kunde aus dem Land der letzten Jahreszeiten (core/kunde.ts). */
   berichte: NonNullable<GameState['berichte']>;
   /** Was aus den Fraktionen wurde (core/fraktionsleben.ts) - fuer alle sichtbar. */
@@ -248,6 +251,8 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     vorhaben: state.vorhaben ?? {},
     fraktionen: state.fraktionen ?? {},
     berichte: state.berichte ?? [],
+    bankZug: state.bankZug ?? {},
+    marktZug: state.marktZug ?? {},
     koop: state.koop ?? false,
     ereignisseAn: state.ereignisseAn ?? false,
     szenario: state.szenario ?? null,

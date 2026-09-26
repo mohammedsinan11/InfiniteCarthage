@@ -283,6 +283,11 @@ export function botAktion(state: GameState, world: World, id: PlayerId, versucht
       const a = neu({ t: 'buyDev' });
       if (a) return a;
     }
+    // Sonst der Markt: Ueberschuss gegen eine Kartenwahl, einmal je Zug.
+    if (state.ereignisseAn && state.marktZug?.[id] !== state.turn) {
+      const a = neu({ t: 'visitMarket' });
+      if (a) return a;
+    }
   }
 
   return { t: 'endTurn' };

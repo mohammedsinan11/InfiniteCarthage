@@ -1021,7 +1021,7 @@ export function SideMenu({
             {/* Fraktionen: wem die Lager ringsum gehoeren, und das Abkommen mit ihnen (rules/diplomatie.ts). */}
             <Kopf
               titel="Fraktionen"
-              hilfe={`Jede Fraktion hat einen Anfuehrer und ein Wesen, das ihr Verhalten praegt. Frieden (Raeuberbanden und kraemerische Staemme) haelt 20 Runden und kostet ${bundleText(FRIEDEN_PREIS)}. Tribut: eine Karte je Siegpunkt (derzeit ${tributPreis}), sofort und zu Beginn jeder grossen Runde - wer nicht zahlen kann, hat wieder Krieg. Solange ein Abkommen gilt, ziehen ihre Raubzuege an dir vorbei.`}
+              hilfe={`Jede Fraktion hat einen Anfuehrer und ein Wesen, das ihr Verhalten praegt. Frieden (Raeuberbanden und kraemerische Staemme) haelt 20 Runden und kostet ${bundleText(FRIEDEN_PREIS)}. Tribut: Karten nach deinen Siegpunkten (derzeit ${tributPreis}), sofort und zu Beginn jeder grossen Runde - wer nicht zahlen kann, hat wieder Krieg. Solange ein Abkommen gilt, ziehen ihre Raubzuege an dir vorbei.`}
             />
             {fraktionen.length === 0 ? (
               <p className="menu-leer">Noch keine entdeckt.</p>

@@ -5756,3 +5756,11 @@ em.off {
 .menu-berichte .kunde-zeilen {
   font-size: 12.5px;
 }
+.dock-markt {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}

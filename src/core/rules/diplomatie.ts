@@ -44,14 +44,21 @@ export const TRIBUT_KARTEN = 1;
  * Steuer, gegen die sich ein Heer wieder rechnen kann.
  */
 export const tributKarten = (
-  s: Pick<GameState, 'buildings' | 'ruhmreichster' | 'hauptstaedte'> & { worldSeed?: number; fraktionen?: GameState['fraktionen'] },
+  s: Pick<GameState, 'buildings' | 'ruhmreichster' | 'hauptstaedte'> & {
+    worldSeed?: number;
+    fraktionen?: GameState['fraktionen'];
+    ereignisseAn?: boolean;
+  },
   player: PlayerId,
   fraktion?: string,
 ): number => {
   // Kraemerische Fraktionen (core/factions.ts) nehmen eine Karte weniger.
   const rabatt =
     fraktion && s.worldSeed !== undefined && wesenIn({ worldSeed: s.worldSeed, fraktionen: s.fraktionen }, fraktion) === 'kraemerisch' ? 1 : 0;
-  return Math.max(TRIBUT_KARTEN, publicPoints(s, player) - rabatt);
+  // Frueher eine Karte je Siegpunkt - im Spieltest 7 bis 8 Karten je grosser
+  // Runde, also nie der Muehe wert. Jetzt eine je drei Siegpunkte, dazu eine.
+  const grund = s.ereignisseAn ? 1 + Math.floor(publicPoints(s, player) / 3) : publicPoints(s, player);
+  return Math.max(TRIBUT_KARTEN, grund - rabatt);
 };
 
 export type Verhandlung = 'frieden' | 'tribut' | 'krieg';

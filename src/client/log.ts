@@ -198,6 +198,8 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
     }
     case 'ambitionFailed':
       return `${who(state, e.player)} laesst das Vorhaben "${vorhabenById(e.id)?.name ?? e.id}" fallen - die Zeit ist um.`;
+    case 'market':
+      return `${who(state, e.player)} geht auf den Markt (${bundleText(e.paid)}).`;
     case 'seasonReport':
       return `Kunde aus dem Land (${SEASON_NAME[e.bericht.saison]}, Jahr ${e.bericht.jahr}): ${e.bericht.zeilen.join(' ')}`;
     case 'chiefChanged':
