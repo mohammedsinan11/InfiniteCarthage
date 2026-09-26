@@ -19,6 +19,7 @@ import { ZWEIG_NAME } from '../core/rules/zweig';
 import { heldKurz } from '../core/lore';
 import { hausById } from '../core/haus';
 import { ereignisById } from '../core/ereignis';
+import { WUNDER } from '../core/wunder';
 
 const RES_NAME: Record<Resource, string> = {
   lumber: 'Holz',
@@ -351,6 +352,12 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
       const wahl = ereignisById(e.id)?.wahlen[e.wahl]?.text ?? '';
       return `${who(state, e.player)} entscheidet: ${wahl.split(':')[0]!.split('(')[0]!.trim()}.${e.verloren > 0 ? ` ${e.verloren} Karten gehen verloren.` : ''}`;
     }
+    case 'wonder':
+      return `${who(state, e.player)} errichtet ${WUNDER[e.art].name}! (+${WUNDER[e.art].punkte} Siegpunkte)`;
+    case 'wonderGift':
+      return e.beute > 0
+        ? `${WUNDER[e.art].name} schenkt ${who(state, e.player)} eine Kartenwahl.`
+        : `${WUNDER[e.art].name} mehrt den Ruhm von ${who(state, e.player)}.`;
     case 'houseChosen':
       return `${who(state, e.player)} fuehrt ${hausById(e.haus)?.name ?? 'ein Haus'}.`;
     case 'draftOffered':

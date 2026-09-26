@@ -18,6 +18,8 @@ import { regnet, wetterOf } from '../zeit';
 import { ertragsBonus } from '../omen';
 import { hausGelaende, hausRegenfest } from '../haus';
 import { JAHRESZEIT_WIRKUNG, seasonOf } from '../season';
+import { hatWunder } from '../wunder';
+import type { Wunder } from '../wunder';
 import type { Wetter } from '../zeit';
 
 export type Payout = Record<PlayerId, Hand>;
@@ -56,6 +58,8 @@ export function productionSources(
     omens?: readonly string[];
     /** Die Zugnummer - fuer die Jahreszeit (core/season.ts). Fehlt: keine Wirkung. */
     turn?: number;
+    /** Die Haengenden Gaerten (core/wunder.ts). */
+    wunder?: Record<string, Wunder>;
   },
   world: World,
   roll: number,
@@ -94,7 +98,8 @@ export function productionSources(
       // Das Haus des Besitzers (core/haus.ts) - etwa der Bergclan an Bergen.
       const haus = state.players.find((p) => p.id === b.owner)?.haus;
       const jahr = tile.terrain === 'pasture' ? (saison?.weide ?? 0) : tile.terrain === 'field' ? (saison?.feld ?? 0) : 0;
-      const voll = Math.max(0, terrainBonusFor(mods, tile.terrain, grund) + omen + hausGelaende(haus, tile.terrain) + jahr);
+      const gaerten = (tile.terrain === 'field' || tile.terrain === 'pasture') && hatWunder(state, b.owner, 'gaerten') ? 1 : 0;
+      const voll = Math.max(0, terrainBonusFor(mods, tile.terrain, grund) + omen + hausGelaende(haus, tile.terrain) + jahr + gaerten);
       // Regen und Winter halbieren die Felder - die Ebene ist dagegen gefeit (core/haus.ts).
       const halb = (nass || (saison?.feldHalb ?? false)) && tile.terrain === 'field' && !hausRegenfest(haus);
       const doppelt = mods.doppelZahlen.includes(roll) ? 2 : 1;

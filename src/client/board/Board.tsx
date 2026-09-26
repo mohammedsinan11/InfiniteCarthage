@@ -44,6 +44,7 @@ import { istSpielerSeite, istKampf, kampfFelder, seiteVon, spielerAus } from '..
 import type { Seite } from '../../core/combat';
 import { fraktionById, istFraktion } from '../../core/factions';
 import { ruinAt } from '../../core/ruins';
+import { WUNDER, wunderAt } from '../../core/wunder';
 import { hexenhausAt } from '../../core/hexe';
 import {
   aufstellung,
@@ -960,6 +961,16 @@ export function Board({
     if (ruinAt(state.worldSeed, q, r) && !state.exploredRuins.includes(hover)) {
       zeilen.push({ text: 'Ruine, unerkundet' });
     }
+    const staette = wunderAt(state.worldSeed, q, r);
+    if (staette) {
+      const w = state.wunder?.[hover];
+      const typ = WUNDER[staette];
+      zeilen.push({
+        text: w
+          ? `${typ.name} - errichtet von ${state.players.find((p) => p.id === w.owner)?.name ?? 'jemandem'}`
+          : `Wunderstaette: ${typ.name} (${typ.punkte} Siegpunkte). ${typ.text} Baue ein Dorf daneben, dann errichte es im Menue unter Reich.`,
+      });
+    }
     if (!nebel) {
       const gruppen = new Map<string, Unit[]>();
       for (const u of state.units) {
@@ -1171,12 +1182,14 @@ export function Board({
       const ruine =
         ruinAt(state.worldSeed, t.q, t.r) && !state.exploredRuins.includes(hexKey(t.q, t.r));
       const nebel = imNebel(t.q, t.r);
+      const staette = wunderAt(state.worldSeed, t.q, t.r);
+      const gebaut = staette ? state.wunder?.[hexKey(t.q, t.r)] : undefined;
       // Im Nebel sieht man nur, was man ohnehin kennt - Lager, ihre Besatzung,
       // Ruinen - und die eigenen Leute. Fremde Einheiten verschwinden darin.
       const leute = besatzung
         .get(hexKey(t.q, t.r))
         ?.filter((u) => !nebel || u.id < 0 || (du !== null && u.owner === du));
-      if (!lager && !ruine && (!leute || leute.length === 0)) return;
+      if (!lager && !ruine && !staette && (!leute || leute.length === 0)) return;
       // Ursprung wie in zeichne, damit Figuren im selben Pixelraster sitzen.
       const { x: x0, y: y0 } = ursprung(t.q, t.r, lift);
       const mx = x0 + Math.round(HEX_CX) * f;
@@ -1186,6 +1199,7 @@ export function Board({
         zeichneFigur(g, 'lager', mx, my + f, f, farbeSeite(nestFraktionOf(state, t.q, t.r)));
       }
       if (ruine) zeichneFigur(g, 'ruine', mx, my + 2 * f, f);
+      if (staette) zeichneFigur(g, gebaut ? 'wunder' : 'staette', mx, my + 2 * f, f);
       // Das Haus der Hexe steht fuer sich, abseits von Lagern und Ruinen.
       if (hexenhausAt(state.worldSeed, t.q, t.r)) zeichneFigur(g, 'hexenhaus', mx, my + 2 * f, f);
       if (!leute || leute.length === 0) {

@@ -34,6 +34,7 @@ import { kartenWert } from './cards/wert';
 import { ereignisById } from './ereignis';
 import type { Folge } from './ereignis';
 import { hausById } from './haus';
+import { COST_WUNDER, wunderAt } from './wunder';
 
 /** Wie oft eine Zahl faellt, in 36steln - der Wert eines Feldes. */
 const PIPS: Record<number, number> = { 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 8: 5, 9: 4, 10: 3, 11: 2, 12: 1 };
@@ -50,7 +51,9 @@ export function eckenWert(world: World, vk: string, schon: ReadonlySet<Resource>
     w += PIPS[t.number] ?? 0;
     if (!schon.has(res)) neu.add(res);
   }
-  return w + neu.size * 2;
+  // Eine freie Wunderstaette nebenan ist ein Ziel fuer sich.
+  const staette = vertexAdjacentHexes(parseVertexKey(vk)).some((h) => wunderAt(world.seed, h.q, h.r) !== null);
+  return w + neu.size * 2 + (staette ? 6 : 0);
 }
 
 function eigeneSorten(state: GameState, world: World, id: PlayerId): Set<Resource> {
@@ -167,6 +170,19 @@ export function botAktion(state: GameState, world: World, id: PlayerId, versucht
   if (p.loot > 0) {
     const a = neu({ t: 'claimLoot' });
     if (a) return a;
+  }
+
+  // Ein Weltwunder, wenn eine freie Staette an einem eigenen Gebaeude liegt.
+  if (canAfford(p.hand, COST_WUNDER)) {
+    for (const [vk, b] of Object.entries(state.buildings)) {
+      if (b.owner !== id) continue;
+      for (const h of vertexAdjacentHexes(parseVertexKey(vk))) {
+        if (wunderAt(state.worldSeed, h.q, h.r) && !state.wunder?.[`${h.q}:${h.r}`]) {
+          const a = neu({ t: 'buildWonder', q: h.q, r: h.r });
+          if (a) return a;
+        }
+      }
+    }
   }
 
   // Stadt, dann Dorf, dann Strasse - jeweils der beste Platz.

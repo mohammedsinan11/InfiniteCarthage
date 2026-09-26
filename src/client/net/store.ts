@@ -221,6 +221,7 @@ function vervollstaendige(msg: ServerMsg): void {
     msg.state.hausAngebot ??= {};
     msg.state.ereignis ??= null;
     msg.state.stufe ??= 0;
+    msg.state.wunder ??= {};
     for (const p of msg.state.players) p.haus ??= null;
   }
 }

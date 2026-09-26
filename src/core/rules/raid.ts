@@ -16,6 +16,7 @@ import { emptyHand, handSize } from '../state';
 import { isHoarding } from './handlimit';
 import { hausPluenderung } from '../haus';
 import { modifiersOf } from '../cards/effects';
+import { hatWunder } from '../wunder';
 import type { Resource } from '../types';
 import type { GameState, Hand, PlayerId } from '../state';
 
@@ -31,7 +32,8 @@ export function raidLoss(state: GameState, id: PlayerId, raiders: number): numbe
   const gehortet = isHoarding(state, id) ? Math.floor(gehalten / 2) : 0;
   // Das Haus (core/haus.ts): Waldvolk und Ebene verlieren eine Karte mehr, die
   // Speicherherren eine weniger - aber nie weniger als keine.
-  const je = Math.max(0, raiders + hausPluenderung(p.haus) - modifiersOf(p.activeCards).schutz);
+  const koloss = hatWunder(state, id, 'koloss') ? 2 : 0;
+  const je = Math.max(0, raiders + hausPluenderung(p.haus) - modifiersOf(p.activeCards).schutz - koloss);
   return Math.min(gehalten, Math.max(je, gehortet));
 }
 

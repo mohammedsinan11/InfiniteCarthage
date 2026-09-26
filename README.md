@@ -246,6 +246,16 @@ Actions fuer `applyAction`, wie ein Mensch; der Raum spielt ihre Zuege, bis
 wieder ein Mensch dran ist. `botsSpielen` dient auch als Simulation:
 `test/bot.test.ts` laesst drei Bots ein ganzes Jahr spielen.
 
+**Weltwunder** (`src/core/wunder.ts`). Jede Welt hat ihre Wunderstaetten -
+eine liegt immer rund sechs Felder vom Start, weitere selten in der Ferne.
+Jede traegt eines von fuenf Wundern: Kothon (Bankhandel 3:1), Koloss
+(Pluenderer nehmen 2 Karten weniger), Haengende Gaerten (Felder und Weiden
++1), Sternwarte (je grosser Runde eine Kartenwahl), Sonnentempel (je grosser
+Runde 1 Ruhm). Wer ein Dorf oder eine Stadt daneben hat, errichtet es fuer
+2 Holz, 3 Lehm, 2 Wolle, 2 Getreide, 3 Erz - und bekommt 3 bis 4 Siegpunkte.
+Jede Staette nur einmal: wer zuerst baut, hat es. Das Menue listet die
+bekannten Staetten unter Reich; auch Bots wetteifern darum.
+
 **Einstieg.** Neue Spieler bekommen beim ersten Auftreten jedes Systems einen
 kurzen Tipp (erster Fund, erstes Feuer, erste Nacht, erste Beute ...,
 `src/client/tipps.ts`), je Browser einmal, und eine Liste "Erste Schritte"

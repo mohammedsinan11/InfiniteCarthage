@@ -18,6 +18,7 @@ import { sturm, wetterOf } from '../zeit';
 import { hatReichsbau } from './reich';
 import { handelsAufschlag, handelsDeckel } from '../omen';
 import { hausHandelsAufschlag, hausHandelsDeckel } from '../haus';
+import { hatWunder } from '../wunder';
 
 export const DEFAULT_RATIO = 4;
 
@@ -41,6 +42,8 @@ export function tradeRatio(
     units?: GameState['units'];
     /** Handelswinde und Zoellner (core/omen.ts). */
     omens?: readonly string[];
+    /** Der Kothon (core/wunder.ts) handelt 3:1. */
+    wunder?: GameState['wunder'];
   },
   world: World,
   player: PlayerId,
@@ -85,6 +88,7 @@ export function tradeRatio(
   const haus = state.players?.find((p) => p.id === player)?.haus;
   const hausDeckel = hausHandelsDeckel(haus);
   if (hausDeckel !== null) ratio = Math.min(ratio, hausDeckel);
+  if (hatWunder(state, player, 'kothon')) ratio = Math.min(ratio, 3);
   return Math.max(2, ratio - mods.tradeDiscount) + handelsAufschlag(state.omens) + hausHandelsAufschlag(haus);
 }
 

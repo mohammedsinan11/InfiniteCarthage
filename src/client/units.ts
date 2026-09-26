@@ -29,6 +29,10 @@ export type FigurArt =
   | 'ruine'
   /** Das Haus der Hexe (core/hexe.ts) - steht auf der Karte wie ein Lager. */
   | 'hexenhaus'
+  /** Eine Wunderstaette (core/wunder.ts): Steinkreis mit Licht, noch frei. */
+  | 'staette'
+  /** Ein errichtetes Weltwunder: goldener Obelisk. */
+  | 'wunder'
   | 'dorf'
   | 'stadt'
   | 'dorfKlein'
@@ -82,6 +86,37 @@ const PALETTE: Record<string, string> = {
 
 /** Die Platzhalter. '.' ist durchsichtig. */
 const ART: Record<FigurArt, readonly string[]> = {
+  /*
+   * Die Wunderstaette: drei alte Steine im Kreis, dazwischen ein Licht. Man
+   * soll sie von weitem sehen und wissen, dass hier etwas wartet.
+   * PLATZHALTER (ASSETS.md).
+   */
+  staette: [
+    '....y....',
+    '...yyy...',
+    '.m..y..m.',
+    'mM.....Mm',
+    'mM..m..Mm',
+    'mM.mMm.Mm',
+    'kk.mMm.kk',
+    '...kkk...',
+  ],
+  /*
+   * Das Weltwunder: ein goldener Obelisk auf steinernem Sockel, hoeher als
+   * jede Stadt. PLATZHALTER (ASSETS.md).
+   */
+  wunder: [
+    '....y....',
+    '...yYy...',
+    '...yYy...',
+    '...yYy...',
+    '..yyYyy..',
+    '..yyYyy..',
+    '..yyYyy..',
+    '.mmmmmmm.',
+    'mMMMMMMMm',
+    'kkkkkkkkk',
+  ],
   /*
    * Der Schleim: ein flacher Klumpen mit zwei Lichtern darin, breiter als hoch.
    * Er soll von weitem nicht mit einer Figur zu verwechseln sein - die Nacht

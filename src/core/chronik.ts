@@ -22,6 +22,7 @@
 import { cardById } from './cards/catalog';
 import { fraktionById } from './factions';
 import { ereignisById } from './ereignis';
+import { WUNDER } from './wunder';
 import { SEASON_NAME, bigRoundChangedAt, roundOf, seasonOf, yearOf } from './season';
 import { hausById } from './haus';
 import { emptyHand, playerById, publicPoints, totalPoints } from './state';
@@ -232,6 +233,9 @@ export function chronikFortschreiben(state: GameState, events: readonly GameEven
       case 'turn':
         // Der Verlauf je grosser Runde - dieselbe Stelle, an der die Raubzuege aufbrechen.
         if (bigRoundChangedAt(state.turn)) c.verlauf.push({ turn: state.turn, punkte: punkteZeile(state, false) });
+        break;
+      case 'wonder':
+        moment(e.player, 'hauptstadt', `${nameVon(state, e.player)} errichtet ${WUNDER[e.art].name}.`);
         break;
       case 'eventResolved': {
         const ev = ereignisById(e.id);

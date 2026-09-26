@@ -19,6 +19,8 @@ import {
   parseEdgeKey,
   parseVertexKey,
   vertexAdjacentHexes,
+  hexVertices,
+  vertexKey,
 } from '../coords';
 import {
   createWorld,
@@ -102,6 +104,8 @@ import { gueltigeOmen, siebenerBonus, startBeute } from '../omen';
 import { hausAngebot, hausById, hausWirkung } from '../haus';
 import { mangelHilfe } from './hilfe';
 import { omenMitStufe } from '../stufe';
+import { COST_WUNDER, hatWunder, wunderAt } from '../wunder';
+import type { WunderArt } from '../wunder';
 import { ereignisById, ereignisFaellig, waehleEreignis } from '../ereignis';
 import type { Folge } from '../ereignis';
 import { seasonOf } from '../season';
@@ -120,6 +124,8 @@ import {
 import { drawDevCard } from './dev';
 
 export type Action =
+  /** Ein Weltwunder auf einer Staette errichten, an der ein eigenes Gebaeude steht (core/wunder.ts). */
+  | { t: 'buildWonder'; q: number; r: number }
   /** Auf ein Ereignis antworten: die Nummer der Wahl (core/ereignis.ts). */
   | { t: 'answerEvent'; wahl: number }
   /** Vor dem Aufbau: eines der angebotenen Adelshaeuser waehlen (core/haus.ts). */
@@ -224,6 +230,8 @@ export type GameEvent =
   | { t: 'turn'; player: PlayerId }
   | { t: 'houseChosen'; player: PlayerId; haus: string }
   | { t: 'eventOffered'; player: PlayerId; id: string }
+  | { t: 'wonder'; player: PlayerId; q: number; r: number; art: WunderArt }
+  | { t: 'wonderGift'; player: PlayerId; art: WunderArt; ruhm: number; beute: number }
   | { t: 'eventResolved'; player: PlayerId; id: string; wahl: number; ruhm: number; verloren: number }
   | { t: 'win'; player: PlayerId }
   /** Heer, Raubzuege, Gefechte, Lager, Ruinen, Held und Feuer - siehe rules/army.ts. */
@@ -468,6 +476,22 @@ function checkWin(state: GameState, events: GameEvent[]): void {
 }
 
 
+/** Warum hier kein Wunder gebaut werden kann - oder null. Auch fuer die Anzeige. */
+export function wunderHindernis(
+  s: Pick<GameState, 'worldSeed' | 'buildings'> & { wunder?: GameState['wunder'] },
+  world: World,
+  id: PlayerId,
+  q: number,
+  r: number,
+): string | null {
+  if (!tileAt(world, q, r)) return 'Dieses Feld ist noch nicht erkundet.';
+  if (wunderAt(s.worldSeed, q, r) === null) return 'Hier liegt keine Wunderstaette.';
+  if (s.wunder?.[hexKey(q, r)]) return 'Hier steht schon ein Wunder.';
+  const angrenzend = hexVertices(q, r).some((v) => s.buildings[vertexKey(v)]?.owner === id);
+  if (!angrenzend) return 'Dafuer brauchst du ein Dorf oder eine Stadt an der Staette.';
+  return null;
+}
+
 /** Warum diese Wahl nicht geht - oder null. Auch fuer die Anzeige (Client). */
 export function wahlHindernis(
   s: Pick<GameState, 'units'> & { players: ReadonlyArray<{ id: PlayerId; hand?: Hand }> },
@@ -585,6 +609,20 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
   const phase = s.phase;
 
   switch (action.t) {
+    // --- Weltwunder ---
+    case 'buildWonder': {
+      if (phase.t !== 'main') return fail('Jetzt kann nicht gebaut werden.');
+      const why = wunderHindernis(s, world, actor, action.q, action.r);
+      if (why) return fail(why);
+      if (!canAfford(actorPlayer.hand, COST_WUNDER)) return fail('Zu wenig Rohstoffe fuer ein Weltwunder.');
+      pay(actorPlayer.hand, COST_WUNDER);
+      const art = wunderAt(s.worldSeed, action.q, action.r)!;
+      s.wunder = { ...(s.wunder ?? {}), [hexKey(action.q, action.r)]: { owner: actor, art, seit: s.turn } };
+      events.push({ t: 'wonder', player: actor, q: action.q, r: action.r, art });
+      checkWin(s, events);
+      break;
+    }
+
     // --- Ereignis: eine Wahl nach dem Wurf ---
     case 'answerEvent': {
       if (phase.t !== 'ereignis' || !s.ereignis) return fail('Es liegt kein Ereignis vor.');
@@ -1375,6 +1413,15 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         tributRunde(s, events);
         // Wer eine Sorte gar nicht erzeugt, bekommt sie ab und zu (rules/hilfe.ts).
         mangelHilfe(s, world, events);
+        // Sternwarte und Sonnentempel geben je grosser Runde (core/wunder.ts).
+        for (const p of s.players) {
+          if (p.besiegt) continue;
+          const beute = hatWunder(s, p.id, 'sternwarte') ? 1 : 0;
+          const ruhm = hatWunder(s, p.id, 'sonnentempel') ? 1 : 0;
+          p.loot += beute;
+          if (beute > 0) events.push({ t: 'wonderGift', player: p.id, art: 'sternwarte', ruhm: 0, beute });
+          if (ruhm > 0) events.push({ t: 'wonderGift', player: p.id, art: 'sonnentempel', ruhm, beute: 0 });
+        }
       }
 
       // Mit der Nacht kommen die Goblins in Horden und die Schleime aus dem

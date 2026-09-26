@@ -129,6 +129,8 @@ export type PublicState = {
   auftraege: GameState['auftraege'];
   /** Die Chronikstufe (core/stufe.ts). */
   stufe: number;
+  /** Errichtete Weltwunder (core/wunder.ts) - weithin sichtbar. */
+  wunder: NonNullable<GameState['wunder']>;
   /** Das offene Ereignis und wer antwortet (core/ereignis.ts) - oeffentlich. */
   ereignis: { id: string; player: PlayerId } | null;
   /** Die Haeuser, die jeder zur Wahl hat (core/haus.ts) - leer ohne Hauswahl. */
@@ -228,6 +230,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     hausAngebot: state.hausAngebot ?? {},
     ereignis: state.ereignis ?? null,
     stufe: state.stufe ?? 0,
+    wunder: state.wunder ?? {},
     omens: state.omens ?? [],
     rundenLimit: state.rundenLimit ?? null,
     tagesDatum: state.tagesDatum ?? null,

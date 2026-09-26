@@ -44,6 +44,8 @@ import { EreignisTafel } from '../ui/EreignisTafel';
 import { ErsteSchritte } from '../ui/ErsteSchritte';
 import { hausById } from '../../core/haus';
 import { kartenPunkte } from '../../core/cards/effects';
+import { COST_WUNDER, WUNDER, wunderAt } from '../../core/wunder';
+import { wunderHindernis } from '../../core/rules/reducer';
 import { OmenListe } from '../ui/OmenListe';
 import { omenById } from '../../core/omen';
 import { neuerRaumCode } from '../net/socket';
@@ -474,6 +476,30 @@ export function Game() {
 
 
   /** Siegpunkte aufgeschluesselt - fuers Menue (Reich). */
+  // Bekannte Wunderstaetten (core/wunder.ts): alle auf aufgedeckten Feldern.
+  const wunderListe = useMemo(() => {
+    const out: { key: string; q: number; r: number; name: string; text: string; punkte: number; besitzer: string | null; grund: string | null; bezahlbar: boolean }[] = [];
+    for (const t of world.tiles.values()) {
+      const art = wunderAt(state.worldSeed, t.q, t.r);
+      if (!art) continue;
+      const key = hexKey(t.q, t.r);
+      const w = state.wunder[key];
+      const typ = WUNDER[art];
+      out.push({
+        key,
+        q: t.q,
+        r: t.r,
+        name: typ.name,
+        text: typ.text,
+        punkte: typ.punkte,
+        besitzer: w ? (state.players.find((p) => p.id === w.owner)?.name ?? 'jemand') : null,
+        grund: you ? wunderHindernis(state, world, you, t.q, t.r) : 'Zuschauer',
+        bezahlbar: !!me?.hand && canAfford(me.hand, COST_WUNDER),
+      });
+    }
+    return out;
+  }, [world, state, you, me]);
+
   const punkte = useMemo(() => {
     const eigene = Object.values(state.buildings).filter((b) => b.owner === you);
     const doerfer = eigene.filter((b) => b.type === 'settlement').length;
@@ -1126,6 +1152,8 @@ export function Game() {
           loeschenMoeglich={loeschenMoeglich}
           onLoeschen={loeschen}
           onErkunden={(id, an) => act({ t: 'explore', unit: id, explore: an })}
+          wunderListe={wunderListe}
+          onWunder={(q, r) => act({ t: 'buildWonder', q, r })}
           onZeigenAuftrag={(a) => {
             const w = a.art === 'geleit' ? state.units.find((u) => u.id === a.wanderer) : undefined;
             zeigeFeld(w ? w.q : a.q, w ? w.r : a.r);

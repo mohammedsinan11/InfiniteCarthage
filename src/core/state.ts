@@ -14,6 +14,8 @@ import type { DraftSource } from './cards/types';
 import type { HeldLore } from './lore';
 import type { Chronik } from './chronik';
 import { kartenPunkte } from './cards/effects';
+import { wunderPunkte } from './wunder';
+import type { Wunder } from './wunder';
 
 export type PlayerId = string;
 
@@ -538,6 +540,8 @@ export type GameState = {
   chronik?: Chronik;
   /** Die drei Haeuser, die jeder zur Wahl hat (core/haus.ts). Oeffentlich. */
   hausAngebot?: Record<PlayerId, string[]>;
+  /** Errichtete Weltwunder: Feldschluessel -> Besitzer und Art (core/wunder.ts). */
+  wunder?: Record<string, Wunder>;
   /** Die Chronikstufe (core/stufe.ts): je Stufe ein Fluch mehr. Fehlt: 0. */
   stufe?: number;
   /** Kommen Ereignisse mit Wahl (core/ereignis.ts)? Fehlt bei alten Staenden: nein. */
@@ -584,7 +588,7 @@ export function setupPlayerId(state: GameState, step: number): PlayerId {
 /** Sichtbare Siegpunkte (ohne verdeckte Siegpunktkarten). */
 export function publicPoints(
   state: Pick<GameState, 'buildings' | 'ruhmreichster' | 'hauptstaedte'> &
-    Partial<Pick<GameState, 'roads' | 'players' | 'chronik'>>,
+    Partial<Pick<GameState, 'roads' | 'players' | 'chronik' | 'wunder'>>,
   id: PlayerId,
 ): number {
   let pts = 0;
@@ -596,6 +600,7 @@ export function publicPoints(
     if (h.owner === id) pts += HAUPTSTADT_PUNKTE + (h.stufe - 1) * STUFE_PUNKTE;
   }
   // Aktive Karten mit Punktewirkung (cards/effects.ts, kartenPunkte).
+  pts += wunderPunkte(state, id);
   if (state.players && state.roads) {
     pts += kartenPunkte({ players: state.players, buildings: state.buildings, roads: state.roads, chronik: state.chronik }, id);
   }

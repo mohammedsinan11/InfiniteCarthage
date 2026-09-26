@@ -289,6 +289,8 @@ export function SideMenu({
   auftraege,
   onAuftrag,
   onZeigenFeld,
+  wunderListe,
+  onWunder,
   nameVon,
   braende,
   loeschKarte,
@@ -374,6 +376,10 @@ export function SideMenu({
   auftraege: readonly WandererAuftrag[];
   onAuftrag: (id: number, annehmen: boolean) => void;
   onZeigenFeld: (q: number, r: number) => void;
+  /** Bekannte Wunderstaetten (core/wunder.ts) - frei oder errichtet. */
+  wunderListe: { key: string; q: number; r: number; name: string; text: string; punkte: number; besitzer: string | null; grund: string | null; bezahlbar: boolean }[];
+  /** Ein Wunder errichten. */
+  onWunder: (q: number, r: number) => void;
   /** Name einer Fraktion. */
   nameVon: (fraktion: string) => string;
   /** Die eigenen Feuer. */
@@ -601,6 +607,39 @@ export function SideMenu({
                 ))}
               </div>
             </div>
+
+            {wunderListe.length > 0 && (
+              <>
+                <Kopf
+                  titel="Weltwunder"
+                  hilfe="Wunderstaetten liegen fest auf der Karte, eine immer nahe dem Start. Wer ein Dorf oder eine Stadt daneben hat, kann dort ein Wunder errichten (2 Holz, 3 Lehm, 2 Wolle, 2 Getreide, 3 Erz) - jede Staette nur einmal: wer zuerst baut, hat es."
+                />
+                <ul className="menu-wunder">
+                  {wunderListe.map((w) => (
+                    <li key={w.key} className={w.besitzer ? 'vergeben' : ''}>
+                      <span className="menu-wunder-kopf">
+                        <b>{w.name}</b> <span>+{w.punkte} Siegpunkte</span>
+                      </span>
+                      <span className="menu-wunder-text">{w.besitzer ? `Errichtet von ${w.besitzer}.` : w.text}</span>
+                      <span className="menu-wunder-knoepfe">
+                        <button onClick={() => onZeigenFeld(w.q, w.r)}>Zeigen</button>
+                        {!w.besitzer && (
+                          <button
+                            className="primary"
+                            disabled={w.grund !== null || !w.bezahlbar}
+                            title={w.grund ?? (w.bezahlbar ? 'Errichten' : 'Zu wenig Rohstoffe')}
+                            onClick={() => onWunder(w.q, w.r)}
+                          >
+                            Errichten
+                          </button>
+                        )}
+                      </span>
+                      {!w.besitzer && w.grund && <span className="menu-wunder-grund">{w.grund}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
 
             <Kopf
               titel="Ertrag je Zahl"
