@@ -1098,6 +1098,8 @@ function heimFuer(s: GameState, u: UnitState): Hex | null {
 
 /** Wie viele Felder die Suche eines Erkunders hoechstens abgeht. */
 const ERKUNDEN_SUCHE = 1500;
+/** Wie weit ein Erkunder sich hoechstens von den eigenen Siedlungen entfernt. */
+export const ERKUNDEN_WEIT = 24;
 
 /**
  * Wohin ein Erkunder zieht: zum naechsten Feld, das Neues bringt - eine
@@ -1106,6 +1108,11 @@ const ERKUNDEN_SUCHE = 1500;
  */
 function erkundungsziel(s: GameState, world: World, u: UnitState): Hex | null {
   const seed = s.worldSeed;
+  // An der langen Leine: nicht weiter als ERKUNDEN_WEIT von den eigenen
+  // Siedlungen - sonst zog der Held so weit, dass kein Weg mehr heimfand
+  // (Spieltest: fuenfzig Felder draussen, "Dorthin fuehrt kein Landweg").
+  const heim = u.owner === null ? [] : [...settlementApproaches(s, u.owner).keys()].map(feld);
+  const nahGenug = (h: Hex) => heim.length === 0 || heim.some((x) => hexDistance(x, h) <= ERKUNDEN_WEIT);
   const gesehen = new Set([hexKey(u.q, u.r)]);
   const warte: Hex[] = [{ q: u.q, r: u.r }];
   for (let i = 0; i < warte.length && gesehen.size < ERKUNDEN_SUCHE; i++) {
@@ -1115,6 +1122,7 @@ function erkundungsziel(s: GameState, world: World, u: UnitState): Hex | null {
       if (gesehen.has(k) || !isLandAt(seed, n.q, n.r)) continue;
       gesehen.add(k);
       if (isNestActive(s, n.q, n.r)) continue;
+      if (!nahGenug(n)) continue;
       if (!isGenerated(world, n.q, n.r)) return n;
       if (ruinAt(seed, n.q, n.r) && !s.exploredRuins.includes(k)) return n;
       warte.push(n);

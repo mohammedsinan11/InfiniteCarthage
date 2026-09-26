@@ -902,6 +902,7 @@ export function SideMenu({
                         {a.status === 'angebot' ? 'Angebot' : 'angenommen'} · noch {Math.max(0, a.bis - turn + 1)} Rd.
                       </span>
                     </div>
+                    <span className="menu-auftrag-wer">Ein Wanderer bittet darum. Lohn: eine Kartenwahl.</span>
                     <div className="menu-ritter-knoepfe">
                       {a.art !== 'liefern' && <button onClick={() => onZeigenAuftrag(a)}>Zeigen</button>}
                       {a.art === 'liefern' && a.status === 'angenommen' && (
