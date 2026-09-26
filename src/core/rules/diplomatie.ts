@@ -10,9 +10,10 @@
  *
  *   FRIEDEN  Gaben: 2 Getreide, 2 Wolle. Gilt 20 Runden, dann ist wieder Krieg.
  *            Nur Raeuberbanden - Goblins schliessen keinen Frieden.
- *   TRIBUT   Eine Karte sofort und eine zu Beginn jeder grossen Runde, vom
- *            groessten Stapel. Gilt, bis man den Krieg erklaert oder nicht
- *            zahlen kann. Raeuber wie Goblins nehmen ihn.
+ *   TRIBUT   Sofort und zu Beginn jeder grossen Runde je eine Karte pro
+ *            Siegpunkt (mindestens eine), vom groessten Stapel. Gilt, bis man
+ *            den Krieg erklaert oder nicht zahlen kann. Raeuber wie Goblins
+ *            nehmen ihn.
  *   KRIEG    Beendet jedes Abkommen, sofort und ohne Kosten.
  *
  * Abkommen gelten je Spieler: wer Frieden hat, schuetzt nur sich.
@@ -20,7 +21,7 @@
 
 import { abkommenVon } from '../combat';
 import { fraktionById, istFraktion } from '../factions';
-import { handSize, playerById } from '../state';
+import { handSize, playerById, publicPoints } from '../state';
 import type { Abkommen, GameState, PlayerId } from '../state';
 import { RESOURCES } from '../types';
 import { canAfford, pay } from './costs';
@@ -29,8 +30,22 @@ import { takeFromLargest } from './raid';
 
 export const FRIEDEN_PREIS: Cost = { grain: 2, wool: 2 };
 export const FRIEDEN_RUNDEN = 20;
-/** Karten je grosser Runde. */
+/** Mindestens so viele Karten je Zahlung. */
 export const TRIBUT_KARTEN = 1;
+
+/**
+ * Was ein Tribut kostet: eine Karte je Siegpunkt, mindestens TRIBUT_KARTEN.
+ *
+ * Fest eine Karte war fuer jedes Reich gleich billig - wer 20 Doerfer hatte,
+ * kaufte sich fuer eine Karte je fuenf Runden von allen Raubzuegen frei, und
+ * das ganze Heer war wirtschaftlich sinnlos. So bleibt Tribut der Rettungsring
+ * des kleinen Reichs (1 bis 3 Karten) und wird fuer ein grosses eine echte
+ * Steuer, gegen die sich ein Heer wieder rechnen kann.
+ */
+export const tributKarten = (
+  s: Pick<GameState, 'buildings' | 'ruhmreichster' | 'hauptstaedte'>,
+  player: PlayerId,
+): number => Math.max(TRIBUT_KARTEN, publicPoints(s, player));
 
 export type Verhandlung = 'frieden' | 'tribut' | 'krieg';
 
@@ -50,15 +65,16 @@ type Ereignisse = { push(...e: DiplomatieEvent[]): number };
 export const nimmtFrieden = (seed: number, fraktion: string): boolean =>
   fraktionById(seed, fraktion).art === 'raeuber';
 
-/** Tribut vom groessten Stapel an die Bank. false, wenn die Hand nicht reicht. */
-function zahleTribut(s: GameState, player: PlayerId): boolean {
+/** Tribut vom groessten Stapel an die Bank. Liefert die Kartenzahl, 0 wenn die Hand nicht reicht. */
+function zahleTribut(s: GameState, player: PlayerId): number {
   const p = playerById(s, player);
-  if (!p || handSize(p.hand) < TRIBUT_KARTEN) return false;
-  const genommen = takeFromLargest(p.hand, TRIBUT_KARTEN);
+  const preis = tributKarten(s, player);
+  if (!p || handSize(p.hand) < preis) return 0;
+  const genommen = takeFromLargest(p.hand, preis);
   for (const r of RESOURCES) {
     p.hand[r] -= genommen[r];
   }
-  return true;
+  return preis;
 }
 
 /** Ein Abkommen schliessen oder beenden. null bei Erfolg, sonst der Grund. */
@@ -87,8 +103,8 @@ export function verhandeln(
     if (!nimmtFrieden(s.worldSeed, fraktion)) return 'Goblins schliessen keinen Frieden - sie nehmen nur Tribut.';
     if (!canAfford(p.hand, FRIEDEN_PREIS)) return 'Fuer den Frieden fehlen dir die Gaben.';
     pay(p.hand, FRIEDEN_PREIS);
-  } else if (!zahleTribut(s, actor)) {
-    return 'Fuer den Tribut fehlt dir eine Karte.';
+  } else if (zahleTribut(s, actor) === 0) {
+    return `Fuer den Tribut fehlen dir Karten (${tributKarten(s, actor)} noetig).`;
   }
 
   s.abkommen = s.abkommen.filter((a) => a !== bisher);
@@ -118,8 +134,9 @@ export function abkommenRunde(s: GameState, events: Ereignisse): void {
 export function tributRunde(s: GameState, events: Ereignisse): void {
   s.abkommen = s.abkommen.filter((a) => {
     if (a.art !== 'tribut') return true;
-    if (zahleTribut(s, a.player)) {
-      events.push({ t: 'tribute', player: a.player, fraktion: a.fraktion, count: TRIBUT_KARTEN });
+    const gezahlt = zahleTribut(s, a.player);
+    if (gezahlt > 0) {
+      events.push({ t: 'tribute', player: a.player, fraktion: a.fraktion, count: gezahlt });
       return true;
     }
     events.push({ t: 'war', player: a.player, fraktion: a.fraktion, grund: 'unbezahlt' });

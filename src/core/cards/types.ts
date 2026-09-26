@@ -111,6 +111,18 @@ export function istEinzigartig(c: Card): boolean {
   return cardKind(c) === 'ausruestung' || dauerwirkungen(c).length > 0;
 }
 
+/**
+ * Darf eine schon besessene einzigartige Karte noch einmal angeboten werden?
+ * Ja, wenn sie eine Sofortwirkung hat: die Dauerwirkung liegt dann schon vor,
+ * und beim zweiten Nehmen zaehlt nur noch der Sofortteil (rules/reducer.ts,
+ * chooseCard). Karten ohne Sofortwirkung waeren dann leer und bleiben draussen.
+ *
+ * Ohne das wurde der Topf mit jeder Dauerkarte kleiner: ab etwa Runde 120
+ * konnten episch und legendaer nie mehr fallen (draft.ts verlangt drei
+ * Kandidaten je Stufe), und der Fund zeigte immer dieselben drei Karten.
+ */
+export const wiederholbar = (c: Card): boolean => c.instant !== undefined;
+
 /** Wie oft eine Seltenheitsstufe je Quelle gezogen wird. Summe egal, es wird gewichtet. */
 export const RARITY_WEIGHTS: Record<DraftSource, Record<Rarity, number>> = {
   // Der Fund ist der seltene Moment - hier gibt es nichts Gewoehnliches.

@@ -519,7 +519,10 @@ export function setupPlayerId(state: GameState, step: number): PlayerId {
 }
 
 /** Sichtbare Siegpunkte (ohne verdeckte Siegpunktkarten). */
-export function publicPoints(state: GameState, id: PlayerId): number {
+export function publicPoints(
+  state: Pick<GameState, 'buildings' | 'ruhmreichster' | 'hauptstaedte'>,
+  id: PlayerId,
+): number {
   let pts = 0;
   for (const b of Object.values(state.buildings)) {
     if (b.owner === id) pts += b.type === 'city' ? 2 : 1;

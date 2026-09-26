@@ -26,7 +26,7 @@ import { hexDistance } from '../../core/coords';
 import { maxLeben } from '../../core/combat';
 import { TAGESZEIT_NAME, WETTER_NAME } from '../../core/zeit';
 import type { Tageszeit, Wetter } from '../../core/zeit';
-import { FRIEDEN_PREIS, TRIBUT_KARTEN } from '../../core/rules/diplomatie';
+import { FRIEDEN_PREIS } from '../../core/rules/diplomatie';
 import type { Verhandlung } from '../../core/rules/diplomatie';
 import { getVolume, initAudio, setVolume } from '../audio';
 import { LogPanel } from './LogPanel';
@@ -231,6 +231,9 @@ export function SideMenu({
   turn,
   cards,
   activeCards,
+  kartenPlaetze,
+  kannUmstellen,
+  onLoadout,
   tactics,
   equipment,
   log,
@@ -265,6 +268,7 @@ export function SideMenu({
   diplomatieMoeglich,
   friedenBezahlbar,
   tributBezahlbar,
+  tributPreis,
   onDiplomatie,
   auftraege,
   onAuftrag,
@@ -286,6 +290,11 @@ export function SideMenu({
   cards: readonly string[];
   /** Reichskarten, deren Dauerwirkung in die begrenzten Plaetze gelegt ist. */
   activeCards: readonly string[];
+  /** Wie viele Dauerkarten gleichzeitig wirken duerfen (cards/loadout.ts). */
+  kartenPlaetze: number;
+  /** Umstellen geht nur in der eigenen Bauphase. */
+  kannUmstellen: boolean;
+  onLoadout: (cards: string[]) => void;
   /** Verbrauchbare Taktikkarten auf der eigenen Hand. */
   tactics: readonly string[];
   /** Getrennte Ausruestungssammlung fuer den Abenteuerzweig. */
@@ -342,6 +351,8 @@ export function SideMenu({
   diplomatieMoeglich: boolean;
   friedenBezahlbar: boolean;
   tributBezahlbar: boolean;
+  /** Was ein Tribut gerade kostet, in Karten (rules/diplomatie.ts, tributKarten). */
+  tributPreis: number;
   onDiplomatie: (fraktion: string, art: Verhandlung) => void;
   /** Die eigenen Auftraege - Angebote und angenommene. */
   auftraege: readonly WandererAuftrag[];
@@ -697,7 +708,7 @@ export function SideMenu({
             {/* Fraktionen: wem die Lager ringsum gehoeren, und das Abkommen mit ihnen (rules/diplomatie.ts). */}
             <Kopf
               titel="Fraktionen"
-              hilfe={`Frieden (nur Raeuberbanden) haelt 20 Runden und kostet ${bundleText(FRIEDEN_PREIS)}. Tribut: ${TRIBUT_KARTEN} Karte sofort und zu Beginn jeder grossen Runde - wer nicht zahlen kann, hat wieder Krieg. Solange ein Abkommen gilt, ziehen ihre Raubzuege an dir vorbei.`}
+              hilfe={`Frieden (nur Raeuberbanden) haelt 20 Runden und kostet ${bundleText(FRIEDEN_PREIS)}. Tribut: eine Karte je Siegpunkt (derzeit ${tributPreis}), sofort und zu Beginn jeder grossen Runde - wer nicht zahlen kann, hat wieder Krieg. Solange ein Abkommen gilt, ziehen ihre Raubzuege an dir vorbei.`}
             />
             {fraktionen.length === 0 ? (
               <p className="menu-leer">Noch keine entdeckt.</p>
@@ -730,7 +741,11 @@ export function SideMenu({
                               Frieden
                             </button>
                           )}
-                          <button disabled={!diplomatieMoeglich || !tributBezahlbar} onClick={() => onDiplomatie(f.id, 'tribut')}>
+                          <button
+                            disabled={!diplomatieMoeglich || !tributBezahlbar}
+                            title={`Tribut: ${tributPreis} ${tributPreis === 1 ? 'Karte' : 'Karten'} sofort und je grosser Runde`}
+                            onClick={() => onDiplomatie(f.id, 'tribut')}
+                          >
                             Tribut
                           </button>
                         </>
@@ -805,7 +820,7 @@ export function SideMenu({
           <>
             <Kopf
               titel={`Reichskarten${cards.length > 0 ? ` · ${cards.length}` : ''}`}
-              hilfe="Nur Karten mit dem Siegel Aktiv liefern eine Dauerwirkung. Anfangs hast du zwei Plaetze; eine Hauptstadt erweitert sie. Eine neue Dauerkarte ersetzt bei vollen Plaetzen die aelteste aktive."
+              hilfe="Nur Karten mit dem Siegel Aktiv liefern eine Dauerwirkung. Anfangs hast du zwei Plaetze; eine Hauptstadt erweitert sie. Tippe eine Dauerkarte an, um sie ein- oder auszuschalten - in deiner Bauphase. Bei vollen Plaetzen waehlst du, welche weicht."
             />
             {cards.length === 0 ? (
               <p className="menu-leer">Noch keine.</p>
@@ -832,12 +847,52 @@ export function SideMenu({
                 {karteOffen &&
                   (() => {
                     const k = cardById(karteOffen);
-                    return k ? (
-                      <p className="menu-karte-detail">
-                        <b>{k.name}</b> {k.text}
-                      </p>
-                    ) : null;
+                    if (!k) return null;
+                    const dauer = dauerwirkungen(k).length > 0;
+                    const an = activeCards.includes(k.id);
+                    const voll = activeCards.length >= kartenPlaetze;
+                    return (
+                      <div className="menu-karte-detail">
+                        <p>
+                          <b>{k.name}</b> {k.text}
+                        </p>
+                        {dauer && (
+                          <span className="menu-ritter-knoepfe">
+                            {an ? (
+                              <button
+                                disabled={!kannUmstellen}
+                                onClick={() => onLoadout(activeCards.filter((c) => c !== k.id))}
+                              >
+                                Abschalten
+                              </button>
+                            ) : !voll ? (
+                              <button
+                                disabled={!kannUmstellen}
+                                onClick={() => onLoadout([...activeCards, k.id])}
+                              >
+                                Aktivieren
+                              </button>
+                            ) : (
+                              activeCards.map((alt) => (
+                                <button
+                                  key={alt}
+                                  disabled={!kannUmstellen}
+                                  title={cardById(alt)?.text}
+                                  onClick={() => onLoadout(activeCards.map((c) => (c === alt ? k.id : c)))}
+                                >
+                                  Statt {cardById(alt)?.name ?? alt}
+                                </button>
+                              ))
+                            )}
+                          </span>
+                        )}
+                        {dauer && !kannUmstellen && <p className="menu-leer">Umstellen geht nur in deiner Bauphase.</p>}
+                      </div>
+                    );
                   })()}
+                <p className="menu-leer">
+                  Plaetze: {activeCards.length} von {kartenPlaetze} belegt.
+                </p>
                 {wirkungen(activeCards).length > 0 && (
                   <>
                     <Kopf titel="Zusammen" />

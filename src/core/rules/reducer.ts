@@ -86,9 +86,9 @@ import { nextStep } from '../units';
 import { bigRoundChangedAt } from '../season';
 import { draftOptions } from '../cards/draft';
 import { cardById } from '../cards/catalog';
-import { cardKind, dauerwirkungen, istEinzigartig } from '../cards/types';
+import { cardKind, dauerwirkungen, istEinzigartig, wiederholbar } from '../cards/types';
 import type { DraftSource } from '../cards/types';
-import { aktiviereNeueReichskarte } from '../cards/loadout';
+import { aktiviereNeueReichskarte, setzeAktiveKarten } from '../cards/loadout';
 import { playTactic } from './tactics';
 import type { TacticEvent } from './tactics';
 import { ruhmAusEreignissen } from './ruhm';
@@ -125,7 +125,9 @@ export type Action =
   /** Anbieter zieht sein Angebot zurueck. */
   | { t: 'cancelTrade' }
   /** Eine der drei angebotenen Karten nehmen. */
-  | { t: 'chooseCard'; card: string }
+  | { t: 'chooseCard'; card: string; replace?: string | null }
+  /** Die aktiven Reichskarten neu zusammenstellen (nur aus dem eigenen Besitz). */
+  | { t: 'setLoadout'; cards: string[] }
   /** Eine ausspielbare Taktikkarte auf eine eigene Einheit oder deren Feld anwenden. */
   | { t: 'playTactic'; card: string; unit: number }
   /** Einen Ritter anwerben - er tritt an einer eigenen Siedlung an. */
@@ -540,15 +542,22 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       const karte = cardById(action.card);
       if (!karte) return fail('Unbekannte Karte.');
 
-      if (istEinzigartig(karte) && [...actorPlayer.cards, ...actorPlayer.equipment].includes(karte.id)) {
+      const schonDa = [...actorPlayer.cards, ...actorPlayer.equipment].includes(karte.id);
+      if (istEinzigartig(karte) && schonDa && !wiederholbar(karte)) {
         return fail('Diese einzigartige Karte besitzt du bereits.');
       }
 
-      if (cardKind(karte) === 'taktik') actorPlayer.tactics.push(karte.id);
-      else if (cardKind(karte) === 'ausruestung') actorPlayer.equipment.push(karte.id);
-      else {
-        actorPlayer.cards.push(karte.id);
-        if (dauerwirkungen(karte).length > 0) aktiviereNeueReichskarte(s, actorPlayer, karte.id);
+      // Ein zweites Mal zaehlt nur die Sofortwirkung - die Dauerwirkung liegt
+      // schon vor und wuerde weder stapeln noch einen zweiten Platz belegen.
+      if (!(istEinzigartig(karte) && schonDa)) {
+        if (cardKind(karte) === 'taktik') actorPlayer.tactics.push(karte.id);
+        else if (cardKind(karte) === 'ausruestung') actorPlayer.equipment.push(karte.id);
+        else {
+          actorPlayer.cards.push(karte.id);
+          if (dauerwirkungen(karte).length > 0) {
+            aktiviereNeueReichskarte(s, actorPlayer, karte.id, action.replace);
+          }
+        }
       }
 
       // Sofortwirkung - die Bank ist unendlich.
@@ -578,6 +587,13 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       s.phase = { t: 'main' };
       events.push({ t: 'cardTaken', player: actor, card: karte.id });
       checkWin(s, events);
+      break;
+    }
+
+    case 'setLoadout': {
+      if (phase.t !== 'main') return fail('Die Karten werden in der Bauphase umgestellt.');
+      const why = setzeAktiveKarten(s, actorPlayer, action.cards);
+      if (why) return fail(why);
       break;
     }
 

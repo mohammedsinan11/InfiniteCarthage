@@ -73,6 +73,24 @@ Nachteil: "diese Karte kommt nur einmal vor" laesst sich so nicht ohne
 Weiteres zusichern. Das liesse sich ueber eine Liste bereits genommener
 Karten im Spielstand nachruesten - klein genug, um sie zu speichern.
 
+**Der Topf schrumpft nicht mehr leer.** Besessene Dauerkarten fielen frueher
+ganz aus der Auswahl; nach etwa 120 Runden war die Sammlung voll, episch und
+legendaer konnten nie mehr fallen (eine Stufe brauchte drei Kandidaten), und
+der Fund zeigte fuer immer dieselben drei Karten. Jetzt bleibt eine besessene
+Dauerkarte im Topf, sofern sie eine Sofortwirkung hat (`wiederholbar`): beim
+zweiten Nehmen zaehlt nur diese, die Dauerwirkung liegt ja schon vor und
+belegt keinen zweiten Platz. Karten ohne Sofortwirkung bleiben draussen. Eine
+Stufe kommt in Frage, sobald sie eine Karte hat; fehlende Plaetze fuellen die
+naechstniedrigen Stufen. Hoechstens eine Taktik je Auslage.
+
+**Kartenplaetze.** Nur so viele Dauerkarten wirken gleichzeitig, wie Plaetze da
+sind (2, mit Hauptstadt 3, mit Koenigssitz 4). Bei vollen Plaetzen sagt die
+Kartenwahl, welche aktive Karte die neue verdraengt - vorbelegt mit der
+seltensten-niedrigsten, umstellbar oder "keine" (die Karte bleibt im Besitz,
+inaktiv). Im Menue unter Karten laesst sich jede besessene Dauerkarte in der
+eigenen Bauphase ein- und ausschalten oder gegen eine aktive tauschen
+(`setLoadout`). Keine Karte geht still verloren.
+
 ### Was zu bauen waere
 
 1. `core/cards/types.ts` — Karte, Seltenheit, Wirkung
@@ -251,9 +269,12 @@ Gebaut in `core/rules/diplomatie.ts` und `core/rules/auftraege.ts`.
 - **Abkommen** gelten je Spieler und Fraktion und machen beide einander nicht
   feind (`feindlich` mit dem Spielstand): keine Raubzuege, keine Horden gegen
   ihn, keine Kaempfe. *Frieden* kostet 2 Getreide und 2 Wolle und gilt 20
-  Runden - nur Raeuberbanden nehmen ihn. *Tribut* kostet eine Karte sofort und
-  eine zu Beginn jeder grossen Runde, vom groessten Stapel; wer nicht zahlen
-  kann, hat wieder Krieg. Krieg erklaeren geht jederzeit in der Bauphase.
+  Runden - nur Raeuberbanden nehmen ihn. *Tribut* kostet sofort und zu Beginn
+  jeder grossen Runde je eine Karte pro Siegpunkt (mindestens eine), vom
+  groessten Stapel; wer nicht zahlen kann, hat wieder Krieg. Er ist damit
+  der Rettungsring des kleinen Reichs und eine echte Steuer fuer ein grosses -
+  sonst kaufte sich jedes Reich fuer eine Karte je fuenf Runden frei, und das
+  Heer rechnete sich nie. Krieg erklaeren geht jederzeit in der Bauphase.
 - **Auftraege.** Kommt ein Wanderer an einer Siedlung vorbei, bietet er ihrem
   Besitzer einen an - Lohn immer eine Kartenwahl:
   - *Lager:* ein feindliches Lager in der Naehe zerstoeren.
@@ -272,7 +293,7 @@ Gebaut in `core/rules/diplomatie.ts` und `core/rules/auftraege.ts`.
   Art einer, einer je Wanderer.
 
 Offen: Auftraege, die Rohstoffe verlangen; Fraktionen, die von selbst Frieden
-anbieten oder brechen; ob Tribut mit der Groesse des Reichs steigen soll.
+anbieten oder brechen.
 
 ## Kleinere Regeln, zuletzt geaendert
 

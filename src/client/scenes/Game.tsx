@@ -35,6 +35,7 @@ import { TradePanel } from '../ui/TradePanel';
 import { DiceOverlay } from '../ui/DiceOverlay';
 import { Announcements } from '../ui/Announcements';
 import { CardDraft } from '../ui/CardDraft';
+import { reichskartenPlaetze } from '../../core/cards/loadout';
 import { SideMenu } from '../ui/SideMenu';
 import type { FraktionsZeile } from '../ui/SideMenu';
 import { isNestActive, nestFraktionOf, sightOf } from '../../core/units';
@@ -48,7 +49,7 @@ import { seasonOf } from '../../core/season';
 import { RESOURCES } from '../../core/types';
 import type { Resource } from '../../core/types';
 import { COST_CAPITAL, COST_CITY, COST_STUFE, COST_ROAD, COST_TURM_STUFE, canAfford } from '../../core/rules/costs';
-import { FRIEDEN_PREIS, TRIBUT_KARTEN, nimmtFrieden } from '../../core/rules/diplomatie';
+import { FRIEDEN_PREIS, nimmtFrieden, tributKarten } from '../../core/rules/diplomatie';
 import { brennt } from '../../core/rules/feuer';
 // maxLeben kennt Art, Zweig des Ernannten und Rang (core/combat.ts).
 import { maxLeben } from '../../core/combat';
@@ -277,6 +278,7 @@ export function Game() {
 
   /** Das Heer in Gruppen (client/heer.ts): Scharen und Felder. */
   const heer = useMemo(() => heerGruppen(meineEinheiten), [meineEinheiten]);
+  const tributPreis = useMemo(() => (you ? tributKarten(state, you) : 1), [state, you]);
   const kampfOrte = useMemo(() => new Set(kampfFelderVon(state).keys()), [state]);
   /** Wie der eigene Held heisst (core/lore.ts) - undefined, bevor er antritt. */
   const heldName = useMemo(() => {
@@ -1018,6 +1020,9 @@ export function Game() {
           turn={state.turn}
           cards={me?.cards ?? []}
           activeCards={me?.activeCards ?? []}
+          kartenPlaetze={you ? reichskartenPlaetze(state, you) : 0}
+          kannUmstellen={isMine && phase.t === 'main'}
+          onLoadout={(cards) => act({ t: 'setLoadout', cards })}
           tactics={me?.tactics ?? []}
           equipment={me?.equipment ?? []}
           log={log}
@@ -1061,7 +1066,8 @@ export function Game() {
           onFolgen={(id, folgen) => act({ t: 'follow', unit: id, follow: folgen })}
           diplomatieMoeglich={isMine && phase.t === 'main'}
           friedenBezahlbar={!!hand && canAfford(hand, FRIEDEN_PREIS)}
-          tributBezahlbar={!!hand && RESOURCES.reduce((n, r) => n + hand[r], 0) >= TRIBUT_KARTEN}
+          tributPreis={tributPreis}
+          tributBezahlbar={!!hand && RESOURCES.reduce((n, r) => n + hand[r], 0) >= tributPreis}
           onDiplomatie={(fraktion, art) => act({ t: 'diplomacy', fraktion, art })}
           auftraege={meineAuftraege}
           onAuftrag={(id, annehmen) => act({ t: 'answerQuest', id, accept: annehmen })}
@@ -1099,7 +1105,10 @@ export function Game() {
             options={state.draft.options}
             source={state.draft.source}
             darfWaehlen={isMine}
-            onChoose={(card) => act({ t: 'chooseCard', card })}
+            besitz={me?.cards ?? []}
+            aktiv={me?.activeCards ?? []}
+            plaetze={you ? reichskartenPlaetze(state, you) : 0}
+            onChoose={(card, replace) => act({ t: 'chooseCard', card, replace })}
           />
         )}
 

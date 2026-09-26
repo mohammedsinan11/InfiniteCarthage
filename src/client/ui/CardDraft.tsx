@@ -17,6 +17,7 @@
 import { useEffect, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import { cardById } from '../../core/cards/catalog';
+import { RARITY_ORDER, dauerwirkungen, istEinzigartig, wiederholbar } from '../../core/cards/types';
 import type { DraftSource, Rarity } from '../../core/cards/types';
 import { playCardDeal, playCardHover, playCardPick, playCardVanish } from '../audio';
 import { KartenBild } from './KartenBild';
@@ -60,6 +61,9 @@ export function CardDraft({
   options,
   source,
   darfWaehlen,
+  besitz = [],
+  aktiv = [],
+  plaetze = 0,
   onChoose,
 }: {
   options: string[];
@@ -67,9 +71,32 @@ export function CardDraft({
   source?: DraftSource;
   /** Nur der Spieler am Zug waehlt - die anderen sehen zu. */
   darfWaehlen: boolean;
-  onChoose: (card: string) => void;
+  /** Eigene Reichskarten, aktive Reichskarten und ihre Plaetze - damit sichtbar wird, was eine neue Dauerkarte verdraengt. */
+  besitz?: readonly string[];
+  aktiv?: readonly string[];
+  plaetze?: number;
+  onChoose: (card: string, ersetze?: string | null) => void;
 }) {
   const [genommen, setGenommen] = useState<string | null>(null);
+  /*
+   * Wer weicht, wenn eine neue Dauerkarte auf volle Plaetze trifft: standardmaessig
+   * die aktive mit der niedrigsten Seltenheit (bei Gleichstand die aelteste) -
+   * sichtbar und umstellbar, statt still die aelteste zu verlieren. null heisst:
+   * niemand weicht, die neue Karte bleibt nur im Besitz.
+   */
+  const schwaechste = [...aktiv].sort((a, b) => {
+    const ra = RARITY_ORDER.indexOf(cardById(a)?.rarity ?? 'gewoehnlich');
+    const rb = RARITY_ORDER.indexOf(cardById(b)?.rarity ?? 'gewoehnlich');
+    return ra - rb;
+  })[0];
+  const [wahlErsetze, setWahlErsetze] = useState<string | null | undefined>(undefined);
+  const ersetze = wahlErsetze === undefined ? (schwaechste ?? null) : wahlErsetze;
+  const voll = plaetze > 0 && aktiv.length >= plaetze;
+  const bringtNeueDauer = (id: string): boolean => {
+    const k = cardById(id);
+    return !!k && dauerwirkungen(k).length > 0 && !besitz.includes(id);
+  };
+  const fragtErsetzen = voll && options.some(bringtNeueDauer);
 
   useEffect(() => {
     playCardDeal();
@@ -99,7 +126,8 @@ export function CardDraft({
             setGenommen(id);
             playCardPick(stufe);
             window.setTimeout(playCardVanish, 180);
-            window.setTimeout(() => onChoose(id), NACHKLANG_MS);
+            const mit = voll && bringtNeueDauer(id) ? ersetze : undefined;
+            window.setTimeout(() => onChoose(id, mit), NACHKLANG_MS);
           };
           return (
             <div
@@ -131,6 +159,14 @@ export function CardDraft({
                 <span className="draft-name">{karte.name}</span>
                 <KartenBild karte={karte} />
                 <span className="draft-text">{karte.text}</span>
+                {istEinzigartig(karte) && besitz.includes(id) && wiederholbar(karte) && (
+                  <span className="draft-nochmal">Schon im Besitz - nur die Sofortwirkung</span>
+                )}
+                {voll && bringtNeueDauer(id) && (
+                  <span className="draft-nochmal draft-verdraengt">
+                    {ersetze === null ? 'Kein Platz - bleibt inaktiv' : `Ersetzt ${cardById(ersetze)?.name ?? '?'}`}
+                  </span>
+                )}
               </button>
               {stufe >= 3 && (
                 <span className={stufe === 3 ? 'draft-funken episch' : 'draft-funken'} aria-hidden>
@@ -144,6 +180,28 @@ export function CardDraft({
           );
         })}
       </div>
+      {fragtErsetzen && darfWaehlen && genommen === null && (
+        <div className="draft-plaetze">
+          <span>Deine {plaetze} Plaetze sind voll. Eine neue Dauerkarte ersetzt:</span>
+          {aktiv.map((id) => (
+            <button
+              key={id}
+              className={ersetze === id ? 'aktiv' : ''}
+              onClick={() => setWahlErsetze(id)}
+              title={cardById(id)?.text}
+            >
+              {cardById(id)?.name ?? id}
+            </button>
+          ))}
+          <button
+            className={ersetze === null ? 'aktiv' : ''}
+            onClick={() => setWahlErsetze(null)}
+            title="Die neue Karte bleibt in deinem Besitz, nimmt aber keinen Platz ein - im Menue unter Karten tauschbar."
+          >
+            keine (nur behalten)
+          </button>
+        </div>
+      )}
     </div>
   );
 }
