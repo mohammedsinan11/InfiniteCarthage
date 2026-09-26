@@ -3922,6 +3922,25 @@ em.off {
   font-size: 12px;
   line-height: 1;
 }
+/* Handkartengrenze (ui/HandPanel.tsx, GrenzSchild): oben links am Blatt. */
+.hand .hand-grenze {
+  position: absolute;
+  top: -9px;
+  left: 6px;
+  z-index: 2;
+  padding: 1px 5px;
+  font-family: var(--pixel);
+  font-size: 8px;
+  line-height: 1.4;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+.hand .hand-grenze.ueber {
+  color: #fff;
+  background: var(--danger);
+  border-color: var(--danger);
+}
 /* Aufgeklappt klappt das ganze Blatt wieder ein, nicht nur das Minuszeichen. */
 .hand.hand-breit {
   cursor: pointer;

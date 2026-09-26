@@ -70,6 +70,7 @@ import { kampfFelder as kampfFelderVon } from '../../core/combat';
 import type { UnitState as HeerEinheit } from '../../core/state';
 import { bundleText } from '../log';
 import { eckenWert } from '../../core/bot';
+import { limitFor } from '../../core/rules/handlimit';
 import { erzeugteSorten } from '../../core/rules/hilfe';
 import {
   HAUPTSTADT_PUNKTE as PUNKTE_HAUPTSTADT,
@@ -1358,7 +1359,7 @@ export function Game() {
             immer da, ausgegraut, solange nichts geht (ui/Aktionsleiste.tsx).
           */}
           <div className="unten" ref={untenRef}>
-            {hand && <HandPanel hand={hand} />}
+            {hand && <HandPanel hand={hand} grenze={you ? limitFor(state, you) : undefined} />}
             {/*
               Der Handel steht als EIGENES Feld neben dem Rohstoffblatt, mit
               eigenem Rahmen und eigenem Hintergrund - er gehoert sichtbar

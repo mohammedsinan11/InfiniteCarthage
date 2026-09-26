@@ -58,7 +58,29 @@ function schmalAnfangs(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(max-width: 700px)').matches;
 }
 
-export function HandPanel({ hand }: { hand: Hand }) {
+/**
+ * Die Handkartengrenze als kleines Schild (rules/handlimit.ts): wer mehr haelt,
+ * verliert bei einer Pluenderung die Haelfte. Spieltest: das wusste niemand,
+ * und Raeuber nahmen die Haelfte aller Ertraege.
+ */
+function GrenzSchild({ total, grenze }: { total: number; grenze: number }) {
+  const ueber = total > grenze;
+  return (
+    <span
+      className={ueber ? 'hand-grenze ueber' : 'hand-grenze'}
+      title={
+        ueber
+          ? `Du haeltst ${total} Karten, die Grenze ist ${grenze}: Pluenderer nehmen dir die Haelfte. Ausgeben oder tauschen!`
+          : `${total} von ${grenze} Karten. Wer mehr haelt, verliert bei einer Pluenderung die Haelfte.`
+      }
+    >
+      {total}/{grenze}
+      {ueber ? ' !' : ''}
+    </span>
+  );
+}
+
+export function HandPanel({ hand, grenze }: { hand: Hand; grenze?: number }) {
   const total = RESOURCES.reduce((n, r) => n + hand[r], 0);
   const [schmalGewaehlt, setSchmalGewaehlt] = useState(schmalAnfangs);
   const [handy, setHandy] = useState(istHandy);
@@ -127,6 +149,7 @@ export function HandPanel({ hand }: { hand: Hand }) {
             <b>{hand[r]}</b>
           </span>
         ))}
+        {grenze !== undefined && <GrenzSchild total={total} grenze={grenze} />}
       </button>
     );
   }
@@ -155,6 +178,7 @@ export function HandPanel({ hand }: { hand: Hand }) {
       <button className="hand-zu" title="Hand einklappen" onClick={() => umschalten(true)}>
         –
       </button>
+      {grenze !== undefined && <GrenzSchild total={total} grenze={grenze} />}
       {RESOURCES.map((r) => (
         <div
           key={r}

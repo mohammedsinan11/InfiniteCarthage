@@ -20,7 +20,7 @@ export type Tipp = { id: string; titel: string; text: string };
 export const TIPPS: Record<string, Omit<Tipp, 'id'>> = {
   aufbau: {
     titel: 'Der Aufbau',
-    text: 'Setze zwei Doerfer und je eine Strasse. Gute Plaetze liegen an Feldern mit 6 und 8 (rote Zahlen) und an moeglichst verschiedenen Rohstoffen. Fahre mit dem Zeiger ueber einen Platz, um seine Zahlen zu sehen.',
+    text: 'Setze zwei Doerfer und je eine Strasse. Gute Plaetze liegen an Feldern mit 6 und 8 (rote Zahlen) und an moeglichst verschiedenen Rohstoffen - die Sterne ★ zeigen dir einige davon. Fahre mit dem Zeiger ueber einen Platz, um seine Zahlen zu sehen.',
   },
   wuerfeln: {
     titel: 'Wuerfeln und Ertrag',
