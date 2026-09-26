@@ -72,6 +72,8 @@ import { bundleText } from '../log';
 import { eckenWert } from '../../core/bot';
 import { weltArtVon } from '../../core/weltart';
 import { geruechte } from '../geruechte';
+import { ratschlag } from '../rat';
+import type { Rat } from '../rat';
 import { vorhabenById, vorhabenFortschritt } from '../../core/vorhaben';
 import { SIEGWEGE, fortschritt, schwelle, siegwegText, siegwegeAn } from '../../core/siegwege';
 import { limitFor } from '../../core/rules/handlimit';
@@ -328,6 +330,9 @@ export function Game() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [you, state.buildings, state.exploredRuins, state.wunder, sicht, state.worldSeed],
   );
+  /** Der Rat (client/rat.ts): ein Vorschlag, bis man ihn wegklickt oder der Zug wechselt. */
+  const [rat, setRat] = useState<Rat | null>(null);
+  useEffect(() => setRat(null), [state.turn, state.current]);
   /** Vorhaben fuers Menue (core/vorhaben.ts). */
   const vorhabenSicht = useMemo(() => {
     const lohnText = (l: { ruhm?: number; beute?: number }) =>
@@ -1232,6 +1237,20 @@ export function Game() {
               {hausById(me.haus)!.name}
             </span>
           )}
+          {you && phase.t !== 'hauswahl' && (
+            <button
+              className="hud-omen hud-rat"
+              disabled={!isMine}
+              title={isMine ? 'Was waere jetzt sinnvoll? Ein Vorschlag - gespielt wird nichts.' : 'Rat gibt es in deinem Zug'}
+              onClick={() => {
+                const r = world ? ratschlag(state, world, you) : null;
+                setRat(r ?? { text: 'Gerade faellt dem Rat nichts ein.' });
+                if (r?.ort) zeigeFeld(r.ort.q, r.ort.r);
+              }}
+            >
+              Rat?
+            </button>
+          )}
           {state.omens.length > 0 && (
             <button
               className={omenOffen ? 'hud-omen offen' : 'hud-omen'}
@@ -1563,6 +1582,18 @@ export function Game() {
                 <TradePanel state={state} you={you} hand={hand} act={act} />
               </div>
             )}
+
+          {rat && (
+            <div className="rat-tafel" role="status">
+              <b>Der Rat meint:</b> {rat.text}
+              <span className="rat-knoepfe">
+                {rat.ort && <button onClick={() => zeigeFeld(rat.ort!.q, rat.ort!.r)}>Zeigen</button>}
+                <button className="klein" onClick={() => setRat(null)}>
+                  Danke
+                </button>
+              </span>
+            </div>
+          )}
 
           {raubWarnung && !zielWahl && (
             <div className="raub-warnung" role="alert">

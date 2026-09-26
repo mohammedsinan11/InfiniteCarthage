@@ -5516,3 +5516,41 @@ em.off {
   font-weight: normal;
   color: var(--accent);
 }
+
+/* Der Rat (client/rat.ts): ein Satz, was jetzt sinnvoll waere. */
+.hud > button.hud-rat {
+  color: var(--accent);
+  border-color: var(--accent-dark);
+}
+.rat-tafel {
+  position: absolute;
+  top: var(--heerleiste-oben, 52px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8;
+  width: min(420px, calc(100% - 32px));
+  padding: 9px 12px;
+  background: rgba(23, 18, 12, 0.95);
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 2px var(--bg);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.rat-tafel b {
+  font-family: var(--pixel);
+  font-size: 10px;
+  font-weight: normal;
+  color: var(--accent);
+}
+.rat-knoepfe {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+@media (max-width: 700px) {
+  .rat-tafel {
+    top: auto;
+    bottom: 176px;
+    font-size: 12px;
+  }
+}
