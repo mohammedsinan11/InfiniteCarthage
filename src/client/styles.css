@@ -5660,3 +5660,17 @@ em.off {
     height: 28px;
   }
 }
+
+/* Das gezeigte Feld (board/Board.tsx, fokusPuls). */
+.hex-fokus {
+  fill: rgba(255, 215, 106, 0.18);
+  stroke: #ffd76a;
+  stroke-width: 3;
+  animation: hex-fokus-puls 0.8s ease-in-out 4;
+}
+@keyframes hex-fokus-puls {
+  50% {
+    stroke-width: 6;
+    fill: rgba(255, 215, 106, 0.05);
+  }
+}

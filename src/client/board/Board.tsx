@@ -653,11 +653,16 @@ export function Board({
     [liftEdge, liftVertex],
   );
 
+  const [fokusPuls, setFokusPuls] = useState<{ q: number; r: number } | null>(null);
   /** Auf Wunsch zu einem Feld fahren - etwa wenn im Menue ein Ritter gezeigt wird. */
   useEffect(() => {
     if (!fokus) return;
     const p = hexToPixel(fokus.q, fokus.r, LAYOUT);
     setCam((c) => ({ ...c, cx: p.x, cy: p.y - liftHex(fokus.q, fokus.r) }));
+    // Das Feld kurz markieren - sonst sucht man, wohin die Karte gefahren ist.
+    setFokusPuls({ q: fokus.q, r: fokus.r });
+    const t = window.setTimeout(() => setFokusPuls(null), 3200);
+    return () => window.clearTimeout(t);
     // Nur bei einem neuen Wunsch - nicht, wenn sich die Hoehenfunktion aendert.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fokus?.n]);
@@ -2654,6 +2659,19 @@ export function Board({
             </g>
           );
         })}
+
+        {/* Das gezeigte Feld (Menue, Rat, Geruechte) - ein pulsierender Rand. */}
+        {fokusPuls &&
+          (() => {
+            const hoch = liftHex(fokusPuls.q, fokusPuls.r);
+            const punkte = [0, 1, 2, 3, 4, 5]
+              .map((i) => {
+                const p = hexCornerPixel(fokusPuls.q, fokusPuls.r, i, LAYOUT);
+                return `${p.x.toFixed(1)},${(p.y - hoch).toFixed(1)}`;
+              })
+              .join(' ');
+            return <polygon className="hex-fokus" points={punkte} pointerEvents="none" />;
+          })()}
 
         {/* Felder, die der Wurf getroffen hat - kurzes Aufleuchten. */}
         {(flashHexes ?? []).map((hk) => {
