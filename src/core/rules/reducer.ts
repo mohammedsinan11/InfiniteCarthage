@@ -11,6 +11,8 @@
  * Kopie, die nur bei Erfolg uebernommen wird.
  */
 
+import { kundeFortschreiben, kundeSchreiben } from '../kunde';
+import type { KundeEvent } from '../kunde';
 import { fraktionsLeben } from '../fraktionsleben';
 import type { FraktionsEvent } from '../fraktionsleben';
 import { vorhabenPruefen, vorhabenRunde, vorhabenWaehlen } from '../vorhaben';
@@ -93,7 +95,7 @@ import type { AuftragEvent } from './auftraege';
 import { nachtBeginntAt, tagBeginntAt } from '../zeit';
 import type { ArmyEvent } from './army';
 import { nextStep } from '../units';
-import { bigRoundChangedAt } from '../season';
+import { bigRoundChangedAt, seasonChangedAt } from '../season';
 import { draftOptions } from '../cards/draft';
 import { cardById } from '../cards/catalog';
 import { cardKind, dauerwirkungen, istEinzigartig, wiederholbar } from '../cards/types';
@@ -251,6 +253,7 @@ export type GameEvent =
   | HilfeEvent
   | VorhabenEvent
   | FraktionsEvent
+  | KundeEvent
   | BedrohungEvent
   | DiplomatieEvent
   | AuftragEvent
@@ -1529,6 +1532,12 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
   ruhmAusEreignissen(s, geschehen, events);
   // Die Fraktionen reagieren: Nachfolger, Beute, Stimmung (core/fraktionsleben.ts).
   fraktionsLeben(s, geschehen, events);
+  // Ins Saisonbuch - und zum Wechsel der Jahreszeit die Kunde aus dem Land (core/kunde.ts).
+  kundeFortschreiben(s, events as never);
+  if (action.t === 'endTurn' && seasonChangedAt(s.turn) && (s.phase as GameState['phase']).t !== 'finished') {
+    const bericht = kundeSchreiben(s, s.turn);
+    if (bericht) events.push({ t: 'seasonReport', bericht });
+  }
   // Die Chronik liest dieselben Ereignisse - fuer die Schlussseite. Der Aufbau
   // zaehlt nicht mit: er ist fuer alle gleich und kein Teil der Geschichte.
   if (action.t !== 'placeSettlement' && action.t !== 'placeRoad') chronikFortschreiben(s, events);

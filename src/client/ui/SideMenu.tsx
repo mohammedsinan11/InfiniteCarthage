@@ -33,6 +33,7 @@ import { getVolume, initAudio, setVolume } from '../audio';
 import { LogPanel } from './LogPanel';
 import { KartenBild } from './KartenBild';
 import { OmenListe } from './OmenListe';
+import type { Bericht } from '../../core/kunde';
 import type { WeltEintrag } from '../net/store';
 import { TRACKS, getMusicMode, getMusicVolume, setMusicMode, setMusicVolume } from '../music';
 import type { MusicMode } from '../music';
@@ -308,6 +309,7 @@ export function SideMenu({
   friedenBezahlbar,
   geruechte,
   omens,
+  berichte,
   vorhaben,
   onVorhaben,
   siegwege,
@@ -398,6 +400,8 @@ export function SideMenu({
   friedenBezahlbar: boolean;
   /** Was man sich erzaehlt (client/geruechte.ts). */
   geruechte: Geruecht[];
+  /** Die Kunde aus dem Land (core/kunde.ts). */
+  berichte: readonly Bericht[];
   /** Die Omen der Partie, schon mit Chronikstufe (core/omen.ts). */
   omens: readonly string[];
   /** Vorhaben: Auswahl oder das laufende (core/vorhaben.ts). */
@@ -708,6 +712,26 @@ export function SideMenu({
                 )}
               </>
             )}
+          </>
+        )}
+
+        {reiter === 'chronist' && berichte.length > 0 && (
+          <>
+            <Kopf titel="Kunde aus dem Land" hilfe="Was in den letzten Jahreszeiten geschah - der Chronist schreibt es zu jedem Wechsel auf." />
+            <div className="menu-berichte">
+              {[...berichte].reverse().map((b) => (
+                <details key={`${b.jahr}-${b.saison}`} open={b === berichte[berichte.length - 1]}>
+                  <summary>
+                    {SEASON_NAME[b.saison]}, Jahr {b.jahr}
+                  </summary>
+                  <ul className="kunde-zeilen">
+                    {b.zeilen.map((z) => (
+                      <li key={z}>{z}</li>
+                    ))}
+                  </ul>
+                </details>
+              ))}
+            </div>
           </>
         )}
 

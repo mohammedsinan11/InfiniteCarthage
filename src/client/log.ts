@@ -3,8 +3,10 @@
  * der Server schickt Ereignisse, keine Saetze.
  */
 
+import { genitiv } from '../core/factions';
 import { vorhabenById } from '../core/vorhaben';
 import { WESEN } from '../core/factions';
+import { SEASON_NAME } from '../core/season';
 import { fraktionIn } from '../core/fraktionsleben';
 import type { GameEvent } from '../core/rules/reducer';
 import type { Verlust } from '../core/rules/army';
@@ -196,6 +198,8 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
     }
     case 'ambitionFailed':
       return `${who(state, e.player)} laesst das Vorhaben "${vorhabenById(e.id)?.name ?? e.id}" fallen - die Zeit ist um.`;
+    case 'seasonReport':
+      return `Kunde aus dem Land (${SEASON_NAME[e.bericht.saison]}, Jahr ${e.bericht.jahr}): ${e.bericht.zeilen.join(' ')}`;
     case 'chiefChanged':
       return `${e.alt} ist gefallen. ${e.neu} fuehrt nun ${fraktionName(state, e.fraktion).replace(/^Die /, 'die ')} - ${WESEN[e.wesen].name}.`;
     case 'vendetta': {
@@ -263,9 +267,9 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
     case 'lootRecovered':
       return `${who(state, e.player)} holt Beute zurueck: ${karten(e.count)}.`;
     case 'nestDestroyed':
-      return `Ein Lager von ${fraktionName(state, e.fraktion)} faellt. Beute fuer ${e.players.map((p) => who(state, p)).join(', ') || 'niemanden'}.`;
+      return `Ein Lager ${genitiv(fraktionName(state, e.fraktion))} faellt. Beute fuer ${e.players.map((p) => who(state, p)).join(', ') || 'niemanden'}.`;
     case 'nestCaptured':
-      return `${fraktionName(state, e.an)} erobern ein Lager von ${fraktionName(state, e.von)}.`;
+      return `${fraktionName(state, e.an)} erobern ein Lager ${genitiv(fraktionName(state, e.von))}.`;
     case 'horde':
       return `Goblin-Horde greift an! ${fraktionName(state, e.fraktion)} schicken ${e.anzahl} Goblins.`;
     case 'burn':

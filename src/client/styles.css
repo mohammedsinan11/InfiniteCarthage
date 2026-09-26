@@ -5725,3 +5725,34 @@ em.off {
   white-space: nowrap;
   color: var(--muted);
 }
+
+/* Kunde aus dem Land (ui/KundeTafel.tsx). */
+.kunde-zeilen {
+  margin: 4px 0 10px;
+  padding: 0 0 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  text-align: left;
+}
+.kunde-zeilen li::marker {
+  color: var(--accent);
+}
+.menu-berichte {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.menu-berichte summary {
+  cursor: pointer;
+  font-family: var(--pixel);
+  font-size: 10px;
+  color: var(--accent);
+  padding: 4px 0;
+}
+.menu-berichte .kunde-zeilen {
+  font-size: 12.5px;
+}

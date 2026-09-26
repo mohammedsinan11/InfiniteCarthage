@@ -10,6 +10,7 @@
 
 import type { VorhabenStand } from './vorhaben';
 import type { FraktionsStand } from './fraktionsleben';
+import type { Bericht, SaisonBuch } from './kunde';
 import type { Bundle, Resource } from './types';
 import type { ChunkCoord } from './chunks';
 import type { DraftSource } from './cards/types';
@@ -574,6 +575,10 @@ export type GameState = {
   ereignisseGesehen?: string[];
   /** Wuerfe in Folge ohne Ertrag je Spieler (rules/hilfe.ts, durstLindern). */
   durst?: Record<PlayerId, number>;
+  /** Was in der laufenden Jahreszeit geschah (core/kunde.ts). */
+  saisonBuch?: SaisonBuch;
+  /** Die Berichte der letzten Jahreszeiten, "Kunde aus dem Land" (core/kunde.ts). */
+  berichte?: Bericht[];
   /** Was aus den Fraktionen wurde: Nachfolger, Beute, Stimmung (core/fraktionsleben.ts). */
   fraktionen?: Record<string, FraktionsStand>;
   /** Vorhaben je Spieler: Auswahl und laufendes (core/vorhaben.ts). */

@@ -74,6 +74,7 @@ import { weltArtVon } from '../../core/weltart';
 import { erstarkt, fraktionIn, stimmungText, stimmungVon } from '../../core/fraktionsleben';
 import { geruechte } from '../geruechte';
 import { Zeitleiste } from '../ui/Zeitleiste';
+import { KundeTafel } from '../ui/KundeTafel';
 import { ratschlag } from '../rat';
 import type { Rat } from '../rat';
 import { vorhabenById, vorhabenFortschritt } from '../../core/vorhaben';
@@ -151,6 +152,8 @@ export function Game() {
   const tippGelesen = useStore((s) => s.tippGelesen);
   const [omenOffen, setOmenOffen] = useState(false);
   const pendingRoll = useStore((s) => s.pendingRoll);
+  const kunde = useStore((s) => s.kunde);
+  const schliesseKunde = useStore((s) => s.schliesseKunde);
   const clearPendingRoll = useStore((s) => s.clearPendingRoll);
   const announcements = useStore((s) => s.announcements);
   const dropAnnouncement = useStore((s) => s.dropAnnouncement);
@@ -1354,6 +1357,7 @@ export function Game() {
           handKarten={hand ? RESOURCES.reduce((n, r) => n + hand[r], 0) : 0}
           geruechte={geruechteListe}
           omens={state.omens}
+          berichte={state.berichte}
           vorhaben={vorhabenSicht}
           onVorhaben={(id) => act({ t: 'chooseAmbition', id })}
           siegwege={
@@ -1434,6 +1438,8 @@ export function Game() {
         {tipps.length > 0 && phase.t !== 'finished' && phase.t !== 'hauswahl' && state.draft === null && (
           <TippBox tipp={tipps[0]!} mehr={tipps.length - 1} onGelesen={tippGelesen} />
         )}
+
+        {kunde && phase.t !== 'ereignis' && pendingRoll === null && <KundeTafel bericht={kunde} onZu={schliesseKunde} />}
 
         {phase.t === 'ereignis' && pendingRoll === null && (
           <EreignisTafel state={state} you={you} onWahl={(wahl) => act({ t: 'answerEvent', wahl })} />

@@ -261,3 +261,14 @@ export function fraktionAt(seed: number, q: number, r: number): Fraktion {
   }
   return fraktionById(seed, id);
 }
+
+/** Ein Fraktionsname mitten im Satz: "die Aschewoelfe" statt "Die Aschewoelfe". */
+export const imSatz = (name: string): string => name.replace(/^Die /, 'die ');
+
+/** Im Genitiv: "der Aschewoelfe", "der Bande von Kraehenfels", "des Stammes Grutzmaul". */
+export function genitiv(name: string): string {
+  if (name.startsWith('Die ')) return `der ${name.slice(4)}`;
+  if (name.startsWith('Bande ')) return `der ${name}`;
+  if (name.startsWith('Stamm ')) return `des Stammes ${name.slice(6)}`;
+  return name;
+}

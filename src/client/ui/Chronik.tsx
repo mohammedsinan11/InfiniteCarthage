@@ -233,6 +233,26 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
           </section>
         )}
 
+        {state.berichte.length > 0 && (
+          <section>
+            <h3>Kunde aus dem Land</h3>
+            <div className="menu-berichte">
+              {state.berichte.map((b) => (
+                <details key={`${b.jahr}-${b.saison}`}>
+                  <summary>
+                    {SEASON_NAME[b.saison]}, Jahr {b.jahr}
+                  </summary>
+                  <ul className="kunde-zeilen">
+                    {b.zeilen.map((z) => (
+                      <li key={z}>{z}</li>
+                    ))}
+                  </ul>
+                </details>
+              ))}
+            </div>
+          </section>
+        )}
+
         {chronik && (
           <section>
             <h3>In Zahlen</h3>

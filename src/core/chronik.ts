@@ -19,6 +19,7 @@
  * sind gedeckelt. Auch eine Endlospartie waechst dadurch nur langsam.
  */
 
+import { genitiv } from './factions';
 import { fraktionIn } from './fraktionsleben';
 import { vorhabenById } from './vorhaben';
 import { szenarioById, szenarioStand } from './szenario';
@@ -195,7 +196,7 @@ export function chronikFortschreiben(state: GameState, events: readonly GameEven
       case 'nestDestroyed': {
         for (const id of e.players) stats(id).lager += 1;
         const wer = e.players.map((id) => nameVon(state, id)).join(' und ') || 'Jemand';
-        moment(e.players[0] ?? null, 'lager', `${wer} zerstoert ein Lager von ${fraktionById(state.worldSeed, e.fraktion).name}.`);
+        moment(e.players[0] ?? null, 'lager', `${wer} zerstoert ein Lager ${genitiv(fraktionById(state.worldSeed, e.fraktion).name)}.`);
         break;
       }
       case 'ambitionDone':

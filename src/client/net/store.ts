@@ -7,6 +7,8 @@
  * der Server, ohne dass ein einziges Gelaendefeld uebertragen wird.
  */
 
+import { genitiv } from '../../core/factions';
+import type { Bericht } from '../../core/kunde';
 import { vorhabenById } from '../../core/vorhaben';
 import { letzterAhn } from '../profil';
 import { create } from 'zustand';
@@ -181,6 +183,9 @@ export type Store = {
   pfeile: Pfeil[];
   /** Treffer der letzten Kampfrunde - das Brett zeigt sie kurz, Game raeumt sie weg. */
   treffer: Treffer[];
+  /** Die frische Kunde aus dem Land, bis man sie wegklickt (core/kunde.ts). */
+  kunde: Bericht | null;
+  schliesseKunde: () => void;
 
   /**
    * oeffentlich gilt nur beim Eroeffnen: erscheint der Raum in der Raumliste?
@@ -233,6 +238,7 @@ function vervollstaendige(msg: ServerMsg): void {
     msg.state.wunder ??= {};
     msg.state.vorhaben ??= {};
     msg.state.fraktionen ??= {};
+    msg.state.berichte ??= [];
     msg.state.koop ??= false;
     msg.state.szenario ??= null;
     msg.state.szenarioErgebnis ??= null;
@@ -304,7 +310,7 @@ function weltAus(
         eintrag('nest', `Lager zerstoert: ${name(e.fraktion)}`);
         break;
       case 'nestCaptured':
-        eintrag('capture', `${name(e.an)} erobern ein Lager von ${name(e.von)}`);
+        eintrag('capture', `${name(e.an)} erobern ein Lager ${genitiv(name(e.von))}`);
         break;
       case 'horde':
         // Das Menue setzt vor diese Zeile ein Ausrufezeichen (styles.css, welt-horde).
@@ -559,7 +565,7 @@ function meldungenAus(
       }
     } else if (e.t === 'nestCaptured') {
       if (sichtbar(e.q, e.r)) {
-        out.push({ id: naechsteId++, text: `${name(e.an)} erobern ein Lager von ${name(e.von)}`, kind: 'info' });
+        out.push({ id: naechsteId++, text: `${name(e.an)} erobern ein Lager ${genitiv(name(e.von))}`, kind: 'info' });
       }
     } else if (e.t === 'nestDestroyed') {
       const meins = you !== null && e.players.includes(you);
@@ -717,6 +723,8 @@ export const useStore = create<Store>((set, get) => ({
   produceEffect: null,
   pfeile: [],
   treffer: [],
+  kunde: null,
+  schliesseKunde: () => set({ kunde: null }),
 
   connect:(code, name, create, oeffentlich = true, token, neu = {}) => {
     beitrittsName = name;
@@ -887,6 +895,8 @@ export const useStore = create<Store>((set, get) => ({
             break;
           case 'events': {
             const wurf = msg.events.find((e: GameEvent) => e.t === 'roll');
+            const kunde = msg.events.find((e: GameEvent) => e.t === 'seasonReport');
+            if (kunde && kunde.t === 'seasonReport') set({ kunde: kunde.bericht });
             const neue = meldungenAus(msg.events, get().state, get().you);
             const neueTipps = tippsAus(msg.events, get().you, get().tipps.map((t) => t.id));
             if (neueTipps.length > 0) set((s) => ({ tipps: [...s.tipps, ...neueTipps] }));
