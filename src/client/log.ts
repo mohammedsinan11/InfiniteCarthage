@@ -345,6 +345,7 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
     case 'turn':
       return `${who(state, e.player)} ist am Zug.`;
     case 'aid':
+      if (e.grund === 'durst') return `Nach mageren Wuerfen hilft ein Nachbar ${who(state, e.player)} mit 1x ${resourceName(e.resource)} aus.`;
       return `Wanderhaendler bringen ${who(state, e.player)} 1x ${resourceName(e.resource)} - das erzeugt das Reich selbst nicht.`;
     case 'eventOffered':
       return `${ereignisById(e.id)?.titel ?? 'Ein Ereignis'} - ${who(state, e.player)} muss entscheiden.`;

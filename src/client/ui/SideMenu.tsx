@@ -188,11 +188,6 @@ type LogFilter = 'alles' | 'kaempfe' | 'ertrag' | 'welt';
 const KAEMPFE = /kampf|bogenschuetzen|gefallen|lager|raubzug|pluender|hinterhalt|horde|fehde|ritter/i;
 const ERTRAG = /ertrag|wuerfelt|beute|monopol|handel|fund|karte/i;
 
-/** Was es noch nicht gibt, sagt das auch. */
-function NochNicht({ was }: { was: string }) {
-  return <p className="menu-leer">{was} folgt noch.</p>;
-}
-
 /** Ein Abschnittskopf. hilfe: die Erklaerung hinter dem "?", ein Klick klappt sie auf. */
 function Kopf({ titel, hilfe, rechts, gefahr }: { titel: string; hilfe?: string; rechts?: ReactNode; gefahr?: boolean }) {
   const [auf, setAuf] = useState(false);
@@ -699,8 +694,6 @@ export function SideMenu({
               </span>
             </div>
 
-            <Kopf titel="Bevoelkerung" />
-            <NochNicht was="Bevoelkerung und Beliebtheit" />
           </>
         )}
 
@@ -1011,8 +1004,6 @@ export function SideMenu({
               </ul>
             )}
 
-            <Kopf titel="Technologie" />
-            <NochNicht was="Der Technologiebaum" />
           </>
         )}
 

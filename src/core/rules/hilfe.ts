@@ -22,7 +22,13 @@ import type { Resource } from '../types';
 import type { GameState, PlayerId } from '../state';
 import { bigRoundOf } from '../season';
 
-export type HilfeEvent = { t: 'aid'; player: PlayerId; resource: Resource };
+export type HilfeEvent = {
+  t: 'aid';
+  player: PlayerId;
+  resource: Resource;
+  /** 'durst': nach mehreren Wuerfen ohne Ertrag (durstLindern). Fehlt: Mangelhilfe. */
+  grund?: 'durst';
+};
 
 type Ereignisse = { push(...e: HilfeEvent[]): number };
 
@@ -65,4 +71,40 @@ export function mangelHilfe(s: GameState, world: World, events: Ereignisse): voi
     p.hand[r] += 1;
     events.push({ t: 'aid', player: p.id, resource: r });
   }
+}
+
+/**
+ * Durststrecke: so viele Wuerfe in Folge ohne jeden Ertrag, dann hilft ein
+ * Nachbar mit einer Karte (Spieltest: zu viele leere Zuege am Stueck).
+ */
+export const DURST_GRENZE = 4;
+
+/**
+ * Nach jedem Wurf ausser der 7: wer nichts bekam, zaehlt weiter; bei der Grenze
+ * gibt es eine Karte der Sorte, von der man am wenigsten hat. Nur in Partien mit
+ * Ereignissen (die neuen Raeume) - alte Staende und Tests bleiben, wie sie waren.
+ */
+export function durstLindern(
+  s: GameState,
+  payout: Record<PlayerId, Record<Resource, number>>,
+  events: Ereignisse,
+): void {
+  if (!s.ereignisseAn) return;
+  const durst = { ...(s.durst ?? {}) };
+  for (const p of s.players) {
+    if (p.besiegt) continue;
+    if (!Object.values(s.buildings).some((b) => b.owner === p.id)) continue;
+    const bekam = payout[p.id] ? RESOURCES.reduce((n, r) => n + (payout[p.id]![r] ?? 0), 0) : 0;
+    if (bekam > 0) {
+      durst[p.id] = 0;
+      continue;
+    }
+    durst[p.id] = (durst[p.id] ?? 0) + 1;
+    if (durst[p.id]! < DURST_GRENZE) continue;
+    const r = RESOURCES.reduce((a, b) => (p.hand[b] < p.hand[a] ? b : a));
+    p.hand[r] += 1;
+    durst[p.id] = 0;
+    events.push({ t: 'aid', player: p.id, resource: r, grund: 'durst' });
+  }
+  s.durst = durst;
 }

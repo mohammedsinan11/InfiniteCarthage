@@ -76,3 +76,48 @@ describe('Jahreszeiten', () => {
     expect(menge('field', 46)).toBe(1); // Winter: 2 halb
   });
 });
+
+describe('Durststrecke', () => {
+  it('hilft nach DURST_GRENZE Wuerfen ohne Ertrag mit der knappsten Sorte', async () => {
+    const { durstLindern, DURST_GRENZE } = await import('../src/core/rules/hilfe');
+    const g = mitDorfAn('forest');
+    g.state.ereignisseAn = true;
+    const p = g.state.players[0]!;
+    for (const r of RESOURCES) p.hand[r] = 3;
+    p.hand.ore = 0;
+    const ev: { t: string; resource?: string; grund?: string }[] = [];
+    for (let i = 0; i < DURST_GRENZE - 1; i++) durstLindern(g.state, {}, ev);
+    expect(ev).toHaveLength(0);
+    durstLindern(g.state, {}, ev);
+    expect(ev).toEqual([{ t: 'aid', player: 'p0', resource: 'ore', grund: 'durst' }]);
+    expect(p.hand.ore).toBe(1);
+    expect(g.state.durst?.p0).toBe(0);
+  });
+
+  it('ein Ertrag setzt die Zaehlung zurueck; ohne Ereignisse gilt die Regel nicht', async () => {
+    const { durstLindern, DURST_GRENZE } = await import('../src/core/rules/hilfe');
+    const g = mitDorfAn('forest');
+    g.state.ereignisseAn = true;
+    const ev: unknown[] = [];
+    for (let i = 0; i < DURST_GRENZE - 1; i++) durstLindern(g.state, {}, ev as never);
+    const gain = Object.fromEntries(RESOURCES.map((r) => [r, r === 'lumber' ? 1 : 0])) as Record<(typeof RESOURCES)[number], number>;
+    durstLindern(g.state, { p0: gain }, ev as never);
+    expect(g.state.durst?.p0).toBe(0);
+    g.state.ereignisseAn = false;
+    for (let i = 0; i < DURST_GRENZE + 2; i++) durstLindern(g.state, {}, ev as never);
+    expect(ev).toHaveLength(0);
+  });
+});
+
+describe('Bankkurs erklaert', () => {
+  it('nennt Zoellner und Karte, wenn sie den Kurs aendern', async () => {
+    const { tradeRatioErklaert } = await import('../src/core/rules/trade');
+    const g = mitDorfAn('forest');
+    g.state.omens = ['zoellner'];
+    g.state.players[0]!.activeCards = ['markttag'];
+    const { ratio, gruende } = tradeRatioErklaert(g.state, g.world, 'p0', 'lumber');
+    expect(ratio).toBe(4);
+    expect(gruende.some((x) => x.startsWith('Karte'))).toBe(true);
+    expect(gruende.some((x) => x.startsWith('Zoellner'))).toBe(true);
+  });
+});

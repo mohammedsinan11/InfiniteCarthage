@@ -562,6 +562,8 @@ export type GameState = {
   ereignis?: { id: string; player: PlayerId } | null;
   /** Schon erlebte Ereignisse - sie kommen erst wieder, wenn alle durch sind. */
   ereignisseGesehen?: string[];
+  /** Wuerfe in Folge ohne Ertrag je Spieler (rules/hilfe.ts, durstLindern). */
+  durst?: Record<PlayerId, number>;
 };
 
 /** Eine Hauptstadt auf einem Feld. Die Stufe beginnt bei 1 - weitere folgen (DESIGN.md, Hauptstadt). */

@@ -33,7 +33,7 @@ export function haefenZu(state: { worldSeed?: number; turn?: number }): boolean 
  * Handelskontor, sonst 4. Bei Sturm laeuft kein Schiff aus - dann gelten die
  * Haefen nicht, das Handelskontor aber schon.
  */
-export function tradeRatio(
+export function tradeRatioErklaert(
   state: BoardView & {
     players?: ReadonlyArray<{ id: PlayerId; activeCards: string[]; haus?: string | null }>;
     worldSeed?: number;
@@ -48,8 +48,15 @@ export function tradeRatio(
   world: World,
   player: PlayerId,
   give: Resource,
-): number {
+): { ratio: number; gruende: string[] } {
   let ratio = DEFAULT_RATIO;
+  const gruende: string[] = [];
+  const setze = (neu: number, grund: string) => {
+    if (neu < ratio) {
+      ratio = neu;
+      gruende.push(`${grund}: ${neu}:1`);
+    }
+  };
   const karten = state.players?.find((p) => p.id === player)?.activeCards ?? [];
   const mods = modifiersOf(karten);
   const zu = haefenZu(state) && !mods.stormPorts;
@@ -59,38 +66,54 @@ export function tradeRatio(
     const port = portAt(world, vk);
     if (port === undefined) continue;
     if (port === give) {
-      ratio = 2;
+      setze(2, 'Passender Hafen');
       break; // besser geht es ueber Haefen nicht
     }
-    if (port === 'any') ratio = Math.min(ratio, 3);
+    if (port === 'any') setze(3, '3:1-Hafen');
   }
   /*
    * Das Handelskontor der Phase 2 (rules/reich.ts) handelt ueber Land: 3:1 auf
    * alles, im ganzen Reich, und es bleibt offen, wenn der Sturm die Haefen
    * schliesst. Einen passenden 2:1-Hafen unterbietet es nicht.
    */
-  if (hatReichsbau(state, player, 'handelskontor')) ratio = Math.min(ratio, 3);
+  if (hatReichsbau(state, player, 'handelskontor')) setze(3, 'Handelskontor');
   /*
    * Der ernannte Haendler (rules/zweig.ts) handelt, solange er auf der Karte
    * steht: 2:1 auf alles. Faellt er, ist es damit vorbei, bis er zurueckkehrt -
    * seine Wirkung haengt an ihm, nicht an einem Gebaeude.
    */
   if (state.units?.some((u) => u.zweig === 'haendler' && u.owner === player)) {
-    ratio = Math.min(ratio, 2);
+    setze(2, 'Haendler');
   }
   // Karten koennen den Handel guenstiger machen - aber nie unter zwei, sonst
   // waere Tauschen kein Handel mehr, sondern eine Umbenennung.
   // Omen gelten fuer alle (core/omen.ts): Handelswinde deckelt bei 3:1,
   // Zoellner schlagen auf alles eine Karte auf - auch auf den besten Hafen.
   const deckel = handelsDeckel(state.omens);
-  if (deckel !== null) ratio = Math.min(ratio, deckel);
+  if (deckel !== null) setze(deckel, 'Handelswinde');
   // Das eigene Haus (core/haus.ts): Karthago handelt 3:1, Bergclan und Seher teurer.
   const haus = state.players?.find((p) => p.id === player)?.haus;
   const hausDeckel = hausHandelsDeckel(haus);
-  if (hausDeckel !== null) ratio = Math.min(ratio, hausDeckel);
-  if (hatWunder(state, player, 'kothon')) ratio = Math.min(ratio, 3);
-  return Math.max(2, ratio - mods.tradeDiscount) + handelsAufschlag(state.omens) + hausHandelsAufschlag(haus);
+  if (hausDeckel !== null) setze(hausDeckel, 'Dein Haus');
+  if (hatWunder(state, player, 'kothon')) setze(3, 'Kothon');
+  if (zu) gruende.push('Sturm: Haefen zu');
+  if (mods.tradeDiscount > 0) {
+    if (ratio > 2) gruende.push(`Karte: -${mods.tradeDiscount}`);
+    else gruende.push('Karte: wirkt nicht unter 2:1');
+  }
+  const omenPlus = handelsAufschlag(state.omens);
+  if (omenPlus > 0) gruende.push(`Zoellner: +${omenPlus}`);
+  const hausPlus = hausHandelsAufschlag(haus);
+  if (hausPlus > 0) gruende.push(`Dein Haus: +${hausPlus}`);
+  return { ratio: Math.max(2, ratio - mods.tradeDiscount) + omenPlus + hausPlus, gruende };
 }
+
+/** Wie tradeRatioErklaert, nur die Zahl. */
+export function tradeRatio(...args: Parameters<typeof tradeRatioErklaert>): number {
+  return tradeRatioErklaert(...args).ratio;
+}
+
+
 
 /** Alle Haefen, an denen dieser Spieler sitzt - fuer die Anzeige. */
 export function playerPorts(

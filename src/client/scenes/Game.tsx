@@ -68,6 +68,7 @@ import { brennt } from '../../core/rules/feuer';
 import { maxLeben } from '../../core/combat';
 import { kampfFelder as kampfFelderVon } from '../../core/combat';
 import type { UnitState as HeerEinheit } from '../../core/state';
+import { bundleText } from '../log';
 import {
   HAUPTSTADT_PUNKTE as PUNKTE_HAUPTSTADT,
   MAX_TURM_STUFE,
@@ -122,7 +123,7 @@ import {
   legalTowerVertices,
 } from '../../core/rules/placement';
 import { productionSources } from '../../core/rules/production';
-import { tradeRatio } from '../../core/rules/trade';
+import { tradeRatio, tradeRatioErklaert } from '../../core/rules/trade';
 import { Aktionsleiste, SymHandel } from '../ui/Aktionsleiste';
 import type { BuildMode } from '../ui/Aktionsleiste';
 import { reichArtVon } from '../ui/Aktionsleiste';
@@ -167,7 +168,13 @@ export function Game() {
   /** Wo die Ausbau-Tafel offen ist: an einem eigenen Gebaeude oder an einer Krone. */
   const [ausbauOrt, setAusbauOrt] = useState<{ art: 'ecke' | 'feld'; key: string } | null>(null);
   /** Zahlen festpinnen - fuer alle, die sie lieber dauerhaft sehen. */
-  const [pinNumbers, setPinNumbers] = useState(false);
+  const [pinNumbers, setPinNumbers] = useState(() => {
+    try {
+      return localStorage.getItem('infinitecarthage.zahlen') === 'an';
+    } catch {
+      return false;
+    }
+  });
   /*
    * Welche Tafel der Bauleiste offen ist. Lag frueher in ui/Aktionsleiste.tsx.
    * Der Handelsknopf sitzt jetzt oben als Karte neben der Hand, also in einem
@@ -264,6 +271,9 @@ export function Game() {
     setKandidaten(ids);
     setAuswahl(ids);
     setZielWahl(ziel && ids.length > 0);
+    // Befehle und Bauen schliessen sich aus: wer eine Einheit waehlt, will nicht
+    // mehr bauen - sonst waeren die Befehlsknoepfe stumm gesperrt.
+    if (ids.length > 0) setMode(null);
   };
   const auswahlSchliessen = () => {
     setKandidaten([]);
@@ -330,6 +340,30 @@ export function Game() {
     const kaempfe = [...kampfFelder(state).keys()].filter((k) => sicht === null || sicht.has(k)).length;
     return { unterwegs: feinde.length, naechster, kaempfe };
   }, [state, meineFelder, sicht]);
+
+  /**
+   * Ein Raubzug, der auf mich zuhaelt und nah ist: dafuer die Warnung mit
+   * Gegenmitteln, bevor es brennt (Spieltest: Raubzuege kamen ohne Vorwarnung).
+   * Nur Truppen ohne Beute - wer schon traegt, zieht heim.
+   */
+  const [weggeklickt, setWeggeklickt] = useState<string[]>([]);
+  const raubWarnung = useMemo(() => {
+    if (!you || meineFelder.length === 0) return null;
+    const felder = new Set(meineFelder.map((h) => hexKey(h.q, h.r)));
+    let best: { u: HeerEinheit; weg: number; anzahl: number; schluessel: string } | null = null;
+    for (const u of state.units) {
+      if (u.auftrag !== 'raub' || u.fraktion === null || u.ziel === null || u.traegt > 0) continue;
+      if (!felder.has(hexKey(u.ziel.q, u.ziel.r))) continue;
+      if (abkommenVon(state, you, u.fraktion)) continue;
+      const weg = hexDistance(u, u.ziel);
+      if (weg > 6) continue;
+      const schluessel = u.heimat ?? String(u.id);
+      if (weggeklickt.includes(schluessel)) continue;
+      const anzahl = state.units.filter((x) => x.heimat === u.heimat && x.auftrag === 'raub').length;
+      if (!best || weg < best.weg) best = { u, weg, anzahl, schluessel };
+    }
+    return best;
+  }, [state, you, meineFelder, weggeklickt]);
 
   /**
    * Die Fraktionen, die man kennt: denen die Lager auf der aufgedeckten Karte
@@ -1147,7 +1181,16 @@ export function Game() {
           }}
           onBeute={() => act({ t: 'claimLoot' })}
           showNumbers={pinNumbers}
-          onToggleNumbers={() => setPinNumbers((v) => !v)}
+          onToggleNumbers={() =>
+            setPinNumbers((v) => {
+              try {
+                localStorage.setItem('infinitecarthage.zahlen', v ? 'aus' : 'an');
+              } catch {
+                // Privater Modus - dann nur fuer diese Sitzung.
+              }
+              return !v;
+            })
+          }
           autoWurfSekunden={AUTO_WURF_MS / 1000}
           zeitInfo={{
             tageszeit,
@@ -1319,9 +1362,14 @@ export function Game() {
                 hand={hand}
                 isMine={isMine}
                 mode={mode}
-                setMode={setMode}
+                setMode={(m) => {
+                  // Umgekehrt: wer bauen will, gibt keinen Befehl mehr.
+                  if (m !== null) setZielWahl(false);
+                  setMode(m);
+                }}
                 act={act}
                 verhaeltnis={(r) => (you ? tradeRatio(state, world, you, r) : 4)}
+                gruende={(r) => (you ? tradeRatioErklaert(state, world, you, r).gruende : [])}
                 onTafel={setTafelOffen}
                 tafel={tafel}
                 setTafel={setTafel}
@@ -1394,6 +1442,51 @@ export function Game() {
                 <TradePanel state={state} you={you} hand={hand} act={act} />
               </div>
             )}
+
+          {raubWarnung && !zielWahl && (
+            <div className="raub-warnung" role="alert">
+              <p>
+                <b>Raubzug!</b> {raubWarnung.anzahl > 1 ? `${raubWarnung.anzahl} ` : ''}
+                {fraktionById(state.worldSeed, raubWarnung.u.fraktion!).name} ziehen auf dich zu - noch{' '}
+                {raubWarnung.weg} {raubWarnung.weg === 1 ? 'Feld' : 'Felder'}.
+              </p>
+              <p className="raub-warnung-klein">Ritter und Bogenschuetzen halten sie auf; ein Abkommen laesst sie vorbeiziehen.</p>
+              <div className="raub-warnung-knoepfe">
+                <button onClick={() => zeigeFeld(raubWarnung.u.q, raubWarnung.u.r)}>Zeigen</button>
+                {meineEinheiten.length > 0 && (
+                  <button
+                    disabled={!befehleMoeglich}
+                    title="Alle Einheiten ohne Auftrag (sonst alle) ziehen dem Raubzug entgegen"
+                    onClick={() => {
+                      const wer = (untaetige.length > 0 ? untaetige : meineEinheiten).map((u) => u.id);
+                      act({ t: 'orderUnits', units: wer, q: raubWarnung.u.ziel!.q, r: raubWarnung.u.ziel!.r });
+                    }}
+                  >
+                    Heer entgegen
+                  </button>
+                )}
+                <button
+                  disabled={!(isMine && phase.t === 'main') || !hand || RESOURCES.reduce((n, r) => n + hand[r], 0) < tributPreis}
+                  title={`Tribut: ${tributPreis} ${tributPreis === 1 ? 'Karte' : 'Karten'} sofort und je grosser Runde`}
+                  onClick={() => act({ t: 'diplomacy', fraktion: raubWarnung.u.fraktion!, art: 'tribut' })}
+                >
+                  Tribut ({tributPreis})
+                </button>
+                {nimmtFrieden(state.worldSeed, raubWarnung.u.fraktion!) && (
+                  <button
+                    disabled={!(isMine && phase.t === 'main') || !hand || !canAfford(hand, FRIEDEN_PREIS)}
+                    title={`Frieden fuer 20 Runden: ${bundleText(FRIEDEN_PREIS)}`}
+                    onClick={() => act({ t: 'diplomacy', fraktion: raubWarnung.u.fraktion!, art: 'frieden' })}
+                  >
+                    Frieden
+                  </button>
+                )}
+                <button className="klein" onClick={() => setWeggeklickt((w) => [...w, raubWarnung.schluessel].slice(-20))}>
+                  Ausblenden
+                </button>
+              </div>
+            </div>
+          )}
 
           {zielWahl && auswahl.length > 0 && (
             <div className="befehl-hinweis">

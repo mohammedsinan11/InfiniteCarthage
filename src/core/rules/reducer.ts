@@ -102,7 +102,7 @@ import type { TacticEvent } from './tactics';
 import { ruhmAusEreignissen } from './ruhm';
 import { gueltigeOmen, siebenerBonus, startBeute } from '../omen';
 import { hausAngebot, hausById, hausWirkung } from '../haus';
-import { mangelHilfe } from './hilfe';
+import { durstLindern, mangelHilfe } from './hilfe';
 import { omenMitStufe } from '../stufe';
 import { szenarioById, szenarioErreicht, sterneFuer, unversehrtGeschafft } from '../szenario';
 import { roundOf } from '../season';
@@ -814,6 +814,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
           }
         }
         events.push({ t: 'production', payout });
+        durstLindern(s, payout, events);
         s.phase = { t: 'main' };
       }
       // Alle paar eigenen Zuege ein Ereignis mit einer Wahl (core/ereignis.ts) -

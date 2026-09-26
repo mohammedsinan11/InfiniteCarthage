@@ -65,8 +65,8 @@ export const NO_TARGET = 0;
  * keinen Rand, und mit Hauptstaedten, Helden und Fraktionen gibt es mehr zu
  * tun, als 15 Punkte Zeit lassen. Wer nie aufhoeren will, nimmt "unendlich".
  */
-export const TARGET_POINTS_CHOICES = [30, 60, NO_TARGET] as const;
-export const DEFAULT_TARGET_POINTS = 30;
+export const TARGET_POINTS_CHOICES = [20, 30, 60, NO_TARGET] as const;
+export const DEFAULT_TARGET_POINTS = 20;
 
 export const targetPointsLabel = (n: number): string =>
   n === NO_TARGET ? 'unendlich' : String(n);

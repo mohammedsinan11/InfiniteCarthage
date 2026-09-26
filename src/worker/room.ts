@@ -260,7 +260,10 @@ export class GameRoom implements DurableObject {
       } else {
         room.tagesDatum = null;
         room.omens = wuerfleOmen(randomSeed());
-        room.rundenLimit = null;
+        // Voreingestellt: 20 Punkte oder ein Jahr, was zuerst kommt - so hat
+        // jede Partie ein absehbares Ende und eine Chronik (Spieltest: allein
+        // zog sich das offene Spiel zu 30 Punkten zu lange).
+        room.rundenLimit = 60;
         // Der Weltseed ist oeffentlich (er steht in jedem Spielstand) - ihn
         // wiederzuverwenden verraet nichts. Wuerfel und Karten kommen neu.
         const welt = Number(url.searchParams.get('welt'));

@@ -38,7 +38,7 @@ import type { PlayerId } from '../../core/state';
 import { STUFE_NAME } from '../../core/rules/hauptstadt';
 import { createWorld, mitAufgedeckt, revealChunks } from '../../core/world';
 import type { World } from '../../core/world';
-import { BRAND_WAS, auftragText, bundleText, describeEvent, fraktionName, seiteName } from '../log';
+import { BRAND_WAS, auftragText, bundleText, describeEvent, fraktionName, resourceName, seiteName } from '../log';
 import { spielerSeite } from '../../core/combat';
 import { sightOf } from '../../core/units';
 import { hexKey } from '../../core/coords';
@@ -386,9 +386,16 @@ function meldungenAus(
       );
       continue;
     }
+    if (e.t === 'aid' && e.player === you) {
+      meldung(`${e.grund === 'durst' ? 'Ein Nachbar hilft aus' : 'Wanderhaendler bringen'}: 1x ${resourceName(e.resource)}`, 'gain');
+      continue;
+    }
     if (e.t === 'plunder') {
       const karten = `${e.count} ${e.count === 1 ? 'Karte' : 'Karten'}`;
-      if (e.player === you) {
+      // Nichts zu holen: kein Alarm, der nach Verlust klingt.
+      if (e.count === 0) {
+        if (e.player === you) out.push({ id: naechsteId++, text: `${name(e.fraktion)} ziehen ab - bei dir war nichts zu holen`, kind: 'info' });
+      } else if (e.player === you) {
         playRaid();
         out.push({ id: naechsteId++, text: `${name(e.fraktion)} pluendern dich: ${karten}`, kind: 'raid' });
       } else {
@@ -832,6 +839,7 @@ export const useStore = create<Store>((set, get) => ({
             break;
           }
           case 'error':
+            if (get().state?.phase.t === 'finished') break;
             set({ error: msg.message });
             break;
         }
@@ -888,7 +896,11 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   send: (msg) => sendMsg(get().ws, msg),
-  act: (action) => sendMsg(get().ws, { t: 'action', action }),
+  act: (action) => {
+    // Nach dem Ende gibt es nichts mehr zu tun - keine Fehlermeldung ueber den Knoepfen der Chronik.
+    if (get().state?.phase.t === 'finished') return;
+    sendMsg(get().ws, { t: 'action', action });
+  },
   dismissError: () => set({ error: null }),
   clearPendingRoll: () => {
     // Erst wenn die Wuerfel weg sind, sollen Felder leuchten und Karten

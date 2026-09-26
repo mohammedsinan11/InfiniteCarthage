@@ -345,6 +345,7 @@ function Tafel({ titel, onZu, children }: { titel: string; onZu: () => void; chi
 function HandelTafel({
   hand,
   verhaeltnis,
+  gruende,
   darf,
   sturm,
   onTausch,
@@ -352,6 +353,8 @@ function HandelTafel({
 }: {
   hand: Hand;
   verhaeltnis: (r: Resource) => number;
+  /** Warum der Kurs so ist, wie er ist (rules/trade.ts, tradeRatioErklaert). */
+  gruende?: (r: Resource) => string[];
   darf: boolean;
   /** Bei Sturm sind die Haefen zu (core/zeit.ts). */
   sturm: boolean;
@@ -378,6 +381,10 @@ function HandelTafel({
       <button className="primary dock-tafel-los" disabled={!geht} onClick={() => onTausch(gib, nimm)}>
         {v}x {resourceName(gib)} gegen {resourceName(nimm)}
       </button>
+      <p className="dock-tafel-klein">
+        Kurs {v}:1 - Grundkurs 4:1
+        {(gruende?.(gib) ?? []).map((g) => `, ${g}`).join('')}
+      </p>
       {sturm && <p className="dock-tafel-klein">Sturm: die Haefen sind geschlossen.</p>}
     </Tafel>
   );
@@ -496,6 +503,7 @@ export function Aktionsleiste({
   setMode,
   act,
   verhaeltnis,
+  gruende,
   onTafel,
   tafel,
   setTafel,
@@ -511,6 +519,7 @@ export function Aktionsleiste({
   setMode: (m: BuildMode) => void;
   act: (a: Action) => void;
   verhaeltnis: (r: Resource) => number;
+  gruende?: (r: Resource) => string[];
   /** Meldet, ob gerade eine Tafel offen ist - solange wuerfelt niemand von selbst. */
   onTafel?: (offen: boolean) => void;
   /*
@@ -605,6 +614,7 @@ export function Aktionsleiste({
         <HandelTafel
           hand={hand}
           verhaeltnis={verhaeltnis}
+          gruende={gruende}
           darf={bauen}
           onTausch={(give, receive) => act({ t: 'bankTrade', give, receive })}
           sturm={haefenZu(state)}
