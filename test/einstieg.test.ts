@@ -55,3 +55,24 @@ describe('Mangelhilfe', () => {
     expect(ev).toHaveLength(0);
   });
 });
+
+import { productionSources } from '../src/core/rules/production';
+import { hexKey } from '../src/core/coords';
+
+describe('Jahreszeiten', () => {
+  function menge(terrain: string, turn: number): number {
+    const g = createGame([{ id: 'p0', name: 'S' }], 4242, 77);
+    const t = [...g.world.tiles.values()].find((x) => x.terrain === terrain && x.number !== null)!;
+    g.state.buildings = { [vertexKey(hexVertices(t.q, t.r)[0]!)]: { owner: 'p0', type: 'city' } };
+    g.state.turn = turn;
+    return productionSources(g.state, g.world, t.number!)
+      .filter((q) => q.hex === hexKey(t.q, t.r))
+      .reduce((n, q) => n + q.amount, 0);
+  }
+  it('Fruehling: Weiden +1, Herbst: Felder +1, Winter: Felder halb', () => {
+    expect(menge('pasture', 1)).toBe(3); // Stadt 2 + Fruehling 1
+    expect(menge('pasture', 16)).toBe(2); // Sommer
+    expect(menge('field', 31)).toBe(3); // Herbst
+    expect(menge('field', 46)).toBe(1); // Winter: 2 halb
+  });
+});

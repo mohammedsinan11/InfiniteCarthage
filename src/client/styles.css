@@ -4962,3 +4962,9 @@ em.off {
   font-size: 11.5px;
   color: #e39a86;
 }
+
+.menu-saison-wirkung {
+  font-size: 11.5px;
+  color: var(--text);
+  margin-top: 2px;
+}

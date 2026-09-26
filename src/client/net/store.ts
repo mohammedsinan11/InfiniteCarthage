@@ -42,7 +42,7 @@ import { BRAND_WAS, auftragText, bundleText, describeEvent, fraktionName, seiteN
 import { spielerSeite } from '../../core/combat';
 import { sightOf } from '../../core/units';
 import { hexKey } from '../../core/coords';
-import { bigRoundChangedAt, bigRoundOf, roundOf, SEASON_NAME, seasonChangedAt, seasonOf } from '../../core/season';
+import { bigRoundChangedAt, bigRoundOf, roundOf, SEASON_NAME, seasonChangedAt, seasonOf, JAHRESZEIT_WIRKUNG } from '../../core/season';
 import { tippGesehen, tippsAus } from '../tipps';
 import type { Tipp } from '../tipps';
 
@@ -731,7 +731,7 @@ export const useStore = create<Store>((set, get) => ({
                   ? [
                       {
                         id: naechsteId++,
-                        text: SEASON_NAME[seasonOf(jetzt)],
+                        text: [SEASON_NAME[seasonOf(jetzt)], JAHRESZEIT_WIRKUNG[seasonOf(jetzt)].text].filter(Boolean).join(' - '),
                         kind: 'season' as const,
                       },
                     ]

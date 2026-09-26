@@ -222,6 +222,12 @@ oder bringen. Mindestens eine Antwort ist immer frei; gesehene Ereignisse
 kommen erst wieder, wenn alle durch sind. Die Chronik erzaehlt die
 Entscheidungen nach.
 
+**Jahreszeiten mit Wirkung** (`JAHRESZEIT_WIRKUNG` in `src/core/season.ts`).
+Im Fruehling liefern Weiden 1 Wolle mehr, im Herbst Felder 1 Getreide mehr,
+im Winter liefern Felder nur die Haelfte. Das Jahr bekommt einen Takt: wer im
+Herbst Getreide zurueckhaelt, baut im Winter weiter. Das Seitenmenue und die
+Meldung beim Wechsel nennen die Wirkung.
+
 **Einstieg.** Neue Spieler bekommen beim ersten Auftreten jedes Systems einen
 kurzen Tipp (erster Fund, erstes Feuer, erste Nacht, erste Beute ...,
 `src/client/tipps.ts`), je Browser einmal, und eine Liste "Erste Schritte"

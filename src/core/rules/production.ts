@@ -17,6 +17,7 @@ import type { Hand } from '../state';
 import { regnet, wetterOf } from '../zeit';
 import { ertragsBonus } from '../omen';
 import { hausGelaende, hausRegenfest } from '../haus';
+import { JAHRESZEIT_WIRKUNG, seasonOf } from '../season';
 import type { Wetter } from '../zeit';
 
 export type Payout = Record<PlayerId, Hand>;
@@ -53,6 +54,8 @@ export function productionSources(
     players: ReadonlyArray<{ id: PlayerId; activeCards: string[]; haus?: string | null }>;
     /** Die Omen der Partie (core/omen.ts) - sie gelten fuer alle. */
     omens?: readonly string[];
+    /** Die Zugnummer - fuer die Jahreszeit (core/season.ts). Fehlt: keine Wirkung. */
+    turn?: number;
   },
   world: World,
   roll: number,
@@ -64,6 +67,7 @@ export function productionSources(
 ): ProductionSource[] {
   const out: ProductionSource[] = [];
   const nass = regnet(wetter);
+  const saison = state.turn !== undefined && state.turn > 0 ? JAHRESZEIT_WIRKUNG[seasonOf(state.turn)] : null;
   const cardsOf = (id: PlayerId): string[] =>
     state.players.find((p) => p.id === id)?.activeCards ?? [];
   // Regelkarten (cards/effects.ts): "die 6 zaehlt auch als 8" - dann liefern
@@ -89,8 +93,10 @@ export function productionSources(
       const omen = ertragsBonus(state.omens, tile.terrain);
       // Das Haus des Besitzers (core/haus.ts) - etwa der Bergclan an Bergen.
       const haus = state.players.find((p) => p.id === b.owner)?.haus;
-      const voll = Math.max(0, terrainBonusFor(mods, tile.terrain, grund) + omen + hausGelaende(haus, tile.terrain));
-      const halb = nass && tile.terrain === 'field' && !hausRegenfest(haus);
+      const jahr = tile.terrain === 'pasture' ? (saison?.weide ?? 0) : tile.terrain === 'field' ? (saison?.feld ?? 0) : 0;
+      const voll = Math.max(0, terrainBonusFor(mods, tile.terrain, grund) + omen + hausGelaende(haus, tile.terrain) + jahr);
+      // Regen und Winter halbieren die Felder - die Ebene ist dagegen gefeit (core/haus.ts).
+      const halb = (nass || (saison?.feldHalb ?? false)) && tile.terrain === 'field' && !hausRegenfest(haus);
       const doppelt = mods.doppelZahlen.includes(roll) ? 2 : 1;
       const amount = (halb ? Math.floor(voll / 2) : voll) * doppelt;
       if (amount > 0) out.push({ hex: hk, owner: b.owner, resource, amount });

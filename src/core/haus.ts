@@ -90,7 +90,7 @@ export const HAEUSER: readonly Haus[] = [
     id: 'ebene',
     name: 'Haus der Ebene',
     motto: 'Korn und Herde',
-    staerke: 'Felder liefern dir 1 Getreide mehr, und Regen halbiert sie nicht.',
+    staerke: 'Felder liefern dir 1 Getreide mehr, und weder Regen noch Winter halbieren sie.',
     schwaeche: 'Jede Pluenderung nimmt dir eine Karte mehr.',
     rat: 'Getreide ist der Stoff fuer Staedte und Ritter - tausche es gezielt.',
     wirkung: { gelaende: { field: 1 }, regenfest: true, pluenderung: 1 },

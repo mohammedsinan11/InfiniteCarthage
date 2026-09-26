@@ -33,6 +33,23 @@ export const SEASON_NAME: Record<Season, string> = {
 };
 
 /**
+ * Was die Jahreszeit am Ertrag aendert - fuer alle gleich (rules/production.ts).
+ *
+ * Frueher nur Aussehen. Jetzt hat das Jahr einen Takt, auf den man sich
+ * einstellt: im Fruehling werfen die Schafe, im Herbst ist Ernte, im Winter
+ * liefern die Felder wie bei Regen nur die Haelfte - wer im Herbst Getreide
+ * zurueckhaelt, baut im Winter weiter. Der Sommer bleibt, wie er ist.
+ */
+export type JahreszeitWirkung = { weide?: number; feld?: number; feldHalb?: boolean; text: string };
+
+export const JAHRESZEIT_WIRKUNG: Record<Season, JahreszeitWirkung> = {
+  spring: { weide: 1, text: 'Weiden liefern 1 Wolle mehr.' },
+  summer: { text: '' },
+  autumn: { feld: 1, text: 'Ernte: Felder liefern 1 Getreide mehr.' },
+  winter: { feldHalb: true, text: 'Felder liefern nur die Haelfte.' },
+};
+
+/**
  * Vor dem ersten Zug steht turn auf 0, waehrend des Aufbaus ebenfalls.
  * Gerechnet wird ab Runde 1, damit die erste Runde nicht Runde 0 heisst.
  */

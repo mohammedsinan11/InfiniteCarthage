@@ -15,7 +15,7 @@
 
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { SEASON_NAME, bigRoundOf, ROUNDS_PER_BIG_ROUND, roundOf, seasonOf, yearOf } from '../../core/season';
+import { JAHRESZEIT_WIRKUNG, SEASON_NAME, bigRoundOf, ROUNDS_PER_BIG_ROUND, roundOf, seasonOf, yearOf } from '../../core/season';
 import { cardById } from '../../core/cards/catalog';
 import { modifiersOf } from '../../core/cards/effects';
 import { RARITY_ORDER, dauerwirkungen } from '../../core/cards/types';
@@ -504,6 +504,7 @@ export function SideMenu({
         <div className="menu-zeit-zier">❧</div>
         <div className="menu-saison">{SEASON_NAME[saison]}</div>
         <div className="menu-jahr">Jahr {yearOf(turn)}</div>
+        {JAHRESZEIT_WIRKUNG[saison].text && <div className="menu-saison-wirkung">{JAHRESZEIT_WIRKUNG[saison].text}</div>}
         <div className="menu-trenner" />
         <div className="menu-runde">
           Runde {roundOf(turn)}
