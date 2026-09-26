@@ -43,6 +43,8 @@ import { spielerSeite } from '../../core/combat';
 import { sightOf } from '../../core/units';
 import { hexKey } from '../../core/coords';
 import { bigRoundChangedAt, bigRoundOf, roundOf, SEASON_NAME, seasonChangedAt, seasonOf } from '../../core/season';
+import { tippGesehen, tippsAus } from '../tipps';
+import type { Tipp } from '../tipps';
 
 /**
  * Ein Weltereignis - was der Welt geschieht, nicht was ein Spieler tut.
@@ -157,6 +159,9 @@ export type Store = {
    * und sie sollen nacheinander zu sehen sein statt sich zu ueberschreiben.
    */
   announcements: Announcement[];
+  /** Tipps, die noch gelesen werden wollen (client/tipps.ts) - der erste wird gezeigt. */
+  tipps: Tipp[];
+  tippGelesen: () => void;
   /**
    * Der letzte Ertrag, damit die Felder aufleuchten und die Karten fliegen
    * koennen. Die Nummer wechselt bei jedem Wurf und stoesst die Animation an.
@@ -613,6 +618,12 @@ export const useStore = create<Store>((set, get) => ({
   platzWahl: null,
   pendingRoll: null,
   announcements: [],
+  tipps: [],
+  tippGelesen: () => {
+    const [erster, ...rest] = get().tipps;
+    if (erster) tippGesehen(erster.id);
+    set({ tipps: rest });
+  },
   produceEffect: null,
   pfeile: [],
   treffer: [],
@@ -762,6 +773,8 @@ export const useStore = create<Store>((set, get) => ({
           case 'events': {
             const wurf = msg.events.find((e: GameEvent) => e.t === 'roll');
             const neue = meldungenAus(msg.events, get().state, get().you);
+            const neueTipps = tippsAus(msg.events, get().you, get().tipps.map((t) => t.id));
+            if (neueTipps.length > 0) set((s) => ({ tipps: [...s.tipps, ...neueTipps] }));
             const weltNeu = weltAus(msg.events, get().state, get().you);
             // Beschuss: je Schuss ein Pfeil, hoechstens fuenf je Salve.
             const pfeile: Pfeil[] = msg.events.flatMap((e: GameEvent) =>

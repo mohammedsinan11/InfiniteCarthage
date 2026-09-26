@@ -342,6 +342,8 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
         : `Die Karte waechst um ${e.coords.length} Gebiete.`;
     case 'turn':
       return `${who(state, e.player)} ist am Zug.`;
+    case 'aid':
+      return `Wanderhaendler bringen ${who(state, e.player)} 1x ${resourceName(e.resource)} - das erzeugt das Reich selbst nicht.`;
     case 'houseChosen':
       return `${who(state, e.player)} fuehrt ${hausById(e.haus)?.name ?? 'ein Haus'}.`;
     case 'draftOffered':

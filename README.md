@@ -204,6 +204,15 @@ Klingen beginnen mit zwei Rittern, die Speicherherren verlieren weniger an
 Pluenderer. Jede Wirkung greift an einer Stelle, die es schon gab (Ertrag,
 Bankhandel, Handkartengrenze, Pluenderung, Startausstattung).
 
+**Einstieg.** Neue Spieler bekommen beim ersten Auftreten jedes Systems einen
+kurzen Tipp (erster Fund, erstes Feuer, erste Nacht, erste Beute ...,
+`src/client/tipps.ts`), je Browser einmal, und eine Liste "Erste Schritte"
+mit sechs Grundzuegen, die sich selbst abhakt. Wer eine Sorte gar nicht
+erzeugt, bekommt sie alle fuenf Runden einmal von Wanderhaendlern
+(`src/core/rules/hilfe.ts`) - keine Partie steckt mehr fest, nur weil kein
+Wald am Dorf liegt. Allein wuerfelt das Spiel nicht mehr von selbst, solange
+man es nicht einschaltet.
+
 **Chronik** (`src/core/chronik.ts`, `src/client/ui/Chronik.tsx`). Statt
 "X gewinnt!" zeigt das Ende eine Schlussseite: Rangliste mit Wertung,
 Siegpunkte im Verlauf, die Momente der Partie (erste Stadt, Horden,

@@ -99,6 +99,8 @@ import type { TacticEvent } from './tactics';
 import { ruhmAusEreignissen } from './ruhm';
 import { gueltigeOmen, siebenerBonus, startBeute } from '../omen';
 import { hausAngebot, hausById, hausWirkung } from '../haus';
+import { mangelHilfe } from './hilfe';
+import type { HilfeEvent } from './hilfe';
 import { chronikBeginnen, chronikFortschreiben, neueChronik, wertung } from '../chronik';
 import type { RuhmEvent } from './ruhm';
 import {
@@ -217,6 +219,7 @@ export type GameEvent =
   /** Heer, Raubzuege, Gefechte, Lager, Ruinen, Held und Feuer - siehe rules/army.ts. */
   | ArmyEvent
   | UntergangEvent
+  | HilfeEvent
   | BedrohungEvent
   | DiplomatieEvent
   | AuftragEvent
@@ -1287,6 +1290,8 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         beginBigRound(s, events);
         lagerNeuBesetzen(s, events);
         tributRunde(s, events);
+        // Wer eine Sorte gar nicht erzeugt, bekommt sie ab und zu (rules/hilfe.ts).
+        mangelHilfe(s, world, events);
       }
 
       // Mit der Nacht kommen die Goblins in Horden und die Schleime aus dem

@@ -39,6 +39,8 @@ import { reichskartenPlaetze } from '../../core/cards/loadout';
 import { SideMenu } from '../ui/SideMenu';
 import { Chronik } from '../ui/Chronik';
 import { HausWahl } from '../ui/HausWahl';
+import { TippBox } from '../ui/TippBox';
+import { ErsteSchritte } from '../ui/ErsteSchritte';
 import { hausById } from '../../core/haus';
 import { OmenListe } from '../ui/OmenListe';
 import { omenById } from '../../core/omen';
@@ -128,6 +130,8 @@ export function Game() {
   const act = useStore((s) => s.act);
   const disconnect = useStore((s) => s.disconnect);
   const connect = useStore((s) => s.connect);
+  const tipps = useStore((s) => s.tipps);
+  const tippGelesen = useStore((s) => s.tippGelesen);
   const [omenOffen, setOmenOffen] = useState(false);
   const pendingRoll = useStore((s) => s.pendingRoll);
   const clearPendingRoll = useStore((s) => s.clearPendingRoll);
@@ -814,11 +818,14 @@ export function Game() {
    * Jede Beruehrung, Taste und jedes Mausrad stellt sie zurueck - wer gerade
    * etwas tut, wird nicht weggewuerfelt. Abschaltbar im Menue (TO, Spiel).
    */
+  // Ohne eigene Wahl: allein aus (niemand wartet, und wer das Protokoll liest,
+  // soll nicht weggewuerfelt werden - IDEEN.md, Spielbarkeit 5), zu mehreren an.
   const [autoWurf, setAutoWurf] = useState(() => {
     try {
-      return localStorage.getItem(AUTO_WURF_KEY) !== 'aus';
+      const gewaehlt = localStorage.getItem(AUTO_WURF_KEY);
+      return gewaehlt === null ? state.order.length > 1 : gewaehlt !== 'aus';
     } catch {
-      return true;
+      return state.order.length > 1;
     }
   });
   const [tafelOffen, setTafelOffen] = useState(false);
@@ -1164,6 +1171,13 @@ export function Game() {
               ? `Dein letztes Gebaeude ist gefallen! Setze bis Zug ${me.untergang} eine Siedlung - auch ohne Strasse davor (${state.turn >= me.untergang ? 'jetzt' : `noch ${me.untergang - state.turn} Zuege`}).`
               : 'Dein Reich steht wieder.'}
           </div>
+        )}
+
+        {phase.t !== 'hauswahl' && phase.t !== 'setup' && phase.t !== 'finished' && you && (
+          <ErsteSchritte state={state} you={you} />
+        )}
+        {tipps.length > 0 && phase.t !== 'finished' && phase.t !== 'hauswahl' && state.draft === null && (
+          <TippBox tipp={tipps[0]!} mehr={tipps.length - 1} onGelesen={tippGelesen} />
         )}
 
         {phase.t === 'hauswahl' && (
