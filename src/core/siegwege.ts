@@ -31,7 +31,7 @@ export type Siegweg = {
 
 export const SIEGWEGE: readonly Siegweg[] = [
   { id: 'eroberer', name: 'Eroberer', text: 'Zerstoere {n} Lager.', basis: 5, waechst: true },
-  { id: 'entdecker', name: 'Entdecker', text: 'Erkunde {n} Ruinen.', basis: 6, waechst: true },
+  { id: 'entdecker', name: 'Entdecker', text: 'Erkunde {n} Ruinen.', basis: 10, waechst: true },
   { id: 'wunderbauer', name: 'Wunderbauer', text: 'Errichte {n} Weltwunder.', basis: 2, waechst: false },
   { id: 'handelsfuerst', name: 'Handelsfuerst', text: 'Handle {n} Mal.', basis: 40, waechst: true },
 ];

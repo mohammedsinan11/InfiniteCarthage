@@ -73,7 +73,7 @@ export const WELTARTEN: readonly WeltArtInfo[] = [
     art: 'grenzland',
     name: 'Grenzland',
     text: 'Dicht besiedelt von Banden: mehr Lager, mehr Raubzuege, mehr Beute.',
-    p: { ...GEWOEHNLICH, lager: 0.8 },
+    p: { ...GEWOEHNLICH, lager: 0.72 },
   },
   {
     art: 'stille',
