@@ -11,6 +11,8 @@
  * Kopie, die nur bei Erfolg uebernommen wird.
  */
 
+import { fraktionsLeben } from '../fraktionsleben';
+import type { FraktionsEvent } from '../fraktionsleben';
 import { vorhabenPruefen, vorhabenRunde, vorhabenWaehlen } from '../vorhaben';
 import type { VorhabenEvent } from '../vorhaben';
 import { ahnSauber, istAhn } from '../lore';
@@ -248,6 +250,7 @@ export type GameEvent =
   | UntergangEvent
   | HilfeEvent
   | VorhabenEvent
+  | FraktionsEvent
   | BedrohungEvent
   | DiplomatieEvent
   | AuftragEvent
@@ -1524,6 +1527,8 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
   // Ihre bereits erzeugten Ereignisse bilden an einer Stelle den Ruhm.
   const geschehen = [...events] as Array<{ t: string } & Record<string, unknown>>;
   ruhmAusEreignissen(s, geschehen, events);
+  // Die Fraktionen reagieren: Nachfolger, Beute, Stimmung (core/fraktionsleben.ts).
+  fraktionsLeben(s, geschehen, events);
   // Die Chronik liest dieselben Ereignisse - fuer die Schlussseite. Der Aufbau
   // zaehlt nicht mit: er ist fuer alle gleich und kein Teil der Geschichte.
   if (action.t !== 'placeSettlement' && action.t !== 'placeRoad') chronikFortschreiben(s, events);

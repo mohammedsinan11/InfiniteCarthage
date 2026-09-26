@@ -76,6 +76,10 @@ export type FraktionsZeile = {
   wesen?: FraktionsWesen;
   /** Was ein Tribut an sie kostet. */
   tribut: number;
+  /** Wie sie zu dir steht (core/fraktionsleben.ts). */
+  stimmung?: string;
+  /** Genug Beute beisammen: der naechste Raubzug kommt verstaerkt. */
+  erstarkt?: boolean;
 };
 
 /** Siegpunkte aufgeschluesselt (Game): Summe, Ziel (0 = endlos) und woher sie kommen. */
@@ -1012,7 +1016,9 @@ export function SideMenu({
                         {f.anfuehrer && (
                           <span className="menu-frak-wesen" title={f.wesen ? WESEN[f.wesen].text : undefined}>
                             {f.anfuehrer}
-                            {f.wesen ? ` · ${WESEN[f.wesen].name}: ${WESEN[f.wesen].text}` : ''}
+                            {f.wesen ? ` · ${WESEN[f.wesen].name}: ${WESEN[f.wesen].text} Sie ${WESEN[f.wesen].ziel}.` : ''}
+                            {f.stimmung ? ` Dir gegenueber: ${f.stimmung}.` : ''}
+                            {f.erstarkt ? ' Voller Beute - der naechste Raubzug kommt verstaerkt!' : ''}
                           </span>
                         )}
                       </span>

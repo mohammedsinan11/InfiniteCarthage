@@ -41,7 +41,7 @@ import { STUFE_NAME } from '../../core/rules/hauptstadt';
 import { createWorld, mitAufgedeckt, revealChunks } from '../../core/world';
 import type { World } from '../../core/world';
 import { BRAND_WAS, auftragText, bundleText, describeEvent, fraktionName, resourceName, seiteName } from '../log';
-import { fraktionById } from '../../core/factions';
+import { fraktionIn } from '../../core/fraktionsleben';
 import { spielerSeite } from '../../core/combat';
 import { sightOf } from '../../core/units';
 import { hexKey } from '../../core/coords';
@@ -232,6 +232,7 @@ function vervollstaendige(msg: ServerMsg): void {
     msg.state.stufe ??= 0;
     msg.state.wunder ??= {};
     msg.state.vorhaben ??= {};
+    msg.state.fraktionen ??= {};
     msg.state.koop ??= false;
     msg.state.szenario ??= null;
     msg.state.szenarioErgebnis ??= null;
@@ -413,9 +414,11 @@ function meldungenAus(
       if (e.player === you) meldung('Neue Vorhaben zur Wahl - beim Kanzler im Menue', 'info');
     } else if (e.t === 'ambitionDone') {
       if (e.player === you) meldung(`Vorhaben vollendet: ${vorhabenById(e.id)?.name ?? e.id}`, 'gain');
+    } else if (e.t === 'chiefChanged') {
+      meldung(`${e.alt} ist gefallen - ${e.neu} fuehrt nun ${name(e.fraktion)}`, 'info');
     } else if (e.t === 'vendetta') {
       if (e.player === you) {
-        const chef = state ? fraktionById(state.worldSeed, e.fraktion).anfuehrer : undefined;
+        const chef = state ? fraktionIn(state, e.fraktion).anfuehrer : undefined;
         meldung(`${chef ?? name(e.fraktion)} schwoert Rache - der naechste Raubzug gilt dir`, 'raid');
       }
     } else if (e.t === 'march') {

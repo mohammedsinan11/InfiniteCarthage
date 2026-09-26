@@ -4,6 +4,8 @@
  */
 
 import { vorhabenById } from '../core/vorhaben';
+import { WESEN } from '../core/factions';
+import { fraktionIn } from '../core/fraktionsleben';
 import type { GameEvent } from '../core/rules/reducer';
 import type { Verlust } from '../core/rules/army';
 import type { PublicState } from '../core/redact';
@@ -179,7 +181,8 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
       const zug = e.parties[0]!;
       if (zug.rache) return `Rachezug: ${fraktionName(state, zug.fraktion)} ziehen gegen ${who(state, zug.rache)}${staerke(zug)}.`;
       // Mit Anfuehrer (core/factions.ts): die Welt hat Gesichter, nicht nur Farben.
-      const chef = state && istFraktion(zug.fraktion) ? fraktionById(state.worldSeed, zug.fraktion).anfuehrer : undefined;
+      const chef = state && istFraktion(zug.fraktion) ? fraktionIn(state, zug.fraktion).anfuehrer : undefined;
+      if (zug.erstarkt) return `${fraktionName(state, zug.fraktion)} ziehen mit der Kraft ihrer Beute los${staerke(zug)}.`;
       return chef
         ? `${chef} fuehrt ${fraktionName(state, zug.fraktion).replace(/^Die /, 'die ')} auf Raubzug${staerke(zug)}.`
         : `Raubzug bricht auf: ${fraktionName(state, zug.fraktion)}${staerke(zug)}.`;
@@ -193,8 +196,10 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
     }
     case 'ambitionFailed':
       return `${who(state, e.player)} laesst das Vorhaben "${vorhabenById(e.id)?.name ?? e.id}" fallen - die Zeit ist um.`;
+    case 'chiefChanged':
+      return `${e.alt} ist gefallen. ${e.neu} fuehrt nun ${fraktionName(state, e.fraktion).replace(/^Die /, 'die ')} - ${WESEN[e.wesen].name}.`;
     case 'vendetta': {
-      const f = state ? fraktionById(state.worldSeed, e.fraktion) : null;
+      const f = state ? fraktionIn(state, e.fraktion) : null;
       return `${f?.anfuehrer ?? 'Ihr Anfuehrer'} (${fraktionName(state, e.fraktion)}) schwoert Rache an ${who(state, e.player)}.`;
     }
     case 'nestRevived':

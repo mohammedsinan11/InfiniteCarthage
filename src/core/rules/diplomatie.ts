@@ -20,7 +20,8 @@
  */
 
 import { abkommenVon } from '../combat';
-import { fraktionById, istFraktion, wesenVon } from '../factions';
+import { istFraktion } from '../factions';
+import { VERHASST, fraktionIn, stimmungVon, wesenIn } from '../fraktionsleben';
 import { handSize, playerById, publicPoints } from '../state';
 import type { Abkommen, GameState, PlayerId } from '../state';
 import { RESOURCES } from '../types';
@@ -43,12 +44,13 @@ export const TRIBUT_KARTEN = 1;
  * Steuer, gegen die sich ein Heer wieder rechnen kann.
  */
 export const tributKarten = (
-  s: Pick<GameState, 'buildings' | 'ruhmreichster' | 'hauptstaedte'> & { worldSeed?: number },
+  s: Pick<GameState, 'buildings' | 'ruhmreichster' | 'hauptstaedte'> & { worldSeed?: number; fraktionen?: GameState['fraktionen'] },
   player: PlayerId,
   fraktion?: string,
 ): number => {
   // Kraemerische Fraktionen (core/factions.ts) nehmen eine Karte weniger.
-  const rabatt = fraktion && s.worldSeed !== undefined && wesenVon(s.worldSeed, fraktion) === 'kraemerisch' ? 1 : 0;
+  const rabatt =
+    fraktion && s.worldSeed !== undefined && wesenIn({ worldSeed: s.worldSeed, fraktionen: s.fraktionen }, fraktion) === 'kraemerisch' ? 1 : 0;
   return Math.max(TRIBUT_KARTEN, publicPoints(s, player) - rabatt);
 };
 
@@ -67,8 +69,8 @@ export type DiplomatieEvent =
 type Ereignisse = { push(...e: DiplomatieEvent[]): number };
 
 /** Nimmt diese Fraktion Frieden an? Nur Raeuberbanden. */
-export const nimmtFrieden = (seed: number, fraktion: string): boolean => {
-  const f = fraktionById(seed, fraktion);
+export const nimmtFrieden = (seed: number, fraktion: string, fraktionen?: GameState['fraktionen']): boolean => {
+  const f = fraktionIn({ worldSeed: seed, fraktionen }, fraktion);
   return f.art === 'raeuber' || (f.art === 'goblin' && f.wesen === 'kraemerisch');
 };
 
@@ -107,7 +109,9 @@ export function verhandeln(
   if (bisher?.art === art) return art === 'frieden' ? 'Es herrscht schon Frieden.' : 'Du zahlst schon Tribut.';
 
   if (art === 'frieden') {
-    if (!nimmtFrieden(s.worldSeed, fraktion)) return 'Dieser Stamm schliesst keinen Frieden - er nimmt nur Tribut.';
+    if (!nimmtFrieden(s.worldSeed, fraktion, s.fraktionen)) return 'Dieser Stamm schliesst keinen Frieden - er nimmt nur Tribut.';
+    // Wer ihnen verhasst ist, bekommt keinen Frieden (core/fraktionsleben.ts).
+    if (stimmungVon(s, fraktion, actor) <= VERHASST) return 'Sie trauen dir nicht - erst Tribut, dann vielleicht Frieden.';
     if (!canAfford(p.hand, FRIEDEN_PREIS)) return 'Fuer den Frieden fehlen dir die Gaben.';
     pay(p.hand, FRIEDEN_PREIS);
   } else if (zahleTribut(s, actor, fraktion) === 0) {

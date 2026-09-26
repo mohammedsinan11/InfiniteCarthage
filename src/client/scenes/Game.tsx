@@ -71,6 +71,7 @@ import type { UnitState as HeerEinheit } from '../../core/state';
 import { bundleText } from '../log';
 import { eckenWert } from '../../core/bot';
 import { weltArtVon } from '../../core/weltart';
+import { erstarkt, fraktionIn, stimmungText, stimmungVon } from '../../core/fraktionsleben';
 import { geruechte } from '../geruechte';
 import { Zeitleiste } from '../ui/Zeitleiste';
 import { ratschlag } from '../rat';
@@ -427,7 +428,7 @@ export function Game() {
       const id = nestFraktionOf(state, t.q, t.r);
       let zeile = m.get(id);
       if (!zeile) {
-        const f = fraktionById(state.worldSeed, id);
+        const f = fraktionIn(state, id);
         zeile = {
           id,
           name: f.name,
@@ -437,10 +438,12 @@ export function Game() {
           unterwegs: 0,
           naechster: null,
           abkommen: you ? (abkommenVon(state, you, id) ?? null) : null,
-          nimmtFrieden: nimmtFrieden(state.worldSeed, id),
+          nimmtFrieden: nimmtFrieden(state.worldSeed, id, state.fraktionen),
           anfuehrer: f.anfuehrer,
           wesen: f.wesen,
           tribut: you ? tributKarten(state, you, id) : 1,
+          stimmung: you && state.ereignisseAn ? stimmungText(stimmungVon(state, id, you)) : undefined,
+          erstarkt: erstarkt(state, id),
         };
         m.set(id, zeile);
       }
@@ -1614,7 +1617,7 @@ export function Game() {
             (() => {
               const [lq, lr] = lagerTafel.split(':').map(Number) as [number, number];
               const fid = nestFraktionOf(state, lq, lr);
-              const f = fraktionById(state.worldSeed, fid);
+              const f = fraktionIn(state, fid);
               const abk = you ? abkommenVon(state, you, fid) : undefined;
               const tribut = you ? tributKarten(state, you, fid) : 1;
               const karten = hand ? RESOURCES.reduce((n, r) => n + hand[r], 0) : 0;
@@ -1626,6 +1629,13 @@ export function Game() {
                     <p>
                       {f.anfuehrer}
                       {f.wesen ? ` - ${WESEN[f.wesen].name}: ${WESEN[f.wesen].text}` : ''}
+                    </p>
+                  )}
+                  {f.wesen && (
+                    <p className="lager-tafel-klein">
+                      Sie {WESEN[f.wesen].ziel}.
+                      {you && state.ereignisseAn ? ` Dir gegenueber: ${stimmungText(stimmungVon(state, fid, you))}.` : ''}
+                      {erstarkt(state, fid) ? ' Voller Beute - der naechste Raubzug kommt verstaerkt.' : ''}
                     </p>
                   )}
                   <p className="lager-tafel-klein">
@@ -1656,7 +1666,7 @@ export function Game() {
                         Tribut ({tribut})
                       </button>
                     )}
-                    {!abk && nimmtFrieden(state.worldSeed, fid) && (
+                    {!abk && nimmtFrieden(state.worldSeed, fid, state.fraktionen) && (
                       <button
                         disabled={!darf || !hand || !canAfford(hand, FRIEDEN_PREIS)}
                         title={`Frieden fuer 20 Runden: ${bundleText(FRIEDEN_PREIS)}`}
@@ -1688,12 +1698,12 @@ export function Game() {
           {raubWarnung && !zielWahl && tafel === null && (
             <div className="raub-warnung" role="alert">
               <p>
-                <b>Raubzug!</b> Ein Trupp ({fraktionById(state.worldSeed, raubWarnung.u.fraktion!).name}
+                <b>Raubzug!</b> Ein Trupp ({fraktionIn(state, raubWarnung.u.fraktion!).name}
                 {raubWarnung.anzahl > 1 ? `, ${raubWarnung.anzahl} Mann` : ''}) zieht auf dich zu - noch{' '}
                 {raubWarnung.weg} {raubWarnung.weg === 1 ? 'Feld' : 'Felder'}.
               </p>
               {(() => {
-                const f = fraktionById(state.worldSeed, raubWarnung.u.fraktion!);
+                const f = fraktionIn(state, raubWarnung.u.fraktion!);
                 return f.anfuehrer ? (
                   <p className="raub-warnung-klein">
                     Angefuehrt von {f.anfuehrer}
@@ -1723,7 +1733,7 @@ export function Game() {
                 >
                   Tribut ({raubWarnung.tribut})
                 </button>
-                {nimmtFrieden(state.worldSeed, raubWarnung.u.fraktion!) && (
+                {nimmtFrieden(state.worldSeed, raubWarnung.u.fraktion!, state.fraktionen) && (
                   <button
                     disabled={!(isMine && phase.t === 'main') || !hand || !canAfford(hand, FRIEDEN_PREIS)}
                     title={`Frieden fuer 20 Runden: ${bundleText(FRIEDEN_PREIS)}`}

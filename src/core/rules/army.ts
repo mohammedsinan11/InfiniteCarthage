@@ -112,7 +112,8 @@ import {
   stufeFuer,
 } from '../combat';
 import { terrainAt } from '../worldgen';
-import { fraktionById, istFraktion, wesenVon } from '../factions';
+import { fraktionById, istFraktion } from '../factions';
+import { erstarkt, fraktionIn, staerkeVerbrauchen, wesenIn } from '../fraktionsleben';
 import type { FraktionArt } from '../factions';
 import { raidLoss, takeFromLargest } from './raid';
 import { reichsbauFelder, tempelNah } from './reich';
@@ -250,6 +251,8 @@ export type ArmyEvent =
         rang?: number;
         /** Ein Rachezug gegen diesen Spieler (vendetta). */
         rache?: PlayerId;
+        /** Mit der heimgebrachten Beute verstaerkt (core/fraktionsleben.ts). */
+        erstarkt?: boolean;
       }[];
     }
   | {
@@ -641,7 +644,7 @@ export function sendRaiders(s: GameState, events: Ereignisse): void {
   );
   const grenze =
     maxAufbrueche(s.order.length) + zusatzAufbrueche(hoechsteBedrohung(s)) + mehrRaubzuege(s.omens);
-  const parties: { q: number; r: number; kind: Feind; fraktion: string; anzahl?: number; rang?: number; rache?: PlayerId }[] = [];
+  const parties: { q: number; r: number; kind: Feind; fraktion: string; anzahl?: number; rang?: number; rache?: PlayerId; erstarkt?: boolean }[] = [];
   const reihe = [...lager].sort((a, b) => a[1].d - b[1].d || nachSchluessel(a[0], b[0]));
   for (const [k, nest] of reihe) {
     if (parties.length >= grenze) break;
@@ -651,7 +654,7 @@ export function sendRaiders(s: GameState, events: Ereignisse): void {
     const fraktion = nestFraktionOf(s, nest.q, nest.r);
     // Zaudernde Fraktionen (core/factions.ts) brechen nur jede zweite grosse
     // Runde auf - ausser, sie haben eine Rechnung offen.
-    const wesen = wesenVon(s.worldSeed, fraktion);
+    const wesen = wesenIn(s, fraktion);
     const krieg = imKriegMit(s, fraktion);
     const groll = s.groll?.[fraktion];
     const rache = groll !== undefined && krieg(groll) ? groll : undefined;
@@ -669,7 +672,11 @@ export function sendRaiders(s: GameState, events: Ereignisse): void {
     // Der Zug richtet sich nach dem, was es beim Ziel zu holen gibt
     // (rules/bedrohung.ts): mehr Punkte, mehr und erfahrenere Raeuber.
     const stufe = bedrohungVon(s, nest.owner);
-    const anzahl = raubzugGroesse(stufe) + (wesen === 'kriegerisch' ? 1 : 0) + (rache !== undefined ? 1 : 0);
+    // Wer genug Beute heimgebracht hat, zieht verstaerkt los (core/fraktionsleben.ts).
+    const stark = erstarkt(s, fraktion);
+    if (stark) staerkeVerbrauchen(s, fraktion);
+    const anzahl =
+      raubzugGroesse(stufe) + (wesen === 'kriegerisch' ? 1 : 0) + (rache !== undefined ? 1 : 0) + (stark ? 1 : 0);
     if (rache !== undefined && s.groll) delete s.groll[fraktion];
     const rang = raeuberRang(stufe);
     for (let i = 0; i < anzahl; i++) {
@@ -689,6 +696,7 @@ export function sendRaiders(s: GameState, events: Ereignisse): void {
       fraktion,
       ...(anzahl > 1 || rang > 0 ? { anzahl, rang } : {}),
       ...(rache !== undefined ? { rache } : {}),
+      ...(stark ? { erstarkt: true } : {}),
     });
   }
   if (parties.length > 0) events.push({ t: 'march', round: roundOf(s.turn), parties });
@@ -1524,7 +1532,7 @@ function schlacht(
         // Der Anfuehrer vergisst das nicht (core/factions.ts): der naechste
         // Raubzug dieser Fraktion gilt dem, der das Lager zerstoert hat. Nur in
         // Partien mit Ereignissen - alte Staende bleiben, wie sie waren.
-        if (s.ereignisseAn && players.length > 0 && istFraktion(lagerSeite) && fraktionById(s.worldSeed, lagerSeite).anfuehrer) {
+        if (s.ereignisseAn && players.length > 0 && istFraktion(lagerSeite) && fraktionIn(s, lagerSeite).anfuehrer) {
           const wer = players[0]!;
           s.groll = { ...(s.groll ?? {}), [lagerSeite]: wer };
           events.push({ t: 'vendetta', fraktion: lagerSeite, player: wer });
@@ -1765,7 +1773,7 @@ export function tickArmy(s: GameState, world: World, events: Ereignisse): void {
     const p = playerById(s, owner);
     if (!p) continue;
     // Gierige Fraktionen (core/factions.ts) nehmen eine Karte mehr.
-    const menge = raidLoss(s, owner, u.fraktion !== null && wesenVon(s.worldSeed, u.fraktion) === 'gierig' ? 2 : 1);
+    const menge = raidLoss(s, owner, u.fraktion !== null && wesenIn(s, u.fraktion) === 'gierig' ? 2 : 1);
     const taken = takeFromLargest(p.hand, menge);
     for (const r of RESOURCES) p.hand[r] -= taken[r];
     ladeAuf(u, taken, owner);

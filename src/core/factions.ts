@@ -52,11 +52,11 @@ export type FraktionArt = 'raeuber' | 'goblin' | 'nacht';
  */
 export type FraktionsWesen = 'gierig' | 'kriegerisch' | 'zaudernd' | 'kraemerisch';
 
-export const WESEN: Record<FraktionsWesen, { name: string; text: string }> = {
-  gierig: { name: 'gierig', text: 'Pluendern 1 Karte mehr.' },
-  kriegerisch: { name: 'kriegerisch', text: 'Ziehen mit einem Mann mehr los.' },
-  zaudernd: { name: 'zaudernd', text: 'Brechen nur jede zweite grosse Runde auf.' },
-  kraemerisch: { name: 'kraemerisch', text: 'Tribut kostet 1 Karte weniger; auch als Goblins nehmen sie Frieden.' },
+export const WESEN: Record<FraktionsWesen, { name: string; text: string; ziel: string }> = {
+  gierig: { name: 'gierig', text: 'Pluendern 1 Karte mehr.', ziel: 'will Beute - jede heimgebrachte Karte macht sie staerker' },
+  kriegerisch: { name: 'kriegerisch', text: 'Ziehen mit einem Mann mehr los.', ziel: 'sucht den Kampf und neues Land' },
+  zaudernd: { name: 'zaudernd', text: 'Brechen nur jede zweite grosse Runde auf.', ziel: 'wartet ab und sammelt Kraefte' },
+  kraemerisch: { name: 'kraemerisch', text: 'Tribut kostet 1 Karte weniger; auch als Goblins nehmen sie Frieden.', ziel: 'will Handel und Tribut, nicht Krieg' },
 };
 
 const WESEN_LISTE = Object.keys(WESEN) as FraktionsWesen[];
@@ -177,6 +177,30 @@ function wesenFuer(seed: number, cx: number, cy: number, art: FraktionArt): { we
   // bekommen verschiedene Namen, so heissen zwei Nachbarn nie gleich.
   const name = h.namen[mod(cx * 3 + cy, h.namen.length)]!;
   return { wesen, anfuehrer: `${h.titel} ${name} ${eins(h.bei)}` };
+}
+
+/**
+ * Ein Nachfolger fuer einen gefallenen Anfuehrer (core/fraktionsleben.ts):
+ * ein anderer Name und ein anderes Wesen - die Fraktion bleibt, ihr
+ * Charakter wechselt. Rein aus Seed, Zelle und Generation.
+ */
+export function nachfolgerFuer(
+  seed: number,
+  id: string,
+  generation: number,
+  altesWesen: FraktionsWesen | undefined,
+): { anfuehrer: string; wesen: FraktionsWesen } {
+  const [, a, b] = id.split(':');
+  const cx = Number(a);
+  const cy = Number(b);
+  const art = fraktionById(seed, id).art;
+  const rng = new Rng(hash3i(seed, cx * 131 + generation, cy, SALT_WESEN + 7));
+  const eins = (liste: readonly string[]) => liste[rng.int(liste.length)]!;
+  const andere = WESEN_LISTE.filter((w) => w !== altesWesen);
+  const wesen = andere[rng.int(andere.length)]!;
+  if (art === 'goblin') return { wesen, anfuehrer: `Haeuptling ${eins(HAEUPTLING_SILBE)} ${eins(HAEUPTLING_BEI)}` };
+  const h = HAUPTLEUTE[rng.int(2) === 0 ? 'm' : 'w'];
+  return { wesen, anfuehrer: `${h.titel} ${eins(h.namen)} ${eins(h.bei)}` };
 }
 
 /** Das Wesen einer Fraktion, oder null (Nacht, Hexe). */

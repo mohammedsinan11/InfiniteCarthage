@@ -14,6 +14,7 @@
  *    in ihre obere Nachbarin.
  */
 
+import { fraktionIn } from '../../core/fraktionsleben';
 import { Uebersicht } from './Uebersicht';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -971,7 +972,7 @@ export function Board({
     const nebel = sicht !== null && !sicht.has(hover);
     const zeilen: { farbe?: string; text: string; kampf?: boolean }[] = [];
     if (isNestActive(state, q, r)) {
-      const f = fraktionById(state.worldSeed, nestFraktionOf(state, q, r));
+      const f = fraktionIn(state, nestFraktionOf(state, q, r));
       const n = garrisonOf(state, q, r);
       zeilen.push({
         farbe: fraktionColor(f.farbe),

@@ -19,6 +19,7 @@
  * sind gedeckelt. Auch eine Endlospartie waechst dadurch nur langsam.
  */
 
+import { fraktionIn } from './fraktionsleben';
 import { vorhabenById } from './vorhaben';
 import { szenarioById, szenarioStand } from './szenario';
 import { siegwegById } from './siegwege';
@@ -200,8 +201,11 @@ export function chronikFortschreiben(state: GameState, events: readonly GameEven
       case 'ambitionDone':
         moment(e.player, 'auftrag', `${nameVon(state, e.player)} vollendet ein Vorhaben: ${vorhabenById(e.id)?.name ?? e.id}.`);
         break;
+      case 'chiefChanged':
+        moment(null, 'rache', `${e.alt} faellt. ${e.neu} fuehrt nun ${fraktionById(state.worldSeed, e.fraktion).name}.`);
+        break;
       case 'vendetta': {
-        const f = fraktionById(state.worldSeed, e.fraktion);
+        const f = fraktionIn(state, e.fraktion);
         moment(e.player, 'rache', `${f.anfuehrer ?? f.name} schwoert ${nameVon(state, e.player)} Rache.`);
         break;
       }
@@ -217,13 +221,13 @@ export function chronikFortschreiben(state: GameState, events: readonly GameEven
         // Nur die grossen Raubzuege gehoeren in die Chronik - die Staemme
         // versuchen es oft, meist mit wenig Erfolg.
         if (e.count >= 4) {
-          const f = fraktionById(state.worldSeed, e.fraktion);
+          const f = fraktionIn(state, e.fraktion);
           moment(e.player, 'brand', `${f.name} pluendern ${nameVon(state, e.player)} aus: ${e.count} Karten.`);
         }
         break;
       }
       case 'pact': {
-        const f = fraktionById(state.worldSeed, e.fraktion);
+        const f = fraktionIn(state, e.fraktion);
         const mit = f.anfuehrer ? `${f.anfuehrer} (${f.name})` : f.name;
         moment(
           e.player,
