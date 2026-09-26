@@ -55,12 +55,15 @@ export type Haus = {
   schwaeche: string;
   /** Kurzer Rat fuer Einsteiger: wie spielt man es? */
   rat: string;
+  /** Fuer Erzaehlungen: "unter dem Banner ..." (core/chronik.ts, saga). */
+  banner: string;
   wirkung: HausWirkung;
 };
 
 export const HAEUSER: readonly Haus[] = [
   {
     id: 'karthago',
+    banner: 'Karthagos',
     name: 'Haus Karthago',
     motto: 'Haendler und Seefahrer',
     staerke: 'Bankhandel 3:1 auf alles, auch ohne Hafen.',
@@ -70,6 +73,7 @@ export const HAEUSER: readonly Haus[] = [
   },
   {
     id: 'bergclan',
+    banner: 'des Bergclans',
     name: 'Der Bergclan',
     motto: 'Erz und Stein',
     staerke: 'Berge liefern dir 1 Erz mehr.',
@@ -79,6 +83,7 @@ export const HAEUSER: readonly Haus[] = [
   },
   {
     id: 'waldvolk',
+    banner: 'des Waldvolks',
     name: 'Das Waldvolk',
     motto: 'Holz und Weg',
     staerke: 'Waelder liefern dir 1 Holz mehr. Du beginnst mit 2 Holz und 2 Lehm.',
@@ -88,6 +93,7 @@ export const HAEUSER: readonly Haus[] = [
   },
   {
     id: 'ebene',
+    banner: 'des Hauses der Ebene',
     name: 'Haus der Ebene',
     motto: 'Korn und Herde',
     staerke: 'Felder liefern dir 1 Getreide mehr, und weder Regen noch Winter halbieren sie.',
@@ -97,6 +103,7 @@ export const HAEUSER: readonly Haus[] = [
   },
   {
     id: 'klingen',
+    banner: 'des Hauses der Klingen',
     name: 'Haus der Klingen',
     motto: 'Schwert und Ruhm',
     staerke: 'Du beginnst mit zwei Rittern an deinen Siedlungen.',
@@ -106,6 +113,7 @@ export const HAEUSER: readonly Haus[] = [
   },
   {
     id: 'seher',
+    banner: 'der Seher',
     name: 'Die Seher',
     motto: 'Karten und Zeichen',
     staerke: 'Du beginnst mit zwei Kartenwahlen.',
@@ -115,6 +123,7 @@ export const HAEUSER: readonly Haus[] = [
   },
   {
     id: 'speicher',
+    banner: 'der Speicherherren',
     name: 'Die Speicherherren',
     motto: 'Vorrat und Geduld',
     staerke: 'Die Handkartengrenze steigt um 4, und Pluenderer nehmen dir eine Karte weniger.',

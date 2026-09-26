@@ -22,7 +22,8 @@
 import { cardById } from './cards/catalog';
 import { fraktionById } from './factions';
 import { ereignisById } from './ereignis';
-import { bigRoundChangedAt, roundOf } from './season';
+import { SEASON_NAME, bigRoundChangedAt, roundOf, seasonOf, yearOf } from './season';
+import { hausById } from './haus';
 import { emptyHand, playerById, publicPoints, totalPoints } from './state';
 import type { GameState, Hand, PlayerId } from './state';
 import { RESOURCES } from './types';
@@ -273,4 +274,60 @@ export function chronikFortschreiben(state: GameState, events: readonly GameEven
   }
 
   if (c.momente.length > MAX_MOMENTE) c.momente.splice(0, c.momente.length - MAX_MOMENTE);
+}
+
+// --- Saga ---------------------------------------------------------------------
+
+
+/** Was die Saga braucht - auch aus der redigierten Sicht. */
+export type SagaSicht = {
+  turn: number;
+  order: readonly PlayerId[];
+  players: ReadonlyArray<{ id: PlayerId; name: string; haus?: string | null; held: { vorname: string; beiname: string; haus: string } | null }>;
+  chronik: Chronik | null | undefined;
+  phase: GameState['phase'];
+};
+
+const zeitVon = (turn: number): string => `im ${SEASON_NAME[seasonOf(turn)]} des Jahres ${yearOf(turn)}`;
+
+/**
+ * Die Partie als kleine Erzaehlung, drei, vier Saetze - fuer die Schlussseite.
+ * Aus Haus, Held und den Momenten der Chronik; kein Zufall, keine neue Regel.
+ * Erzaehlt aus der Sicht eines Spielers (du).
+ */
+export function saga(s: SagaSicht, du: PlayerId): string {
+  const p = s.players.find((x) => x.id === du);
+  if (!p) return '';
+  const haus = hausById(p.haus ?? null);
+  const saetze: string[] = [];
+  const held = p.held ? `${p.held.vorname} ${p.held.beiname} vom Haus ${p.held.haus}` : null;
+  saetze.push(`Im Fruehling des Jahres 1 zog ${p.name}${haus ? ` unter dem Banner ${haus.banner}` : ''} aus, ein Reich zu gruenden.`);
+  if (held) saetze.push(`Zur Seite stand ${held}.`);
+  const meine = (s.chronik?.momente ?? []).filter((m) => m.player === du || m.player === null);
+  const erste = (art: string) => meine.find((m) => m.art === art);
+  const stadt = erste('stadt');
+  if (stadt) saetze.push(`${zeitVon(stadt.turn).replace(/^im/, 'Im')} stand die erste Stadt.`);
+  const horde = erste('horde');
+  const brand = erste('brand');
+  if (horde && brand) saetze.push(`Horden kamen aus dem Dunkel, und nicht alles ueberstand das Feuer.`);
+  else if (horde) saetze.push(`Horden kamen aus dem Dunkel - das Reich hielt stand.`);
+  const heldFiel = erste('held');
+  if (heldFiel) saetze.push(`${heldFiel.text.replace(/\.$/, '')} ${zeitVon(heldFiel.turn)}.`);
+  const karte = erste('karte');
+  if (karte) saetze.push(karte.text.replace(`${p.name} nimmt`, 'Das Schicksal brachte'));
+  const ereignis = erste('ereignis');
+  if (ereignis) saetze.push(`Lange erzaehlte man sich von jenem Tag ${zeitVon(ereignis.turn)}: ${ereignis.text.split(':')[0]}.`);
+  if (s.phase.t === 'finished') {
+    const i = s.order.indexOf(du);
+    const pkt = s.chronik?.verlauf[s.chronik.verlauf.length - 1]?.punkte[i];
+    const wie =
+      s.phase.winner === du
+        ? 'mit einem Sieg'
+        : s.phase.winner === null
+          ? 'mit dem Fall aller Reiche'
+          : '- ein anderes Haus steht vorn';
+    const zeit = zeitVon(s.turn).replace(/^im/, 'Im');
+    saetze.push(`${zeit} schliesst die Chronik ${wie}.${pkt !== undefined ? ` Am Ende: ${pkt} Siegpunkte.` : ''}`);
+  }
+  return saetze.join(' ');
 }

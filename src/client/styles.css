@@ -5027,3 +5027,13 @@ em.off {
   margin-left: auto;
   padding: 1px 7px;
 }
+
+.chronik-saga {
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  font-style: italic;
+  color: var(--text);
+  border-left: 3px solid var(--accent-dark);
+  padding-left: 12px;
+}

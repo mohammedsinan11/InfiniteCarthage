@@ -22,6 +22,7 @@ import { OmenListe } from './OmenListe';
 import { holeTagesInfo } from '../net/socket';
 import { hausById } from '../../core/haus';
 import { werteAus } from '../profil';
+import { saga } from '../../core/chronik';
 import { STUFE_NAME } from '../../core/stufe';
 import type { BestenEintrag } from '../../core/tages';
 
@@ -136,6 +137,7 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
               </span>
             </p>
           )}
+          {you && <p className="chronik-saga">{saga(state, you)}</p>}
         </header>
 
         {bilanz && !bilanz.schonGewertet && (bilanz.neueTaten.length > 0 || bilanz.neueStufe !== null) && (
