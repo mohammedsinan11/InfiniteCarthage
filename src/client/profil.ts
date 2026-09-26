@@ -16,6 +16,8 @@ import { MAX_STUFE } from '../core/stufe';
 import { HAEUSER } from '../core/haus';
 import { cardById } from '../core/cards/catalog';
 import { roundOf } from '../core/season';
+import { heldVoll } from '../core/lore';
+import { weltArtVon } from '../core/weltart';
 
 const SPEICHER = 'infinitecarthage.profil';
 
@@ -33,9 +35,30 @@ export type Profil = {
   gewertet: string[];
   /** Beste Sterne je Szenario (core/szenario.ts). */
   sterne: Record<string, number>;
+  /** Die Ahnenhalle: wer in frueheren Partien fuer dich stand, neueste zuerst. */
+  ahnen: Ahne[];
 };
 
-const LEER: Profil = { partien: 0, siege: 0, besteWertung: 0, stufeFrei: 0, haeuser: [], taten: {}, gewertet: [], sterne: {} };
+/**
+ * Ein Eintrag der Ahnenhalle: der Held einer beendeten Partie und was aus
+ * seinem Reich wurde. Rein erzaehlend - er gibt der naechsten Partie keinen
+ * Vorteil, nur eine Geschichte (REPLAYABILITY.md, H - Dynastie).
+ */
+export type Ahne = {
+  zeit: number;
+  /** "Aldebrand der Kuehne, Markgraf von Sturmfels" - oder der Spielername, wenn kein Held antrat. */
+  name: string;
+  haus: string | null;
+  welt: string;
+  wertung: number;
+  sieg: boolean;
+  /** Ein Satz: was er vollbracht hat. */
+  tat: string;
+};
+
+const AHNEN_MAX = 12;
+
+const LEER: Profil = { partien: 0, siege: 0, besteWertung: 0, stufeFrei: 0, haeuser: [], taten: {}, gewertet: [], sterne: {}, ahnen: [] };
 
 export function leseProfil(): Profil {
   try {
@@ -121,6 +144,37 @@ export const TATEN: readonly Tat[] = [
   },
 ];
 
+/** Das Bemerkenswerteste einer Partie in einem Satz. */
+function ahnenTat(state: PublicState, you: string, sieg: boolean): string {
+  const st = state.chronik?.stats[you];
+  const eigen = Object.values(state.buildings).filter((b) => b.owner === you);
+  const staedte = eigen.filter((b) => b.type === 'city').length;
+  const teile: string[] = [];
+  if (Object.values(state.wunder ?? {}).some((w) => w.owner === you)) teile.push('errichtete ein Weltwunder');
+  if (Object.values(state.hauptstaedte ?? {}).some((h) => h.owner === you)) teile.push('gruendete eine Hauptstadt');
+  if ((st?.lager ?? 0) >= 2) teile.push(`zerstoerte ${st!.lager} Lager`);
+  if ((st?.ruinen ?? 0) >= 2) teile.push(`erkundete ${st!.ruinen} Ruinen`);
+  if ((st?.auftraege ?? 0) >= 2) teile.push(`erfuellte ${st!.auftraege} Auftraege`);
+  if (teile.length < 2 && staedte > 0) teile.push(`baute ${staedte} ${staedte === 1 ? 'Stadt' : 'Staedte'}`);
+  if (teile.length === 0) teile.push(`hielt ${eigen.length} ${eigen.length === 1 ? 'Siedlung' : 'Siedlungen'}`);
+  const satz = teile.slice(0, 2).join(' und ');
+  return sieg ? `Siegte, ${satz}.` : `${satz[0]!.toUpperCase()}${satz.slice(1)}.`;
+}
+
+function ahneAus(state: PublicState, you: string, wertung: number, sieg: boolean): Ahne {
+  const me = state.players.find((p) => p.id === you);
+  const held = me?.held;
+  return {
+    zeit: Date.now(),
+    name: held ? heldVoll(held) : (me?.name ?? 'Unbekannt'),
+    haus: me?.haus ?? null,
+    welt: weltArtVon(state.worldSeed).name,
+    wertung,
+    sieg,
+    tat: ahnenTat(state, you, sieg),
+  };
+}
+
 export type Wertung = { neueTaten: Tat[]; neueStufe: number | null; sieg: boolean; schonGewertet: boolean };
 
 /**
@@ -158,6 +212,7 @@ export function werteAus(state: PublicState, you: string, code: string): Wertung
     profil.stufeFrei = state.stufe + 1;
     neueStufe = profil.stufeFrei;
   }
+  profil.ahnen = [ahneAus(state, you, wertung, sieg), ...profil.ahnen].slice(0, AHNEN_MAX);
   const blick: Blick = { state, you, sieg, wertung, profil };
   const neueTaten = TATEN.filter((t) => !profil.taten[t.id] && t.erreicht(blick));
   for (const t of neueTaten) profil.taten[t.id] = Date.now();

@@ -51,4 +51,16 @@ describe('Profil', () => {
     expect(werteAus(beendet({ punkte: 12, stufe: 1 }), 'p0', 'C').neueStufe).toBe(2);
     expect(leseProfil().stufeFrei).toBe(2);
   });
+
+  it('traegt jede Partie einmal in die Ahnenhalle ein, neueste zuerst', () => {
+    werteAus(beendet({ punkte: 12 }), 'p0', 'H1');
+    werteAus(beendet({ punkte: 3 }), 'p0', 'H2');
+    werteAus(beendet({ punkte: 3 }), 'p0', 'H2');
+    const ahnen = leseProfil().ahnen;
+    expect(ahnen).toHaveLength(2);
+    expect(ahnen[0]!.wertung).toBe(30);
+    expect(ahnen[1]!.sieg).toBe(true);
+    expect(ahnen[0]!.welt).toBe('Kernland');
+    expect(ahnen[0]!.tat).toMatch(/\.$/);
+  });
 });

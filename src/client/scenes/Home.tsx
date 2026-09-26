@@ -11,6 +11,7 @@
  * und nennt dessen PIN (sie steht im Menue der Partie).
  */
 
+import { hausById } from '../../core/haus';
 import { weltArtVon } from '../../core/weltart';
 import { tagesWeltSeed } from '../../core/tages';
 import { useEffect, useRef, useState } from 'react';
@@ -471,6 +472,7 @@ export function Home() {
  */
 function DeineChronik() {
   const [offen, setOffen] = useState(false);
+  const [halle, setHalle] = useState(false);
   const p = leseProfil();
   if (p.partien === 0) return null;
   const erreicht = TATEN.filter((t) => p.taten[t.id]).length;
@@ -482,9 +484,30 @@ function DeineChronik() {
         {p.besteWertung}
         {p.stufeFrei > 0 ? ` · Chronikstufe bis ${p.stufeFrei} (${STUFE_NAME[p.stufeFrei]})` : ''}
       </p>
-      <button className="klein" onClick={() => setOffen((v) => !v)}>
-        Taten {erreicht}/{TATEN.length} {offen ? '▲' : '▼'}
-      </button>
+      <div className="choices">
+        <button className="klein" onClick={() => setOffen((v) => !v)}>
+          Taten {erreicht}/{TATEN.length} {offen ? '▲' : '▼'}
+        </button>
+        {p.ahnen.length > 0 && (
+          <button className="klein" onClick={() => setHalle((v) => !v)}>
+            Ahnenhalle {p.ahnen.length} {halle ? '▲' : '▼'}
+          </button>
+        )}
+      </div>
+      {halle && (
+        <ol className="ahnen-liste">
+          {p.ahnen.map((a) => (
+            <li key={a.zeit} className={a.sieg ? 'sieg' : ''}>
+              <b>{a.name}</b>
+              <span className="ahnen-info">
+                {a.haus && hausById(a.haus) ? `${hausById(a.haus)!.name} · ` : ''}
+                {a.welt} · Wertung {a.wertung} · {new Date(a.zeit).toLocaleDateString('de-DE')}
+              </span>
+              <span className="ahnen-tat">{a.tat}</span>
+            </li>
+          ))}
+        </ol>
+      )}
       {offen && (
         <ul className="taten-liste">
           {TATEN.map((t) => (

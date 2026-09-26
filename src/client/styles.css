@@ -5313,3 +5313,41 @@ em.off {
   font-size: 10px;
   padding: 5px 8px;
 }
+
+/* Ahnenhalle (client/profil.ts, Ahne): die Helden frueherer Partien. */
+.ahnen-liste {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.ahnen-liste li {
+  display: flex;
+  flex-direction: column;
+  padding: 5px 8px;
+  border-left: 3px solid var(--line);
+  background: var(--panel2);
+}
+.ahnen-liste li.sieg {
+  border-left-color: var(--accent);
+}
+.ahnen-liste b {
+  font-family: var(--pixel);
+  font-size: 10px;
+  font-weight: normal;
+  color: var(--text);
+}
+.ahnen-liste li.sieg b {
+  color: var(--accent);
+}
+.ahnen-info {
+  color: var(--muted);
+  font-size: 11px;
+}
+.ahnen-tat {
+  font-style: italic;
+}

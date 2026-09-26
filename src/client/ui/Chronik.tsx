@@ -150,6 +150,9 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
             </p>
           )}
           {you && <p className="chronik-saga">{saga(state, you)}</p>}
+          {bilanz && !bilanz.schonGewertet && (
+            <p className="note">Eingetragen in deine Ahnenhalle - zu finden auf der Startseite unter Deine Chronik.</p>
+          )}
         </header>
 
         {bilanz && !bilanz.schonGewertet && (bilanz.neueTaten.length > 0 || bilanz.neueStufe !== null) && (
