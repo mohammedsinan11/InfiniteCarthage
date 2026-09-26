@@ -17,7 +17,9 @@
  * nicht im Arbeitsspeicher.
  */
 
-import { istAhn } from '../core/lore';
+import { heldKurz, istAhn } from '../core/lore';
+import { parseVertexKey, vertexAdjacentHexes } from '../core/coords';
+import { istErbstueck } from '../core/erbe';
 import type { HeldLore } from '../core/lore';
 import { istWeltArt, mitWeltArt, weltArtVon, zufallsArt } from '../core/weltart';
 import type { WeltArt } from '../core/weltart';
@@ -89,6 +91,8 @@ type RoomData = {
   weltArt?: WeltArt;
   /** Ahnen je Platz (core/lore.ts): die Helden, deren Nachfolger antreten. */
   ahnen?: Record<PlayerId, HeldLore>;
+  /** Erbstuecke je Platz (core/erbe.ts). */
+  erbstuecke?: Record<PlayerId, string>;
   /** Tagesexpedition: ihr Datum (core/tages.ts). Sonst fehlt es. */
   tagesDatum?: string | null;
   /** Das Ergebnis der Tagesexpedition ist in der Bestenliste. */
@@ -423,7 +427,12 @@ export class GameRoom implements DurableObject {
           : (room.weltSeed ?? mitWeltArt(randomSeed(), room.weltArt ?? 'kernland'));
         const geheimSeed = tages ? await this.tagesGeheimSeed(tages) : randomSeed();
         this.game = createGame(
-          room.members.map((m) => ({ id: m.id, name: m.name, ...(room.ahnen?.[m.id] ? { ahn: room.ahnen[m.id] } : {}) })),
+          room.members.map((m) => ({
+            id: m.id,
+            name: m.name,
+            ...(room.ahnen?.[m.id] ? { ahn: room.ahnen[m.id] } : {}),
+            ...(room.erbstuecke?.[m.id] ? { erbstueck: room.erbstuecke[m.id] } : {}),
+          })),
           weltSeed,
           geheimSeed,
           room.koop && !tages ? 0 : room.targetPoints,
@@ -433,6 +442,8 @@ export class GameRoom implements DurableObject {
             tagesDatum: tages,
             haeuser: true,
             ereignisse: true,
+            // Erbstuecke nur in gewoehnlichen Partien (core/erbe.ts) - createGame prueft auch "allein".
+            erbeAn: !tages && !room.szenario,
             stufe: tages ? 0 : (room.stufe ?? 0),
             koop: !tages && !room.szenario && (room.koop ?? false),
             szenario: room.szenario ?? null,
@@ -553,6 +564,9 @@ export class GameRoom implements DurableObject {
     if (playerId !== undefined && !room.started && istAhn(msg.ahn)) {
       room.ahnen = { ...(room.ahnen ?? {}), [playerId]: msg.ahn };
     }
+    if (playerId !== undefined && !room.started && istErbstueck(msg.erbstueck)) {
+      room.erbstuecke = { ...(room.erbstuecke ?? {}), [playerId]: msg.erbstueck };
+    }
 
     const member = room.members.find((m) => m.id === playerId);
     if (!member || playerId === undefined || token === undefined) {
@@ -641,6 +655,16 @@ export class GameRoom implements DurableObject {
       ruhm: p.ruhm,
       code: room.code,
       zeit: Date.now(),
+      // Wo er siedelte - Spaetere sehen dort seine Spuren (core/tages.ts).
+      orte: Object.entries(state.buildings)
+        .filter(([, b]) => b.owner === id)
+        .sort((a, b) => (a[1].type === 'city' ? 0 : 1) - (b[1].type === 'city' ? 0 : 1))
+        .slice(0, 3)
+        .map(([vk]) => {
+          const h = vertexAdjacentHexes(parseVertexKey(vk))[0]!;
+          return [h.q, h.r] as [number, number];
+        }),
+      ...(p.held ? { held: heldKurz(p.held) } : {}),
     };
     try {
       await this.bestenliste(datum).fetch('https://bestenliste/eintragen', {

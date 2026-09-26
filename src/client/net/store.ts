@@ -10,7 +10,7 @@
 import { genitiv } from '../../core/factions';
 import type { Bericht } from '../../core/kunde';
 import { vorhabenById } from '../../core/vorhaben';
-import { letzterAhn } from '../profil';
+import { aktuellesErbstueck, letzterAhn } from '../profil';
 import { create } from 'zustand';
 import { openSocket, sendMsg } from './socket';
 import type { RaumWunsch } from './socket';
@@ -758,7 +758,8 @@ export const useStore = create<Store>((set, get) => ({
     const ws = openSocket(code, create, oeffentlich, {
       onOpen: () => {
         const ahn = letzterAhn();
-        sendMsg(ws, { t: 'join', name, token: token ?? loadToken(code), ...(ahn ? { ahn } : {}) });
+        const erbstueck = aktuellesErbstueck();
+        sendMsg(ws, { t: 'join', name, token: token ?? loadToken(code), ...(ahn ? { ahn } : {}), ...(erbstueck ? { erbstueck } : {}) });
       },
       onClose: () => {
         // Nur die AKTUELLE Verbindung darf den Zustand aendern.

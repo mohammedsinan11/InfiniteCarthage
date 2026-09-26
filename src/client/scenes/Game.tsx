@@ -74,6 +74,7 @@ import { weltArtVon } from '../../core/weltart';
 import { erstarkt, fraktionIn, stimmungText, stimmungVon } from '../../core/fraktionsleben';
 import { geruechte } from '../geruechte';
 import { Zeitleiste } from '../ui/Zeitleiste';
+import { holeTagesInfo } from '../net/socket';
 import { KundeTafel } from '../ui/KundeTafel';
 import { ratschlag } from '../rat';
 import type { Rat } from '../rat';
@@ -335,6 +336,31 @@ export function Game() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [you, state.buildings, state.exploredRuins, state.wunder, sicht, state.worldSeed],
   );
+  /*
+   * Spuren der Tagesexpedition: wer heute schon in dieser Welt siedelte, hat
+   * dort einen Gedenkstein (core/tages.ts, orte). Einmal geholt, nicht mehr.
+   */
+  const [spuren, setSpuren] = useState<{ q: number; r: number; text: string }[]>([]);
+  useEffect(() => {
+    if (!state.tagesDatum) return;
+    let aus = false;
+    holeTagesInfo()
+      .then((info) => {
+        if (aus || info.datum !== state.tagesDatum) return;
+        const code = useStore.getState().code;
+        setSpuren(
+          info.eintraege
+            .filter((e) => e.code !== code)
+            .flatMap((e) =>
+              (e.orte ?? []).map(([q, r]) => ({ q, r, text: `Hier siedelte ${e.name}${e.held ? ` mit ${e.held}` : ''} - Wertung ${e.wertung}` })),
+            ),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      aus = true;
+    };
+  }, [state.tagesDatum]);
   /** Die Tafel eines angeklickten Lagers - Feldschluessel oder null. */
   const [lagerTafel, setLagerTafel] = useState<string | null>(null);
   /** Der Rat (client/rat.ts): ein Vorschlag, bis man ihn wegklickt oder der Zug wechselt. */
@@ -1477,6 +1503,7 @@ export function Game() {
           auswahl={kandidaten.length > 0 ? auswahl : []}
           befehlsTafel={befehlsTafel}
           fokus={fokus}
+          spuren={spuren}
           tageszeit={tageszeit}
           wetter={wetter}
           geisterBau={isMine ? geisterBau : null}

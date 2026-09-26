@@ -22,7 +22,8 @@ import type { RaumEintrag } from '../../core/lobby';
 import { SERVER_MISSING, holeRaeume, holeTagesInfo, neuerRaumCode as freshCode } from '../net/socket';
 import type { TagesInfo } from '../../core/tages';
 import { OmenListe } from '../ui/OmenListe';
-import { TATEN, leseProfil, setzeDynastie } from '../profil';
+import { TATEN, leseProfil, setzeDynastie, unsereArt } from '../profil';
+import { FAMILIENART, erbstueckById } from '../../core/erbe';
 import { STUFE_NAME } from '../../core/stufe';
 import { SZENARIEN } from '../../core/szenario';
 import { lesePartien, lokalerSpeicher, vergissPartie } from '../net/partien';
@@ -513,7 +514,7 @@ function DeineChronik() {
         </button>
         {p.ahnen.length > 0 && (
           <button className="klein" onClick={() => setHalle((v) => !v)}>
-            Ahnenhalle {p.ahnen.length} {halle ? '▲' : '▼'}
+            Stammbaum {p.ahnen.length} {halle ? '▲' : '▼'}
           </button>
         )}
       </div>
@@ -531,18 +532,37 @@ function DeineChronik() {
         </label>
       )}
       {halle && (
-        <ol className="ahnen-liste">
-          {p.ahnen.map((a) => (
-            <li key={a.zeit} className={a.sieg ? 'sieg' : ''}>
-              <b>{a.name}</b>
-              <span className="ahnen-info">
-                {a.haus && hausById(a.haus) ? `${hausById(a.haus)!.name} · ` : ''}
-                {a.welt} · Wertung {a.wertung} · {new Date(a.zeit).toLocaleDateString('de-DE')}
-              </span>
-              <span className="ahnen-tat">{a.tat}</span>
-            </li>
-          ))}
-        </ol>
+        <div className="stammbaum">
+          {(() => {
+            const art = unsereArt();
+            const erb = erbstueckById(p.erbstueck);
+            return (
+              <p className="stammbaum-kopf">
+                {art ? (
+                  <>
+                    <b>Ein Haus der {FAMILIENART[art].name}.</b> {FAMILIENART[art].text}{' '}
+                  </>
+                ) : null}
+                {erb ? `Die naechste Generation traegt ${erb.name}: ${erb.wirkung}` : 'Noch kein Erbstueck gewaehlt.'}
+              </p>
+            );
+          })()}
+          <ol className="ahnen-liste stammbaum-liste">
+            {p.ahnen.map((a, i) => (
+              <li key={a.zeit} className={a.sieg ? 'sieg' : ''}>
+                <span className="stammbaum-knoten" aria-hidden />
+                <span className="ahnen-gen">{i === 0 ? 'Zuletzt' : `${i + 1} Generationen zurueck`}</span>
+                <b>{a.name}</b>
+                <span className="ahnen-info">
+                  {a.haus && hausById(a.haus) ? `${hausById(a.haus)!.name} · ` : ''}
+                  {a.welt} · Wertung {a.wertung} · {new Date(a.zeit).toLocaleDateString('de-DE')}
+                </span>
+                <span className="ahnen-tat">{a.tat}</span>
+                {erbstueckById(a.erbstueck) && <span className="ahnen-info">Brachte mit: {erbstueckById(a.erbstueck)!.name}</span>}
+              </li>
+            ))}
+          </ol>
+        </div>
       )}
       {offen && (
         <ul className="taten-liste">

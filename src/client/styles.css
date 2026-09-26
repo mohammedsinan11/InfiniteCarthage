@@ -5764,3 +5764,91 @@ em.off {
   flex-direction: column;
   gap: 3px;
 }
+
+/* Das Erbe in der Chronik (core/erbe.ts). */
+.erbe-wahl {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+.erbe-wahl button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  text-align: left;
+  text-transform: none;
+  letter-spacing: 0;
+  font: 12px/1.35 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+.erbe-wahl button b {
+  font-family: var(--pixel);
+  font-size: 10px;
+  font-weight: normal;
+  color: var(--accent);
+}
+.erbe-wahl button.chosen b {
+  color: #21170a;
+}
+
+/* Stammbaum (scenes/Home.tsx): die Generationen als Linie. */
+.stammbaum-kopf {
+  margin: 8px 0 4px;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.stammbaum-kopf b {
+  color: var(--accent);
+  font-weight: normal;
+  font-family: var(--pixel);
+  font-size: 10px;
+}
+.stammbaum-liste {
+  position: relative;
+  padding-left: 16px;
+}
+.stammbaum-liste::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background: var(--line);
+}
+.stammbaum-liste li {
+  position: relative;
+}
+.stammbaum-knoten {
+  position: absolute;
+  left: -16px;
+  top: 9px;
+  width: 10px;
+  height: 10px;
+  background: var(--panel);
+  border: 2px solid var(--line);
+}
+.stammbaum-liste li.sieg .stammbaum-knoten {
+  border-color: var(--accent);
+  background: var(--accent-dark);
+}
+.ahnen-gen {
+  font-family: var(--pixel);
+  font-size: 8px;
+  color: var(--muted);
+}
+
+/* Gedenksteine anderer Spieler (board/Board.tsx, spuren). */
+.spur {
+  pointer-events: visiblePainted;
+  cursor: help;
+}
+.spur-stein {
+  fill: #9b958a;
+  stroke: #2a241c;
+  stroke-width: 1;
+}
+.spur-kreuz {
+  fill: #3a342a;
+}

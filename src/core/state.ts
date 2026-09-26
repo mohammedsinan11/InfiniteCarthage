@@ -9,6 +9,7 @@
  */
 
 import type { VorhabenStand } from './vorhaben';
+import type { ErbstueckId } from './erbe';
 import type { FraktionsStand } from './fraktionsleben';
 import type { Bericht, SaisonBuch } from './kunde';
 import type { Bundle, Resource } from './types';
@@ -98,6 +99,8 @@ export type Player = {
    * Adelshaus ueberlebt seinen Traeger (DESIGN.md, Heldenlore).
    */
   held: HeldLore | null;
+  /** Das Erbstueck der letzten Generation (core/erbe.ts) - Gabe nur allein, sonst nur ein Name. */
+  erbstueck?: ErbstueckId;
   /** Der Ahn aus einer frueheren Partie - der Held wird sein Nachfolger (rules/army.ts, benenneHeld). */
   ahn?: HeldLore;
   /**

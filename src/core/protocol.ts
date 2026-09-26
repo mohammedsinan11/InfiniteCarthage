@@ -98,6 +98,8 @@ export type ClientMsg =
       pin?: string;
       /** Der Held der letzten Partie dieses Browsers - der neue wird sein Nachfolger (core/lore.ts, istAhn). */
       ahn?: HeldLore;
+      /** Das Erbstueck der Familie (core/erbe.ts, istErbstueck). */
+      erbstueck?: string;
     }
   /** Nur der Gastgeber, nur vor dem Start. Was fehlt, bleibt, wie es ist. */
   | {

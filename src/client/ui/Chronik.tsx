@@ -24,7 +24,8 @@ import { playerColor } from '../theme';
 import { OmenListe } from './OmenListe';
 import { holeTagesInfo } from '../net/socket';
 import { hausById } from '../../core/haus';
-import { werteAus } from '../profil';
+import { aktuellesErbstueck, leseProfil, setzeErbstueck, werteAus } from '../profil';
+import { erbstueckById } from '../../core/erbe';
 import { saga } from '../../core/chronik';
 import { szenarioById } from '../../core/szenario';
 import { STUFE_NAME } from '../../core/stufe';
@@ -54,6 +55,9 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
   const [besten, setBesten] = useState<BestenEintrag[] | null>(null);
   // Einmal je Partie ins Profil dieses Browsers eintragen (client/profil.ts).
   const [bilanz] = useState(() => (you && code && state.phase.t === 'finished' ? werteAus(state, you, code) : null));
+  // Das Erbe dieser Partie (core/erbe.ts): was sie freischaltet, und was gewaehlt ist.
+  const ahne = code ? leseProfil().ahnen.find((a) => a.code === code) : undefined;
+  const [erbe, setErbe] = useState(() => aktuellesErbstueck());
   const phase = state.phase;
   const chronik = state.chronik;
   const tages = state.tagesDatum;
@@ -179,6 +183,35 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
                 </ul>
               </>
             )}
+          </section>
+        )}
+
+        {ahne?.freie && ahne.freie.length > 0 && (
+          <section className="chronik-erbe">
+            <h3>Dein Erbe</h3>
+            <p className="note">
+              Was gibt diese Generation der naechsten mit? Das Erbstueck wirkt in gewoehnlichen Partien allein; sonst bleibt es
+              eine Erinnerung.
+            </p>
+            <div className="erbe-wahl">
+              {ahne.freie.map((id) => {
+                const e = erbstueckById(id)!;
+                return (
+                  <button
+                    key={id}
+                    className={erbe === id ? 'chosen' : ''}
+                    onClick={() => {
+                      setzeErbstueck(id);
+                      setErbe(id);
+                    }}
+                    title={`Freigeschaltet: ${e.wofuer}`}
+                  >
+                    <b>{e.name}</b>
+                    <span>{e.wirkung}</span>
+                  </button>
+                );
+              })}
+            </div>
           </section>
         )}
 

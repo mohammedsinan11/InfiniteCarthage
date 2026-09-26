@@ -18,6 +18,8 @@ import { cardById } from '../core/cards/catalog';
 import { roundOf } from '../core/season';
 import { heldVoll } from '../core/lore';
 import type { HeldLore } from '../core/lore';
+import { familienart, freieErbstuecke, istErbstueck } from '../core/erbe';
+import type { ErbstueckId, Familienart } from '../core/erbe';
 import { weltArtVon } from '../core/weltart';
 
 const SPEICHER = 'infinitecarthage.profil';
@@ -40,6 +42,8 @@ export type Profil = {
   ahnen: Ahne[];
   /** Tritt der Nachfolger des letzten Helden an? Fehlt: ja. */
   dynastie?: boolean;
+  /** Das Erbstueck fuer die naechste Partie (core/erbe.ts). */
+  erbstueck?: ErbstueckId;
 };
 
 /**
@@ -59,7 +63,31 @@ export type Ahne = {
   tat: string;
   /** Der Held selbst - sein Nachfolger tritt in der naechsten Partie an. */
   lore?: HeldLore;
+  /** Die Zahlen der Partie - fuer Familienart und Erbstuecke (core/erbe.ts). */
+  zahlen?: { staedte: number; lager: number; handel: number; ruinen: number; auftraege: number; wunder: number };
+  /** Welche Erbstuecke diese Partie freigeschaltet hat. */
+  freie?: ErbstueckId[];
+  /** Das Erbstueck, das diese Generation mitbrachte. */
+  erbstueck?: ErbstueckId;
+  /** Der Raum - damit die Chronik das Erbe dieser Partie findet. */
+  code?: string;
 };
+
+/** Das Erbstueck, das die naechste Generation mitnimmt (core/erbe.ts). */
+export function aktuellesErbstueck(): ErbstueckId | undefined {
+  return leseProfil().erbstueck;
+}
+
+export function setzeErbstueck(id: ErbstueckId): void {
+  const p = leseProfil();
+  p.erbstueck = id;
+  schreibe(p);
+}
+
+/** Die Familienart aus den letzten fuenf Generationen. */
+export function unsereArt(): Familienart | null {
+  return familienart(leseProfil().ahnen.slice(0, 5).flatMap((a) => (a.zahlen ? [a.zahlen] : [])));
+}
 
 /** Der juengste Ahn mit Held - fuer die naechste Partie (Dynastie). */
 export function letzterAhn(): HeldLore | undefined {
@@ -180,9 +208,18 @@ function ahnenTat(state: PublicState, you: string, sieg: boolean): string {
   return sieg ? `Siegte, ${satz}.` : `${satz[0]!.toUpperCase()}${satz.slice(1)}.`;
 }
 
-function ahneAus(state: PublicState, you: string, wertung: number, sieg: boolean): Ahne {
+function ahneAus(state: PublicState, you: string, wertung: number, sieg: boolean, code: string): Ahne {
   const me = state.players.find((p) => p.id === you);
   const held = me?.held;
+  const st = state.chronik?.stats[you];
+  const zahlen = {
+    staedte: Object.values(state.buildings).filter((b) => b.owner === you && b.type === 'city').length,
+    lager: st?.lager ?? 0,
+    handel: st?.handel ?? 0,
+    ruinen: st?.ruinen ?? 0,
+    auftraege: st?.auftraege ?? 0,
+    wunder: Object.values(state.wunder ?? {}).filter((w) => w.owner === you).length,
+  };
   return {
     zeit: Date.now(),
     name: held ? `${heldVoll(held)}${held.folge > 1 ? ` (${held.folge}. Generation)` : ''}` : (me?.name ?? 'Unbekannt'),
@@ -192,6 +229,10 @@ function ahneAus(state: PublicState, you: string, wertung: number, sieg: boolean
     sieg,
     tat: ahnenTat(state, you, sieg),
     ...(held ? { lore: held } : {}),
+    zahlen,
+    freie: freieErbstuecke(zahlen),
+    ...(istErbstueck(me?.erbstueck) ? { erbstueck: me!.erbstueck as ErbstueckId } : {}),
+    code,
   };
 }
 
@@ -232,7 +273,7 @@ export function werteAus(state: PublicState, you: string, code: string): Wertung
     profil.stufeFrei = state.stufe + 1;
     neueStufe = profil.stufeFrei;
   }
-  profil.ahnen = [ahneAus(state, you, wertung, sieg), ...profil.ahnen].slice(0, AHNEN_MAX);
+  profil.ahnen = [ahneAus(state, you, wertung, sieg, code), ...profil.ahnen].slice(0, AHNEN_MAX);
   const blick: Blick = { state, you, sieg, wertung, profil };
   const neueTaten = TATEN.filter((t) => !profil.taten[t.id] && t.erreicht(blick));
   for (const t of neueTaten) profil.taten[t.id] = Date.now();

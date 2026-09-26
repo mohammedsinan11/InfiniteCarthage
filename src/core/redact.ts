@@ -52,6 +52,8 @@ export type PublicPlayer = {
   besiegt: boolean;
   /** Name, Haus und Titel des Helden - oeffentlich: sein Schild steht auf der Karte. */
   held: HeldLore | null;
+  /** Das Erbstueck der Familie (core/erbe.ts). */
+  erbstueck: string | null;
   /** Gesammelte Dinge, etwa Gelee - oeffentlich wie die Beute. */
   inventar: Record<string, number>;
   /**
@@ -188,6 +190,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
       ernannt: p.ernannt ? { ...p.ernannt, lore: { ...p.ernannt.lore } } : null,
       connected: p.connected,
       haus: p.haus ?? null,
+      erbstueck: p.erbstueck ?? null,
       points: publicPoints(state, p.id),
     };
     if (p.id === viewer) {

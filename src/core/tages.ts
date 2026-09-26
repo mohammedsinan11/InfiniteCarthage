@@ -63,6 +63,13 @@ export type BestenEintrag = {
   code: string;
   /** Millisekunden seit 1970. */
   zeit: number;
+  /**
+   * Wo er siedelte - bis zu drei Felder (Staedte zuerst). Die Tageswelt ist fuer
+   * alle dieselbe: Spaetere sehen dort seine Spuren (OVERHAUL.md, Abschnitt 3).
+   */
+  orte?: [number, number][];
+  /** Wie sein Held hiess. */
+  held?: string;
 };
 
 export function istBestenEintrag(v: unknown): v is BestenEintrag {
@@ -76,7 +83,12 @@ export function istBestenEintrag(v: unknown): v is BestenEintrag {
     Number.isInteger(e.punkte) &&
     Number.isInteger(e.ruhm) &&
     typeof e.code === 'string' &&
-    typeof e.zeit === 'number'
+    typeof e.zeit === 'number' &&
+    (e.orte === undefined ||
+      (Array.isArray(e.orte) &&
+        e.orte.length <= 3 &&
+        e.orte.every((o) => Array.isArray(o) && o.length === 2 && o.every((n) => Number.isInteger(n) && Math.abs(n as number) < 10000)))) &&
+    (e.held === undefined || (typeof e.held === 'string' && e.held.length <= 60))
   );
 }
 

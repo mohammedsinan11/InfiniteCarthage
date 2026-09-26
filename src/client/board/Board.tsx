@@ -275,6 +275,8 @@ type Props = {
   befehlsTafel?: { q: number; r: number; inhalt: React.ReactNode } | null;
   /** Kamera auf dieses Feld fahren. n wechselt bei jedem neuen Wunsch. */
   fokus?: { q: number; r: number; n: number } | null;
+  /** Spuren anderer Spieler derselben Tageswelt (core/tages.ts) - kleine Gedenksteine. */
+  spuren?: { q: number; r: number; text: string }[];
   /** Tageszeit und Wetter - fuer Licht, Nacht und Fackeln (WetterSchicht). */
   tageszeit?: Tageszeit;
   wetter?: Wetter;
@@ -428,6 +430,7 @@ export function Board({
   auswahl = [],
   befehlsTafel = null,
   fokus = null,
+  spuren = [],
   tageszeit = 'tag',
   wetter = 'klar',
   geisterBau = null,
@@ -2670,6 +2673,21 @@ export function Board({
                   </text>
                 </g>
               )}
+            </g>
+          );
+        })}
+
+        {/* Gedenksteine: wo heute schon andere siedelten (Tagesexpedition). */}
+        {spuren.map((sp, i) => {
+          const c = hexToPixel(sp.q, sp.r, LAYOUT);
+          const x = c.x + LAYOUT.w * 0.22;
+          const y = c.y - liftHex(sp.q, sp.r) - LAYOUT.h * 0.05;
+          return (
+            <g key={'spur' + i} className="spur" transform={`translate(${x.toFixed(1)} ${y.toFixed(1)})`}>
+              <title>{sp.text}</title>
+              <rect x={-4} y={-9} width={8} height={10} rx={3} className="spur-stein" />
+              <rect x={-1} y={-7} width={2} height={5} className="spur-kreuz" />
+              <rect x={-2.5} y={-6} width={5} height={1.5} className="spur-kreuz" />
             </g>
           );
         })}

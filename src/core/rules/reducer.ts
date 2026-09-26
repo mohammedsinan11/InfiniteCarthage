@@ -11,6 +11,7 @@
  * Kopie, die nur bei Erfolg uebernommen wird.
  */
 
+import { erbstueckById, istErbstueck } from '../erbe';
 import { kundeFortschreiben, kundeSchreiben } from '../kunde';
 import type { KundeEvent } from '../kunde';
 import { fraktionsLeben } from '../fraktionsleben';
@@ -299,6 +300,8 @@ export type NewPlayer = {
   name: string;
   /** Der Held einer frueheren Partie: der neue wird sein Nachfolger (core/lore.ts). */
   ahn?: HeldLore;
+  /** Das Erbstueck der letzten Generation (core/erbe.ts). */
+  erbstueck?: string;
 };
 
 /** Was eine Partie ausser Spielern, Seeds und Siegpunktziel mitbringt. */
@@ -323,6 +326,8 @@ export type PartieOptionen = {
   koop?: boolean;
   /** Ein Szenario (core/szenario.ts): Ziel, Frist und Omen kommen von dort. */
   szenario?: string | null;
+  /** Wirken Erbstuecke (core/erbe.ts)? Nur in gewoehnlichen Partien allein. */
+  erbeAn?: boolean;
 };
 
 /** Im gemeinsamen Spiel: so viele Siegpunkte je Spieler soll die Summe erreichen. */
@@ -377,6 +382,7 @@ export function createGame(
       inventar: {},
       ernannt: null,
       ...(p.ahn && istAhn(p.ahn) ? { ahn: ahnSauber(p.ahn) } : {}),
+      ...(istErbstueck(p.erbstueck) ? { erbstueck: p.erbstueck } : {}),
     })),
     order: players.map((p) => p.id),
     current: 0,
@@ -417,6 +423,16 @@ export function createGame(
   };
 
   if (optionen.ereignisse) state.ereignisseAn = true;
+  // Erbstuecke geben ihre Gabe nur allein und nur in gewoehnlichen Partien (core/erbe.ts).
+  if (optionen.erbeAn && state.players.length === 1 && !optionen.szenario && !optionen.tagesDatum) {
+    for (const p of state.players) {
+      const e = erbstueckById(p.erbstueck);
+      if (!e) continue;
+      for (const [r, n] of Object.entries(e.gabe.hand ?? {})) p.hand[r as keyof typeof p.hand] += n ?? 0;
+      p.loot += e.gabe.beute ?? 0;
+      p.ruhm += e.gabe.ruhm ?? 0;
+    }
+  }
   const sz = szenarioById(optionen.szenario);
   if (sz) {
     state.szenario = sz.id;
