@@ -52,12 +52,23 @@ export function Lobby() {
             <li key={m.id}>
               <span className="dot" style={{ background: playerColor(i) }} />
               {m.name}
+              {m.bot && <em> Bot</em>}
               {m.id === room.hostId && <em> Gastgeber</em>}
               {m.id === you && <em> du</em>}
               {!m.connected && <em className="off"> offline</em>}
+              {m.bot && isHost && (
+                <button className="klein bot-weg" title="Bot entfernen" onClick={() => send({ t: 'removeBot', id: m.id })}>
+                  ×
+                </button>
+              )}
             </li>
           ))}
         </ul>
+        {!tages && isHost && room.members.length < MAX_PLAYERS && (
+          <button onClick={() => send({ t: 'addBot' })} title="Ein Rivale, den das Spiel selbst fuehrt: er siedelt, baut und handelt nach festen Vorlieben">
+            + Rivalen dazusetzen (Bot)
+          </button>
+        )}
 
         {room.weltSeed !== null && !tages && (
           <p className="note">Gespielt wird die Welt einer frueheren Partie - dieselbe Landschaft, neue Wuerfel.</p>

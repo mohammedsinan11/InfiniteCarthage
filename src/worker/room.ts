@@ -28,6 +28,7 @@ import {
   MIN_PLAYERS,
   NO_TARGET,
   PIN_LENGTH,
+  BOT_NAMEN,
   RUNDEN_LIMIT_CHOICES,
   TARGET_POINTS_CHOICES,
   normalizePin,
@@ -43,6 +44,7 @@ import { TAGES_RUNDEN, istTagesDatum, tagesDatum, tagesOmen, tagesWeltSeed } fro
 import type { BestenEintrag } from '../core/tages';
 import { wertung } from '../core/chronik';
 import { istStufe } from '../core/stufe';
+import { botsSpielen } from '../core/bot';
 import { totalPoints } from '../core/state';
 
 export type Env = {
@@ -396,9 +398,37 @@ export class GameRoom implements DurableObject {
           },
         );
         room.started = true;
+        const botZuege = this.spieleBots(this.game, room);
         await this.save();
         this.broadcastRoom();
         this.broadcastState();
+        for (const ev of botZuege) this.broadcastEvents(ev);
+        await this.melden();
+        return;
+      }
+
+      case 'addBot':
+      case 'removeBot': {
+        if (room.hostId !== playerId) {
+          this.send(ws, { t: 'error', message: 'Nur der Gastgeber setzt Bots.' });
+          return;
+        }
+        if (room.started || room.tagesDatum) {
+          this.send(ws, { t: 'error', message: room.started ? 'Die Partie laeuft bereits.' : 'Die Tagesexpedition spielt man allein.' });
+          return;
+        }
+        if (msg.t === 'addBot') {
+          if (room.members.length >= MAX_PLAYERS) {
+            this.send(ws, { t: 'error', message: 'Der Raum ist voll.' });
+            return;
+          }
+          const name = BOT_NAMEN.find((n) => !room.members.some((m) => m.name === n)) ?? 'Rivale';
+          room.members.push({ id: 'bot_' + randomId(6), name, connected: true, bot: true });
+        } else {
+          room.members = room.members.filter((m) => !(m.bot && m.id === msg.id));
+        }
+        await this.save();
+        this.broadcastRoom();
         await this.melden();
         return;
       }
@@ -414,9 +444,12 @@ export class GameRoom implements DurableObject {
           this.send(ws, { t: 'error', message: result.error });
           return;
         }
+        // Danach sind die Bots dran, bis wieder ein Mensch am Zug ist.
+        const botZuege = this.spieleBots(game, room);
         await this.save();
         this.broadcastState();
         this.broadcastEvents(result.events);
+        for (const ev of botZuege) this.broadcastEvents(ev);
         // Zuege gedrosselt - ausser dem letzten: eine beendete Partie soll
         // sofort als beendet in der Liste stehen.
         await this.melden(game.state.phase.t === 'finished');
@@ -515,6 +548,15 @@ export class GameRoom implements DurableObject {
     this.broadcastRoom();
     if (game) this.sendState(ws, game.state, playerId);
     await this.melden();
+  }
+
+  // --- Bots ----------------------------------------------------------------
+
+  /** Die Bots spielen, bis ein Mensch dran ist (core/bot.ts). Ereignisse je Aktion. */
+  private spieleBots(game: Game, room: RoomData): GameEvent[][] {
+    const bots = new Set(room.members.filter((m) => m.bot).map((m) => m.id));
+    if (bots.size === 0) return [];
+    return botsSpielen(game, (id) => bots.has(id));
   }
 
   // --- Tagesexpedition ------------------------------------------------------

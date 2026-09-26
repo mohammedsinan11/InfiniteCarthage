@@ -169,7 +169,7 @@ Raeuber mit Abwerfen und Klauen, Bank- und Hafenhandel, Handel zwischen
 Spielern, alle Entwicklungskarten, Groesste Rittermacht, 30/60/unendlich Siegpunkte,
 2 bis 6 Spieler.
 
-Noch nicht enthalten: Laengste Handelsstrasse, Accounts, KI-Gegner.
+Noch nicht enthalten: Laengste Handelsstrasse, Accounts.
 
 ### Wiederspielwert: Omen, Tagesexpedition, Chronik
 
@@ -236,6 +236,15 @@ ersten Sieg ueber "Unversehrt" (ein Jahr ohne Brand) bis "Koenig" (Sieg auf
 Stufe 6). Profil, Taten und Stufen leben im Browser, es gibt keine Konten.
 Die Startseite zeigt sie ab der ersten Partie, die Chronik nennt neue Taten
 und Stufen; die Stufenwahl in der Lobby erscheint erst, wenn eine frei ist.
+
+**Rivalen (Bots)** (`src/core/bot.ts`). In der Lobby setzt der Gastgeber
+bis zum vollen Tisch Bots dazu - karthagische Haeuser wie Hanno oder Dido.
+Sie waehlen ihr Haus, siedeln nach Zahlen und Vielfalt, bauen Stadt vor Dorf
+vor Strasse, tauschen Ueberzaehliges, nehmen die wertvollste Karte,
+entscheiden Ereignisse und schicken ihren Helden erkunden. Sie benutzen nur
+Actions fuer `applyAction`, wie ein Mensch; der Raum spielt ihre Zuege, bis
+wieder ein Mensch dran ist. `botsSpielen` dient auch als Simulation:
+`test/bot.test.ts` laesst drei Bots ein ganzes Jahr spielen.
 
 **Einstieg.** Neue Spieler bekommen beim ersten Auftreten jedes Systems einen
 kurzen Tipp (erster Fund, erstes Feuer, erste Nacht, erste Beute ...,

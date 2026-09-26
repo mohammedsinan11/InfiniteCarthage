@@ -15,7 +15,12 @@ export type Member = {
   id: PlayerId;
   name: string;
   connected: boolean;
+  /** Ein Bot (core/bot.ts): der Raum spielt seine Zuege selbst. */
+  bot?: boolean;
 };
+
+/** Namen fuer Bots - karthagische Namen, damit die Rivalen nach etwas klingen. */
+export const BOT_NAMEN = ['Hanno', 'Dido', 'Hamilkar', 'Magon', 'Elissa', 'Hasdrubal'] as const;
 
 export type RoomInfo = {
   code: string;
@@ -90,6 +95,9 @@ export type ClientMsg =
       stufe?: number;
     }
   | { t: 'start' }
+  /** Nur der Gastgeber, nur vor dem Start: einen Bot dazusetzen oder entfernen. */
+  | { t: 'addBot' }
+  | { t: 'removeBot'; id: PlayerId }
   | { t: 'action'; action: Action };
 
 export type ServerMsg =

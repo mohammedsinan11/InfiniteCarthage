@@ -5022,3 +5022,8 @@ em.off {
   font-size: 11px;
   color: var(--accent);
 }
+
+.members li .bot-weg {
+  margin-left: auto;
+  padding: 1px 7px;
+}
