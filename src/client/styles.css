@@ -4893,3 +4893,18 @@ em.off {
     bottom: 150px;
   }
 }
+
+/* Marken fuer Punkte-, Regel-, Sieben- und Schildkarten (ui/KartenBild.tsx). */
+.karten-marke b {
+  font-family: var(--pixel);
+  font-size: 10px;
+  color: var(--accent);
+  white-space: nowrap;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+}
+.karten-bild.klein .karten-marke b {
+  font-size: 8px;
+  padding: 2px 4px;
+}

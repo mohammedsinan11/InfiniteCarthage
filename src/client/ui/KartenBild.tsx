@@ -142,6 +142,24 @@ export function KartenBild({ karte, klein = false }: { karte: Card; klein?: bool
       </span>,
     );
   }
+  // Die neueren Wirkungen als kleine Marken: Zahl und Zeichen, keine Bilder.
+  const QUELLE: Record<string, string> = { stadt: 'Staedte', lager: 'Lager', ruine: 'Ruinen', auftrag: 'Auftraege', strasse: 'Strassen' };
+  wirkungen.forEach((l, i) => {
+    let marke: string | null = null;
+    if (l.t === 'siegpunkte') marke = `★ je ${l.pro} ${QUELLE[l.je]}`;
+    else if (l.t === 'alsZahl') marke = `${l.von} → ${l.zu}`;
+    else if (l.t === 'doppelZahl') marke = `${l.zahlen.join(' · ')} x2`;
+    else if (l.t === 'siebenGabe') marke = `7: +${l.anzahl}`;
+    else if (l.t === 'schutz') marke = `Schild −${l.amount}`;
+    if (marke === null) return;
+    // Zwei gleiche Regelmarken (2 → 12, 12 → 2) als eine lesen lassen.
+    if (l.t === 'alsZahl' && wirkungen.some((x, j) => j < i && x.t === 'alsZahl' && x.von === l.zu && x.zu === l.von)) return;
+    teile.push(
+      <span key={`m${i}`} className="karten-teil karten-marke">
+        <b>{l.t === 'alsZahl' && wirkungen.some((x) => x.t === 'alsZahl' && x.von === l.zu && x.zu === l.von) ? `${l.von} ↔ ${l.zu}` : marke}</b>
+      </span>,
+    );
+  });
   const sofort = karte.instant;
   if (sofort?.t === 'gain') {
     teile.push(

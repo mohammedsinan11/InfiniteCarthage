@@ -66,8 +66,15 @@ export function productionSources(
   const nass = regnet(wetter);
   const cardsOf = (id: PlayerId): string[] =>
     state.players.find((p) => p.id === id)?.activeCards ?? [];
+  // Regelkarten (cards/effects.ts): "die 6 zaehlt auch als 8" - dann liefern
+  // bei einer 6 auch die 8er-Felder, aber nur an den Besitzer der Karte.
+  const alsZahlVon = (id: PlayerId): number[] =>
+    modifiersOf(cardsOf(id))
+      .alsZahl.filter(([von]) => von === roll)
+      .map(([, zu]) => zu);
+  const auchZahlen = new Set(state.players.flatMap((p) => alsZahlVon(p.id)));
   for (const tile of world.tiles.values()) {
-    if (tile.number !== roll) continue;
+    if (tile.number !== roll && !auchZahlen.has(tile.number ?? -1)) continue;
     const hk = hexKey(tile.q, tile.r);
     const resource = TERRAIN_RESOURCE[tile.terrain];
     if (resource === null) continue;
@@ -75,6 +82,7 @@ export function productionSources(
     for (const v of hexVertices(tile.q, tile.r)) {
       const b = state.buildings[vertexKey(v)];
       if (b === undefined) continue;
+      if (tile.number !== roll && !alsZahlVon(b.owner).includes(tile.number ?? -1)) continue;
       const grund = b.type === 'city' ? 2 : 1;
       // Karten koennen den Ertrag heben oder senken, aber nie unter null.
       const mods = modifiersOf(cardsOf(b.owner));
@@ -83,7 +91,8 @@ export function productionSources(
       const haus = state.players.find((p) => p.id === b.owner)?.haus;
       const voll = Math.max(0, terrainBonusFor(mods, tile.terrain, grund) + omen + hausGelaende(haus, tile.terrain));
       const halb = nass && tile.terrain === 'field' && !hausRegenfest(haus);
-      const amount = halb ? Math.floor(voll / 2) : voll;
+      const doppelt = mods.doppelZahlen.includes(roll) ? 2 : 1;
+      const amount = (halb ? Math.floor(voll / 2) : voll) * doppelt;
       if (amount > 0) out.push({ hex: hk, owner: b.owner, resource, amount });
     }
   }

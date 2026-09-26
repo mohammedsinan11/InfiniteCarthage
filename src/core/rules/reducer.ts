@@ -88,6 +88,7 @@ import { bigRoundChangedAt } from '../season';
 import { draftOptions } from '../cards/draft';
 import { cardById } from '../cards/catalog';
 import { cardKind, dauerwirkungen, istEinzigartig, wiederholbar } from '../cards/types';
+import { modifiersOf } from '../cards/effects';
 import type { DraftSource } from '../cards/types';
 import { aktiviereNeueReichskarte, setzeAktiveKarten } from '../cards/loadout';
 import { playTactic } from './tactics';
@@ -634,16 +635,20 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         // dieselbe Zahl zu Geschenk und Strafe zugleich; es haengt jetzt an
         // den Pluenderungen.
         enterDraft(s, 'fund', events);
-        // Glueckliche Sieben (core/omen.ts): dazu ein paar Rohstoffe.
-        const bonus = siebenerBonus(s.omens);
-        if (bonus > 0) {
-          const rng = new Rng(s.rngState);
+        // Glueckliche Sieben (core/omen.ts) fuer den Werfer, Siebenergaben
+        // aus Karten (cards/effects.ts) fuer jeden, der sie aktiv hat.
+        const payout: Record<PlayerId, Hand> = {};
+        const rng = new Rng(s.rngState);
+        for (const p of s.players) {
+          const n = (p.id === actor ? siebenerBonus(s.omens) : 0) + modifiersOf(p.activeCards).siebenGabe;
+          if (n <= 0) continue;
           const gain = emptyHand();
-          for (let i = 0; i < bonus; i++) gain[RESOURCES[rng.int(RESOURCES.length)]!] += 1;
-          s.rngState = rng.getState();
-          for (const r of RESOURCES) actorPlayer.hand[r] += gain[r];
-          events.push({ t: 'production', payout: { [actor]: gain } });
+          for (let i = 0; i < n; i++) gain[RESOURCES[rng.int(RESOURCES.length)]!] += 1;
+          for (const r of RESOURCES) p.hand[r] += gain[r];
+          payout[p.id] = gain;
         }
+        s.rngState = rng.getState();
+        if (Object.keys(payout).length > 0) events.push({ t: 'production', payout });
       } else {
         const { payout } = computeProduction(s, world, sum);
         for (const [pid, gain] of Object.entries(payout)) {

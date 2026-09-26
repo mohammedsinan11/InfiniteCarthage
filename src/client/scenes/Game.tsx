@@ -42,6 +42,7 @@ import { HausWahl } from '../ui/HausWahl';
 import { TippBox } from '../ui/TippBox';
 import { ErsteSchritte } from '../ui/ErsteSchritte';
 import { hausById } from '../../core/haus';
+import { kartenPunkte } from '../../core/cards/effects';
 import { OmenListe } from '../ui/OmenListe';
 import { omenById } from '../../core/omen';
 import { neuerRaumCode } from '../net/socket';
@@ -489,6 +490,7 @@ export function Game() {
         { text: `Staedte ${staedte} × 2`, wert: staedte > 0 ? staedte * 2 : null },
         { text: haupt.length > 1 ? `Hauptstaedte ${haupt.length}` : 'Hauptstadt', wert: hauptPunkte > 0 ? hauptPunkte : null },
         { text: 'Siegpunktkarten', wert: karten > 0 ? karten : null },
+        { text: 'Punktekarten', wert: you && kartenPunkte(state, you) > 0 ? kartenPunkte(state, you) : null },
         { text: 'Ruhmreichster', wert: state.ruhmreichster === you ? 2 : null },
       ],
     };

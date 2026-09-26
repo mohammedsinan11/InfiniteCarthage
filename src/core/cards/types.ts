@@ -63,7 +63,23 @@ export type Lasting =
   /** Die Handkartengrenze vor dem Abwerfen steigt. */
   | { t: 'handLimit'; amount: number }
   /** Haefen bleiben auch im Sturm geoeffnet. */
-  | { t: 'stormPorts' };
+  | { t: 'stormPorts' }
+  /**
+   * Siegpunkte fuer eine Spielweise (cards/effects.ts, kartenPunkte): je `pro`
+   * Staedte, zerstoerte Lager, erkundete Ruinen, erfuellte Auftraege oder
+   * Strassen einen Punkt. Das macht aus einer Karte eine Richtung.
+   */
+  | { t: 'siegpunkte'; je: KartenPunkteQuelle; pro: number }
+  /** Regelkarte: faellt `von`, liefern deine Felder mit `zu` ebenfalls. */
+  | { t: 'alsZahl'; von: number; zu: number }
+  /** Regelkarte: bei diesen Zahlen liefern deine Felder doppelt. */
+  | { t: 'doppelZahl'; zahlen: readonly number[] }
+  /** Bei jeder 7 - gleich wer wuerfelt - so viele zufaellige Rohstoffe. */
+  | { t: 'siebenGabe'; anzahl: number }
+  /** Pluenderer nehmen dir so viele Karten weniger. */
+  | { t: 'schutz'; amount: number };
+
+export type KartenPunkteQuelle = 'stadt' | 'lager' | 'ruine' | 'auftrag' | 'strasse';
 
 /** Eine ausspielbare Taktik. value speist dasselbe Balancemodell wie Reichskarten. */
 export type TacticEffect =

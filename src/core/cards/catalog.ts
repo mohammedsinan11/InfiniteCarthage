@@ -72,6 +72,26 @@ export const CARDS: readonly Card[] = [
     instant: { t: 'gain', resources: { ore: 3, grain: 1 } },
   },
 
+  // Regelkarten: kleine Verschiebungen der Wuerfel (DESIGN.md, "Regel").
+  {
+    id: 'schlangenaugen',
+    name: 'Schlangenaugen',
+    rarity: 'gewoehnlich',
+    text: 'Faellt eine 2, liefern deine 12er-Felder mit - und umgekehrt.',
+    lasting: [
+      { t: 'alsZahl', von: 2, zu: 12 },
+      { t: 'alsZahl', von: 12, zu: 2 },
+    ],
+  },
+  {
+    id: 'doppelernte',
+    name: 'Doppelernte',
+    rarity: 'gewoehnlich',
+    text: 'Nimm 1 Getreide. Bei einer 2 oder 12 liefern deine Felder doppelt.',
+    instant: { t: 'gain', resources: { grain: 1 } },
+    lasting: { t: 'doppelZahl', zahlen: [2, 12] },
+  },
+
   // --- ungewoehnlich: Wert 6 bis 10 -----------------------------------------
   {
     id: 'holzlager',
@@ -117,6 +137,29 @@ export const CARDS: readonly Card[] = [
     instant: { t: 'gain', resources: { lumber: 2, brick: 2, wool: 1, grain: 1, ore: 1 } },
   },
 
+  {
+    id: 'glueckliche_hand',
+    name: 'Glueckliche Hand',
+    rarity: 'ungewoehnlich',
+    text: 'Bei jeder 7 - gleich wer wuerfelt - bekommst du 2 zufaellige Rohstoffe.',
+    lasting: { t: 'siebenGabe', anzahl: 2 },
+  },
+  {
+    id: 'wehrhafte_doerfer',
+    name: 'Wehrhafte Doerfer',
+    rarity: 'ungewoehnlich',
+    text: 'Pluenderer nehmen dir je Raubzug eine Karte weniger.',
+    lasting: { t: 'schutz', amount: 1 },
+  },
+  {
+    id: 'strassennetz',
+    name: 'Strassennetz',
+    rarity: 'ungewoehnlich',
+    text: 'Nimm 2 Holz und 2 Lehm. Je 6 eigene Strassen: 1 Siegpunkt.',
+    instant: { t: 'gain', resources: { lumber: 2, brick: 2 } },
+    lasting: { t: 'siegpunkte', je: 'strasse', pro: 6 },
+  },
+
   // --- selten: Wert 10 bis 14 -----------------------------------------------
   {
     id: 'muehlen',
@@ -159,6 +202,43 @@ export const CARDS: readonly Card[] = [
     lasting: { t: 'tradeDiscount', amount: 1 },
   },
 
+  // Punktekarten: jede belohnt eine Spielweise (cards/effects.ts, kartenPunkte).
+  {
+    id: 'baumeistergilde',
+    name: 'Baumeistergilde',
+    rarity: 'selten',
+    text: 'Je 2 eigene Staedte: 1 Siegpunkt.',
+    lasting: { t: 'siegpunkte', je: 'stadt', pro: 2 },
+  },
+  {
+    id: 'trophaeenhalle',
+    name: 'Trophaeenhalle',
+    rarity: 'selten',
+    text: 'Je 2 zerstoerte Lager: 1 Siegpunkt.',
+    lasting: { t: 'siegpunkte', je: 'lager', pro: 2 },
+  },
+  {
+    id: 'kartograph',
+    name: 'Kartograph',
+    rarity: 'selten',
+    text: 'Je 2 erkundete Ruinen: 1 Siegpunkt.',
+    lasting: { t: 'siegpunkte', je: 'ruine', pro: 2 },
+  },
+  {
+    id: 'freund_der_wanderer',
+    name: 'Freund der Wanderer',
+    rarity: 'selten',
+    text: 'Je 2 erfuellte Auftraege: 1 Siegpunkt.',
+    lasting: { t: 'siegpunkte', je: 'auftrag', pro: 2 },
+  },
+  {
+    id: 'gluecksstraehne',
+    name: 'Gluecksstraehne',
+    rarity: 'selten',
+    text: 'Faellt eine 6, liefern deine 8er-Felder mit.',
+    lasting: { t: 'alsZahl', von: 6, zu: 8 },
+  },
+
   // --- episch: Wert 15 bis 20 -----------------------------------------------
   {
     id: 'erzader',
@@ -194,6 +274,27 @@ export const CARDS: readonly Card[] = [
     lasting: [{ t: 'tradeDiscount', amount: 1 }, { t: 'stormPorts' }],
   },
 
+  {
+    id: 'kriegsbeute',
+    name: 'Kriegsbeute',
+    rarity: 'episch',
+    text: 'Je 2 zerstoerte Lager: 1 Siegpunkt. Pluenderer nehmen dir je Raubzug eine Karte weniger.',
+    lasting: [
+      { t: 'siegpunkte', je: 'lager', pro: 2 },
+      { t: 'schutz', amount: 1 },
+    ],
+  },
+  {
+    id: 'weltenwanderer',
+    name: 'Weltenwanderer',
+    rarity: 'episch',
+    text: 'Je 2 erkundete Ruinen: 1 Siegpunkt. Bei jeder 7 bekommst du 2 zufaellige Rohstoffe.',
+    lasting: [
+      { t: 'siegpunkte', je: 'ruine', pro: 2 },
+      { t: 'siebenGabe', anzahl: 2 },
+    ],
+  },
+
   // --- legendaer: Wert 22 bis 30 --------------------------------------------
   {
     id: 'der_fund',
@@ -213,6 +314,14 @@ export const CARDS: readonly Card[] = [
       { t: 'terrainBonus', terrain: 'field', amount: 2 },
       { t: 'terrainBonus', terrain: 'pasture', amount: 1 },
     ],
+  },
+
+  {
+    id: 'grosse_bauhuette',
+    name: 'Grosse Bauhuette',
+    rarity: 'legendaer',
+    text: 'Jede eigene Stadt zaehlt einen Siegpunkt mehr.',
+    lasting: { t: 'siegpunkte', je: 'stadt', pro: 1 },
   },
 
   // --- Taktiken: ausspielen, dann verbraucht -------------------------------

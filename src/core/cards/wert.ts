@@ -37,7 +37,16 @@ export const WERT = {
   handel: [0, 5, 12, 18] as const,
   handkarte: 1.2,
   sturmhafen: 5,
+  /** Ein Siegpunkt je `pro` einer Sache: grob, was ein Punkt ueber die Partie wert ist. */
+  siegpunkt: 24,
+  /** Regelkarte: eine zweite Zahl liefert mit - ihre Wahrscheinlichkeit x 72. */
+  zahlWahrscheinlichkeit: 72,
+  siebenGabe: 3,
+  schutz: 7,
 };
+
+/** Wie oft eine Zahl mit zwei Wuerfeln faellt, in 36steln. */
+const WEGE: Record<number, number> = { 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 7: 6, 8: 5, 9: 4, 10: 3, 11: 2, 12: 1 };
 
 /** Wertspanne je Seltenheit, einschliesslich. */
 export const WERT_SPANNE: Record<Rarity, readonly [number, number]> = {
@@ -68,6 +77,21 @@ export function kartenWert(c: Card): number {
         break;
       case 'stormPorts':
         w += WERT.sturmhafen;
+        break;
+      case 'siegpunkte':
+        w += WERT.siegpunkt / l.pro;
+        break;
+      case 'alsZahl':
+        w += ((WEGE[l.von] ?? 0) / 36) * WERT.zahlWahrscheinlichkeit;
+        break;
+      case 'doppelZahl':
+        w += l.zahlen.reduce((n, z) => n + ((WEGE[z] ?? 0) / 36) * WERT.zahlWahrscheinlichkeit, 0);
+        break;
+      case 'siebenGabe':
+        w += l.anzahl * WERT.siebenGabe;
+        break;
+      case 'schutz':
+        w += l.amount * WERT.schutz;
         break;
     }
   }

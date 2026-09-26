@@ -204,6 +204,15 @@ Klingen beginnen mit zwei Rittern, die Speicherherren verlieren weniger an
 Pluenderer. Jede Wirkung greift an einer Stelle, die es schon gab (Ertrag,
 Bankhandel, Handkartengrenze, Pluenderung, Startausstattung).
 
+**Kartenrichtungen** (`src/core/cards/catalog.ts`, `effects.ts`). Zu den
+Ertragskarten kamen 13 Karten, die eine Spielweise belohnen: Punktekarten
+(je 2 Staedte, zerstoerte Lager, erkundete Ruinen oder erfuellte Auftraege ein
+Siegpunkt; die legendaere Grosse Bauhuette macht jede Stadt einen Punkt
+wertvoller), Regelkarten ("faellt eine 6, liefern deine 8er mit", "bei 2 und
+12 doppelt"), Siebenergaben und Schutz vor Pluenderern. Weil nur zwei
+Dauerkarten gleichzeitig wirken, ist die Auswahl eine Entscheidung ueber die
+Richtung der Partie.
+
 **Einstieg.** Neue Spieler bekommen beim ersten Auftreten jedes Systems einen
 kurzen Tipp (erster Fund, erstes Feuer, erste Nacht, erste Beute ...,
 `src/client/tipps.ts`), je Browser einmal, und eine Liste "Erste Schritte"

@@ -13,6 +13,7 @@ import type { ChunkCoord } from './chunks';
 import type { DraftSource } from './cards/types';
 import type { HeldLore } from './lore';
 import type { Chronik } from './chronik';
+import { kartenPunkte } from './cards/effects';
 
 export type PlayerId = string;
 
@@ -572,7 +573,8 @@ export function setupPlayerId(state: GameState, step: number): PlayerId {
 
 /** Sichtbare Siegpunkte (ohne verdeckte Siegpunktkarten). */
 export function publicPoints(
-  state: Pick<GameState, 'buildings' | 'ruhmreichster' | 'hauptstaedte'>,
+  state: Pick<GameState, 'buildings' | 'ruhmreichster' | 'hauptstaedte'> &
+    Partial<Pick<GameState, 'roads' | 'players' | 'chronik'>>,
   id: PlayerId,
 ): number {
   let pts = 0;
@@ -582,6 +584,10 @@ export function publicPoints(
   if (state.ruhmreichster === id) pts += 2;
   for (const h of Object.values(state.hauptstaedte ?? {})) {
     if (h.owner === id) pts += HAUPTSTADT_PUNKTE + (h.stufe - 1) * STUFE_PUNKTE;
+  }
+  // Aktive Karten mit Punktewirkung (cards/effects.ts, kartenPunkte).
+  if (state.players && state.roads) {
+    pts += kartenPunkte({ players: state.players, buildings: state.buildings, roads: state.roads, chronik: state.chronik }, id);
   }
   return pts;
 }
