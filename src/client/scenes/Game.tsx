@@ -1071,9 +1071,30 @@ export function Game() {
    * pinnt sie im Menue fest.
    */
 
+  /*
+   * Die Heerleiste sitzt unter der Kopfleiste. Deren Hoehe haengt von Breite,
+   * Hausname und Schildern ab - auf dem Handy bricht sie in zwei oder drei
+   * Zeilen. Gemessen statt geschaetzt, sonst deckt die Leiste Schilder zu.
+   */
+  const mainRef = useRef<HTMLElement>(null);
+  const hudRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const hud = hudRef.current;
+    const main = mainRef.current;
+    if (!hud || !main || typeof ResizeObserver === 'undefined') return;
+    const setze = () => {
+      const unten = hud.getBoundingClientRect().bottom - main.getBoundingClientRect().top;
+      main.style.setProperty('--heerleiste-oben', `${Math.round(unten + 6)}px`);
+    };
+    const ro = new ResizeObserver(setze);
+    ro.observe(hud);
+    setze();
+    return () => ro.disconnect();
+  }, []);
+
   return (
     <div className="game">
-      <main className="main">
+      <main className="main" ref={mainRef}>
         {/*
           Die Karte bekommt den ganzen Platz. Was frueher in einer linken
           Spalte stand - Protokoll, Zuganzeige, Spielerliste - ist weg: allein
@@ -1084,7 +1105,7 @@ export function Game() {
           zum Weitergeben und, sobald mehr als einer mitspielt, wer am Zug ist.
           Ohne das waere eine Partie zu mehreren nicht spielbar.
         */}
-        <div className="hud">
+        <div className="hud" ref={hudRef}>
           <span className="hud-room">{useStore.getState().code}</span>
           <span
             className={`hud-wetter zeit-${tageszeit}`}

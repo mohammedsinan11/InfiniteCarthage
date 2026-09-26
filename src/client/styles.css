@@ -861,6 +861,11 @@ em.off {
   .main {
     --heerleiste-oben: 96px;
   }
+  /* Die Weltart hat auf dem Handy keinen Platz mehr in der Kopfleiste -
+     sie steht in Lobby und Chronik; sonst braeche die Leiste in eine dritte Zeile. */
+  .hud-welt {
+    display: none;
+  }
   .heerleiste {
     right: 10px;
   }
@@ -5381,4 +5386,9 @@ em.off {
 }
 .menu-siegwege .fertig b {
   color: var(--accent);
+}
+@media (max-width: 700px) {
+  .raub-warnung {
+    top: calc(var(--heerleiste-oben, 96px) + var(--heerleiste-hoehe, 43px) + 8px);
+  }
 }
