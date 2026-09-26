@@ -899,3 +899,19 @@ describe('Bedrohung', () => {
     expect(s.destroyedNests).toContain(key);
   });
 });
+
+describe('Groll', () => {
+  it('ein Rachezug gilt dem, der das Lager zerstoert hat - groesser, und nur einmal', () => {
+    const game = solo();
+    const { nest } = lagerMitSiedlung(game);
+    const fraktion = nestFraktionOf(game.state, nest.q, nest.r);
+    // Zur Probe: die zweite Runde, in der Zaudernde nicht aufbrechen wuerden.
+    game.state.turn = 6;
+    game.state.groll = { [fraktion]: 'p0' };
+    const events: ArmyEvent[] = [];
+    sendRaiders(game.state, events);
+    const zug = events.find((e) => e.t === 'march');
+    expect(zug && zug.t === 'march' && zug.parties.some((p) => p.fraktion === fraktion && p.rache === 'p0')).toBe(true);
+    expect(game.state.groll[fraktion]).toBeUndefined();
+  });
+});

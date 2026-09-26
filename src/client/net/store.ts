@@ -39,6 +39,7 @@ import { STUFE_NAME } from '../../core/rules/hauptstadt';
 import { createWorld, mitAufgedeckt, revealChunks } from '../../core/world';
 import type { World } from '../../core/world';
 import { BRAND_WAS, auftragText, bundleText, describeEvent, fraktionName, resourceName, seiteName } from '../log';
+import { fraktionById } from '../../core/factions';
 import { spielerSeite } from '../../core/combat';
 import { sightOf } from '../../core/units';
 import { hexKey } from '../../core/coords';
@@ -400,6 +401,11 @@ function meldungenAus(
         out.push({ id: naechsteId++, text: `${name(e.fraktion)} pluendern dich: ${karten}`, kind: 'raid' });
       } else {
         out.push({ id: naechsteId++, text: `${wer(e.player)} wird gepluendert: ${e.count}`, kind: 'raid' });
+      }
+    } else if (e.t === 'vendetta') {
+      if (e.player === you) {
+        const chef = state ? fraktionById(state.worldSeed, e.fraktion).anfuehrer : undefined;
+        meldung(`${chef ?? name(e.fraktion)} schwoert Rache - der naechste Raubzug gilt dir`, 'raid');
       }
     } else if (e.t === 'march') {
       playMarch();

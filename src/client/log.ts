@@ -176,11 +176,16 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
           : '';
       if (e.parties.length !== 1) return `${e.parties.length} Raubzuege brechen auf.`;
       const zug = e.parties[0]!;
+      if (zug.rache) return `Rachezug: ${fraktionName(state, zug.fraktion)} ziehen gegen ${who(state, zug.rache)}${staerke(zug)}.`;
       // Mit Anfuehrer (core/factions.ts): die Welt hat Gesichter, nicht nur Farben.
       const chef = state && istFraktion(zug.fraktion) ? fraktionById(state.worldSeed, zug.fraktion).anfuehrer : undefined;
       return chef
         ? `${chef} fuehrt ${fraktionName(state, zug.fraktion).replace(/^Die /, 'die ')} auf Raubzug${staerke(zug)}.`
         : `Raubzug bricht auf: ${fraktionName(state, zug.fraktion)}${staerke(zug)}.`;
+    }
+    case 'vendetta': {
+      const f = state ? fraktionById(state.worldSeed, e.fraktion) : null;
+      return `${f?.anfuehrer ?? 'Ihr Anfuehrer'} (${fraktionName(state, e.fraktion)}) schwoert Rache an ${who(state, e.player)}.`;
     }
     case 'nestRevived':
       return `${fraktionName(state, e.fraktion)} beziehen ein verlassenes Lager neu.`;

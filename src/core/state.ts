@@ -564,6 +564,8 @@ export type GameState = {
   ereignisseGesehen?: string[];
   /** Wuerfe in Folge ohne Ertrag je Spieler (rules/hilfe.ts, durstLindern). */
   durst?: Record<PlayerId, number>;
+  /** Offene Rechnungen: Fraktion -> Spieler, der ihr Lager zerstoert hat (rules/army.ts). */
+  groll?: Record<string, PlayerId>;
 };
 
 /** Eine Hauptstadt auf einem Feld. Die Stufe beginnt bei 1 - weitere folgen (DESIGN.md, Hauptstadt). */

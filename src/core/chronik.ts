@@ -190,6 +190,11 @@ export function chronikFortschreiben(state: GameState, events: readonly GameEven
         moment(e.players[0] ?? null, 'lager', `${wer} zerstoert ein Lager von ${fraktionById(state.worldSeed, e.fraktion).name}.`);
         break;
       }
+      case 'vendetta': {
+        const f = fraktionById(state.worldSeed, e.fraktion);
+        moment(e.player, 'horde', `${f.anfuehrer ?? f.name} schwoert ${nameVon(state, e.player)} Rache.`);
+        break;
+      }
       case 'ruin':
         stats(e.player).ruinen += 1;
         break;

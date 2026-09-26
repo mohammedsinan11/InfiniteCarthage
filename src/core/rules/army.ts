@@ -111,7 +111,7 @@ import {
   stufeFuer,
 } from '../combat';
 import { terrainAt } from '../worldgen';
-import { fraktionById, wesenVon } from '../factions';
+import { fraktionById, istFraktion, wesenVon } from '../factions';
 import type { FraktionArt } from '../factions';
 import { raidLoss, takeFromLargest } from './raid';
 import { reichsbauFelder, tempelNah } from './reich';
@@ -240,7 +240,16 @@ export type ArmyEvent =
   | {
       t: 'march';
       round: number;
-      parties: { q: number; r: number; kind: Feind; fraktion: string; anzahl?: number; rang?: number }[];
+      parties: {
+        q: number;
+        r: number;
+        kind: Feind;
+        fraktion: string;
+        anzahl?: number;
+        rang?: number;
+        /** Ein Rachezug gegen diesen Spieler (vendetta). */
+        rache?: PlayerId;
+      }[];
     }
   | {
       t: 'feud';
@@ -321,6 +330,8 @@ export type ArmyEvent =
       count: number;
     }
   | { t: 'nestDestroyed'; q: number; r: number; kind: Feind; fraktion: string; players: PlayerId[] }
+  /** Ein Anfuehrer schwoert Rache: sein naechster Raubzug gilt diesem Spieler. */
+  | { t: 'vendetta'; fraktion: string; player: PlayerId }
   | { t: 'nestCaptured'; q: number; r: number; von: string; an: string }
   | {
       t: 'ruin';
@@ -628,7 +639,7 @@ export function sendRaiders(s: GameState, events: Ereignisse): void {
   );
   const grenze =
     maxAufbrueche(s.order.length) + zusatzAufbrueche(hoechsteBedrohung(s)) + mehrRaubzuege(s.omens);
-  const parties: { q: number; r: number; kind: Feind; fraktion: string; anzahl?: number; rang?: number }[] = [];
+  const parties: { q: number; r: number; kind: Feind; fraktion: string; anzahl?: number; rang?: number; rache?: PlayerId }[] = [];
   const reihe = [...lager].sort((a, b) => a[1].d - b[1].d || nachSchluessel(a[0], b[0]));
   for (const [k, nest] of reihe) {
     if (parties.length >= grenze) break;
@@ -636,10 +647,18 @@ export function sendRaiders(s: GameState, events: Ereignisse): void {
     // Wer feiert, bleibt im Lager (lagerLeben).
     if (feiert(s, k)) continue;
     const fraktion = nestFraktionOf(s, nest.q, nest.r);
-    // Zaudernde Fraktionen (core/factions.ts) brechen nur jede zweite grosse Runde auf.
+    // Zaudernde Fraktionen (core/factions.ts) brechen nur jede zweite grosse
+    // Runde auf - ausser, sie haben eine Rechnung offen.
     const wesen = wesenVon(s.worldSeed, fraktion);
-    if (wesen === 'zaudernd' && bigRoundOf(s.turn) % 2 === 1) continue;
-    const zielSet = new Set(settlementApproaches(s, undefined, imKriegMit(s, fraktion)).keys());
+    const krieg = imKriegMit(s, fraktion);
+    const groll = s.groll?.[fraktion];
+    const rache = groll !== undefined && krieg(groll) ? groll : undefined;
+    if (wesen === 'zaudernd' && rache === undefined && bigRoundOf(s.turn) % 2 === 1) continue;
+    // Groll: wer ihr Lager zerstoert hat, wird zuerst heimgesucht.
+    let zielSet = new Set(
+      settlementApproaches(s, undefined, rache !== undefined ? (id) => id === rache : krieg).keys(),
+    );
+    if (zielSet.size === 0) zielSet = new Set(settlementApproaches(s, undefined, krieg).keys());
     const schonDa = zielSet.has(k);
     const weg = schonDa ? null : nextStep(s.worldSeed, nest, zielSet, SUCHE_RAEUBER);
     if (!weg && !schonDa) continue;
@@ -648,7 +667,8 @@ export function sendRaiders(s: GameState, events: Ereignisse): void {
     // Der Zug richtet sich nach dem, was es beim Ziel zu holen gibt
     // (rules/bedrohung.ts): mehr Punkte, mehr und erfahrenere Raeuber.
     const stufe = bedrohungVon(s, nest.owner);
-    const anzahl = raubzugGroesse(stufe) + (wesen === 'kriegerisch' ? 1 : 0);
+    const anzahl = raubzugGroesse(stufe) + (wesen === 'kriegerisch' ? 1 : 0) + (rache !== undefined ? 1 : 0);
+    if (rache !== undefined && s.groll) delete s.groll[fraktion];
     const rang = raeuberRang(stufe);
     for (let i = 0; i < anzahl; i++) {
       const vorlage = einheitVorlage(lagerArt(art), nest.q, nest.r, {
@@ -660,7 +680,14 @@ export function sendRaiders(s: GameState, events: Ereignisse): void {
       });
       aufstellen(s, { ...vorlage, leben: maxLeben({ kind: vorlage.kind, stufe: rang }) });
     }
-    parties.push({ q: nest.q, r: nest.r, kind: art, fraktion, ...(anzahl > 1 || rang > 0 ? { anzahl, rang } : {}) });
+    parties.push({
+      q: nest.q,
+      r: nest.r,
+      kind: art,
+      fraktion,
+      ...(anzahl > 1 || rang > 0 ? { anzahl, rang } : {}),
+      ...(rache !== undefined ? { rache } : {}),
+    });
   }
   if (parties.length > 0) events.push({ t: 'march', round: roundOf(s.turn), parties });
 }
@@ -1482,6 +1509,14 @@ function schlacht(
           if (p) p.loot += 1;
         }
         events.push({ t: 'nestDestroyed', q, r, kind: besatzungArt, fraktion: lagerSeite, players });
+        // Der Anfuehrer vergisst das nicht (core/factions.ts): der naechste
+        // Raubzug dieser Fraktion gilt dem, der das Lager zerstoert hat. Nur in
+        // Partien mit Ereignissen - alte Staende bleiben, wie sie waren.
+        if (s.ereignisseAn && players.length > 0 && istFraktion(lagerSeite) && fraktionById(s.worldSeed, lagerSeite).anfuehrer) {
+          const wer = players[0]!;
+          s.groll = { ...(s.groll ?? {}), [lagerSeite]: wer };
+          events.push({ t: 'vendetta', fraktion: lagerSeite, player: wer });
+        }
       } else {
         // Nur fremde Fraktionen: die staerkste erobert das Lager.
         const [an, leute] = [...fremde].sort(
