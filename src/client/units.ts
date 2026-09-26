@@ -265,6 +265,20 @@ const ART: Record<FigurArt, readonly string[]> = {
     '.kBkBk...',
     '.kk.kk...',
   ],
+  // Die Karawane (core/karawane.ts): ein Kamel mit Packen. PLATZHALTER (ASSETS.md).
+  karawane: [
+    '.........kk..',
+    '........kffk.',
+    '........kfk..',
+    '..kkkk..kfk..',
+    '.krrrrk.kffk.',
+    'kcCcCcCkfffk.',
+    'kfffffffffk..',
+    '.kffEfffffk..',
+    '..kfk..kfk...',
+    '..kfk..kfk...',
+    '..kkk..kkk...',
+  ],
   wanderer: [
     '..kkk....',
     '.kaaak..k',

@@ -208,6 +208,8 @@ export type UnitKind =
   /** Der Morast: der grosse Schleim, den die Nacht irgendwann ausspuckt. */
   | 'morast'
   | 'wanderer'
+  /** Eine Karawane eines Spielers: zieht zwischen zwei Siedlungen und bringt Waren (core/karawane.ts). */
+  | 'karawane'
   | 'held'
   | 'bogen'
   | 'schleim';
@@ -234,7 +236,9 @@ export type Auftrag =
   | 'fehde'
   | 'wandern'
   | 'jagd'
-  | 'ruht';
+  | 'ruht'
+  /** Karawane: zieht zwischen heimat und ziel hin und her (core/karawane.ts). */
+  | 'handel';
 
 /**
  * Eine Einheit im Spielstand.

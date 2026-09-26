@@ -43,7 +43,14 @@ the feel of the game, with a recommended path at the end.
 > temperament has a stated goal. The season report "Kunde aus dem Land"
 > (`src/core/kunde.ts`) appears at every season change and is kept in the
 > Chronist's tab and on the end screen. Still open: camps growing into
-> strongholds, factions merging or splitting, population, caravans.
+> strongholds, factions merging or splitting.
+>
+> **Built (step 4):** population (`src/core/bevoelkerung.ts`: villages hold
+> 3, cities 5, growth each big round, faster with food nearby; plunder costs
+> an inhabitant; a city needs 2, a knight takes 1; figures on the map) and
+> caravans (`src/core/karawane.ts`: one per player between the two farthest
+> settlements, 2 cards of the scarcest sorts per arrival, raiders attack
+> them).
 
 **Idea.** The world simulates a little every big round, whether or not a
 player touches it. Factions are not only raid spawners; they are actors
@@ -114,6 +121,11 @@ timeline reads `season.ts`, `raiders`, `vorhaben` and the event schedule.
 ---
 
 ## 3. A dynasty campaign: one family, many generations
+
+> **Built (step 3):** heirlooms (`src/core/erbe.ts`, chosen at the end of a
+> game, a small start gift in solo normal games only), family trait, family
+> tree on the home page, and gravestones of today's other players in the
+> daily expedition. Cross-game faction reputation is still open.
 
 **Idea.** Make the dynasty the spine of the game. Each game is **one
 generation** of your house. What you achieve shapes the next generation's

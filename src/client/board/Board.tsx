@@ -314,6 +314,7 @@ type Props = {
 type Camera = { cx: number; cy: number; zi: number };
 
 const ART_NAME = {
+  karawane: ['Karawane', 'Karawanen'],
   ritter: ['Ritter', 'Ritter'],
   raeuber: ['Raeuber', 'Raeuber'],
   goblin: ['Goblin', 'Goblins'],
@@ -328,6 +329,7 @@ const ART_NAME = {
 } as const;
 
 const VORHABEN = {
+  handel: 'mit Waren unterwegs',
   befehl: '',
   erkunden: 'erkundet',
   jagd: 'auf Jagd',

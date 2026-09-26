@@ -60,6 +60,8 @@ export const WERTE: Record<UnitKind, { angriff: number; leben: number }> = {
   raeuber: { angriff: 2, leben: 2 },
   goblin: { angriff: 1, leben: 2 },
   wanderer: { angriff: 0, leben: 1 },
+  // Die Karawane wehrt sich kaum - wer sie schuetzen will, gibt ihr Ritter mit.
+  karawane: { angriff: 0, leben: 2 },
   // Der Held haelt mehr aus als ein Ritter und trifft wie er - stark ist er
   // durch das, was er fuer andere tut (ANFUEHRUNG, Sicht, Licht).
   held: { angriff: 3, leben: 5 },
@@ -139,6 +141,8 @@ export function einheitVorlage(
       ? 'befehl'
       : kind === 'wanderer'
         ? 'wandern'
+        : kind === 'karawane'
+          ? 'handel'
         : kind === 'schleim' || kind === 'morast'
           ? 'ruht'
           : // Die Hexe zieht nie los - sie bleibt bei ihrem Haus (core/hexe.ts).

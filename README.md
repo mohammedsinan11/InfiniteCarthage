@@ -306,6 +306,22 @@ behandelt. Zu jedem Wechsel der Jahreszeit schreibt der Chronist auf, was in
 der Welt geschah - Ernte, Raubzuege, Fehden, Feste, eroberte Lager,
 gefallene Anfuehrer.
 
+**Dynastie** (`src/core/erbe.ts`). Am Ende einer Partie waehlt man ein
+Erbstueck, das die naechste Generation mitnimmt (eine kleine Gabe, nur allein
+in gewoehnlichen Partien). Die Startseite zeigt den Stammbaum mit
+Familienart; in der Tagesexpedition stehen Gedenksteine, wo andere heute
+siedelten.
+
+**Bevoelkerung und Karawanen** (`src/core/bevoelkerung.ts`,
+`src/core/karawane.ts`). Siedlungen haben Einwohner, die wachsen und bei
+Pluenderungen verschleppt werden; eine Stadt braucht zwei, ein Ritter nimmt
+einen. Zwischen den zwei fernsten Siedlungen zieht eine Karawane und bringt
+die knappsten Sorten - Raeuber jagen sie.
+
+**Markt und Bankhandel.** Im Bankhandel liegt der Markt: einmal je Zug drei
+Karten gegen eine Kartenwahl. Jeder weitere Bankhandel im selben Zug kostet
+mehr.
+
 **Siegwege** (`src/core/siegwege.ts`). Neben dem Siegpunktziel gewinnt auch,
 wer als Eroberer, Entdecker, Wunderbauer oder Handelsfuerst weit genug kommt.
 

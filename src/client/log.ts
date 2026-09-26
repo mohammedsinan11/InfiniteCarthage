@@ -55,6 +55,7 @@ const BUILD_NAME = {
 } as const;
 
 const ART_NAME = {
+  karawane: 'Karawane',
   ritter: 'Ritter',
   raeuber: 'Raeuber',
   goblin: 'Goblin',
@@ -198,6 +199,10 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
     }
     case 'ambitionFailed':
       return `${who(state, e.player)} laesst das Vorhaben "${vorhabenById(e.id)?.name ?? e.id}" fallen - die Zeit ist um.`;
+    case 'caravanSet':
+      return `${who(state, e.player)} schickt eine Karawane zwischen ihren Siedlungen los.`;
+    case 'caravanArrived':
+      return `Die Karawane von ${who(state, e.player)} kommt an: ${bundleText(e.gained)}.`;
     case 'growth':
       return `Die Siedlungen von ${who(state, e.player)} wachsen: +${e.zuwachs} Einwohner (jetzt ${e.gesamt}).`;
     case 'peopleLost':

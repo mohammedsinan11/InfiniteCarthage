@@ -54,6 +54,8 @@
  * ihre Raubzuege kein Ziel (feindlich mit dem Spielstand, rules/diplomatie.ts).
  */
 
+import { karawaneAngekommen, karawanenRunde } from '../karawane';
+import type { KarawanenEvent } from '../karawane';
 import { szenarioById } from '../szenario';
 import { Rng } from '../rng';
 import { hexDistance, hexKey, hexesInRange, neighbors, parseVertexKey, vertexAdjacentHexes } from '../coords';
@@ -223,6 +225,7 @@ type Feind = FraktionArt;
 export type Verlust = { seite: Seite; kind: UnitKind | 'besatzung'; anzahl: number };
 
 export type ArmyEvent =
+  | KarawanenEvent
   /** Ein Ritter oder Bogenschuetze tritt an (kind fehlt bei alten Staenden: Ritter). */
   | { t: 'knightReady'; player: PlayerId; unit: number; q: number; r: number; kind?: 'ritter' | 'bogen' }
   | {
@@ -805,6 +808,8 @@ export function beginBigRound(s: GameState, events: Ereignisse): void {
   // Schonfrist im Szenario (core/szenario.ts): die ersten Runden bleibt es ruhig.
   const frist = szenarioById(s.szenario)?.schonfrist ?? 0;
   if (raubzugRunde(s.omens, bigRoundOf(s.turn)) && roundOf(s.turn) > frist) sendRaiders(s, events);
+  // Karawanen fuer alle, die zwei Siedlungen weit genug auseinander haben (core/karawane.ts).
+  karawanenRunde(s, events, (vorlage) => aufstellen(s, vorlage));
   const rng = new Rng(s.rngState);
   sendFeud(s, rng, events);
   sendWanderer(s, rng, events);
@@ -1333,6 +1338,19 @@ function ziehe(
       if (!weg) return false;
       schritt(weg.step);
       return true;
+    }
+
+    case 'handel': {
+      // Karawane (core/karawane.ts): am Ziel abliefern und umkehren, sonst weiter.
+      if (!u.ziel) return false;
+      if (u.q === u.ziel.q && u.r === u.ziel.r) karawaneAngekommen(s, u, events);
+      if (!u.ziel) return false;
+      const weg = nextStep(seed, u, new Set([hexKey(u.ziel.q, u.ziel.r)]), SUCHE_RAEUBER);
+      if (weg) {
+        schritt(weg.step);
+        return true;
+      }
+      return false;
     }
 
     case 'wandern': {
