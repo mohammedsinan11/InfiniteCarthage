@@ -5351,3 +5351,25 @@ em.off {
 .ahnen-tat {
   font-style: italic;
 }
+
+/* Geruechte im Menue (client/geruechte.ts). */
+.menu-geruechte {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.menu-geruechte li {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 6px 8px;
+  border-left: 3px solid var(--line);
+  background: var(--panel2);
+  font-size: 12.5px;
+  font-style: italic;
+  line-height: 1.4;
+}

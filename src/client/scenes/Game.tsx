@@ -71,6 +71,7 @@ import type { UnitState as HeerEinheit } from '../../core/state';
 import { bundleText } from '../log';
 import { eckenWert } from '../../core/bot';
 import { weltArtVon } from '../../core/weltart';
+import { geruechte } from '../geruechte';
 import { limitFor } from '../../core/rules/handlimit';
 import { erzeugteSorten } from '../../core/rules/hilfe';
 import {
@@ -311,6 +312,12 @@ export function Game() {
   const heer = useMemo(() => heerGruppen(meineEinheiten), [meineEinheiten]);
   /** Kein Gebaeude mehr, aber die Frist laeuft: eine Siedlung darf ueberall stehen (rules/untergang.ts). */
   const notbau = !!me && me.untergang !== null && !me.besiegt && !Object.values(state.buildings).some((b) => b.owner === me.id);
+  // Geruechte (client/geruechte.ts): nur neu, wenn sich Reich, Sicht oder Funde aendern.
+  const geruechteListe = useMemo(
+    () => (you && state.phase.t !== 'setup' ? geruechte(state, you, sicht) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [you, state.buildings, state.exploredRuins, state.wunder, sicht, state.worldSeed],
+  );
   const tributPreis = useMemo(() => (you ? tributKarten(state, you) : 1), [state, you]);
   const kampfOrte = useMemo(() => new Set(kampfFelderVon(state).keys()), [state]);
   /** Wie der eigene Held heisst (core/lore.ts) - undefined, bevor er antritt. */
@@ -1241,6 +1248,7 @@ export function Game() {
           friedenBezahlbar={!!hand && canAfford(hand, FRIEDEN_PREIS)}
           tributPreis={tributPreis}
           handKarten={hand ? RESOURCES.reduce((n, r) => n + hand[r], 0) : 0}
+          geruechte={geruechteListe}
           onDiplomatie={(fraktion, art) => act({ t: 'diplomacy', fraktion, art })}
           auftraege={meineAuftraege}
           onAuftrag={(id, annehmen) => act({ t: 'answerQuest', id, accept: annehmen })}

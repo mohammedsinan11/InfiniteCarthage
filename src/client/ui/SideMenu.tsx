@@ -36,6 +36,7 @@ import { TRACKS, getMusicMode, getMusicVolume, setMusicMode, setMusicVolume } fr
 import type { MusicMode } from '../music';
 import { getUmgebungVolume, setUmgebungVolume } from '../ambiente';
 import { WESEN } from '../../core/factions';
+import type { Geruecht } from '../geruechte';
 import type { FraktionsWesen } from '../../core/factions';
 import { BRAND_WAS, auftragText, bundleText, resourceName } from '../log';
 import { einheitNamen, gruppenName, heerGruppen, untaetig } from '../heer';
@@ -286,6 +287,7 @@ export function SideMenu({
   onFolgen,
   diplomatieMoeglich,
   friedenBezahlbar,
+  geruechte,
   handKarten,
   tributPreis,
   onDiplomatie,
@@ -371,6 +373,8 @@ export function SideMenu({
   /** Darf gerade verhandelt werden (eigene Bauphase)? */
   diplomatieMoeglich: boolean;
   friedenBezahlbar: boolean;
+  /** Was man sich erzaehlt (client/geruechte.ts). */
+  geruechte: Geruecht[];
   /** Wie viele Karten man haelt - reicht es fuer den Tribut? */
   handKarten: number;
   /** Was ein Tribut gerade kostet, in Karten (rules/diplomatie.ts, tributKarten). */
@@ -639,6 +643,25 @@ export function SideMenu({
                         )}
                       </span>
                       {!w.besitzer && w.grund && <span className="menu-wunder-grund">{w.grund}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+
+            {geruechte.length > 0 && (
+              <>
+                <Kopf
+                  titel="Geruechte"
+                  hilfe="Was man sich in deinen Doerfern erzaehlt: wo im Nebel die naechste Ruine, Wunderstaette oder das Haus der Hexe liegt. Schick deinen Helden hin."
+                />
+                <ul className="menu-geruechte">
+                  {geruechte.map((g) => (
+                    <li key={g.art}>
+                      <span>{g.text}</span>
+                      <button className="klein" onClick={() => onZeigenFeld(g.q, g.r)}>
+                        Richtung zeigen
+                      </button>
                     </li>
                   ))}
                 </ul>
