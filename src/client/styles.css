@@ -5554,3 +5554,60 @@ em.off {
     font-size: 12px;
   }
 }
+
+/* Berater (ui/SideMenu.tsx): ein Satz oben, ein Punkt am Reiter, wenn etwas drangt. */
+.menu-reiter-knopf {
+  position: relative;
+}
+.menu-reiter-punkt {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  width: 7px;
+  height: 7px;
+  background: var(--danger);
+  box-shadow: 0 0 0 2px var(--panel2);
+  animation: untaetig-puls 1.6s ease-in-out infinite;
+}
+.berater-zeile {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  margin: 0 0 12px;
+  padding: 8px 9px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent-dark);
+  background: var(--panel2);
+}
+.berater-zeile.wichtig {
+  border-left-color: var(--danger);
+}
+.berater-bild {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  color: var(--accent);
+}
+.berater-bild svg {
+  width: 24px;
+  height: 24px;
+}
+.berater-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  font-style: italic;
+}
+.berater-text b {
+  font-family: var(--pixel);
+  font-size: 9px;
+  font-style: normal;
+  font-weight: normal;
+  color: var(--accent);
+}

@@ -7,8 +7,9 @@
  * weit hinausbaut, will den Platz.
  *
  * Oben steht die Zeit, weil sie zum Spielstand gehoert und nicht zu den
- * Einstellungen. Darunter vier Reiter mit Symbol und Wort: Reich, Heer,
- * Karten & Technologie, Optionen (mit dem Protokoll unten). Erklaerungen
+ * Einstellungen. Darunter vier Berater als Reiter: Kanzler, Marschall,
+ * Seherin, Chronist (mit Protokoll und Einstellungen). Jeder sagt oben in
+ * einem Satz, was er sieht (OVERHAUL.md, Abschnitt 2). Erklaerungen
  * stehen nicht mehr als Absaetze da, sondern hinter einem "?" am Abschnitt -
  * wer spielt, liest sie einmal, danach nehmen sie nur Platz.
  */
@@ -31,6 +32,7 @@ import type { Verhandlung } from '../../core/rules/diplomatie';
 import { getVolume, initAudio, setVolume } from '../audio';
 import { LogPanel } from './LogPanel';
 import { KartenBild } from './KartenBild';
+import { OmenListe } from './OmenListe';
 import type { WeltEintrag } from '../net/store';
 import { TRACKS, getMusicMode, getMusicVolume, setMusicMode, setMusicVolume } from '../music';
 import type { MusicMode } from '../music';
@@ -42,7 +44,14 @@ import { BRAND_WAS, auftragText, bundleText, resourceName } from '../log';
 import { einheitNamen, gruppenName, heerGruppen, untaetig } from '../heer';
 import { tippsZuruecksetzen } from '../tipps';
 
-type Reiter = 'reich' | 'heer' | 'karten' | 'optionen';
+/*
+ * Die Reiter sind Berater (OVERHAUL.md, Abschnitt 2): der Kanzler fuer Wirtschaft,
+ * Vorhaben und Karten, der Marschall fuer Lage, Heer und Fraktionen, die
+ * Seherin fuer Geruechte, Wunder und Auftraege, der Chronist fuer Punkte,
+ * Siegwege, Protokoll und Einstellungen. Jeder sagt oben in einem Satz, was
+ * er sieht, und meldet sich mit einem Punkt, wenn etwas drangt.
+ */
+type Reiter = 'kanzler' | 'marschall' | 'seherin' | 'chronist';
 
 /** Eine bekannte Fraktion, fertig fuer die Anzeige. */
 export type FraktionsZeile = {
@@ -88,43 +97,49 @@ function zielText(p: PunkteSicht): string {
   return teile.length > 0 ? teile.join(' · ') : 'endlos';
 }
 
-/* Symbole der Reiter - kleine SVG-Flaechen. PLATZHALTER (ASSETS.md). */
+/* Bildnisse der Berater - kleine Pixelgesichter. PLATZHALTER (ASSETS.md). */
 const SYMBOL: Record<Reiter, ReactNode> = {
-  reich: (
-    <svg viewBox="0 0 18 18" aria-hidden="true">
-      <path d="M3 15 V7 L9 3 L15 7 V15 Z" fill="none" stroke="currentColor" strokeWidth="2" />
-      <rect x="7" y="10" width="4" height="5" fill="currentColor" />
+  // Kanzler: Kappe und Muenze.
+  kanzler: (
+    <svg viewBox="0 0 18 18" aria-hidden="true" shapeRendering="crispEdges">
+      <rect x="5" y="2" width="8" height="3" fill="currentColor" />
+      <rect x="6" y="5" width="6" height="6" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="4" y="12" width="10" height="4" fill="currentColor" opacity="0.6" />
+      <rect x="12" y="11" width="4" height="4" fill="#ffd76a" />
     </svg>
   ),
-  heer: (
-    <svg viewBox="0 0 18 18" aria-hidden="true">
+  // Marschall: Helm mit Sehschlitz.
+  marschall: (
+    <svg viewBox="0 0 18 18" aria-hidden="true" shapeRendering="crispEdges">
       <path d="M4 15 V6 Q9 0 14 6 V15 Z" fill="none" stroke="currentColor" strokeWidth="2" />
       <rect x="6" y="7" width="6" height="2" fill="currentColor" />
+      <rect x="8" y="1" width="2" height="3" fill="#e0473a" />
     </svg>
   ),
-  karten: (
-    <svg viewBox="0 0 18 18" aria-hidden="true">
-      <rect x="3" y="4" width="8" height="11" fill="none" stroke="currentColor" strokeWidth="2" />
-      <rect x="8" y="2" width="8" height="11" fill="currentColor" opacity="0.6" />
+  // Seherin: Kapuze und Auge.
+  seherin: (
+    <svg viewBox="0 0 18 18" aria-hidden="true" shapeRendering="crispEdges">
+      <path d="M3 16 L5 5 Q9 1 13 5 L15 16 Z" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <ellipse cx="9" cy="9" rx="3" ry="1.8" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <rect x="8" y="8" width="2" height="2" fill="#9ad0ff" />
     </svg>
   ),
-  optionen: (
-    <svg viewBox="0 0 18 18" aria-hidden="true">
-      <circle cx="9" cy="9" r="3" fill="none" stroke="currentColor" strokeWidth="2" />
-      <path
-        d="M9 1 V4 M9 14 V17 M1 9 H4 M14 9 H17 M3.5 3.5 L5.5 5.5 M12.5 12.5 L14.5 14.5 M3.5 14.5 L5.5 12.5 M12.5 5.5 L14.5 3.5"
-        stroke="currentColor"
-        strokeWidth="1.8"
-      />
+  // Chronist: Buch und Feder.
+  chronist: (
+    <svg viewBox="0 0 18 18" aria-hidden="true" shapeRendering="crispEdges">
+      <rect x="3" y="5" width="10" height="11" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="5" y="8" width="6" height="1" fill="currentColor" />
+      <rect x="5" y="11" width="6" height="1" fill="currentColor" />
+      <path d="M12 2 L16 1 L13 7 Z" fill="currentColor" opacity="0.7" />
     </svg>
   ),
 };
 
-const REITER: ReadonlyArray<{ id: Reiter; name: string }> = [
-  { id: 'reich', name: 'Reich' },
-  { id: 'heer', name: 'Heer' },
-  { id: 'karten', name: 'Karten & Technologie' },
-  { id: 'optionen', name: 'Optionen' },
+const REITER: ReadonlyArray<{ id: Reiter; name: string; amt: string }> = [
+  { id: 'kanzler', name: 'Kanzler', amt: 'Wirtschaft, Vorhaben, Karten' },
+  { id: 'marschall', name: 'Marschall', amt: 'Lage, Heer, Fraktionen' },
+  { id: 'seherin', name: 'Seherin', amt: 'Geruechte, Wunder, Auftraege' },
+  { id: 'chronist', name: 'Chronist', amt: 'Punkte, Protokoll, Einstellungen' },
 ];
 
 /** Gelaendenamen fuers Auge - der Kern kennt nur die englischen Kennungen. */
@@ -321,6 +336,7 @@ export function SideMenu({
   diplomatieMoeglich,
   friedenBezahlbar,
   geruechte,
+  omens,
   vorhaben,
   onVorhaben,
   siegwege,
@@ -411,6 +427,8 @@ export function SideMenu({
   friedenBezahlbar: boolean;
   /** Was man sich erzaehlt (client/geruechte.ts). */
   geruechte: Geruecht[];
+  /** Die Omen der Partie, schon mit Chronikstufe (core/omen.ts). */
+  omens: readonly string[];
   /** Vorhaben: Auswahl oder das laufende (core/vorhaben.ts). */
   vorhaben: {
     angebot: { id: string; name: string; text: string; lohn: string }[];
@@ -456,7 +474,7 @@ export function SideMenu({
   const [offen, setOffen] = useState(
     () => typeof window === 'undefined' || !window.matchMedia('(max-width: 700px)').matches,
   );
-  const [reiter, setReiter] = useState<Reiter>('reich');
+  const [reiter, setReiter] = useState<Reiter>('kanzler');
   /** Welche Einheit in der Liste aufgeklappt ist - hoechstens eine. */
   const [offenerRitter, setOffenerRitter] = useState<number | null>(null);
   /** Welche Gruppen aufgeklappt sind. */
@@ -472,6 +490,59 @@ export function SideMenu({
   const saison = seasonOf(turn);
   // Raubzuege brechen zum Beginn jeder grossen Runde auf (rules/army.ts, sendRaiders).
   const bisPluenderung = ROUNDS_PER_BIG_ROUND - ((Math.max(1, turn) - 1) % ROUNDS_PER_BIG_ROUND);
+
+  /*
+   * Was jeder Berater sagt - der dringendste Satz zuerst. wichtig: ein Punkt
+   * am Reiter, damit man es auch sieht, wenn der Berater nicht offen ist.
+   */
+  const berater: Record<Reiter, { satz: string; wichtig: boolean }> = (() => {
+    const besteZahl = Object.entries(ertrag).sort((a, b) => b[1] - a[1])[0];
+    const kanzler =
+      braende.length > 0
+        ? { satz: 'Es brennt! Loescht, bevor es niederbrennt.', wichtig: true }
+        : vorhaben.angebot.length > 0
+          ? { satz: 'Waehlt ein Vorhaben fuer diese Jahreszeit - es lohnt sich.', wichtig: true }
+          : vorhaben.aktiv
+            ? {
+                satz: `Unser Vorhaben "${vorhaben.aktiv.name}": ${Math.min(vorhaben.aktiv.ist, vorhaben.aktiv.soll)} von ${vorhaben.aktiv.soll}, noch ${vorhaben.aktiv.rest} Runden.`,
+                wichtig: false,
+              }
+            : besteZahl && besteZahl[1] > 0
+              ? { satz: `Die ${besteZahl[0]} bringt uns am meisten ein: ${besteZahl[1]} Karten je Wurf.`, wichtig: false }
+              : { satz: 'Noch bringt uns keine Zahl etwas ein - wir brauchen Doerfer an gutem Land.', wichtig: false };
+    const faul = einheiten.filter(untaetig).length;
+    const marschall =
+      lage.unterwegs > 0 && lage.naechster !== null && lage.naechster <= 4
+        ? { satz: `Raeuber sind nur ${lage.naechster} Felder vor unseren Siedlungen!`, wichtig: true }
+        : beute > 0
+          ? { satz: `Beute wartet: ${beute} ${beute === 1 ? 'Kartenwahl' : 'Kartenwahlen'}. Loest sie ein.`, wichtig: true }
+          : faul > 0
+            ? { satz: `${faul} ${faul === 1 ? 'Einheit steht' : 'Einheiten stehen'} untaetig herum.`, wichtig: false }
+            : lage.unterwegs > 0
+              ? { satz: `${lage.unterwegs} ${lage.unterwegs === 1 ? 'Raubzug ist' : 'Raubzuege sind'} unterwegs.`, wichtig: false }
+              : { satz: `Ruhig an den Grenzen. Der naechste Aufbruch der Banden in ${bisPluenderung} Runden.`, wichtig: false };
+    const wunderBereit = wunderListe.find((w) => !w.besitzer && w.grund === null && w.bezahlbar);
+    const angebot = auftraege.find((a) => a.status === 'angebot');
+    const seherin = wunderBereit
+      ? { satz: `${wunderBereit.name} kann errichtet werden!`, wichtig: true }
+      : angebot
+        ? { satz: 'Ein Wanderer bittet um Hilfe - hoert ihn an.', wichtig: true }
+        : geruechte[0]
+          ? { satz: geruechte[0].text, wichtig: false }
+          : { satz: 'Die Sterne schweigen. Erkundet mehr Land, dann erzaehlen sie wieder.', wichtig: false };
+    const nah = [...siegwege].filter((w) => w.soll > 0).sort((a, b) => b.ist / b.soll - a.ist / a.soll)[0];
+    const chronist =
+      nah && nah.ist / nah.soll >= 0.6
+        ? { satz: `Der Weg des ${nah.name} ist nah: ${Math.min(nah.ist, nah.soll)} von ${nah.soll}.`, wichtig: false }
+        : {
+            satz:
+              punkte.ziel > 0
+                ? `Wir stehen bei ${punkte.gesamt} von ${punkte.ziel} Siegpunkten.`
+                : `Wir stehen bei ${punkte.gesamt} Siegpunkten, Wertung ${punkte.wertung}.`,
+            wichtig: false,
+          };
+    return { kanzler, marschall, seherin, chronist };
+  })();
   const namen = einheitNamen(einheiten, heldName);
 
   const umschaltenGruppe = (key: string) =>
@@ -582,17 +653,25 @@ export function SideMenu({
           <button
             key={r.id}
             className={reiter === r.id ? 'menu-reiter-knopf aktiv' : 'menu-reiter-knopf'}
-            title={r.name}
+            title={`${r.name}: ${r.amt}`}
             onClick={() => setReiter(r.id)}
           >
             {SYMBOL[r.id]}
             <span>{r.name}</span>
+            {berater[r.id].wichtig && reiter !== r.id && <i className="menu-reiter-punkt" aria-label="Etwas drangt" />}
           </button>
         ))}
       </div>
 
       <div className="menu-inhalt">
-        {reiter === 'reich' && (
+        <div className={berater[reiter].wichtig ? 'berater-zeile wichtig' : 'berater-zeile'}>
+          <span className="berater-bild">{SYMBOL[reiter]}</span>
+          <span className="berater-text">
+            <b>{REITER.find((r) => r.id === reiter)!.name}</b>
+            <span>{berater[reiter].satz}</span>
+          </span>
+        </div>
+        {reiter === 'kanzler' && (
           <>
             {/* Feuer zuerst: wer brennt, hat nur diesen Zug zum Loeschen (rules/feuer.ts). */}
             {braende.length > 0 && (
@@ -618,7 +697,11 @@ export function SideMenu({
                 </ul>
               </>
             )}
+          </>
+        )}
 
+        {reiter === 'kanzler' && (
+          <>
             {/* Vorhaben (core/vorhaben.ts): ein selbst gewaehltes Ziel fuer die Jahreszeit. */}
             {(vorhaben.angebot.length > 0 || vorhaben.aktiv) && (
               <>
@@ -655,7 +738,11 @@ export function SideMenu({
                 )}
               </>
             )}
+          </>
+        )}
 
+        {reiter === 'chronist' && (
+          <>
             <Kopf
               titel="Siegpunkte"
               hilfe={
@@ -697,7 +784,11 @@ export function SideMenu({
                 ))}
               </div>
             </div>
+          </>
+        )}
 
+        {reiter === 'chronist' && (
+          <>
             {siegwege.length > 0 && (
               <>
                 <Kopf
@@ -718,7 +809,18 @@ export function SideMenu({
                 </div>
               </>
             )}
+          </>
+        )}
 
+        {reiter === 'seherin' && omens.length > 0 && (
+          <>
+            <Kopf titel="Omen" hilfe="Die Vorzeichen dieser Partie: sie gelten fuer alle, von der ersten bis zur letzten Runde." />
+            <OmenListe omens={omens} />
+          </>
+        )}
+
+        {reiter === 'seherin' && (
+          <>
             {wunderListe.length > 0 && (
               <>
                 <Kopf
@@ -751,7 +853,11 @@ export function SideMenu({
                 </ul>
               </>
             )}
+          </>
+        )}
 
+        {reiter === 'seherin' && (
+          <>
             {geruechte.length > 0 && (
               <>
                 <Kopf
@@ -770,7 +876,11 @@ export function SideMenu({
                 </ul>
               </>
             )}
+          </>
+        )}
 
+        {reiter === 'kanzler' && (
+          <>
             <Kopf
               titel="Ertrag je Zahl"
               hilfe="Wie viele Rohstoffkarten dir jede Wuerfelzahl bringt: je Dorf 1, je Stadt 2 fuer jedes angrenzende Feld mit dieser Zahl. Karten und Wetter sind nicht eingerechnet."
@@ -788,7 +898,11 @@ export function SideMenu({
                 })}
               </div>
             </div>
+          </>
+        )}
 
+        {reiter === 'marschall' && (
+          <>
             <Kopf
               titel="Lage"
               hilfe={
@@ -814,7 +928,11 @@ export function SideMenu({
                 <b>{bisPluenderung}</b> Rd. Aufbruch
               </div>
             </div>
+          </>
+        )}
 
+        {reiter === 'chronist' && (
+          <>
             <Kopf
               titel="Weiterspielen"
               hilfe='Auf einem anderen Geraet: Raumcode eingeben, deinen Platz waehlen, PIN nennen. Hier im Browser steht die Partie auf der Startseite unter "Deine Partien".'
@@ -827,11 +945,10 @@ export function SideMenu({
                 PIN <b>{pin ?? '-'}</b>
               </span>
             </div>
-
           </>
         )}
 
-        {reiter === 'heer' && (
+        {reiter === 'marschall' && (
           <>
             {/*
               Die eigenen Einheiten nach Scharen und Feldern (client/heer.ts) -
@@ -902,7 +1019,11 @@ export function SideMenu({
                 {heldZurueck !== null ? `Held gefallen - er kehrt in Runde ${heldZurueck} zurueck.` : 'Der Held tritt nach dem Aufbau an.'}
               </p>
             )}
+          </>
+        )}
 
+        {reiter === 'marschall' && (
+          <>
             {/* Fraktionen: wem die Lager ringsum gehoeren, und das Abkommen mit ihnen (rules/diplomatie.ts). */}
             <Kopf
               titel="Fraktionen"
@@ -963,7 +1084,11 @@ export function SideMenu({
                 ))}
               </ul>
             )}
+          </>
+        )}
 
+        {reiter === 'seherin' && (
+          <>
             {/* Auftraege der Wanderer (rules/auftraege.ts). */}
             <Kopf titel="Auftraege" hilfe="Wanderer bieten Auftraege an, wenn sie an deinen Siedlungen vorbeikommen. Lohn: eine Kartenwahl." />
             {auftraege.length === 0 ? (
@@ -1007,7 +1132,11 @@ export function SideMenu({
                 ))}
               </ul>
             )}
+          </>
+        )}
 
+        {reiter === 'marschall' && (
+          <>
             <Kopf titel="Beute" hilfe="Zerstoerte Lager und erkundete Ruinen bringen Beute: je eine Kartenwahl." />
             {beute === 0 ? (
               <p className="menu-leer">Keine.</p>
@@ -1021,7 +1150,8 @@ export function SideMenu({
           </>
         )}
 
-        {reiter === 'karten' && (
+
+        {reiter === 'kanzler' && (
           <>
             <Kopf
               titel={`Reichskarten${cards.length > 0 ? ` · ${cards.length}` : ''}`}
@@ -1148,7 +1278,7 @@ export function SideMenu({
           </>
         )}
 
-        {reiter === 'optionen' && (
+        {reiter === 'chronist' && (
           <>
             <Kopf titel="Spiel" />
             <div className="menu-box">

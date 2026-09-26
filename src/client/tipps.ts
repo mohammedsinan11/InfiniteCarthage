@@ -48,7 +48,7 @@ export const TIPPS: Record<string, Omit<Tipp, 'id'>> = {
   },
   auftrag: {
     titel: 'Ein Wanderer bittet um Hilfe',
-    text: 'Wanderer bieten Auftraege an: ein Lager zerstoeren, eine Ruine erkunden, Rohstoffe bringen. Wer einen erfuellt, bekommt eine Kartenwahl. Annehmen oder ablehnen im Menue unter "Heer".',
+    text: 'Wanderer bieten Auftraege an: ein Lager zerstoeren, eine Ruine erkunden, Rohstoffe bringen. Wer einen erfuellt, bekommt eine Kartenwahl. Annehmen oder ablehnen bei der Seherin im Menue.',
   },
   hilfe: {
     titel: 'Wanderhaendler',

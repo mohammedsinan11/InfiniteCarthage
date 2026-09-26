@@ -1334,6 +1334,7 @@ export function Game() {
           tributPreis={tributPreis}
           handKarten={hand ? RESOURCES.reduce((n, r) => n + hand[r], 0) : 0}
           geruechte={geruechteListe}
+          omens={state.omens}
           vorhaben={vorhabenSicht}
           onVorhaben={(id) => act({ t: 'chooseAmbition', id })}
           siegwege={
@@ -1536,7 +1537,7 @@ export function Game() {
                 disabled={!wurfMoeglich}
                 title={
                   autoWurf
-                    ? `Wuerfeln - geschieht nach ${AUTO_WURF_MS / 1000} Sekunden von selbst (abschaltbar im Menue unter TO)`
+                    ? `Wuerfeln - geschieht nach ${AUTO_WURF_MS / 1000} Sekunden von selbst (abschaltbar beim Chronisten im Menue)`
                     : 'Wuerfeln'
                 }
                 onClick={wuerfeln}

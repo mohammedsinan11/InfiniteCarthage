@@ -76,7 +76,7 @@ export function ratschlag(state: PublicState, world: World, you: string): Rat | 
     case 'claimLoot':
       return { text: 'Loese deine Beute ein: eine Kartenwahl (Knopf Beute unten).' };
     case 'chooseAmbition':
-      return { text: 'Waehle ein Vorhaben fuer diese Jahreszeit - im Menue unter Reich.' };
+      return { text: 'Waehle ein Vorhaben fuer diese Jahreszeit - beim Kanzler im Menue.' };
     case 'answerEvent':
     case 'chooseCard':
     case 'chooseHouse':

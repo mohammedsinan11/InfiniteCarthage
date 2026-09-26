@@ -970,7 +970,7 @@ export function Board({
       zeilen.push({
         text: w
           ? `${typ.name} - errichtet von ${state.players.find((p) => p.id === w.owner)?.name ?? 'jemandem'}`
-          : `Wunderstaette: ${typ.name} (${typ.punkte} Siegpunkte). ${typ.text} Baue ein Dorf daneben, dann errichte es im Menue unter Reich.`,
+          : `Wunderstaette: ${typ.name} (${typ.punkte} Siegpunkte). ${typ.text} Baue ein Dorf daneben, dann errichte es bei der Seherin im Menue.`,
       });
     }
     if (!nebel) {

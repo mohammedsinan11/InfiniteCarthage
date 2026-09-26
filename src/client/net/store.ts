@@ -410,7 +410,7 @@ function meldungenAus(
         out.push({ id: naechsteId++, text: `${wer(e.player)} wird gepluendert: ${karten}`, kind: 'raid' });
       }
     } else if (e.t === 'ambitionOffered') {
-      if (e.player === you) meldung('Neue Vorhaben zur Wahl - im Menue unter Reich', 'info');
+      if (e.player === you) meldung('Neue Vorhaben zur Wahl - beim Kanzler im Menue', 'info');
     } else if (e.t === 'ambitionDone') {
       if (e.player === you) meldung(`Vorhaben vollendet: ${vorhabenById(e.id)?.name ?? e.id}`, 'gain');
     } else if (e.t === 'vendetta') {
