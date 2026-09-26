@@ -70,7 +70,6 @@ const LOESCHER = {
   bogen: 'von einem Bogenschuetzen',
   held: 'vom Helden',
   regen: 'vom Regen',
-  verschont: 'knapp - das letzte Gebaeude bleibt stehen',
 } as const;
 
 /** Worum es in einem Auftrag geht, in Worten. nameVon nennt eine Fraktion. */
@@ -167,10 +166,25 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
       const tote = verlusteText(state, e.verluste);
       return `${wer} treffen ${e.treffer} von ${e.schuesse}.${tote ? ` Gefallen: ${tote}.` : ''}`;
     }
-    case 'march':
+    case 'march': {
+      const staerke = (p: (typeof e.parties)[number]) =>
+        (p.anzahl ?? 1) > 1 || (p.rang ?? 0) > 0
+          ? ` (${p.anzahl ?? 1} Mann${(p.rang ?? 0) > 0 ? `, Rang ${p.rang}` : ''})`
+          : '';
       return e.parties.length === 1
-        ? `Raubzug bricht auf: ${fraktionName(state, e.parties[0]!.fraktion)}.`
+        ? `Raubzug bricht auf: ${fraktionName(state, e.parties[0]!.fraktion)}${staerke(e.parties[0]!)}.`
         : `${e.parties.length} Raubzuege brechen auf.`;
+    }
+    case 'nestRevived':
+      return `${fraktionName(state, e.fraktion)} beziehen ein verlassenes Lager neu.`;
+    case 'fall':
+      return `${who(state, e.player)}: das letzte Gebaeude ist gefallen! Bis Zug ${e.bis} muss wieder eines stehen.`;
+    case 'recovered':
+      return `${who(state, e.player)} hat wieder ein Gebaeude - das Reich steht.`;
+    case 'defeated':
+      return `${who(state, e.player)} ist gefallen und scheidet aus.`;
+    case 'lost':
+      return 'Alle Reiche sind gefallen. Die Partie ist verloren.';
     case 'feud':
       return `Fehde: ${fraktionName(state, e.fraktion)} gegen ${fraktionName(state, e.gegen)}.`;
     case 'wanderer':

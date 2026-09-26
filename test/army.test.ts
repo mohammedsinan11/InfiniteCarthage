@@ -54,6 +54,19 @@ import { emptyHand, handSize } from '../src/core/state';
 import type { UnitState } from '../src/core/state';
 import { RESOURCES } from '../src/core/types';
 import { ROUNDS_PER_BIG_ROUND } from '../src/core/season';
+import {
+  LAGER_NEU_RUNDEN,
+  bedrohung,
+  bedrohungVon,
+  hoechsteBedrohung,
+  lagerFiel,
+  lagerNeuBesetzen,
+  raeuberRang,
+  raubzugGroesse,
+  zusatzAufbrueche,
+} from '../src/core/rules/bedrohung';
+import type { BedrohungEvent } from '../src/core/rules/bedrohung';
+import { maxLeben } from '../src/core/combat';
 
 const ORIGIN = { q: 0, r: 0 };
 const solo = (geheim = 4711): Game => createGame([{ id: 'p0', name: 'Solo' }], 2024, geheim, 15);
@@ -699,8 +712,11 @@ describe('Brandschatzen', () => {
     expect(stadt).toBe(true);
   });
 
-  it('das letzte Dorf eines Spielers brennt nie nieder', () => {
-    for (let versuch = 0; versuch < 60; versuch++) {
+  it('auch das letzte Dorf eines Spielers kann Feuer fangen', () => {
+    // Fruehere Fassung: "brennt nie nieder". Ohne Gefahr blieb jeder Ueberfall
+    // folgenlos (rules/untergang.ts) - jetzt kann es das letzte Gebaeude treffen.
+    let gebrannt = false;
+    for (let versuch = 0; versuch < 60 && !gebrannt; versuch++) {
       const game = solo(9500 + versuch);
       const s = game.state;
       const mitte = landFlaeche(game, 4);
@@ -710,9 +726,9 @@ describe('Brandschatzen', () => {
       for (const r of RESOURCES) s.players[0]!.hand[r] = 2;
       einheit(game, raeuber(an.q, an.r));
       const events = tick(game);
-      expect(events.some((e) => e.t === 'burn' && e.art === 'dorf')).toBe(false);
-      expect(s.buildings[vertexKey(ecke)]).toBeDefined();
+      if (events.some((e) => e.t === 'burn' && e.art === 'dorf')) gebrannt = true;
     }
+    expect(gebrannt).toBe(true);
   });
 });
 
@@ -793,5 +809,93 @@ describe('Das Heer im Spielstand', () => {
     const wieder = JSON.parse(JSON.stringify(game.state));
     expect(wieder.units).toEqual(game.state.units);
     expect(redactStateFor(game.state, 'jemand-anders').units).toHaveLength(1);
+  });
+});
+
+describe('Bedrohung', () => {
+  const mitPunkten = (game: Game, punkte: number) => {
+    // Ohne die Karte zu verstellen: eine ferne Hauptstadt liefert die Punkte.
+    game.state.hauptstaedte['99:99'] = { owner: 'p0', stufe: punkte, seit: 0 };
+  };
+
+  it('rechnet Punkte in Stufen um', () => {
+    expect([0, 3, 4, 7, 8, 12, 16, 24, 30, 99].map(bedrohung)).toEqual([0, 0, 1, 1, 2, 3, 4, 6, 6, 6]);
+    expect([0, 1, 2, 3, 4, 5, 6].map(raubzugGroesse)).toEqual([1, 1, 1, 2, 2, 2, 3]);
+    expect([0, 1, 2, 3, 4, 5, 6].map(raeuberRang)).toEqual([0, 0, 1, 1, 2, 2, 3]);
+    expect([0, 3, 4, 6].map(zusatzAufbrueche)).toEqual([0, 0, 1, 1]);
+  });
+
+  it('schickt einem kleinen Reich einen frischen Raeuber', () => {
+    const game = solo();
+    lagerMitSiedlung(game);
+    sendRaiders(game.state, []);
+    for (const u of game.state.units) {
+      expect(u.stufe).toBe(0);
+    }
+    const je = new Map<string | null, number>();
+    for (const u of game.state.units) je.set(u.heimat, (je.get(u.heimat) ?? 0) + 1);
+    expect([...je.values()].every((n) => n === 1)).toBe(true);
+  });
+
+  it('schickt einem grossen Reich mehr und erfahrenere Raeuber', () => {
+    const game = solo();
+    lagerMitSiedlung(game);
+    mitPunkten(game, 12);
+    expect(bedrohungVon(game.state, 'p0')).toBe(3);
+    const events: ArmyEvent[] = [];
+    sendRaiders(game.state, events);
+    expect(game.state.units.length).toBeGreaterThan(0);
+    const je = new Map<string | null, number>();
+    for (const u of game.state.units) {
+      je.set(u.heimat, (je.get(u.heimat) ?? 0) + 1);
+      expect(u.stufe).toBe(1);
+      expect(u.leben).toBe(maxLeben(u));
+      expect(u.leben).toBe(WERTE.raeuber.leben + 1);
+    }
+    expect([...je.values()].every((n) => n === 2)).toBe(true);
+    const march = events.find((e) => e.t === 'march');
+    expect(march && march.t === 'march' && march.parties[0]).toMatchObject({ anzahl: 2, rang: 1 });
+  });
+
+  it('erlaubt ab Stufe 4 einen Raubzug mehr je grosser Runde', () => {
+    const klein = solo();
+    const gross = solo();
+    for (const g of [klein, gross]) {
+      lagerMitSiedlung(g);
+    }
+    mitPunkten(gross, 16);
+    expect(maxAufbrueche(1) + zusatzAufbrueche(hoechsteBedrohung(gross.state))).toBe(maxAufbrueche(1) + 1);
+    expect(zusatzAufbrueche(hoechsteBedrohung(klein.state))).toBe(0);
+  });
+
+  it('bezieht ein zerstoertes Lager nach einer Weile wieder', () => {
+    const game = solo();
+    const { nest, key } = lagerMitSiedlung(game);
+    const s = game.state;
+    mitPunkten(game, 4);
+    s.destroyedNests.push(key);
+    lagerFiel(s, key);
+    // Ein zerstoertes Lager, das zu frisch ist, bleibt leer.
+    s.turn += ROUNDS_PER_BIG_ROUND * (LAGER_NEU_RUNDEN - 1);
+    lagerNeuBesetzen(s, []);
+    expect(s.destroyedNests).toContain(key);
+    // Nach genug Runden zieht eine Fraktion wieder ein.
+    s.turn += ROUNDS_PER_BIG_ROUND * 2;
+    const events: BedrohungEvent[] = [];
+    lagerNeuBesetzen(s, events);
+    expect(s.destroyedNests).not.toContain(key);
+    expect(events).toMatchObject([{ t: 'nestRevived', q: nest.q, r: nest.r }]);
+    expect(garrisonOf(s, nest.q, nest.r)).toBeGreaterThan(0);
+  });
+
+  it('laesst ein Lager leer, solange kein Reich die Stufe 1 erreicht hat', () => {
+    const game = solo();
+    const { key } = lagerMitSiedlung(game);
+    const s = game.state;
+    s.destroyedNests.push(key);
+    lagerFiel(s, key);
+    s.turn += ROUNDS_PER_BIG_ROUND * 40;
+    lagerNeuBesetzen(s, []);
+    expect(s.destroyedNests).toContain(key);
   });
 });

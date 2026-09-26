@@ -5,8 +5,7 @@
  *
  *   1-3  nichts weiter
  *   4-5  eine Strasse des Spielers an diesem Feld faengt Feuer
- *   6    ein Gebaeude an diesem Feld - ausser dem letzten Gebaeude des
- *        Spielers; dann trifft es eine Strasse
+ *   6    ein Gebaeude an diesem Feld; findet sich keines, trifft es eine Strasse
  *
  * Frueher brannte es sofort nieder. Jetzt BRENNT es erst: das Feuer steht auf
  * der Karte, bis sein Besitzer einen eigenen Zug hinter sich hat (brandRunde).
@@ -29,9 +28,10 @@
  * Strassen brennen nicht, und die Bastionen an seinen Ecken fangen kein Feuer
  * (rules/hauptstadt.ts, festungsSchutz).
  *
- * Das letzte Gebaeude eines Spielers brennt nie nieder: ohne Siedlung kann kein
- * Ritter mehr antreten und nichts mehr wachsen - ein Ueberfall soll schmerzen,
- * nicht die Partie beenden.
+ * Auch das letzte Gebaeude eines Spielers kann niederbrennen. Dann beginnt
+ * eine kurze Frist zum Wiederaufbau, danach scheidet er aus (rules/untergang.ts).
+ * Bis dahin laesst sich das Feuer mit einer Karte loeschen - es fordert
+ * Aufmerksamkeit, keine Ueberlegenheit.
  */
 
 import type { Rng } from '../rng';
@@ -68,8 +68,7 @@ export type FeuerEvent =
   | { t: 'burnPrevented'; player: PlayerId; fraktion: string; q: number; r: number }
   | ({
       t: 'extinguished';
-      /** verschont: das letzte Gebaeude eines Spielers brennt nicht nieder. */
-      durch: 'karte' | 'ritter' | 'bogen' | 'held' | 'regen' | 'verschont';
+      durch: 'karte' | 'ritter' | 'bogen' | 'held' | 'regen';
     } & Basis)
   | ({ t: 'burnedDown'; fraktion: string } & Basis);
 
@@ -128,12 +127,11 @@ export function feuerLegen(
   let abgewehrt = false;
 
   if (wurf >= BRAND_GEBAEUDE_AB) {
-    const gebaeude = Object.values(s.buildings).filter((b) => b.owner === owner).length;
     const ecken = hexVertices(u.q, u.r)
       .map(vertexKey)
       .filter((vk) => {
         const b = s.buildings[vk];
-        return b !== undefined && b.owner === owner && !brennt(s, vk) && (b.type === 'city' || gebaeude > 1);
+        return b !== undefined && b.owner === owner && !brennt(s, vk);
       })
       .sort();
     const bastionen = festungsSchutz(s, owner).ecken;
@@ -175,11 +173,6 @@ function abbrennen(s: GameState, b: Brand, events: Ereignisse): void {
   } else if (b.art === 'stadt') {
     s.buildings[b.key]!.type = 'settlement';
   } else {
-    const gebaeude = Object.values(s.buildings).filter((g) => g.owner === b.owner).length;
-    if (gebaeude <= 1) {
-      events.push({ t: 'extinguished', ...basis(b), durch: 'verschont' });
-      return;
-    }
     delete s.buildings[b.key];
   }
   events.push({ t: 'burnedDown', ...basis(b), fraktion: b.fraktion });

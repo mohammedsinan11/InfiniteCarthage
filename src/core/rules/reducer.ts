@@ -90,6 +90,10 @@ import { cardKind, dauerwirkungen, istEinzigartig, wiederholbar } from '../cards
 import type { DraftSource } from '../cards/types';
 import { aktiviereNeueReichskarte, setzeAktiveKarten } from '../cards/loadout';
 import { playTactic } from './tactics';
+import { lagerNeuBesetzen } from './bedrohung';
+import type { BedrohungEvent } from './bedrohung';
+import { imUntergang, untergangRunde, ueberspringeBesiegte } from './untergang';
+import type { UntergangEvent } from './untergang';
 import type { TacticEvent } from './tactics';
 import { ruhmAusEreignissen } from './ruhm';
 import type { RuhmEvent } from './ruhm';
@@ -205,6 +209,8 @@ export type GameEvent =
   | { t: 'win'; player: PlayerId }
   /** Heer, Raubzuege, Gefechte, Lager, Ruinen, Held und Feuer - siehe rules/army.ts. */
   | ArmyEvent
+  | UntergangEvent
+  | BedrohungEvent
   | DiplomatieEvent
   | AuftragEvent
   | TacticEvent
@@ -277,6 +283,8 @@ export function createGame(
       equipment: [],
       loot: 0,
       connected: true,
+      untergang: null,
+      besiegt: false,
       heldZurueck: null,
       held: null,
       inventar: {},
@@ -304,6 +312,7 @@ export function createGame(
     nextUnitId: 1,
     destroyedNests: [],
     nestGarrison: {},
+    nestTod: {},
     nestFraktion: {},
     exploredRuins: [],
     braende: [],
@@ -340,6 +349,7 @@ function grow(state: GameState, world: World, hexes: { q: number; r: number }[])
 
 function nextTurn(state: GameState): void {
   state.current = (state.current + 1) % state.order.length;
+  ueberspringeBesiegte(state);
   state.turn += 1;
   // Ein Angebot gehoert zum Zug seines Anbieters und verfaellt mit ihm.
   state.trade = null;
@@ -423,6 +433,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
   const actorPlayer = playerById(s, actor);
   if (!actorPlayer) return fail('Unbekannter Spieler.');
   if (s.phase.t === 'finished') return fail('Die Partie ist beendet.');
+  if (actorPlayer.besiegt) return fail('Dein Reich ist gefallen.');
 
   /**
    * Eine Aktion kommt bewusst NICHT vom Spieler am Zug: die Antwort auf ein
@@ -640,7 +651,9 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
 
     case 'buildSettlement': {
       if (phase.t !== 'main') return fail('Jetzt kann nicht gebaut werden.');
-      const why = canPlaceSettlement(s, world, actor, action.vertex, { setup: false });
+      // Steht kein Gebaeude mehr, darf die Siedlung ueberall stehen - ohne
+      // eigene Strasse davor (rules/untergang.ts).
+      const why = canPlaceSettlement(s, world, actor, action.vertex, { setup: imUntergang(s, actor) });
       if (why) return fail(why);
       if (!canAfford(actorPlayer.hand, COST_SETTLEMENT)) {
         return fail('Zu wenig Rohstoffe fuer eine Siedlung.');
@@ -1143,11 +1156,18 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       // Feuer: Regen und Helfer loeschen, was ein Zug lang brannte, brennt ab.
       brandRunde(s, ender, beendet, events);
 
+      // Ist ein Reich gefallen, laeuft seine Frist - und ist die Partie damit
+      // entschieden, endet sie hier (rules/untergang.ts).
+      untergangRunde(s, events);
+      if ((s.phase as GameState['phase']).t === 'finished') break;
+      ueberspringeBesiegte(s);
+
       // Zum Beginn jeder grossen Runde brechen Raubzuege auf, vielleicht eine
       // Fehde und ein Wanderer - nach dem Ziehen, damit ein frischer Raubzug
       // nicht im selben Moment schon pluendert. Und der Tribut wird faellig.
       if (bigRoundChangedAt(s.turn)) {
         beginBigRound(s, events);
+        lagerNeuBesetzen(s, events);
         tributRunde(s, events);
       }
 

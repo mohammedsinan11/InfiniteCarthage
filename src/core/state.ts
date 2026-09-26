@@ -73,6 +73,14 @@ export type Player = {
   loot: number;
   connected: boolean;
   /**
+   * Bis wann muss wieder ein Gebaeude stehen (Zugnummer)? null, solange eines
+   * steht. Faellt das letzte, beginnt eine kurze Frist - danach ist der
+   * Spieler besiegt (rules/untergang.ts).
+   */
+  untergang?: number | null;
+  /** Ausgeschieden: kein Gebaeude mehr und die Frist ist verstrichen. */
+  besiegt?: boolean;
+  /**
    * Wann der gefallene Held zurueckkehrt (Zugnummer). null, solange er lebt -
    * oder bevor er zum ersten Mal angetreten ist.
    */
@@ -370,7 +378,8 @@ export type Phase =
   | { t: 'draft' }
   | { t: 'main' }
   | { t: 'roadBuilding'; remaining: number }
-  | { t: 'finished'; winner: PlayerId };
+  /** winner null: alle sind gefallen - die Partie ist verloren. */
+  | { t: 'finished'; winner: PlayerId | null };
 
 /**
  * Ein offenes Handelsangebot des Spielers am Zug.
@@ -456,6 +465,12 @@ export type GameState = {
   nextUnitId: number;
   /** Zerstoerte Lager, als Feldschluessel "q:r". */
   destroyedNests: string[];
+  /**
+   * Wann ein Lager zerstoert wurde (Feldschluessel -> Zug). Nur der Server
+   * liest es: nach einer Weile bezieht eine Fraktion ein zerstoertes Lager
+   * wieder (rules/bedrohung.ts, lagerNeuBesetzen).
+   */
+  nestTod?: Record<string, number>;
   /**
    * Verbliebene Besatzung angegriffener Lager. Fehlt ein Lager hier, ist es
    * unberuehrt und hat seine volle Besatzung (units.ts, nestOccupants).

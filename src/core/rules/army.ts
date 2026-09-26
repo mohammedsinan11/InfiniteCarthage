@@ -121,6 +121,7 @@ import { angriffVon, maxLeben } from '../combat';
 import { roundOf } from '../season';
 import { einheitenRasten } from '../zeit';
 import { feuerLegen } from './feuer';
+import { bedrohungVon, hoechsteBedrohung, lagerFiel, raeuberRang, raubzugGroesse, zusatzAufbrueche } from './bedrohung';
 import type { FeuerEvent } from './feuer';
 import { clearExpiredTactics, hasTactic, tacticBonus } from './tactics';
 
@@ -238,7 +239,7 @@ export type ArmyEvent =
   | {
       t: 'march';
       round: number;
-      parties: { q: number; r: number; kind: Feind; fraktion: string }[];
+      parties: { q: number; r: number; kind: Feind; fraktion: string; anzahl?: number; rang?: number }[];
     }
   | {
       t: 'feud';
@@ -608,7 +609,7 @@ export function sendRaiders(s: GameState, events: Ereignisse): void {
   if (ziele.size === 0) return;
 
   // Aktive Lager in Reichweite, jeweils mit dem Abstand zur naechsten Siedlung.
-  const lager = new Map<string, { q: number; r: number; d: number }>();
+  const lager = new Map<string, { q: number; r: number; d: number; owner: PlayerId }>();
   for (const [k, owner] of ziele) {
     const an = feld(k);
     for (const c of hexesInRange(an, SPAWN_RANGE)) {
@@ -617,15 +618,15 @@ export function sendRaiders(s: GameState, events: Ereignisse): void {
       const ck = hexKey(c.q, c.r);
       const d = hexDistance(an, c);
       const bisher = lager.get(ck);
-      if (!bisher || d < bisher.d) lager.set(ck, { q: c.q, r: c.r, d });
+      if (!bisher || d < bisher.d) lager.set(ck, { q: c.q, r: c.r, d, owner });
     }
   }
 
   const unterwegs = new Set(
     s.units.map((u) => u.heimat).filter((h): h is string => h !== null),
   );
-  const grenze = maxAufbrueche(s.order.length);
-  const parties: { q: number; r: number; kind: Feind; fraktion: string }[] = [];
+  const grenze = maxAufbrueche(s.order.length) + zusatzAufbrueche(hoechsteBedrohung(s));
+  const parties: { q: number; r: number; kind: Feind; fraktion: string; anzahl?: number; rang?: number }[] = [];
   const reihe = [...lager].sort((a, b) => a[1].d - b[1].d || nachSchluessel(a[0], b[0]));
   for (const [k, nest] of reihe) {
     if (parties.length >= grenze) break;
@@ -639,16 +640,22 @@ export function sendRaiders(s: GameState, events: Ereignisse): void {
     if (!weg && !schonDa) continue;
     // Die Art der Fraktion meldet das Ereignis, die Art der Einheit stellt an.
     const art = fraktionById(s.worldSeed, fraktion).art;
-    aufstellen(
-      s,
-      einheitVorlage(lagerArt(art), nest.q, nest.r, {
+    // Der Zug richtet sich nach dem, was es beim Ziel zu holen gibt
+    // (rules/bedrohung.ts): mehr Punkte, mehr und erfahrenere Raeuber.
+    const stufe = bedrohungVon(s, nest.owner);
+    const anzahl = raubzugGroesse(stufe);
+    const rang = raeuberRang(stufe);
+    for (let i = 0; i < anzahl; i++) {
+      const vorlage = einheitVorlage(lagerArt(art), nest.q, nest.r, {
         fraktion,
         heimat: k,
         auftrag: 'raub',
         ziel: weg ? weg.ziel : { q: nest.q, r: nest.r },
-      }),
-    );
-    parties.push({ q: nest.q, r: nest.r, kind: art, fraktion });
+        stufe: rang,
+      });
+      aufstellen(s, { ...vorlage, leben: maxLeben({ kind: vorlage.kind, stufe: rang }) });
+    }
+    parties.push({ q: nest.q, r: nest.r, kind: art, fraktion, ...(anzahl > 1 || rang > 0 ? { anzahl, rang } : {}) });
   }
   if (parties.length > 0) events.push({ t: 'march', round: roundOf(s.turn), parties });
 }
@@ -1459,6 +1466,7 @@ function schlacht(
       } else if (ritter.length > 0 || fremde.size === 0) {
         const players = [...new Set(ritter.map((x) => x.owner!))].sort();
         s.destroyedNests.push(k);
+        lagerFiel(s, k);
         delete s.nestGarrison[k];
         delete s.nestFraktion[k];
         for (const o of players) {

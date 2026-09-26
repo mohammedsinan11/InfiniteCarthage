@@ -249,8 +249,26 @@ Gebaut in `core/zeit.ts`, `core/rules/army.ts` und `client/board/WetterSchicht.t
   einer Rohstoffkarte (Klick auf die Flammen oder im Menue), mit einem Ritter
   oder dem Helden daneben, oder der Regen tut es. Sonst brennt die Strasse ab
   und hinterlaesst Asche - dort baut ihr Besitzer sie fuer ein Holz wieder auf -,
-  die Stadt brennt zum Dorf herunter, das Dorf nieder. Das letzte Gebaeude eines
-  Spielers bleibt stehen.
+  die Stadt brennt zum Dorf herunter, das Dorf nieder. Auch das letzte Gebaeude
+  eines Spielers kann fallen - siehe *Untergang*.
+- **Bedrohung** (`rules/bedrohung.ts`). Ein Raubzug war in Runde 5 derselbe wie in
+  Runde 500, und zerstoerte Lager kamen nie wieder - die Gefahr nahm ab, waehrend
+  man wuchs. Jetzt richtet sie sich nach dem Ziel: Stufe = sichtbare Siegpunkte
+  / 4 (hoechstens 6). Ab Stufe 3 kommen zwei Raeuber je Raubzug, ab 6 drei; sie
+  tragen den Rang der Veteranen (Stufe / 2: je Rang +1 Angriff und Leben); ab
+  Stufe 4 bricht je grosser Runde ein Raubzug mehr auf. Wer klein bleibt, bleibt
+  verschont. Ein zerstoertes Lager bezieht nach 6 grossen Runden wieder eine
+  Fraktion - nur wenn jemand Stufe 1 erreicht hat, dort niemand steht und keine
+  Siedlung naeher als drei Felder liegt; die Besatzung waechst mit der Stufe.
+- **Untergang** (`rules/untergang.ts`). Ohne Gefahr blieb jeder Ueberfall folgenlos.
+  Faellt das letzte Gebaeude, beginnt eine Frist von drei eigenen Zuegen: in ihr
+  darf eine Siedlung zum gewohnten Preis UEBERALL stehen (keine eigene Strasse
+  noetig). Steht wieder eines, ist das Reich gerettet; sonst scheidet der Spieler
+  aus und kommt nicht mehr an die Reihe. Sind alle gefallen, ist die Partie
+  verloren; bleibt bei mehreren Spielern nur einer, gewinnt er. Vorbeugen: eine
+  Karte loescht jedes Feuer, ein Ritter daneben von selbst, Tuerme und
+  Festungsringe halten es fern. Die Meldung warnt eigens, wenn das letzte
+  Gebaeude brennt.
 - **Wachturm.** Bauteil fuer Holz, Lehm und Erz an einem eigenen Dorf oder einer
   Stadt: sieht fuenf Felder weit, auch nachts, und laesst Brandstifter nicht an
   sein Haus und die Strassen an dieser Ecke - die Antwort auf die Nacht, die

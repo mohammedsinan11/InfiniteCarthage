@@ -278,6 +278,8 @@ export function Game() {
 
   /** Das Heer in Gruppen (client/heer.ts): Scharen und Felder. */
   const heer = useMemo(() => heerGruppen(meineEinheiten), [meineEinheiten]);
+  /** Kein Gebaeude mehr, aber die Frist laeuft: eine Siedlung darf ueberall stehen (rules/untergang.ts). */
+  const notbau = !!me && me.untergang !== null && !me.besiegt && !Object.values(state.buildings).some((b) => b.owner === me.id);
   const tributPreis = useMemo(() => (you ? tributKarten(state, you) : 1), [state, you]);
   const kampfOrte = useMemo(() => new Set(kampfFelderVon(state).keys()), [state]);
   /** Wie der eigene Held heisst (core/lore.ts) - undefined, bevor er antritt. */
@@ -392,7 +394,7 @@ export function Game() {
           };
         }
         if (mode === 'settlement') {
-          return { vertices: legalSettlementVertices(state, world, you, { setup: false }) };
+          return { vertices: legalSettlementVertices(state, world, you, { setup: notbau }) };
         }
         if (mode === 'city') return { vertices: legalCityVertices(state, you) };
         return {};
@@ -1114,9 +1116,23 @@ export function Game() {
 
         <Announcements items={announcements} onDone={dropAnnouncement} />
 
+        {phase.t !== 'finished' && me?.untergang != null && !me.besiegt && (
+          <div className="hud-untergang" role="alert">
+            {notbau
+              ? `Dein letztes Gebaeude ist gefallen! Setze bis Zug ${me.untergang} eine Siedlung - auch ohne Strasse davor (${state.turn >= me.untergang ? 'jetzt' : `noch ${me.untergang - state.turn} Zuege`}).`
+              : 'Dein Reich steht wieder.'}
+          </div>
+        )}
+
         {phase.t === 'finished' && (
-          <div className="hud-win">
-            {state.players.find((p) => p.id === phase.winner)?.name} gewinnt!
+          <div className={phase.winner === null || phase.winner !== you ? 'hud-win hud-niederlage' : 'hud-win'}>
+            {phase.winner === null
+              ? 'Alle Reiche sind gefallen - die Partie ist verloren.'
+              : `${state.players.find((p) => p.id === phase.winner)?.name} gewinnt!`}
+            {me?.besiegt && phase.winner !== null && <div className="hud-win-sub">Dein Reich ist gefallen.</div>}
+            <div className="hud-win-sub">
+              <button onClick={disconnect}>Zur Lobby - neue Partie</button>
+            </div>
           </div>
         )}
 

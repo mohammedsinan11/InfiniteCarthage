@@ -41,6 +41,12 @@ export function migriereStand(state: GameState): GameState {
   if (!state.feste) state.feste = {};
   // Reichsbauten kamen mit Phase 2 dazu (DESIGN.md, Phase 2).
   if (!state.reichsbauten) state.reichsbauten = {};
+  // Der Untergang kam mit dem Verlustzustand dazu (rules/untergang.ts).
+  for (const p of state.players) {
+    if (p.untergang === undefined) p.untergang = null;
+    if (p.besiegt === undefined) p.besiegt = false;
+  }
+  if (!state.nestTod) state.nestTod = {};
   // Die Palisade kam mit dem Einflussbereich dazu (DESIGN.md, Palisade).
   if (!state.mauern) state.mauern = {};
   // Der ernannte Held kam danach dazu. Wer schon spielt, hat noch keinen und
