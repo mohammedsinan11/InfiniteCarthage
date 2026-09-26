@@ -292,6 +292,12 @@ kraemerisch -, das Pluenderung, Raubzuege, Tribut und Frieden veraendert. Wer
 ein Lager zerstoert, dem schwoert der Anfuehrer Rache: der naechste Raubzug
 dieser Fraktion zieht gezielt gegen ihn (`groll`, `rules/army.ts`).
 
+**Vorhaben** (`src/core/vorhaben.ts`). Zu Beginn jeder grossen Runde, wenn
+man keines hat, stehen drei Ziele fuer die naechste Jahreszeit zur Wahl -
+drei Strassen, ein Lager, fuenf Handel, eine Stadt ... Wer es binnen 15
+Runden schafft, bekommt Ruhm oder eine Kartenwahl. So entscheidet man auf
+mittlere Sicht, statt nur auf die Wuerfel zu reagieren.
+
 **Siegwege** (`src/core/siegwege.ts`). Neben dem Siegpunktziel gewinnt auch,
 wer als Eroberer, Entdecker, Wunderbauer oder Handelsfuerst weit genug kommt.
 

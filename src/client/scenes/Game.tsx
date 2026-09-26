@@ -72,6 +72,7 @@ import { bundleText } from '../log';
 import { eckenWert } from '../../core/bot';
 import { weltArtVon } from '../../core/weltart';
 import { geruechte } from '../geruechte';
+import { vorhabenById, vorhabenFortschritt } from '../../core/vorhaben';
 import { SIEGWEGE, fortschritt, schwelle, siegwegText, siegwegeAn } from '../../core/siegwege';
 import { limitFor } from '../../core/rules/handlimit';
 import { erzeugteSorten } from '../../core/rules/hilfe';
@@ -327,6 +328,26 @@ export function Game() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [you, state.buildings, state.exploredRuins, state.wunder, sicht, state.worldSeed],
   );
+  /** Vorhaben fuers Menue (core/vorhaben.ts). */
+  const vorhabenSicht = useMemo(() => {
+    const lohnText = (l: { ruhm?: number; beute?: number }) =>
+      [l.ruhm ? `+${l.ruhm} Ruhm` : '', l.beute ? 'Kartenwahl' : ''].filter(Boolean).join(', ');
+    const stand = you ? state.vorhaben?.[you] : undefined;
+    const angebot = (stand?.angebot ?? [])
+      .map((id) => vorhabenById(id))
+      .filter((v): v is NonNullable<typeof v> => !!v)
+      .map((v) => ({ id: v.id, name: v.name, text: v.text, lohn: lohnText(v.lohn) }));
+    const a = stand?.aktiv;
+    const v = a ? vorhabenById(a.id) : undefined;
+    const f = you ? vorhabenFortschritt(state, you) : null;
+    return {
+      angebot,
+      aktiv:
+        a && v && f
+          ? { name: v.name, text: v.text, lohn: lohnText(v.lohn), ist: f[0], soll: f[1], rest: Math.max(0, a.bis - state.turn + 1) }
+          : null,
+    };
+  }, [state, you]);
   const tributPreis = useMemo(() => (you ? tributKarten(state, you) : 1), [state, you]);
   const kampfOrte = useMemo(() => new Set(kampfFelderVon(state).keys()), [state]);
   /** Wie der eigene Held heisst (core/lore.ts) - undefined, bevor er antritt. */
@@ -1294,6 +1315,8 @@ export function Game() {
           tributPreis={tributPreis}
           handKarten={hand ? RESOURCES.reduce((n, r) => n + hand[r], 0) : 0}
           geruechte={geruechteListe}
+          vorhaben={vorhabenSicht}
+          onVorhaben={(id) => act({ t: 'chooseAmbition', id })}
           siegwege={
             you && siegwegeAn(state)
               ? SIEGWEGE.map((w) => ({

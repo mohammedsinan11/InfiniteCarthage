@@ -137,6 +137,8 @@ export type PublicState = {
   koopErgebnis: { erfolg: boolean; summe: number; ziel: number } | null;
   /** Errichtete Weltwunder (core/wunder.ts) - weithin sichtbar. */
   wunder: NonNullable<GameState['wunder']>;
+  /** Vorhaben aller Spieler (core/vorhaben.ts) - wer was vorhat, ist kein Geheimnis. */
+  vorhaben: NonNullable<GameState['vorhaben']>;
   /** Das offene Ereignis und wer antwortet (core/ereignis.ts) - oeffentlich. */
   ereignis: { id: string; player: PlayerId } | null;
   /** Die Haeuser, die jeder zur Wahl hat (core/haus.ts) - leer ohne Hauswahl. */
@@ -237,6 +239,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     ereignis: state.ereignis ?? null,
     stufe: state.stufe ?? 0,
     wunder: state.wunder ?? {},
+    vorhaben: state.vorhaben ?? {},
     koop: state.koop ?? false,
     szenario: state.szenario ?? null,
     szenarioErgebnis: state.szenarioErgebnis ?? null,

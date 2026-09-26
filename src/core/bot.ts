@@ -136,6 +136,13 @@ export function botAktion(state: GameState, world: World, id: PlayerId, versucht
   const amZug = phase.t === 'setup' ? null : state.order[state.current];
   if (phase.t !== 'setup' && amZug !== id) return null;
 
+  // Ein Vorhaben (core/vorhaben.ts): das erste der Auswahl - Bots planen nicht so weit.
+  const vorschlag = state.vorhaben?.[id]?.angebot[0];
+  if (vorschlag) {
+    const a = neu({ t: 'chooseAmbition', id: vorschlag });
+    if (a) return a;
+  }
+
   if (phase.t === 'setup') {
     if (phase.awaiting === 'settlement') {
       const sorten = eigeneSorten(state, world, id);

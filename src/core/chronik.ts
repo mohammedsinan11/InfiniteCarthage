@@ -19,6 +19,7 @@
  * sind gedeckelt. Auch eine Endlospartie waechst dadurch nur langsam.
  */
 
+import { vorhabenById } from './vorhaben';
 import { szenarioById, szenarioStand } from './szenario';
 import { siegwegById } from './siegwege';
 import { cardById } from './cards/catalog';
@@ -194,6 +195,9 @@ export function chronikFortschreiben(state: GameState, events: readonly GameEven
         moment(e.players[0] ?? null, 'lager', `${wer} zerstoert ein Lager von ${fraktionById(state.worldSeed, e.fraktion).name}.`);
         break;
       }
+      case 'ambitionDone':
+        moment(e.player, 'auftrag', `${nameVon(state, e.player)} vollendet ein Vorhaben: ${vorhabenById(e.id)?.name ?? e.id}.`);
+        break;
       case 'vendetta': {
         const f = fraktionById(state.worldSeed, e.fraktion);
         moment(e.player, 'horde', `${f.anfuehrer ?? f.name} schwoert ${nameVon(state, e.player)} Rache.`);

@@ -7,6 +7,7 @@
  * der Server, ohne dass ein einziges Gelaendefeld uebertragen wird.
  */
 
+import { vorhabenById } from '../../core/vorhaben';
 import { letzterAhn } from '../profil';
 import { create } from 'zustand';
 import { openSocket, sendMsg } from './socket';
@@ -230,6 +231,7 @@ function vervollstaendige(msg: ServerMsg): void {
     msg.state.ereignis ??= null;
     msg.state.stufe ??= 0;
     msg.state.wunder ??= {};
+    msg.state.vorhaben ??= {};
     msg.state.koop ??= false;
     msg.state.szenario ??= null;
     msg.state.szenarioErgebnis ??= null;
@@ -407,6 +409,10 @@ function meldungenAus(
       } else {
         out.push({ id: naechsteId++, text: `${wer(e.player)} wird gepluendert: ${karten}`, kind: 'raid' });
       }
+    } else if (e.t === 'ambitionOffered') {
+      if (e.player === you) meldung('Neue Vorhaben zur Wahl - im Menue unter Reich', 'info');
+    } else if (e.t === 'ambitionDone') {
+      if (e.player === you) meldung(`Vorhaben vollendet: ${vorhabenById(e.id)?.name ?? e.id}`, 'gain');
     } else if (e.t === 'vendetta') {
       if (e.player === you) {
         const chef = state ? fraktionById(state.worldSeed, e.fraktion).anfuehrer : undefined;

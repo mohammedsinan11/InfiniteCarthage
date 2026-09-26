@@ -288,6 +288,8 @@ export function SideMenu({
   diplomatieMoeglich,
   friedenBezahlbar,
   geruechte,
+  vorhaben,
+  onVorhaben,
   siegwege,
   handKarten,
   tributPreis,
@@ -376,6 +378,12 @@ export function SideMenu({
   friedenBezahlbar: boolean;
   /** Was man sich erzaehlt (client/geruechte.ts). */
   geruechte: Geruecht[];
+  /** Vorhaben: Auswahl oder das laufende (core/vorhaben.ts). */
+  vorhaben: {
+    angebot: { id: string; name: string; text: string; lohn: string }[];
+    aktiv: { name: string; text: string; lohn: string; ist: number; soll: number; rest: number } | null;
+  };
+  onVorhaben: (id: string | null) => void;
   /** Die anderen Wege zum Sieg und wie weit man ist (core/siegwege.ts). Leer, wenn sie nicht gelten. */
   siegwege: { name: string; text: string; ist: number; soll: number }[];
   /** Wie viele Karten man haelt - reicht es fuer den Tribut? */
@@ -574,6 +582,43 @@ export function SideMenu({
                     </li>
                   ))}
                 </ul>
+              </>
+            )}
+
+            {/* Vorhaben (core/vorhaben.ts): ein selbst gewaehltes Ziel fuer die Jahreszeit. */}
+            {(vorhaben.angebot.length > 0 || vorhaben.aktiv) && (
+              <>
+                <Kopf
+                  titel="Vorhaben"
+                  hilfe="Ein Ziel fuer die naechste Jahreszeit (15 Runden), das du selbst waehlst. Wer es schafft, bekommt den Lohn. Neue Vorschlaege kommen zu Beginn jeder grossen Runde, wenn du keines hast."
+                />
+                {vorhaben.aktiv ? (
+                  <div className="menu-box menu-vorhaben aktiv">
+                    <b>{vorhaben.aktiv.name}</b>
+                    <span>{vorhaben.aktiv.text}</span>
+                    <span className="menu-vorhaben-stand">
+                      {Math.min(vorhaben.aktiv.ist, vorhaben.aktiv.soll)}/{vorhaben.aktiv.soll} · noch {vorhaben.aktiv.rest} Rd. ·
+                      Lohn: {vorhaben.aktiv.lohn}
+                    </span>
+                  </div>
+                ) : (
+                  <ul className="menu-vorhaben-wahl">
+                    {vorhaben.angebot.map((v) => (
+                      <li key={v.id}>
+                        <button onClick={() => onVorhaben(v.id)} title={`Annehmen - Lohn: ${v.lohn}`}>
+                          <b>{v.name}</b>
+                          <span>{v.text}</span>
+                          <i>Lohn: {v.lohn}</i>
+                        </button>
+                      </li>
+                    ))}
+                    <li>
+                      <button className="klein" onClick={() => onVorhaben(null)}>
+                        Keines - spaeter neue Vorschlaege
+                      </button>
+                    </li>
+                  </ul>
+                )}
               </>
             )}
 

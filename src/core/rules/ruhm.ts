@@ -9,7 +9,7 @@ export type RuhmEvent = {
   t: 'glory';
   player: PlayerId;
   amount: number;
-  reason: 'lager' | 'auftrag' | 'veteran' | 'morast' | 'ereignis' | 'wunder';
+  reason: 'lager' | 'auftrag' | 'veteran' | 'morast' | 'ereignis' | 'wunder' | 'vorhaben';
 };
 
 type Ereignis = { t: string } & Record<string, unknown>;
@@ -44,6 +44,8 @@ export function ruhmAusEreignissen(s: GameState, geschehen: readonly Ereignis[],
       geben(s, e.player as PlayerId, e.ruhm as number, 'ereignis', out);
     } else if (e.t === 'wonderGift' && ((e.ruhm as number | undefined) ?? 0) > 0) {
       geben(s, e.player as PlayerId, e.ruhm as number, 'wunder', out);
+    } else if (e.t === 'ambitionDone' && ((e.ruhm as number | undefined) ?? 0) > 0) {
+      geben(s, e.player as PlayerId, e.ruhm as number, 'vorhaben', out);
     } else if (e.t === 'questDone') {
       geben(s, e.player as PlayerId, 1, 'auftrag', out);
     } else if (e.t === 'levelUp' && ((e.stufe as number) === 2 || (e.stufe as number) === 4)) {

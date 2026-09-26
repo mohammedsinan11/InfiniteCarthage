@@ -3,6 +3,7 @@
  * der Server schickt Ereignisse, keine Saetze.
  */
 
+import { vorhabenById } from '../core/vorhaben';
 import type { GameEvent } from '../core/rules/reducer';
 import type { Verlust } from '../core/rules/army';
 import type { PublicState } from '../core/redact';
@@ -183,6 +184,15 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
         ? `${chef} fuehrt ${fraktionName(state, zug.fraktion).replace(/^Die /, 'die ')} auf Raubzug${staerke(zug)}.`
         : `Raubzug bricht auf: ${fraktionName(state, zug.fraktion)}${staerke(zug)}.`;
     }
+    case 'ambitionOffered':
+      return '';
+    case 'ambitionDone': {
+      const v = vorhabenById(e.id);
+      const lohn = [e.ruhm > 0 ? `+${e.ruhm} Ruhm` : '', e.beute > 0 ? 'eine Kartenwahl' : ''].filter(Boolean).join(' und ');
+      return `${who(state, e.player)} vollendet das Vorhaben "${v?.name ?? e.id}": ${lohn}.`;
+    }
+    case 'ambitionFailed':
+      return `${who(state, e.player)} laesst das Vorhaben "${vorhabenById(e.id)?.name ?? e.id}" fallen - die Zeit ist um.`;
     case 'vendetta': {
       const f = state ? fraktionById(state.worldSeed, e.fraktion) : null;
       return `${f?.anfuehrer ?? 'Ihr Anfuehrer'} (${fraktionName(state, e.fraktion)}) schwoert Rache an ${who(state, e.player)}.`;

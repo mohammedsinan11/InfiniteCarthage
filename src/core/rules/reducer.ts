@@ -11,6 +11,8 @@
  * Kopie, die nur bei Erfolg uebernommen wird.
  */
 
+import { vorhabenPruefen, vorhabenRunde, vorhabenWaehlen } from '../vorhaben';
+import type { VorhabenEvent } from '../vorhaben';
 import { ahnSauber, istAhn } from '../lore';
 import type { HeldLore } from '../lore';
 import { erfuellterWeg, siegwegeAn } from '../siegwege';
@@ -133,6 +135,8 @@ export type Action =
   | { t: 'buildWonder'; q: number; r: number }
   /** Auf ein Ereignis antworten: die Nummer der Wahl (core/ereignis.ts). */
   | { t: 'answerEvent'; wahl: number }
+  /** Ein Vorhaben aus der Auswahl annehmen, null verwirft die Auswahl (core/vorhaben.ts). */
+  | { t: 'chooseAmbition'; id: string | null }
   /** Vor dem Aufbau: eines der angebotenen Adelshaeuser waehlen (core/haus.ts). */
   | { t: 'chooseHouse'; haus: string }
   | { t: 'placeSettlement'; vertex: string }
@@ -243,6 +247,7 @@ export type GameEvent =
   | ArmyEvent
   | UntergangEvent
   | HilfeEvent
+  | VorhabenEvent
   | BedrohungEvent
   | DiplomatieEvent
   | AuftragEvent
@@ -659,6 +664,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
     action.t === 'respondTrade' ||
     action.t === 'answerQuest' ||
     action.t === 'deliverQuest' ||
+    action.t === 'chooseAmbition' ||
     action.t === 'chooseHouse';
   if (!fromOthers && actor !== currentPlayerId(s)) return fail('Du bist nicht am Zug.');
 
@@ -1431,6 +1437,12 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       break;
     }
 
+    case 'chooseAmbition': {
+      const why = vorhabenWaehlen(s, actor, action.id);
+      if (why) return fail(why);
+      break;
+    }
+
     case 'answerQuest': {
       const why = aufAuftragAntworten(s, actor, action.id, action.accept, events);
       if (why) return fail(why);
@@ -1468,6 +1480,8 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         beginBigRound(s, events);
         lagerNeuBesetzen(s, events);
         tributRunde(s, events);
+        // Vorhaben (core/vorhaben.ts): verfallen lassen, neue anbieten.
+        vorhabenRunde(s, events);
         // Wer eine Sorte gar nicht erzeugt, bekommt sie ab und zu (rules/hilfe.ts).
         mangelHilfe(s, world, events);
         // Sternwarte und Sonnentempel geben je grosser Runde (core/wunder.ts).
@@ -1513,6 +1527,19 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
   // Die Chronik liest dieselben Ereignisse - fuer die Schlussseite. Der Aufbau
   // zaehlt nicht mit: er ist fuer alle gleich und kein Teil der Geschichte.
   if (action.t !== 'placeSettlement' && action.t !== 'placeRoad') chronikFortschreiben(s, events);
+
+  // Vorhaben (core/vorhaben.ts): erst jetzt stehen die Zahlen der Chronik.
+  // Der Lohn laeuft wie jeder Ruhm und jedes Ereignis durch Ruhm und Chronik.
+  if ((s.phase as GameState['phase']).t !== 'finished') {
+    const erfuellt: GameEvent[] = [];
+    vorhabenPruefen(s, erfuellt);
+    if (erfuellt.length > 0) {
+      const ruhm: GameEvent[] = [];
+      ruhmAusEreignissen(s, erfuellt as never, ruhm);
+      events.push(...erfuellt, ...ruhm);
+      chronikFortschreiben(s, [...erfuellt, ...ruhm]);
+    }
+  }
 
   // Siegwege (core/siegwege.ts): wer auf einem eigenen Weg weit genug kam,
   // gewinnt wie mit den Siegpunkten - der Spieler am Zug zuerst.
