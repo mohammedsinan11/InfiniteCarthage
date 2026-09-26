@@ -243,7 +243,9 @@ Sie waehlen ihr Haus, siedeln nach Zahlen und Vielfalt, bauen Stadt vor Dorf
 vor Strasse, tauschen Ueberzaehliges, nehmen die wertvollste Karte,
 entscheiden Ereignisse und schicken ihren Helden erkunden. Sie benutzen nur
 Actions fuer `applyAction`, wie ein Mensch; der Raum spielt ihre Zuege, bis
-wieder ein Mensch dran ist. `botsSpielen` dient auch als Simulation:
+wieder ein Mensch dran ist. Jeder Bot hat eine Natur (`botNatur`): der
+Baumeister baut, der Haendler tauscht frueh, der Krieger wirbt Ritter an und
+zieht gegen das naechste Lager. `botsSpielen` dient auch als Simulation:
 `test/bot.test.ts` laesst drei Bots ein ganzes Jahr spielen.
 
 **Weltwunder** (`src/core/wunder.ts`). Jede Welt hat ihre Wunderstaetten -

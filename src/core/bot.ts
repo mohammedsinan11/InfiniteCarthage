@@ -35,6 +35,22 @@ import { ereignisById } from './ereignis';
 import type { Folge } from './ereignis';
 import { hausById } from './haus';
 import { COST_WUNDER, wunderAt } from './wunder';
+import { hexDistance, hexesInRange } from './coords';
+import { isNestActive } from './units';
+
+/**
+ * Wie ein Bot tickt - aus seiner Kennung, fest fuer die ganze Partie. Drei
+ * Naturen, damit Rivalen sich unterscheiden: der Baumeister baut, der
+ * Haendler tauscht frueh und viel, der Krieger wirbt Ritter an und zieht gegen
+ * das naechste Lager.
+ */
+export type BotNatur = 'baumeister' | 'haendler' | 'krieger';
+
+export function botNatur(id: PlayerId): BotNatur {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return (['baumeister', 'haendler', 'krieger'] as const)[Math.abs(h) % 3]!;
+}
 
 /** Wie oft eine Zahl faellt, in 36steln - der Wert eines Feldes. */
 const PIPS: Record<number, number> = { 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 8: 5, 9: 4, 10: 3, 11: 2, 12: 1 };
@@ -166,6 +182,27 @@ export function botAktion(state: GameState, world: World, id: PlayerId, versucht
     if (a) return a;
   }
 
+  const natur = botNatur(id);
+
+  // Der Krieger: Ritter, die nichts zu tun haben, ziehen gegen das naechste Lager.
+  if (natur === 'krieger') {
+    const ritter = state.units.filter((u) => u.owner === id && u.kind === 'ritter' && !u.ziel && u.auftrag === 'befehl');
+    if (ritter.length >= 2) {
+      const r0 = ritter[0]!;
+      const lager = hexesInRange({ q: r0.q, r: r0.r }, 8)
+        .filter((h) => isNestActive(state, h.q, h.r))
+        .sort((a, b) => hexDistance(a, r0) - hexDistance(b, r0))[0];
+      if (lager) {
+        const a = neu({ t: 'orderUnits', units: ritter.map((u) => u.id), q: lager.q, r: lager.r });
+        if (a) return a;
+      }
+    }
+    if (canAfford(p.hand, COST_KNIGHT) && state.units.filter((u) => u.owner === id && u.kind === 'ritter').length < 4) {
+      const a = neu({ t: 'recruitKnight' });
+      if (a) return a;
+    }
+  }
+
   // Beute einloesen.
   if (p.loot > 0) {
     const a = neu({ t: 'claimLoot' });
@@ -216,7 +253,7 @@ export function botAktion(state: GameState, world: World, id: PlayerId, versucht
 
   // Ueberzaehliges tauschen - gegen das, was dem naechsten Ziel fehlt.
   const ziel = legalCityVertices(state, id).length > 0 ? COST_CITY : COST_SETTLEMENT;
-  const braucht = fehlt(p.hand, ziel) ?? fehlt(p.hand, COST_ROAD);
+  const braucht = fehlt(p.hand, ziel) ?? fehlt(p.hand, COST_ROAD) ?? (natur === 'haendler' ? fehlt(p.hand, COST_CITY) : null);
   if (braucht) {
     const geben = beste(
       RESOURCES.filter((r) => r !== braucht && p.hand[r] - (ziel[r] ?? 0) >= tradeRatio(state, world, id, r)),
@@ -277,6 +314,8 @@ export function botsSpielen(game: Game, istBot: (id: PlayerId) => boolean, grenz
     if (r.ok) {
       alle.push(r.events);
       if (a.t === 'endTurn') versucht.clear();
+      // Befehle gelingen auch, wenn sie nichts aendern - einmal je Zug genuegt.
+      else if (a.t === 'orderUnits' || a.t === 'explore') versucht.add(JSON.stringify(a));
     } else {
       versucht.add(JSON.stringify(a));
       // Selbst das Zugende geht nicht? Dann gibt es nichts mehr zu tun.
