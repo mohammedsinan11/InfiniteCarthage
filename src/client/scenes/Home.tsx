@@ -107,8 +107,15 @@ export function Home() {
 
   const ready = name.trim().length > 0 && !SERVER_MISSING;
   const verbindet = status === 'connecting';
-  const offen = (raeume ?? []).filter((r) => r.status === 'lobby');
-  const laufend = (raeume ?? []).filter((r) => r.status !== 'lobby');
+  // Nicht die ganze Liste: wer die Seite zum ersten Mal sieht, soll nicht
+  // durch Dutzende alter Raeume scrollen (Spieltest). Beendete gar nicht.
+  const [alleRaeume, setAlleRaeume] = useState(false);
+  const offenAlle = (raeume ?? []).filter((r) => r.status === 'lobby');
+  const laufendAlle = (raeume ?? []).filter((r) => r.status === 'laeuft');
+  const offen = alleRaeume ? offenAlle : offenAlle.slice(0, 6);
+  const laufend = alleRaeume ? laufendAlle : laufendAlle.slice(0, 4);
+  const versteckt = offenAlle.length - offen.length + laufendAlle.length - laufend.length;
+  const neuHier = leseProfil().partien === 0 && partien.length === 0;
   const partieVon = (c: string) => partien.find((p) => p.code === c);
 
   const weiterspielen = (p: Partie) => {
@@ -307,6 +314,23 @@ export function Home() {
         </label>
         {nameFehlt && <p className="note">Erst einen Namen eingeben, dann beitreten.</p>}
 
+        {neuHier && !SERVER_MISSING && (
+          <section className="neu-hier">
+            <h2>Neu hier?</h2>
+            <p className="note">
+              Beginne mit einer kurzen Aufgabe: <b>Die Gruendung</b> - baue auf einer neuen Karte vier Staedte. Das
+              Spiel erklaert dir unterwegs, was du brauchst.
+            </p>
+            <button
+              className="primary"
+              disabled={!ready || verbindet}
+              onClick={() => connect(freshCode(), name.trim(), true, false, undefined, { szenario: 'gruendung' })}
+            >
+              Erste Partie beginnen
+            </button>
+          </section>
+        )}
+
         <label className="home-schalter">
           <input
             type="checkbox"
@@ -418,6 +442,11 @@ export function Home() {
                 <h2>Laufende Partien</h2>
                 <ul>{laufend.map(zeile)}</ul>
               </>
+            )}
+            {versteckt > 0 && (
+              <button className="klein" onClick={() => setAlleRaeume(true)}>
+                {versteckt} weitere zeigen
+              </button>
             )}
             <p className="raumliste-leer">
               Oeffentliche Raeume der letzten {VERFALL_TAGE} Tage. Eine laufende Partie oeffnet sich per Klick: mit

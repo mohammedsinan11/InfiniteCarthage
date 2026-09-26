@@ -223,6 +223,8 @@ export type Flight = {
 
 export type Targets = {
   vertices?: string[];
+  /** Die besten davon, zum Hervorheben (scenes/Game.tsx, mitEmpfehlung). */
+  empfohlen?: string[];
   edges?: string[];
   hexes?: string[];
 };
@@ -2557,6 +2559,7 @@ export function Board({
   }, [flights, view, scale, size]);
 
   const vertexTargets = new Set(targets.vertices ?? []);
+  const empfohlen = new Set(targets.empfohlen ?? []);
   /** Die drei Felder an der Bauplatz-Ecke unter dem Zeiger. */
   const eckeNachbarn =
     eckeHover !== null && vertexTargets.has(eckeHover)
@@ -2775,6 +2778,11 @@ export function Board({
             >
               <circle cx={p.x} cy={y} r={12} className="vertex-treffer" />
               <circle cx={p.x} cy={y} r={7} className="vertex-ring" />
+              {empfohlen.has(vk) && (
+                <text x={p.x} y={y - 13} className="vertex-empfohlen">
+                  ★
+                </text>
+              )}
             </g>
           );
         })}

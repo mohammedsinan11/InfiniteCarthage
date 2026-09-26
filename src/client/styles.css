@@ -1901,6 +1901,12 @@ em.off {
   font-size: 12px;
   color: var(--muted);
 }
+.draft-sub:has(+ .draft-slots) {
+  margin-bottom: 4px;
+}
+.draft-slots {
+  font-size: 11px;
+}
 
 .draft-plaetze {
   display: flex;
@@ -2919,6 +2925,30 @@ em.off {
 .dock-knopf.leuchtet:not(:disabled) {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px rgba(217, 164, 65, 0.35);
+}
+.dock-knopf.hops:not(:disabled) {
+  animation: dock-hops 1.4s ease-in-out infinite;
+}
+@keyframes dock-hops {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+  }
+  70% {
+    transform: translateY(-6px);
+  }
+  80% {
+    transform: translateY(0);
+  }
+  88% {
+    transform: translateY(-3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dock-knopf.hops:not(:disabled) {
+    animation: none;
+  }
 }
 /* Bauzeile (Aktionsleiste, BAU_ZEILE): der schmale Pfeil zurueck zur Leiste. */
 .dock-knopf.dock-zurueck {
@@ -4056,6 +4086,15 @@ em.off {
 
 /* Bauplaetze: ein Ring je Platz, wie ganz am Anfang. Unter dem Zeiger gefuellt,
    dazu die Vorschau des Gebaeudes. PLATZHALTER (ASSETS.md). */
+.vertex-empfohlen {
+  fill: #ffd76a;
+  stroke: #2a1c0c;
+  stroke-width: 3px;
+  paint-order: stroke;
+  font-size: 16px;
+  text-anchor: middle;
+  pointer-events: none;
+}
 .vertex-ring {
   fill: rgba(217, 164, 65, 0.14);
   stroke: var(--accent);
@@ -4464,7 +4503,8 @@ em.off {
 
 /* --- Tagesexpedition auf der Startseite (core/tages.ts) --------------------- */
 
-.tages {
+.tages,
+.neu-hier {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -4472,7 +4512,14 @@ em.off {
   background: var(--panel2);
   padding: 13px;
 }
-.tages h2 {
+.neu-hier {
+  border-color: var(--accent);
+}
+.neu-hier p {
+  margin: 0;
+}
+.tages h2,
+.neu-hier h2 {
   margin: 0;
   font-family: var(--pixel);
   font-size: 12px;

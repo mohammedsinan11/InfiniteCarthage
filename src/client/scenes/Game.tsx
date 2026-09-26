@@ -69,6 +69,8 @@ import { maxLeben } from '../../core/combat';
 import { kampfFelder as kampfFelderVon } from '../../core/combat';
 import type { UnitState as HeerEinheit } from '../../core/state';
 import { bundleText } from '../log';
+import { eckenWert } from '../../core/bot';
+import { erzeugteSorten } from '../../core/rules/hilfe';
 import {
   HAUPTSTADT_PUNKTE as PUNKTE_HAUPTSTADT,
   MAX_TURM_STUFE,
@@ -407,13 +409,36 @@ export function Game() {
   const phase = state.phase;
   const isMine = state.currentPlayer === you && phase.t !== 'finished';
 
+  /**
+   * Die besten Bauplaetze hervorheben: viele Wurfpunkte, dazu Sorten, die man
+   * noch nicht hat (core/bot.ts, eckenWert) - Spieltest: auf der vollen Karte
+   * fanden Neue keinen guten Start.
+   */
+  const mitEmpfehlung = (vertices: string[], n: number): Targets => {
+    if (!you) return { vertices };
+    const schon = erzeugteSorten(state, world, you);
+    const wert = new Map(vertices.map((vk) => [vk, eckenWert(world, vk, schon)]));
+    // Verteilt: keine zwei Empfehlungen am selben Feld, sonst saessen alle
+    // Sterne um dieselbe gute Stelle.
+    const empfohlen: string[] = [];
+    const belegt = new Set<string>();
+    for (const vk of [...vertices].sort((a, b) => wert.get(b)! - wert.get(a)!)) {
+      if (empfohlen.length >= n) break;
+      const felder = vertexAdjacentHexes(parseVertexKey(vk)).map((h) => hexKey(h.q, h.r));
+      if (felder.some((k) => belegt.has(k))) continue;
+      empfohlen.push(vk);
+      for (const k of felder) belegt.add(k);
+    }
+    return { vertices, empfohlen };
+  };
+
   /** Welche Stellen darf ich gerade anklicken? */
   const targets: Targets = useMemo(() => {
     if (!you || !isMine) return {};
     switch (phase.t) {
       case 'setup':
         return phase.awaiting === 'settlement'
-          ? { vertices: legalSettlementVertices(state, world, you, { setup: true }) }
+          ? mitEmpfehlung(legalSettlementVertices(state, world, you, { setup: true }), 5)
           : { edges: legalRoadEdges(state, world, you, phase.lastVertex ?? undefined) };
       case 'roadBuilding':
         return { edges: legalRoadEdges(state, world, you) };
@@ -445,7 +470,7 @@ export function Game() {
           };
         }
         if (mode === 'settlement') {
-          return { vertices: legalSettlementVertices(state, world, you, { setup: notbau }) };
+          return mitEmpfehlung(legalSettlementVertices(state, world, you, { setup: notbau }), 3);
         }
         if (mode === 'city') return { vertices: legalCityVertices(state, you) };
         return {};

@@ -113,6 +113,12 @@ export function CardDraft({
           ? 'Waehle eine Karte. Die anderen beiden verfallen.'
           : 'Der Spieler am Zug waehlt.'}
       </p>
+      {darfWaehlen && (
+        <p className="draft-sub draft-slots" title="Dauerwirkungen gelten nur, solange die Karte einen Platz hat. Tauschen kannst du im Menue unter Karten.">
+          Dauerwirkungen: {aktiv.length} von {plaetze} Plaetzen belegt
+          {aktiv.length > 0 ? ` (${aktiv.map((id) => cardById(id)?.name ?? id).join(', ')})` : ''}
+        </p>
+      )}
 
       <div className="draft-karten">
         {options.map((id, i) => {

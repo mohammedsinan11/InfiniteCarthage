@@ -270,6 +270,7 @@ function DockKnopf({
   gewaehlt = false,
   darf,
   leuchtet = false,
+  hops = false,
   tip,
   onClick,
 }: {
@@ -280,10 +281,12 @@ function DockKnopf({
   gewaehlt?: boolean;
   darf: boolean;
   leuchtet?: boolean;
+  /** Huepft, bis man ihn drueckt - fuer Beute, die sonst uebersehen wird. */
+  hops?: boolean;
   tip?: string;
   onClick: () => void;
 }) {
-  const klassen = ['dock-knopf', gewaehlt ? 'gewaehlt' : '', leuchtet ? 'leuchtet' : '']
+  const klassen = ['dock-knopf', gewaehlt ? 'gewaehlt' : '', leuchtet ? 'leuchtet' : '', hops ? 'hops' : '']
     .filter(Boolean)
     .join(' ');
   return (
@@ -575,7 +578,7 @@ export function Aktionsleiste({
       : ''
     : phase.t === 'setup'
       ? phase.awaiting === 'settlement'
-        ? 'Aufbau: setze ein Dorf'
+        ? 'Aufbau: setze ein Dorf - ★ markiert gute Plaetze'
         : 'Aufbau: setze eine Strasse'
       : phase.t === 'roll'
         ? 'Erst wuerfeln'
@@ -790,7 +793,7 @@ export function Aktionsleiste({
         <DockKnopf titel="Karten" symbol={<SymKarten />} zahl={offen.length + taktiken.length} gewaehlt={tafel === 'karten'} darf={offen.length + taktiken.length > 0} tip="Deine Entwicklungs- und Taktikkarten" onClick={umschalten('karten')} />
         {/* Beute rechts neben Handel und Karten - dort, wo Karten ohnehin hingehen. */}
         {(me?.loot ?? 0) > 0 && (
-          <DockKnopf titel="Beute" symbol={<SymBeute />} zahl={me?.loot} leuchtet darf={bauen} tip="Beute einloesen: eine Kartenwahl" onClick={() => act({ t: 'claimLoot' })} />
+          <DockKnopf titel="Beute" symbol={<SymBeute />} zahl={me?.loot} leuchtet hops={bauen && (me?.loot ?? 0) > 0} darf={bauen} tip="Beute einloesen: eine Kartenwahl" onClick={() => act({ t: 'claimLoot' })} />
         )}
         {state.order.length > 1 && (
           <DockKnopf titel="Zug Ende" symbol={<SymZugEnde />} darf={bauen} tip="Zug beenden" onClick={() => act({ t: 'endTurn' })} />

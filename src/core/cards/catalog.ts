@@ -155,9 +155,9 @@ export const CARDS: readonly Card[] = [
     id: 'strassennetz',
     name: 'Strassennetz',
     rarity: 'ungewoehnlich',
-    text: 'Nimm 2 Holz und 2 Lehm. Je 6 eigene Strassen: 1 Siegpunkt.',
+    text: 'Nimm 2 Holz und 2 Lehm. Je 8 eigene Strassen: 1 Siegpunkt.',
     instant: { t: 'gain', resources: { lumber: 2, brick: 2 } },
-    lasting: { t: 'siegpunkte', je: 'strasse', pro: 6 },
+    lasting: { t: 'siegpunkte', je: 'strasse', pro: 8 },
   },
 
   // --- selten: Wert 10 bis 14 -----------------------------------------------

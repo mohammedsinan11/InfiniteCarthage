@@ -353,7 +353,7 @@ function ruinenMeldung(e: Extract<GameEvent, { t: 'ruin' }>): string {
     case 'schatz':
       return `Schatz in der Ruine: ${bundleText(e.gained)}`;
     case 'beute':
-      return 'Beute in der Ruine - einloesen unter Helden & Auftraege';
+      return 'Beute in der Ruine - einloesen mit dem Knopf Beute unten';
     case 'karte':
       return 'Eine alte Karte - die Umgebung ist aufgedeckt';
     case 'hinterhalt':
@@ -621,6 +621,35 @@ function buildWorld(prev: World | null, state: PublicState): World {
   return w;
 }
 
+/*
+ * Protokoll und Weltgeschehen ueberleben ein Neuladen oder eine kurze
+ * Trennung: je Raum im sessionStorage (Spieltest: nach jeder Wiederverbindung
+ * war das Protokoll leer). Der Server schickt nur den Stand, nicht die
+ * Geschichte - was hier fehlt, ist verloren.
+ */
+const LOG_SPEICHER = 'infinitecarthage.log.';
+
+function ladeLog(code: string): { log: string[]; welt: WeltEintrag[] } {
+  try {
+    const roh = JSON.parse(sessionStorage.getItem(LOG_SPEICHER + code) ?? 'null') as { log?: string[]; welt?: WeltEintrag[] } | null;
+    const welt = Array.isArray(roh?.welt) ? roh.welt : [];
+    // Die Zaehler fuer neue Eintraege muessen hinter den alten liegen.
+    for (const w of welt) naechsteId = Math.max(naechsteId, w.id + 1);
+    return { log: Array.isArray(roh?.log) ? roh.log : [], welt };
+  } catch {
+    return { log: [], welt: [] };
+  }
+}
+
+function speichereLog(code: string, log: string[], welt: WeltEintrag[]): void {
+  if (!code) return;
+  try {
+    sessionStorage.setItem(LOG_SPEICHER + code, JSON.stringify({ log, welt }));
+  } catch {
+    // Voll oder privat - dann eben ohne.
+  }
+}
+
 export const useStore = create<Store>((set, get) => ({
   status: 'idle',
   error: null,
@@ -663,7 +692,8 @@ export const useStore = create<Store>((set, get) => ({
       alt.onmessage = null;
       alt.close();
     }
-    set({ status: 'connecting', error: null, code, log: [], welt: [], state: null, world: null, pin: null, platzWahl: null });
+    const alterLog = ladeLog(code);
+    set({ status: 'connecting', error: null, code, log: alterLog.log, welt: alterLog.welt, state: null, world: null, pin: null, platzWahl: null });
 
     const ws = openSocket(code, create, oeffentlich, {
       onOpen: () => {
@@ -836,6 +866,7 @@ export const useStore = create<Store>((set, get) => ({
                 ? { pendingRoll: wurf.dice }
                 : {}),
             }));
+            speichereLog(get().code, get().log, get().welt);
             break;
           }
           case 'error':

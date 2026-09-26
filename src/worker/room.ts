@@ -316,6 +316,9 @@ export class GameRoom implements DurableObject {
     await this.save();
     this.broadcastRoom();
     this.broadcastState();
+    // Wer geht, hinterlaesst den letzten Stand in der Raumliste - die Zuege
+    // davor waren gedrosselt, sonst stuende dort eine alte Runde.
+    await this.melden();
   }
 
   async webSocketError(ws: WebSocket): Promise<void> {
