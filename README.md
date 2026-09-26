@@ -280,6 +280,33 @@ erzeugt, bekommt sie alle fuenf Runden einmal von Wanderhaendlern
 Wald am Dorf liegt. Allein wuerfelt das Spiel nicht mehr von selbst, solange
 man es nicht einschaltet.
 
+**Weltarten** (`src/core/weltart.ts`). Kernland, Archipel, Hochland,
+Waldmeer, Kornkammer, Grenzland oder Stille Lande: jede Art verschiebt Meer,
+Gelaende und Lagerdichte. Die Art steckt im Seed (eine Marke im obersten
+Byte), Server und Clients rechnen daraus dieselbe Welt; alte Seeds bleiben
+Kernland. Neue Raeume wuerfeln eine Art, der Gastgeber kann waehlen.
+
+**Fraktionen mit Gesicht** (`src/core/factions.ts`). Jede Bande und jeder
+Stamm hat einen Anfuehrer und ein Wesen - gierig, kriegerisch, zaudernd oder
+kraemerisch -, das Pluenderung, Raubzuege, Tribut und Frieden veraendert. Wer
+ein Lager zerstoert, dem schwoert der Anfuehrer Rache: der naechste Raubzug
+dieser Fraktion zieht gezielt gegen ihn (`groll`, `rules/army.ts`).
+
+**Siegwege** (`src/core/siegwege.ts`). Neben dem Siegpunktziel gewinnt auch,
+wer als Eroberer, Entdecker, Wunderbauer oder Handelsfuerst weit genug kommt.
+
+**Orientierung.** Sterne markieren gute Bauplaetze, eine Warnung meldet
+Raubzuege, die auf die eigenen Siedlungen zuhalten (mit Heer, Tribut und
+Frieden auf einen Klick), der Bankhandel erklaert seinen Kurs, das Blatt
+zeigt die Handkartengrenze, und unter "Geruechte" erzaehlt das Menue, in
+welcher Richtung die naechste Ruine, Wunderstaette oder Hexe liegt
+(`src/client/geruechte.ts`). Nach vier Wuerfen ohne Ertrag hilft ein Nachbar
+mit einer Karte aus.
+
+**Ahnenhalle** (`src/client/profil.ts`). Jede beendete Partie traegt ihren
+Helden mit Haus, Welt, Wertung und seiner groessten Tat ein; die Startseite
+zeigt die letzten zwoelf.
+
 **Chronik** (`src/core/chronik.ts`, `src/client/ui/Chronik.tsx`). Statt
 "X gewinnt!" zeigt das Ende eine Schlussseite: Rangliste mit Wertung,
 Siegpunkte im Verlauf, die Momente der Partie (erste Stadt, Horden,
