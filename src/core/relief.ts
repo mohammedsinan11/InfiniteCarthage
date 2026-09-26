@@ -23,7 +23,8 @@
  */
 
 import { HEX_DIRS, neighbors } from './coords';
-import { LAKE_LEVEL, SEA_LEVEL, fieldsAt, isSeaAt, terrainAt } from './worldgen';
+import { LAKE_LEVEL, fieldsAt, isSeaAt, terrainAt } from './worldgen';
+import { weltParameter } from './weltart';
 
 /**
  * Wie stark hohe Lagen bevorzugt werden.
@@ -153,7 +154,8 @@ export function reliefTargetAt(seed: number, q: number, r: number): number {
   } else {
     // Wie tief im Kontinent: 0 an seiner Kueste, 1 im Kern.
     const kont = fieldsAt(seed, q, r).kontinent;
-    const kern = Math.min(1, Math.max(0, (kont - SEA_LEVEL) / (1 - SEA_LEVEL)));
+    const meer = weltParameter(seed).meer;
+    const kern = Math.min(1, Math.max(0, (kont - meer) / (1 - meer)));
     v = Math.min(1, (1 - BREIT_ANTEIL) * reliefAt(seed, q, r) + BREIT_ANTEIL * kern);
   }
   if (zielCache.size >= GEDAECHTNIS_MAX) zielCache.clear();

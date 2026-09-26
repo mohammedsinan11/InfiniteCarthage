@@ -359,7 +359,10 @@ fair.
 - **Season rules:** `season.ts` says "Noch aendern die Jahreszeiten nur das
   Aussehen". Add harvest in autumn (fields +1), winter scarcity (no wheat)
   and spring floods.
-- **World presets:** *Archipelago* (much water, ports matter), *Highlands*,
+- **World presets** (built, `src/core/weltart.ts`: Kernland, Archipel,
+  Hochland, Waldmeer, Kornkammer, Grenzland, Stille Lande; the type is
+  encoded in the seed, rolled per room and choosable in the lobby).
+  Original idea: *Archipelago* (much water, ports matter), *Highlands*,
   *Great River*, *Frontier* (dense camps), *Peaceful* (few camps). Each is a
   parameter set for `worldgen.ts` noise and region densities.
 - **Landmarks and wonders:** rare, seed-placed sites (a volcano, a sunken

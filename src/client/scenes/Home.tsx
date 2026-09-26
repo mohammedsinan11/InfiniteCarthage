@@ -11,6 +11,8 @@
  * und nennt dessen PIN (sie steht im Menue der Partie).
  */
 
+import { weltArtVon } from '../../core/weltart';
+import { tagesWeltSeed } from '../../core/tages';
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../net/store';
 import { PIN_LENGTH, ROOM_CODE_LENGTH, isPin, isRoomCode, normalizePin, targetPointsLabel } from '../../core/protocol';
@@ -353,6 +355,9 @@ export function Home() {
             <p className="note">
               Heute spielen alle dieselbe Welt mit denselben Wuerfeln: ein Jahr ({tages.runden} Runden),
               allein. Es zaehlt die Wertung - Siegpunkte mal 10 plus Ruhm.
+            </p>
+            <p className="note">
+              Welt: <b>{weltArtVon(tagesWeltSeed(tages.datum)).name}</b> - {weltArtVon(tagesWeltSeed(tages.datum)).text}
             </p>
             <OmenListe omens={tages.omens} />
             <button

@@ -17,6 +17,8 @@
  * nicht im Arbeitsspeicher.
  */
 
+import { istWeltArt, mitWeltArt, weltArtVon, zufallsArt } from '../core/weltart';
+import type { WeltArt } from '../core/weltart';
 import { applyAction, createGame, rebuildWorld } from '../core/rules/reducer';
 import type { Game, GameEvent } from '../core/rules/reducer';
 import { redactEventsFor, redactStateFor } from '../core/redact';
@@ -81,6 +83,8 @@ type RoomData = {
   omens?: string[];
   /** Rundengrenze, null ohne. Fehlt bei alten Raeumen. */
   rundenLimit?: number | null;
+  /** Die Weltart der kommenden Partie (core/weltart.ts). */
+  weltArt?: WeltArt;
   /** Tagesexpedition: ihr Datum (core/tages.ts). Sonst fehlt es. */
   tagesDatum?: string | null;
   /** Das Ergebnis der Tagesexpedition ist in der Bestenliste. */
@@ -254,12 +258,15 @@ export class GameRoom implements DurableObject {
         room.tagesDatum = null;
         room.szenario = sz.id;
         room.omens = [...sz.omens];
+        // Die erste Aufgabe fuer Neue auf gewohntem Land, die anderen ueberall.
+        room.weltArt = sz.id === 'gruendung' ? 'kernland' : zufallsArt(randomSeed());
         room.rundenLimit = sz.runden;
         room.targetPoints = NO_TARGET;
         room.oeffentlich = false;
       } else {
         room.tagesDatum = null;
         room.omens = wuerfleOmen(randomSeed());
+        room.weltArt = zufallsArt(randomSeed());
         // Voreingestellt: 20 Punkte oder ein Jahr, was zuerst kommt - so hat
         // jede Partie ein absehbares Ende und eine Chronik (Spieltest: allein
         // zog sich das offene Spiel zu 30 Punkten zu lange).
@@ -356,6 +363,8 @@ export class GameRoom implements DurableObject {
           this.send(ws, { t: 'error', message: room.szenario ? 'Das Szenario hat feste Regeln.' : 'Die Tagesexpedition hat feste Regeln.' });
           return;
         }
+        if (msg.weltArt === 'neu') room.weltArt = zufallsArt(randomSeed());
+        else if (istWeltArt(msg.weltArt)) room.weltArt = msg.weltArt;
         if (msg.omens === 'neu') room.omens = wuerfleOmen(randomSeed());
         else if (msg.omens === 'keine') room.omens = [];
         if (typeof msg.koop === 'boolean') {
@@ -405,7 +414,9 @@ export class GameRoom implements DurableObject {
           return;
         }
         const tages = room.tagesDatum ?? null;
-        const weltSeed = tages ? tagesWeltSeed(tages) : (room.weltSeed ?? randomSeed());
+        const weltSeed = tages
+          ? tagesWeltSeed(tages)
+          : (room.weltSeed ?? mitWeltArt(randomSeed(), room.weltArt ?? 'kernland'));
         const geheimSeed = tages ? await this.tagesGeheimSeed(tages) : randomSeed();
         this.game = createGame(
           room.members.map((m) => ({ id: m.id, name: m.name })),
@@ -697,6 +708,12 @@ export class GameRoom implements DurableObject {
       rundenLimit: room.rundenLimit ?? null,
       tagesDatum: room.tagesDatum ?? null,
       weltSeed: room.weltSeed ?? null,
+      weltArt:
+        room.weltSeed != null
+          ? weltArtVon(room.weltSeed).art
+          : room.tagesDatum
+            ? weltArtVon(tagesWeltSeed(room.tagesDatum)).art
+            : (room.weltArt ?? 'kernland'),
       stufe: room.stufe ?? 0,
       koop: room.koop ?? false,
       szenario: room.szenario ?? null,

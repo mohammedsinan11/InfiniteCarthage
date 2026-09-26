@@ -21,6 +21,7 @@
  * Karte soll nicht wie ein Gitter aussehen.
  */
 
+import { weltParameter } from './weltart';
 import { Rng } from './rng';
 import { hash3i } from './hash';
 import { hexDistance, hexesInRange } from './coords';
@@ -32,8 +33,7 @@ const SALT_NEST = 71;
 /** Kantenlaenge einer Region in Axialkoordinaten. */
 export const NEST_REGION = 6;
 
-/** Wie viele Regionen ueberhaupt ein Nest tragen. */
-const NEST_CHANCE = 0.55;
+/* Wie viele Regionen ueberhaupt ein Nest tragen: je Weltart (core/weltart.ts, lager). */
 
 /**
  * Ruhe um den Ursprung.
@@ -52,7 +52,7 @@ export function nestAt(seed: number, q: number, r: number): boolean {
   const rr = Math.floor(r / NEST_REGION);
 
   const rng = new Rng(hash3i(seed, rq, rr, SALT_NEST));
-  if (rng.next() / 4294967296 > NEST_CHANCE) return false;
+  if (rng.next() / 4294967296 > weltParameter(seed).lager) return false;
 
   // Innere Felder der Region: 1 .. NEST_REGION-2. Der Rand bleibt frei, damit
   // Nester benachbarter Regionen Abstand halten.

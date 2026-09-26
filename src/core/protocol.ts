@@ -7,6 +7,7 @@
  * aus (siehe worldgen.ts). Uebertragen werden nur Koordinatenpaare.
  */
 
+import type { WeltArt } from './weltart';
 import type { Action, GameEvent } from './rules/reducer';
 import type { PublicState } from './redact';
 import type { PlayerId } from './state';
@@ -44,6 +45,8 @@ export type RoomInfo = {
   koop: boolean;
   /** Ein Szenario (core/szenario.ts) - allein, feste Omen und Frist. */
   szenario: string | null;
+  /** Die Weltart der kommenden Partie (core/weltart.ts). Fehlt bei alten Servern. */
+  weltArt?: WeltArt;
 };
 
 /**
@@ -99,6 +102,8 @@ export type ClientMsg =
       stufe?: number;
       /** Gemeinsam statt gegeneinander. */
       koop?: boolean;
+      /** Weltart waehlen oder neu wuerfeln (core/weltart.ts). */
+      weltArt?: WeltArt | 'neu';
     }
   | { t: 'start' }
   /** Nur der Gastgeber, nur vor dem Start: einen Bot dazusetzen oder entfernen. */

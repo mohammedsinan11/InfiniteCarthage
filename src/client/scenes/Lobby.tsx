@@ -1,5 +1,6 @@
 /** Warteraum: Mitspieler sammeln, Zielpunkte, Laenge und Omen waehlen, starten. */
 
+import { WELTARTEN, weltArtInfo } from '../../core/weltart';
 import { useStore } from '../net/store';
 import {
   MIN_PLAYERS,
@@ -83,6 +84,33 @@ export function Lobby() {
 
         {room.weltSeed !== null && !tages && (
           <p className="note">Gespielt wird die Welt einer frueheren Partie - dieselbe Landschaft, neue Wuerfel.</p>
+        )}
+
+        {room.weltArt && (
+          <label>
+            Welt
+            <div className="weltart-karte">
+              <b>{weltArtInfo(room.weltArt).name}</b>
+              <span>{weltArtInfo(room.weltArt).text}</span>
+            </div>
+          </label>
+        )}
+        {room.weltArt && !tages && !room.szenario && room.weltSeed === null && isHost && (
+          <div className="choices weltart-wahl">
+            {WELTARTEN.map((w) => (
+              <button
+                key={w.art}
+                className={room.weltArt === w.art ? 'chosen' : ''}
+                title={w.text}
+                onClick={() => send({ t: 'setOptions', weltArt: w.art })}
+              >
+                {w.name}
+              </button>
+            ))}
+            <button title="Eine zufaellige Weltart" onClick={() => send({ t: 'setOptions', weltArt: 'neu' })}>
+              Zufall
+            </button>
+          </div>
         )}
 
         <label>

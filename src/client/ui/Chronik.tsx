@@ -12,6 +12,7 @@
  * Schild bringt es zurueck.
  */
 
+import { weltArtVon } from '../../core/weltart';
 import { useEffect, useMemo, useState } from 'react';
 import type { PublicState } from '../../core/redact';
 import type { ChronikStats } from '../../core/chronik';
@@ -130,7 +131,8 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
           <span className="chronik-titel">Chronik</span>
           <h2>{kopf}</h2>
           <p className="note">
-            Runde {runde} · {SEASON_NAME[seasonOf(state.turn)]} im Jahr {yearOf(state.turn)}
+            Runde {runde} · {SEASON_NAME[seasonOf(state.turn)]} im Jahr {yearOf(state.turn)} ·{' '}
+            {weltArtVon(state.worldSeed).name}
             {state.stufe > 0 ? ` · Chronikstufe ${state.stufe}` : ''}
             {phase.durch === 'ziel' && state.targetPoints > 0 ? ` · Ziel ${state.targetPoints} Siegpunkte erreicht` : ''}
           </p>

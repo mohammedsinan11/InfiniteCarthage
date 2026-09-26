@@ -5284,3 +5284,32 @@ em.off {
   gap: 6px;
   margin-top: 6px;
 }
+
+/* Weltart in der Lobby (core/weltart.ts). */
+.weltart-karte {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  background: var(--panel2);
+  font-family: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.weltart-karte b {
+  font-family: var(--pixel);
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: normal;
+}
+.weltart-karte span {
+  font: 13px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--text);
+}
+.weltart-wahl button {
+  font-size: 10px;
+  padding: 5px 8px;
+}

@@ -70,6 +70,7 @@ import { kampfFelder as kampfFelderVon } from '../../core/combat';
 import type { UnitState as HeerEinheit } from '../../core/state';
 import { bundleText } from '../log';
 import { eckenWert } from '../../core/bot';
+import { weltArtVon } from '../../core/weltart';
 import { limitFor } from '../../core/rules/handlimit';
 import { erzeugteSorten } from '../../core/rules/hilfe';
 import {
@@ -1143,6 +1144,11 @@ export function Game() {
               title={`Nach Runde ${state.rundenLimit} ist Schluss - dann gewinnt die hoechste Wertung (Siegpunkte x 10 + Ruhm).`}
             >
               {state.tagesDatum ? 'Tagesexpedition · ' : ''}Runde {Math.min(roundOf(state.turn), state.rundenLimit)} / {state.rundenLimit}
+            </span>
+          )}
+          {weltArtVon(state.worldSeed).art !== 'kernland' && (
+            <span className="hud-haus hud-welt" title={weltArtVon(state.worldSeed).text}>
+              {weltArtVon(state.worldSeed).name}
             </span>
           )}
           {me?.haus && hausById(me.haus) && (

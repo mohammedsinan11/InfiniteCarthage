@@ -20,6 +20,7 @@
  * ohne Worker pruefen laesst.
  */
 
+import { mitWeltArt, zufallsArt } from './weltart';
 import { fnv1a } from './hash';
 import { wuerfleOmen } from './omen';
 
@@ -38,7 +39,12 @@ export const istTagesDatum = (s: unknown): s is string =>
   typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
 
 /** Der oeffentliche Weltseed des Tages. */
-export const tagesWeltSeed = (datum: string): number => fnv1a('carthago:' + datum) | 0;
+export const tagesWeltSeed = (datum: string): number => {
+  const roh = fnv1a('carthago:' + datum) | 0;
+  // Ab dem 27.09.2026 hat auch die Tageswelt eine Weltart (core/weltart.ts).
+  // Fruehere Tage bleiben, wie sie waren - ihre Bestenlisten gelten weiter.
+  return datum >= '2026-09-27' ? mitWeltArt(roh, zufallsArt(fnv1a('weltart:' + datum))) : roh;
+};
 
 /**
  * Die Omen des Tages: ein Segen, zwei Flueche. Etwas haerter als eine

@@ -27,6 +27,7 @@
  * ein Grund ist, sich zu bewegen, statt ein Mangel.
  */
 
+import { GEWOEHNLICH, weltParameter } from './weltart';
 import { Rng } from './rng';
 import { hash3i } from './hash';
 import { expand, fbm, hexToField, ridged } from './noise';
@@ -142,13 +143,10 @@ const KONTINENT_VERZERRUNG = KONTINENT_SKALA * 0.35;
  * ueber seine hoeheren Teile. Wer an einem Feld dreht, muss hier nachmessen,
  * sonst verschiebt sich die Balance unbemerkt.
  */
-export const SEA_LEVEL = 0.2593;
+export const SEA_LEVEL = GEWOEHNLICH.meer;
 export const LAKE_LEVEL = 0.024;
-const HILL_LEVEL = 0.6691;
-const MOUNTAIN_LEVEL = 0.9065;
-const FOREST_LEVEL = 0.6778;
-const PASTURE_LEVEL = 0.4238;
-const FIELD_LEVEL = 0.1951;
+// Die uebrigen Schwellen stehen in core/weltart.ts (GEWOEHNLICH) - dort
+// haengen sie an der Weltart.
 
 export type Fields = { elevation: number; moisture: number; kontinent: number };
 
@@ -225,13 +223,16 @@ function berechneFelder(seed: number, q: number, r: number): Fields {
 /** Gelaende ohne Nachbarschaftskorrektur. */
 function rawTerrainAt(seed: number, q: number, r: number): Terrain {
   const { elevation, moisture, kontinent } = fieldsAt(seed, q, r);
-  if (kontinent < SEA_LEVEL) return 'water'; // Meer
+  // Die Schwellen haengen an der Weltart (core/weltart.ts); ohne Marke im
+  // Seed sind es genau die Konstanten oben.
+  const w = weltParameter(seed);
+  if (kontinent < w.meer) return 'water'; // Meer
   if (elevation < LAKE_LEVEL) return 'water'; // See im Land
-  if (elevation > MOUNTAIN_LEVEL) return 'mountain';
-  if (elevation > HILL_LEVEL) return 'hill';
-  if (moisture > FOREST_LEVEL) return 'forest';
-  if (moisture > PASTURE_LEVEL) return 'pasture';
-  if (moisture > FIELD_LEVEL) return 'field';
+  if (elevation > w.berg) return 'mountain';
+  if (elevation > w.huegel) return 'hill';
+  if (moisture > w.wald) return 'forest';
+  if (moisture > w.weide) return 'pasture';
+  if (moisture > w.feld) return 'field';
   return 'desert';
 }
 
@@ -243,7 +244,7 @@ function rawTerrainAt(seed: number, q: number, r: number): Terrain {
  * und bekommt nur keinen Hafen.
  */
 export function isSeaAt(seed: number, q: number, r: number): boolean {
-  return fieldsAt(seed, q, r).kontinent < SEA_LEVEL;
+  return fieldsAt(seed, q, r).kontinent < weltParameter(seed).meer;
 }
 
 /**
