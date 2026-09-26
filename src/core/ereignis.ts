@@ -183,16 +183,6 @@ export const EREIGNISSE: readonly Ereignis[] = [
     ],
   },
   {
-    id: 'erntedank',
-    titel: 'Erntedank',
-    text: 'Die Scheunen sind voll. Die Frage ist nur, was man damit macht.',
-    zeit: ['autumn'],
-    wahlen: [
-      { text: 'Einlagern: 3 Getreide', folge: { gib: r({ grain: 3 }) } },
-      { text: 'Ein Erntefest (keine Kosten): +2 Ruhm', folge: { ruhm: 2 } },
-    ],
-  },
-  {
     id: 'zugvoegel',
     titel: 'Fremde Zugvoegel',
     text: 'Sie kommen aus einer Richtung, aus der noch nie Voegel kamen. Die Seher sind unruhig.',
@@ -232,6 +222,87 @@ export const EREIGNISSE: readonly Ereignis[] = [
       { text: 'Aufnehmen (1 Getreide): eine Kartenwahl', folge: { zahle: r({ grain: 1 }), beute: 1 } },
       { text: 'Ihn als Wache anstellen (1 Getreide, 1 Erz): ein Ritter', folge: { zahle: r({ grain: 1, ore: 1 }), ritter: 1 } },
       { text: 'Die Tuer bleibt zu', folge: {} },
+    ],
+  },
+  {
+    id: 'ueberlaeufer',
+    titel: 'Ein Ueberlaeufer',
+    text: 'Ein Raeuber hat genug von seinem Hauptmann. Er kennt die Pfade der Banden und bittet, bleiben zu duerfen.',
+    wahlen: [
+      { text: 'Aufnehmen (1 Getreide): ein Ritter tritt an', folge: { zahle: r({ grain: 1 }), ritter: 1 } },
+      { text: 'Ihn dem Gericht uebergeben: +1 Ruhm', folge: { ruhm: 1 } },
+      { text: 'Davonjagen', folge: {} },
+    ],
+  },
+  {
+    id: 'komet',
+    titel: 'Ein Komet am Himmel',
+    text: 'Nacht fuer Nacht zieht ein Stern mit Schweif ueber das Land. Die einen sehen ein Zeichen, die anderen das Ende.',
+    wahlen: [
+      { text: 'Die Seher deuten lassen (1 Wolle): eine Kartenwahl', folge: { zahle: r({ wool: 1 }), beute: 1 } },
+      { text: 'Ein Fest unter dem Stern (1 Getreide, 1 Wolle): +2 Ruhm', folge: { zahle: r({ grain: 1, wool: 1 }), ruhm: 2 } },
+      { text: 'Die Leute beruhigen', folge: {} },
+    ],
+  },
+  {
+    id: 'sturmflut',
+    titel: 'Sturmflut',
+    text: 'Das Wasser steigt, und die Uferhuetten stehen schon knoecheltief.',
+    zeit: ['autumn', 'winter'],
+    wahlen: [
+      { text: 'Einen Deich aufschuetten (2 Lehm, 1 Holz): +1 Ruhm', folge: { zahle: r({ brick: 2, lumber: 1 }), ruhm: 1 } },
+      { text: 'Auf das Beste hoffen: du verlierst 2 Karten', folge: { verliere: 2 } },
+    ],
+  },
+  {
+    id: 'karawane',
+    titel: 'Eine Karawane',
+    text: 'Kamele, Kisten, Gewuerzduft. Die Haendler suchen Handel - und Schutz fuer die naechste Etappe.',
+    wahlen: [
+      { text: 'Handeln (2 Wolle): 1 Holz, 1 Lehm, 1 Erz', folge: { zahle: r({ wool: 2 }), gib: r({ lumber: 1, brick: 1, ore: 1 }) } },
+      { text: 'Den Helden als Geleitschutz mitgeben: 2 zufaellige Rohstoffe, +1 Ruhm', folge: { zufall: 2, ruhm: 1 }, brauchtHeld: true },
+      { text: 'Vorbeiziehen lassen', folge: {} },
+    ],
+  },
+  {
+    id: 'erntedank',
+    titel: 'Erntedank',
+    text: 'Die Scheunen sind voll. Die Leute wollen feiern - oder vorsorgen.',
+    zeit: ['autumn'],
+    wahlen: [
+      { text: 'Ein grosses Fest (2 Getreide): +2 Ruhm', folge: { zahle: r({ grain: 2 }), ruhm: 2 } },
+      { text: 'Die Speicher fuellen: 2 Getreide', folge: { gib: r({ grain: 2 }) } },
+    ],
+  },
+  {
+    id: 'wolfswinter',
+    titel: 'Ein Wolfswinter',
+    text: 'Die Rudel kommen bis an die Pferche. Die Hirten trauen sich nachts nicht mehr hinaus.',
+    zeit: ['winter'],
+    wahlen: [
+      { text: 'Der Held fuehrt die Jagd: 1 Wolle, +2 Ruhm', folge: { gib: r({ wool: 1 }), ruhm: 2 }, brauchtHeld: true },
+      { text: 'Die Hirten entlohnen (1 Getreide)', folge: { zahle: r({ grain: 1 }) } },
+      { text: 'Die Herden sich selbst ueberlassen: du verlierst 1 Karte', folge: { verliere: 1 } },
+    ],
+  },
+  {
+    id: 'maibaum',
+    titel: 'Der Maibaum',
+    text: 'Die Jugend will einen Maibaum aufstellen, den hoechsten im ganzen Land.',
+    zeit: ['spring'],
+    wahlen: [
+      { text: 'Den Stamm stiften (1 Holz): +1 Ruhm', folge: { zahle: r({ lumber: 1 }), ruhm: 1 } },
+      { text: 'Mittanzen: 1 zufaelliger Rohstoff', folge: { zufall: 1 } },
+    ],
+  },
+  {
+    id: 'schreibstube',
+    titel: 'Ein Gelehrter',
+    text: 'Er will eine Schreibstube einrichten und die Geschichte deines Reiches aufschreiben - damit man sich erinnert.',
+    wahlen: [
+      { text: 'Die Schreibstube bauen (1 Holz, 1 Lehm, 1 Wolle): eine Kartenwahl, +1 Ruhm', folge: { zahle: r({ lumber: 1, brick: 1, wool: 1 }), beute: 1, ruhm: 1 } },
+      { text: 'Ihm ein Zimmer geben: +1 Ruhm', folge: { ruhm: 1 } },
+      { text: 'Keine Zeit fuer Geschichten', folge: {} },
     ],
   },
 ];

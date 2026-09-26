@@ -82,7 +82,8 @@ export function untergangRunde(s: GameState, events: Ereignisse): void {
   if (uebrig.length === 0) {
     s.phase = { t: 'finished', winner: null };
     events.push({ t: 'lost' });
-  } else if (s.order.length > 1 && uebrig.length === 1) {
+  } else if (s.order.length > 1 && uebrig.length === 1 && !s.koop) {
+    // Gemeinsam spielt der Letzte weiter - dort entscheidet nur die Summe am Ende.
     s.phase = { t: 'finished', winner: uebrig[0]! };
     events.push({ t: 'win', player: uebrig[0]! });
   }
