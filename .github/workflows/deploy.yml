@@ -34,8 +34,40 @@ jobs:
         with:
           path: dist
 
-  deploy:
+  # Der Spielserver (Cloudflare Worker, wrangler.toml) - nach Tests und Build,
+  # vor der Oberflaeche: eine neue Seite soll nie auf einen alten Server
+  # treffen, der ihre Nachrichten noch nicht kennt.
+  #
+  # Braucht das Repository-Secret CLOUDFLARE_API_TOKEN (Vorlage "Edit
+  # Cloudflare Workers"). Hat der Token Zugriff auf mehrere Konten, zusaetzlich
+  # CLOUDFLARE_ACCOUNT_ID. Fehlt der Token, wird der Schritt uebersprungen und
+  # die Seite trotzdem veroeffentlicht - wie vorher, als der Worker nur von
+  # Hand hochging (npm run deploy:worker).
+  worker:
     needs: build
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Kein Token hinterlegt
+        if: env.CLOUDFLARE_API_TOKEN == ''
+        run: echo "::notice::CLOUDFLARE_API_TOKEN fehlt - Worker nicht bereitgestellt, nur die Seite."
+      - uses: actions/checkout@v4
+        if: env.CLOUDFLARE_API_TOKEN != ''
+      - uses: actions/setup-node@v4
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+        if: env.CLOUDFLARE_API_TOKEN != ''
+      # Dieselbe wrangler-Fassung wie lokal (package-lock.json).
+      - run: npx wrangler deploy
+        if: env.CLOUDFLARE_API_TOKEN != ''
+
+  deploy:
+    needs: [build, worker]
     runs-on: ubuntu-latest
     environment:
       name: github-pages

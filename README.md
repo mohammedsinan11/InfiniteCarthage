@@ -131,7 +131,15 @@ Grundlage der Tagesexpedition.
 
 ## Bereitstellen
 
-**Worker** (einmalig Cloudflare-Konto und `npx wrangler login`):
+**Worker**: Der Workflow `.github/workflows/deploy.yml` stellt ihn bei jedem
+Push auf `main` bereit - nach Tests und Build, vor der Oberflaeche. Dafuer
+einmalig unter *Settings → Secrets and variables → Actions → Secrets* das
+Secret `CLOUDFLARE_API_TOKEN` anlegen (im Cloudflare-Dashboard unter *My
+Profile → API Tokens* mit der Vorlage "Edit Cloudflare Workers"). Gehoert der
+Token zu mehreren Konten, zusaetzlich `CLOUDFLARE_ACCOUNT_ID`. Ohne Token
+ueberspringt der Workflow den Worker und veroeffentlicht nur die Seite.
+
+Von Hand geht es weiterhin (einmalig `npx wrangler login`):
 
 ```bash
 npm run deploy:worker
