@@ -105,12 +105,21 @@ const welA2 = await a2.wait((m) => m.t === 'welcome', 'welcome A2');
 check(welA2.you === welA.you, 'Token holt denselben Platz zurueck');
 check(welA2.room.members.length === 2, 'kein zusaetzliches Mitglied durch Wiedereinstieg');
 
-// Laufender Partie kann niemand Neues beitreten.
+// Laufender Partie kann niemand Neues beitreten: ohne Token gibt es nur die
+// Platzliste, der Client muss dann einen Platz samt PIN nennen.
 const c = client('Cem', false);
 await c.open();
 c.send({ t: 'join', name: 'Cem' });
+const seatsC = await c.wait((m) => m.t === 'seats', 'Plaetze fuer C');
+check(seatsC.room.started === true, 'C sieht die laufende Partie');
+check(seatsC.room.members.length === 2, 'kein neues Mitglied durch Beitritt ohne Token');
+check(!c.inbox.some((m) => m.t === 'welcome'), 'C bekommt keinen Platz ohne PIN');
+
+// Falsche PIN fuer einen fremden Platz wird abgewiesen.
+const wrongPin = welB.pin === 'AAAA' ? 'BBBB' : 'AAAA';
+c.send({ t: 'join', name: 'Cem', seat: welB.you, pin: wrongPin });
 const errC = await c.wait((m) => m.t === 'error', 'Fehler fuer C');
-check(errC.message.includes('laeuft bereits'), 'Beitritt zur laufenden Partie abgewiesen');
+check(errC.message === 'Die PIN passt nicht zu diesem Platz.', 'falsche PIN abgewiesen: ' + errC.message);
 
 a2.ws.close(); b.ws.close(); c.ws.close();
 console.log(fails.length === 0 ? '\nALLE PRUEFUNGEN BESTANDEN' : `\n${fails.length} FEHLGESCHLAGEN`);
