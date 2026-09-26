@@ -31,9 +31,11 @@ export type Profil = {
   taten: Record<string, number>;
   /** Schon gewertete Raeume (die letzten 50). */
   gewertet: string[];
+  /** Beste Sterne je Szenario (core/szenario.ts). */
+  sterne: Record<string, number>;
 };
 
-const LEER: Profil = { partien: 0, siege: 0, besteWertung: 0, stufeFrei: 0, haeuser: [], taten: {}, gewertet: [] };
+const LEER: Profil = { partien: 0, siege: 0, besteWertung: 0, stufeFrei: 0, haeuser: [], taten: {}, gewertet: [], sterne: {} };
 
 export function leseProfil(): Profil {
   try {
@@ -136,7 +138,9 @@ export function werteAus(state: PublicState, you: string, code: string): Wertung
   const me = state.players.find((p) => p.id === you);
   const wertung = punkte * 10 + (me?.ruhm ?? 0);
   // Gemeinsam gewinnen alle oder keiner; sonst wie oben beschrieben.
-  const sieg = state.koop
+  const sieg = state.szenario
+    ? state.szenarioErgebnis?.erreicht === true
+    : state.koop
     ? state.koopErgebnis?.erfolg === true
     : phase.winner === you && (phase.durch === 'ziel' || state.order.length > 1 || punkte >= 10);
   if (profil.gewertet.includes(code)) return { neueTaten: [], neueStufe: null, sieg, schonGewertet: true };
@@ -146,7 +150,11 @@ export function werteAus(state: PublicState, you: string, code: string): Wertung
   profil.besteWertung = Math.max(profil.besteWertung, wertung);
   if (me?.haus && !profil.haeuser.includes(me.haus)) profil.haeuser.push(me.haus);
   let neueStufe: number | null = null;
-  if (sieg && state.stufe >= profil.stufeFrei && profil.stufeFrei < MAX_STUFE) {
+  if (state.szenario && state.szenarioErgebnis?.erreicht) {
+    profil.sterne = { ...profil.sterne, [state.szenario]: Math.max(profil.sterne[state.szenario] ?? 0, state.szenarioErgebnis.sterne) };
+  }
+  // Die Chronikstufen schaltet nur eine freie Partie frei, kein Szenario.
+  if (sieg && !state.szenario && state.stufe >= profil.stufeFrei && profil.stufeFrei < MAX_STUFE) {
     profil.stufeFrei = state.stufe + 1;
     neueStufe = profil.stufeFrei;
   }

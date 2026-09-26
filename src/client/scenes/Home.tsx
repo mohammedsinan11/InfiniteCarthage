@@ -21,6 +21,7 @@ import type { TagesInfo } from '../../core/tages';
 import { OmenListe } from '../ui/OmenListe';
 import { TATEN, leseProfil } from '../profil';
 import { STUFE_NAME } from '../../core/stufe';
+import { SZENARIEN } from '../../core/szenario';
 import { lesePartien, lokalerSpeicher, vergissPartie } from '../net/partien';
 import type { Partie } from '../net/partien';
 
@@ -362,6 +363,18 @@ export function Home() {
           </section>
         )}
 
+        <SzenarienListe
+          bereit={ready && !verbindet}
+          onSpielen={(id) => {
+            if (name.trim().length === 0) {
+              setNameFehlt(true);
+              nameFeld.current?.focus();
+              return;
+            }
+            connect(freshCode(), name.trim(), true, false, undefined, { szenario: id });
+          }}
+        />
+
         <DeineChronik />
 
         <div className="divider">oder</div>
@@ -443,6 +456,40 @@ function DeineChronik() {
           {TATEN.map((t) => (
             <li key={t.id} className={p.taten[t.id] ? 'erreicht' : ''}>
               <b>{p.taten[t.id] ? '✓ ' : ''}{t.name}</b> <span>{t.text}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Die Szenarien (core/szenario.ts): kurze Aufgaben auf neuen Karten, mit
+ * Sternen fuer Tempo. Eingeklappt, bis man sie oeffnet - die Startseite soll
+ * fuer Einsteiger schlicht bleiben.
+ */
+function SzenarienListe({ bereit, onSpielen }: { bereit: boolean; onSpielen: (id: string) => void }) {
+  const [offen, setOffen] = useState(false);
+  const sterne = leseProfil().sterne ?? {};
+  const gesamt = SZENARIEN.reduce((n, s) => n + (sterne[s.id] ?? 0), 0);
+  return (
+    <section className="szenarien">
+      <button className="szenarien-kopf" onClick={() => setOffen((v) => !v)}>
+        Szenarien <span>{gesamt}/{SZENARIEN.length * 3} ★ {offen ? '▲' : '▼'}</span>
+      </button>
+      {offen && (
+        <ul>
+          {SZENARIEN.map((s) => (
+            <li key={s.id}>
+              <div className="szenario-kopf">
+                <b>{s.name}</b>
+                <span className="szenario-sterne">{'★'.repeat(sterne[s.id] ?? 0)}{'☆'.repeat(3 - (sterne[s.id] ?? 0))}</span>
+              </div>
+              <span className="szenario-aufgabe">{s.aufgabe} In {s.runden} Runden.</span>
+              <button disabled={!bereit} onClick={() => onSpielen(s.id)}>
+                Spielen
+              </button>
             </li>
           ))}
         </ul>

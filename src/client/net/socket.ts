@@ -67,7 +67,7 @@ export function neuerRaumCode(): string {
 }
 
 /** Was ein neuer Raum ausser dem Code mitbringt. */
-export type RaumWunsch = { tages?: boolean; welt?: number };
+export type RaumWunsch = { tages?: boolean; welt?: number; szenario?: string };
 
 export function openSocket(
   code: string,
@@ -81,7 +81,10 @@ export function openSocket(
   neu: RaumWunsch = {},
 ): WebSocket {
   const base = SERVER_URL.replace(/^http/, 'ws').replace(/\/$/, '');
-  const extra = (neu.tages ? '&tages=1' : '') + (neu.welt !== undefined ? `&welt=${neu.welt | 0}` : '');
+  const extra =
+    (neu.tages ? '&tages=1' : '') +
+    (neu.welt !== undefined ? `&welt=${neu.welt | 0}` : '') +
+    (neu.szenario ? `&szenario=${encodeURIComponent(neu.szenario)}` : '');
   const url = `${base}/room/${code}/ws${create ? `?create=1${oeffentlich ? '' : '&public=0'}${extra}` : ''}`;
   const ws = new WebSocket(url);
 

@@ -104,6 +104,8 @@ import { gueltigeOmen, siebenerBonus, startBeute } from '../omen';
 import { hausAngebot, hausById, hausWirkung } from '../haus';
 import { mangelHilfe } from './hilfe';
 import { omenMitStufe } from '../stufe';
+import { szenarioById, szenarioErreicht, sterneFuer, unversehrtGeschafft } from '../szenario';
+import { roundOf } from '../season';
 import { COST_WUNDER, hatWunder, wunderAt } from '../wunder';
 import type { WunderArt } from '../wunder';
 import { ereignisById, ereignisFaellig, waehleEreignis } from '../ereignis';
@@ -293,6 +295,8 @@ export type PartieOptionen = {
   stufe?: number;
   /** Gemeinsam gegen die Wildnis: ein Ziel fuer alle (KOOP_ZIEL_JE). */
   koop?: boolean;
+  /** Ein Szenario (core/szenario.ts): Ziel, Frist und Omen kommen von dort. */
+  szenario?: string | null;
 };
 
 /** Im gemeinsamen Spiel: so viele Siegpunkte je Spieler soll die Summe erreichen. */
@@ -386,6 +390,14 @@ export function createGame(
   };
 
   if (optionen.ereignisse) state.ereignisseAn = true;
+  const sz = szenarioById(optionen.szenario);
+  if (sz) {
+    state.szenario = sz.id;
+    state.szenarioErgebnis = null;
+    state.omens = omenMitStufe(gueltigeOmen(sz.omens), optionen.stufe ?? 0);
+    state.rundenLimit = sz.runden;
+    state.targetPoints = 0;
+  }
   if (optionen.koop) {
     state.koop = true;
     state.koopErgebnis = null;
@@ -458,6 +470,16 @@ export function wuerfelFuer(secretSeed: number, turn: number): [number, number] 
  */
 function zeitAbgelaufen(state: GameState, events: GameEvent[]): void {
   const uebrig = imSpiel(state);
+  const sz = szenarioById(state.szenario);
+  if (sz) {
+    // Die Frist ist um: nur "unversehrt" kann jetzt noch gelingen.
+    const id = state.order[0]!;
+    const erreicht = uebrig.length > 0 && unversehrtGeschafft(state, id, sz.ziel);
+    state.szenarioErgebnis = { erreicht, runde: state.turn, sterne: erreicht ? sterneFuer(sz, roundOf(state.turn)) : 0 };
+    state.phase = { t: 'finished', winner: erreicht ? id : null, durch: 'zeit' };
+    events.push(erreicht ? { t: 'win', player: id } : { t: 'lost' });
+    return;
+  }
   if (state.koop) {
     // Gemeinsam: die Summe aller zaehlt, auch die der Gefallenen.
     const summe = state.order.reduce((n, id) => n + totalPoints(state, id), 0);
@@ -1481,6 +1503,22 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
   // Die Chronik liest dieselben Ereignisse - fuer die Schlussseite. Der Aufbau
   // zaehlt nicht mit: er ist fuer alle gleich und kein Teil der Geschichte.
   if (action.t !== 'placeSettlement' && action.t !== 'placeRoad') chronikFortschreiben(s, events);
+
+  // Szenario: ist das Ziel erreicht? Dann ist es geschafft - je schneller, desto
+  // mehr Sterne (core/szenario.ts). Die Chronik bekommt den Schluss nachgereicht.
+  const szenario = szenarioById(s.szenario);
+  const jetzt = (s.phase as GameState['phase']).t;
+  if (szenario && jetzt !== 'finished' && jetzt !== 'setup' && jetzt !== 'hauswahl') {
+    const id = s.order[0]!;
+    if (szenarioErreicht(s, id, szenario.ziel)) {
+      const runde = roundOf(s.turn);
+      s.szenarioErgebnis = { erreicht: true, runde, sterne: sterneFuer(szenario, runde) };
+      s.phase = { t: 'finished', winner: id, durch: 'ziel' };
+      const schluss: GameEvent[] = [{ t: 'win', player: id }];
+      events.push(...schluss);
+      chronikFortschreiben(s, schluss);
+    }
+  }
 
   game.state = s;
   return { ok: true, events };

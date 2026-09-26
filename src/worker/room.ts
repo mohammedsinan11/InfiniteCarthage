@@ -45,6 +45,7 @@ import type { BestenEintrag } from '../core/tages';
 import { wertung } from '../core/chronik';
 import { istStufe } from '../core/stufe';
 import { botsSpielen } from '../core/bot';
+import { szenarioById } from '../core/szenario';
 import { totalPoints } from '../core/state';
 
 export type Env = {
@@ -90,6 +91,8 @@ type RoomData = {
   stufe?: number;
   /** Gemeinsam gegen die Wildnis. */
   koop?: boolean;
+  /** Ein Szenario (core/szenario.ts) - allein. */
+  szenario?: string | null;
 };
 
 type Attachment = { playerId: PlayerId | null };
@@ -246,6 +249,14 @@ export class GameRoom implements DurableObject {
         room.rundenLimit = TAGES_RUNDEN;
         room.targetPoints = NO_TARGET;
         room.oeffentlich = false;
+      } else if (szenarioById(url.searchParams.get('szenario'))) {
+        const sz = szenarioById(url.searchParams.get('szenario'))!;
+        room.tagesDatum = null;
+        room.szenario = sz.id;
+        room.omens = [...sz.omens];
+        room.rundenLimit = sz.runden;
+        room.targetPoints = NO_TARGET;
+        room.oeffentlich = false;
       } else {
         room.tagesDatum = null;
         room.omens = wuerfleOmen(randomSeed());
@@ -335,8 +346,8 @@ export class GameRoom implements DurableObject {
           this.send(ws, { t: 'error', message: 'Die Partie laeuft bereits.' });
           return;
         }
-        if (room.tagesDatum) {
-          this.send(ws, { t: 'error', message: 'Die Tagesexpedition hat feste Regeln.' });
+        if (room.tagesDatum || room.szenario) {
+          this.send(ws, { t: 'error', message: room.szenario ? 'Das Szenario hat feste Regeln.' : 'Die Tagesexpedition hat feste Regeln.' });
           return;
         }
         if (msg.omens === 'neu') room.omens = wuerfleOmen(randomSeed());
@@ -402,7 +413,8 @@ export class GameRoom implements DurableObject {
             haeuser: true,
             ereignisse: true,
             stufe: tages ? 0 : (room.stufe ?? 0),
-            koop: !tages && (room.koop ?? false),
+            koop: !tages && !room.szenario && (room.koop ?? false),
+            szenario: room.szenario ?? null,
           },
         );
         room.started = true;
@@ -421,7 +433,7 @@ export class GameRoom implements DurableObject {
           this.send(ws, { t: 'error', message: 'Nur der Gastgeber setzt Bots.' });
           return;
         }
-        if (room.started || room.tagesDatum) {
+        if (room.started || room.tagesDatum || room.szenario) {
           this.send(ws, { t: 'error', message: room.started ? 'Die Partie laeuft bereits.' : 'Die Tagesexpedition spielt man allein.' });
           return;
         }
@@ -504,7 +516,7 @@ export class GameRoom implements DurableObject {
     } else if (room.members.length >= MAX_PLAYERS) {
       this.send(ws, { t: 'error', message: 'Der Raum ist voll.' });
       return;
-    } else if (room.tagesDatum && room.members.length >= 1) {
+    } else if ((room.tagesDatum || room.szenario) && room.members.length >= 1) {
       // Allein, damit die Ergebnisse vergleichbar bleiben.
       this.send(ws, { t: 'error', message: 'Die Tagesexpedition spielt man allein.' });
       return;
@@ -681,6 +693,7 @@ export class GameRoom implements DurableObject {
       weltSeed: room.weltSeed ?? null,
       stufe: room.stufe ?? 0,
       koop: room.koop ?? false,
+      szenario: room.szenario ?? null,
     };
   }
 

@@ -129,6 +129,9 @@ export type PublicState = {
   auftraege: GameState['auftraege'];
   /** Die Chronikstufe (core/stufe.ts). */
   stufe: number;
+  /** Szenario und sein Ausgang (core/szenario.ts). */
+  szenario: string | null;
+  szenarioErgebnis: { erreicht: boolean; runde: number; sterne: number } | null;
   /** Gemeinsames Spiel und sein Ergebnis (rules/reducer.ts, koopZiel). */
   koop: boolean;
   koopErgebnis: { erfolg: boolean; summe: number; ziel: number } | null;
@@ -235,6 +238,8 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     stufe: state.stufe ?? 0,
     wunder: state.wunder ?? {},
     koop: state.koop ?? false,
+    szenario: state.szenario ?? null,
+    szenarioErgebnis: state.szenarioErgebnis ?? null,
     koopErgebnis: state.koopErgebnis ?? null,
     omens: state.omens ?? [],
     rundenLimit: state.rundenLimit ?? null,

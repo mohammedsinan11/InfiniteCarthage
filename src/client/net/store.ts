@@ -213,6 +213,7 @@ function vervollstaendige(msg: ServerMsg): void {
     room.weltSeed ??= null;
     room.stufe ??= 0;
     room.koop ??= false;
+    room.szenario ??= null;
   }
   if (msg.t === 'state') {
     msg.state.omens ??= [];
@@ -224,6 +225,8 @@ function vervollstaendige(msg: ServerMsg): void {
     msg.state.stufe ??= 0;
     msg.state.wunder ??= {};
     msg.state.koop ??= false;
+    msg.state.szenario ??= null;
+    msg.state.szenarioErgebnis ??= null;
     msg.state.koopErgebnis ??= null;
     for (const p of msg.state.players) p.haus ??= null;
   }

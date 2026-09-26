@@ -45,6 +45,7 @@ import { ErsteSchritte } from '../ui/ErsteSchritte';
 import { hausById } from '../../core/haus';
 import { kartenPunkte } from '../../core/cards/effects';
 import { COST_WUNDER, WUNDER, wunderAt } from '../../core/wunder';
+import { szenarioById, szenarioStand } from '../../core/szenario';
 import { KOOP_ZIEL_JE, wunderHindernis } from '../../core/rules/reducer';
 import { OmenListe } from '../ui/OmenListe';
 import { omenById } from '../../core/omen';
@@ -1052,6 +1053,20 @@ export function Game() {
             ★ {state.myPoints}
             {state.targetPoints > 0 ? ` / ${state.targetPoints}` : ''}
           </span>
+          {/* Szenario: wie weit das Ziel ist (core/szenario.ts). */}
+          {szenarioById(state.szenario) && you && (
+            <span className="hud-koop" title={szenarioById(state.szenario)!.aufgabe}>
+              {(() => {
+                const sz = szenarioById(state.szenario)!;
+                if (sz.ziel.t === 'unversehrt') {
+                  const brand = state.chronik?.stats[you]?.abgebrannt ?? 0;
+                  return brand === 0 ? `Ziel: unversehrt · ${sz.ziel.punkte} Siegpunkte` : 'Ziel verfehlt: es hat gebrannt';
+                }
+                const [ist, soll] = szenarioStand(state, you, sz.ziel);
+                return `Ziel: ${sz.aufgabe.replace(/\.$/, '')} · ${Math.min(ist, soll)}/${soll}`;
+              })()}
+            </span>
+          )}
           {/* Gemeinsam: wie weit die Summe vom Ziel ist (rules/reducer.ts, koopZiel). */}
           {state.koop && (
             <span className="hud-koop" title="Gemeinsam gegen die Wildnis: die Summe eurer Siegpunkte muss am Ende das Ziel erreichen.">

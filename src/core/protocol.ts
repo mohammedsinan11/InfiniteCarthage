@@ -42,6 +42,8 @@ export type RoomInfo = {
   stufe: number;
   /** Gemeinsam gegen die Wildnis (ein Jahr, ein Ziel fuer alle). */
   koop: boolean;
+  /** Ein Szenario (core/szenario.ts) - allein, feste Omen und Frist. */
+  szenario: string | null;
 };
 
 /**

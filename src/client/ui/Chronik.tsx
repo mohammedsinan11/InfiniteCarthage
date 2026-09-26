@@ -23,6 +23,7 @@ import { holeTagesInfo } from '../net/socket';
 import { hausById } from '../../core/haus';
 import { werteAus } from '../profil';
 import { saga } from '../../core/chronik';
+import { szenarioById } from '../../core/szenario';
 import { STUFE_NAME } from '../../core/stufe';
 import type { BestenEintrag } from '../../core/tages';
 
@@ -31,7 +32,7 @@ type Props = {
   you: string | null;
   code: string | null;
   /** Neuer Raum: dieselbe Welt, oder eine neue Tagesexpedition. */
-  nochmal: (neu: { welt?: number; tages?: boolean }) => void;
+  nochmal: (neu: { welt?: number; tages?: boolean; szenario?: string }) => void;
   verlassen: () => void;
 };
 
@@ -107,7 +108,12 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
   }
 
   let kopf: string;
-  if (state.koop && state.koopErgebnis)
+  const sz = szenarioById(state.szenario);
+  if (sz && state.szenarioErgebnis)
+    kopf = state.szenarioErgebnis.erreicht
+      ? `${sz.name}: geschafft in Runde ${state.szenarioErgebnis.runde} ${'★'.repeat(state.szenarioErgebnis.sterne)}${'☆'.repeat(3 - state.szenarioErgebnis.sterne)}`
+      : `${sz.name}: verfehlt`;
+  else if (state.koop && state.koopErgebnis)
     kopf = state.koopErgebnis.erfolg
       ? `Gemeinsam geschafft - ${state.koopErgebnis.summe} von ${state.koopErgebnis.ziel} Siegpunkten`
       : `Gemeinsam gescheitert - ${state.koopErgebnis.summe} von ${state.koopErgebnis.ziel} Siegpunkten`;
@@ -234,6 +240,10 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
           {tages ? (
             <button className="primary" onClick={() => nochmal({ tages: true })}>
               Nochmal versuchen
+            </button>
+          ) : sz ? (
+            <button className="primary" onClick={() => nochmal({ szenario: sz.id })}>
+              Szenario nochmal
             </button>
           ) : (
             <button

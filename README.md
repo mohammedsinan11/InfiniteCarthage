@@ -262,6 +262,13 @@ je Spieler erreichen - alle gewinnen oder keiner. Einzelziele gibt es dann
 nicht; Pluenderer, Horden, Omen und Chronikstufen sind der Gegner. Bots
 spielen als Verbuendete mit.
 
+**Szenarien** (`src/core/szenario.ts`). Sechs kurze Aufgaben auf neuen
+Karten, jede mit festen Omen, einer Frist und einem Ziel: vier Staedte, ein
+Weltwunder, drei Ruinen, zwei Lager, zwei Auftraege - oder die
+Blutmondnaechte unversehrt ueberstehen. Wer das Ziel erreicht, bekommt je
+nach Tempo ein bis drei Sterne; die Startseite zeigt sie. Szenarien spielt
+man allein, sie lehren ein System nach dem anderen.
+
 **Einstieg.** Neue Spieler bekommen beim ersten Auftreten jedes Systems einen
 kurzen Tipp (erster Fund, erstes Feuer, erste Nacht, erste Beute ...,
 `src/client/tipps.ts`), je Browser einmal, und eine Liste "Erste Schritte"

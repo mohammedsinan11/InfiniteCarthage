@@ -14,6 +14,7 @@ import { OmenListe } from '../ui/OmenListe';
 import { MAX_STUFE, STUFE_NAME, omenMitStufe } from '../../core/stufe';
 import { leseProfil } from '../profil';
 import { KOOP_ZIEL_JE } from '../../core/rules/reducer';
+import { szenarioById } from '../../core/szenario';
 
 export function Lobby() {
   const room = useStore((s) => s.room);
@@ -29,7 +30,16 @@ export function Lobby() {
   return (
     <div className="home">
       <div className="home-card">
-        {tages ? (
+        {szenarioById(room.szenario) ? (
+          <>
+            <h1>{szenarioById(room.szenario)!.name}</h1>
+            <p className="sub">{szenarioById(room.szenario)!.text}</p>
+            <p className="szenario-aufgabe gross">
+              Ziel: {szenarioById(room.szenario)!.aufgabe} In {szenarioById(room.szenario)!.runden} Runden - je schneller, desto mehr
+              Sterne.
+            </p>
+          </>
+        ) : tages ? (
           <>
             <h1>Tagesexpedition</h1>
             <p className="sub">
@@ -65,7 +75,7 @@ export function Lobby() {
             </li>
           ))}
         </ul>
-        {!tages && isHost && room.members.length < MAX_PLAYERS && (
+        {!tages && !room.szenario && isHost && room.members.length < MAX_PLAYERS && (
           <button onClick={() => send({ t: 'addBot' })} title="Ein Rivale, den das Spiel selbst fuehrt: er siedelt, baut und handelt nach festen Vorlieben">
             + Rivalen dazusetzen (Bot)
           </button>
@@ -79,7 +89,7 @@ export function Lobby() {
           Omen
           <OmenListe omens={omenMitStufe(room.omens, room.stufe)} />
         </label>
-        {!tages && isHost && (
+        {!tages && !room.szenario && isHost && (
           <div className="choices">
             <button onClick={() => send({ t: 'setOptions', omens: 'neu' })}>Neu wuerfeln</button>
             <button
@@ -91,7 +101,7 @@ export function Lobby() {
           </div>
         )}
 
-        {!tages && (
+        {!tages && !room.szenario && (
           <>
             <label>
               Spielart
@@ -198,7 +208,7 @@ export function Lobby() {
 
         {isHost ? (
           <button className="primary" disabled={!canStart} onClick={() => send({ t: 'start' })}>
-            {tages ? 'Expedition beginnen' : room.members.length === 1 ? 'Allein starten' : 'Partie starten'}
+            {room.szenario ? 'Szenario beginnen' : tages ? 'Expedition beginnen' : room.members.length === 1 ? 'Allein starten' : 'Partie starten'}
           </button>
         ) : (
           <p className="note">Warten auf den Gastgeber...</p>

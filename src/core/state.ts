@@ -546,6 +546,10 @@ export type GameState = {
    * (KOOP_ZIEL_JE je Spieler). Fehlt: gegeneinander.
    */
   koop?: boolean;
+  /** Das Szenario dieser Partie (core/szenario.ts), sonst null. */
+  szenario?: string | null;
+  /** Wie das Szenario ausging: erreicht, in welcher Runde, wie viele Sterne. */
+  szenarioErgebnis?: { erreicht: boolean; runde: number; sterne: number } | null;
   /** Das Ergebnis eines gemeinsamen Spiels, sobald es entschieden ist. */
   koopErgebnis?: { erfolg: boolean; summe: number; ziel: number } | null;
   /** Errichtete Weltwunder: Feldschluessel -> Besitzer und Art (core/wunder.ts). */
