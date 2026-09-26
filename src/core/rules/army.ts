@@ -67,7 +67,7 @@ import { emptyHand, handSize, playerById } from '../state';
 import { HEXE_FRAKTION, NACHT_ID } from '../factions';
 import { hexenhausAt } from '../hexe';
 import type { GameState, Hand, HeldZweig, PlayerId, UnitKind, UnitState } from '../state';
-import { einheitName, wuerfleHeld } from '../lore';
+import { einheitName, nachfolger, wuerfleHeld } from '../lore';
 import type { HeldLore } from '../lore';
 import {
   BESATZUNG_MAX,
@@ -471,7 +471,8 @@ export function spawnHeld(s: GameState, id: PlayerId, events: Ereignisse): UnitS
 export function benenneHeld(s: GameState, p: GameState['players'][number]): HeldLore {
   if (p.held) return p.held;
   const rng = new Rng(s.rngState);
-  const lore = wuerfleHeld(rng);
+  // Mit Ahn aus einer frueheren Partie: sein Nachfolger - dasselbe Haus, eine Generation weiter.
+  const lore = p.ahn ? nachfolger(rng, p.ahn) : wuerfleHeld(rng);
   s.rngState = rng.getState();
   p.held = lore;
   return lore;

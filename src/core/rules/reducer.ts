@@ -11,6 +11,8 @@
  * Kopie, die nur bei Erfolg uebernommen wird.
  */
 
+import { ahnSauber, istAhn } from '../lore';
+import type { HeldLore } from '../lore';
 import { erfuellterWeg, siegwegeAn } from '../siegwege';
 import { Rng } from '../rng';
 import { hash3i } from '../hash';
@@ -274,7 +276,12 @@ const fail = (error: string): Result => ({ ok: false, error });
 const START_REVEAL_RADIUS = 6;
 
 
-export type NewPlayer = { id: PlayerId; name: string };
+export type NewPlayer = {
+  id: PlayerId;
+  name: string;
+  /** Der Held einer frueheren Partie: der neue wird sein Nachfolger (core/lore.ts). */
+  ahn?: HeldLore;
+};
 
 /** Was eine Partie ausser Spielern, Seeds und Siegpunktziel mitbringt. */
 export type PartieOptionen = {
@@ -351,6 +358,7 @@ export function createGame(
       held: null,
       inventar: {},
       ernannt: null,
+      ...(p.ahn && istAhn(p.ahn) ? { ahn: ahnSauber(p.ahn) } : {}),
     })),
     order: players.map((p) => p.id),
     current: 0,

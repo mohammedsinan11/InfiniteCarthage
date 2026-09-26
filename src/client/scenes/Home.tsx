@@ -22,7 +22,7 @@ import type { RaumEintrag } from '../../core/lobby';
 import { SERVER_MISSING, holeRaeume, holeTagesInfo, neuerRaumCode as freshCode } from '../net/socket';
 import type { TagesInfo } from '../../core/tages';
 import { OmenListe } from '../ui/OmenListe';
-import { TATEN, leseProfil } from '../profil';
+import { TATEN, leseProfil, setzeDynastie } from '../profil';
 import { STUFE_NAME } from '../../core/stufe';
 import { SZENARIEN } from '../../core/szenario';
 import { lesePartien, lokalerSpeicher, vergissPartie } from '../net/partien';
@@ -473,6 +473,7 @@ export function Home() {
 function DeineChronik() {
   const [offen, setOffen] = useState(false);
   const [halle, setHalle] = useState(false);
+  const [dynastie, setDynastie] = useState(() => leseProfil().dynastie !== false);
   const p = leseProfil();
   if (p.partien === 0) return null;
   const erreicht = TATEN.filter((t) => p.taten[t.id]).length;
@@ -494,6 +495,19 @@ function DeineChronik() {
           </button>
         )}
       </div>
+      {halle && p.ahnen.some((a) => a.lore) && (
+        <label className="home-schalter">
+          <input
+            type="checkbox"
+            checked={dynastie}
+            onChange={(e) => {
+              setzeDynastie(e.target.checked);
+              setDynastie(e.target.checked);
+            }}
+          />
+          Dynastie fortfuehren: in der naechsten Partie tritt ein Nachfolger aus dem Haus deines letzten Helden an
+        </label>
+      )}
       {halle && (
         <ol className="ahnen-liste">
           {p.ahnen.map((a) => (

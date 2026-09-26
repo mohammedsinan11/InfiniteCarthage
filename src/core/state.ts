@@ -95,6 +95,8 @@ export type Player = {
    * Adelshaus ueberlebt seinen Traeger (DESIGN.md, Heldenlore).
    */
   held: HeldLore | null;
+  /** Der Ahn aus einer frueheren Partie - der Held wird sein Nachfolger (rules/army.ts, benenneHeld). */
+  ahn?: HeldLore;
   /**
    * Was der Spieler an Dingen besitzt: Kennung -> Anzahl, etwa "gelee" von
    * erschlagenen Schleimen. Getrennt von der Hand, weil es keine Rohstoffe

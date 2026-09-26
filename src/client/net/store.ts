@@ -7,6 +7,7 @@
  * der Server, ohne dass ein einziges Gelaendefeld uebertragen wird.
  */
 
+import { letzterAhn } from '../profil';
 import { create } from 'zustand';
 import { openSocket, sendMsg } from './socket';
 import type { RaumWunsch } from './socket';
@@ -495,7 +496,15 @@ function meldungenAus(
     } else if (e.t === 'heroReady') {
       if (e.player === you) {
         playHeld();
-        meldung(e.zurueck ? 'Dein Held kehrt zurueck' : 'Dein Held tritt an', 'gain');
+        const held = state?.players.find((p) => p.id === you)?.held;
+        meldung(
+          e.zurueck
+            ? 'Dein Held kehrt zurueck'
+            : held && held.folge > 1
+              ? `${held.vorname} tritt an - ${held.folge}. Generation des Hauses ${held.haus}`
+              : 'Dein Held tritt an',
+          'gain',
+        );
       }
     } else if (e.t === 'heroFell') {
       if (e.player === you) {
@@ -703,7 +712,8 @@ export const useStore = create<Store>((set, get) => ({
 
     const ws = openSocket(code, create, oeffentlich, {
       onOpen: () => {
-        sendMsg(ws, { t: 'join', name, token: token ?? loadToken(code) });
+        const ahn = letzterAhn();
+        sendMsg(ws, { t: 'join', name, token: token ?? loadToken(code), ...(ahn ? { ahn } : {}) });
       },
       onClose: () => {
         // Nur die AKTUELLE Verbindung darf den Zustand aendern.

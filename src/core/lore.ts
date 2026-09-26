@@ -154,3 +154,34 @@ export const heldKurz = (l: HeldLore): string => `${l.vorname} ${l.beiname}`;
 
 /** Der volle Name mit Titel und Haus - fuer Tafeln und Meldungen. */
 export const heldVoll = (l: HeldLore): string => `${heldKurz(l)}, ${l.titel} von ${l.haus}`;
+
+/**
+ * Taugt das als Ahn (client/profil.ts, Dynastie)? Er kommt vom Client und
+ * wird deshalb streng geprueft: nur Stamm, Haus und Titel aus den eigenen
+ * Listen, eine vernuenftige Folge und Gestalt. Alles andere - Vorname,
+ * Beiname - wuerfelt der Nachfolger ohnehin neu. So kann niemand beliebigen
+ * Text als Heldennamen in fremde Partien schicken.
+ */
+export function istAhn(x: unknown): x is HeldLore {
+  if (typeof x !== 'object' || x === null) return false;
+  const l = x as Record<string, unknown>;
+  if (typeof l.stamm !== 'string' || !(STAEMME as readonly string[]).includes(l.stamm)) return false;
+  if (typeof l.haus !== 'string' || !HAUS_VORN.some((v) => (l.haus as string).startsWith(v) && (HAUS_HINTEN as readonly string[]).includes((l.haus as string).slice(v.length)))) return false;
+  if (typeof l.titel !== 'string' || !TITEL.some(([m, w]) => m === l.titel || w === l.titel)) return false;
+  if (typeof l.folge !== 'number' || !Number.isInteger(l.folge) || l.folge < 1 || l.folge > 99) return false;
+  if (l.gestalt !== undefined && (typeof l.gestalt !== 'number' || !Number.isInteger(l.gestalt) || l.gestalt < 0 || l.gestalt >= GESTALTEN)) return false;
+  if (typeof l.vorname !== 'string' || typeof l.beiname !== 'string' || (l.geschlecht !== 'm' && l.geschlecht !== 'w')) return false;
+  return true;
+}
+
+/** Nur die geprueften Teile - was ein Nachfolger vom Ahn braucht. */
+export const ahnSauber = (l: HeldLore): HeldLore => ({
+  vorname: l.stamm,
+  stamm: l.stamm,
+  beiname: '',
+  haus: l.haus,
+  titel: l.titel,
+  geschlecht: l.geschlecht,
+  folge: l.folge,
+  ...(l.gestalt !== undefined ? { gestalt: l.gestalt } : {}),
+});

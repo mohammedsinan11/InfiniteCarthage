@@ -8,6 +8,7 @@
  */
 
 import type { WeltArt } from './weltart';
+import type { HeldLore } from './lore';
 import type { Action, GameEvent } from './rules/reducer';
 import type { PublicState } from './redact';
 import type { PlayerId } from './state';
@@ -89,7 +90,15 @@ export type ClientMsg =
    * token stammt aus einer frueheren Sitzung und holt den Platz zurueck. Auf
    * einem anderen Geraet gibt es kein Token: dann seat (der Platz) und pin.
    */
-  | { t: 'join'; name: string; token?: string; seat?: PlayerId; pin?: string }
+  | {
+      t: 'join';
+      name: string;
+      token?: string;
+      seat?: PlayerId;
+      pin?: string;
+      /** Der Held der letzten Partie dieses Browsers - der neue wird sein Nachfolger (core/lore.ts, istAhn). */
+      ahn?: HeldLore;
+    }
   /** Nur der Gastgeber, nur vor dem Start. Was fehlt, bleibt, wie es ist. */
   | {
       t: 'setOptions';

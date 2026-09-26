@@ -17,6 +17,7 @@ import { HAEUSER } from '../core/haus';
 import { cardById } from '../core/cards/catalog';
 import { roundOf } from '../core/season';
 import { heldVoll } from '../core/lore';
+import type { HeldLore } from '../core/lore';
 import { weltArtVon } from '../core/weltart';
 
 const SPEICHER = 'infinitecarthage.profil';
@@ -37,6 +38,8 @@ export type Profil = {
   sterne: Record<string, number>;
   /** Die Ahnenhalle: wer in frueheren Partien fuer dich stand, neueste zuerst. */
   ahnen: Ahne[];
+  /** Tritt der Nachfolger des letzten Helden an? Fehlt: ja. */
+  dynastie?: boolean;
 };
 
 /**
@@ -54,7 +57,23 @@ export type Ahne = {
   sieg: boolean;
   /** Ein Satz: was er vollbracht hat. */
   tat: string;
+  /** Der Held selbst - sein Nachfolger tritt in der naechsten Partie an. */
+  lore?: HeldLore;
 };
+
+/** Der juengste Ahn mit Held - fuer die naechste Partie (Dynastie). */
+export function letzterAhn(): HeldLore | undefined {
+  const p = leseProfil();
+  if (p.dynastie === false) return undefined;
+  return p.ahnen.find((a) => a.lore)?.lore;
+}
+
+/** Die Dynastie fortfuehren oder mit einem neuen Geschlecht beginnen. */
+export function setzeDynastie(an: boolean): void {
+  const p = leseProfil();
+  p.dynastie = an;
+  schreibe(p);
+}
 
 const AHNEN_MAX = 12;
 
@@ -166,12 +185,13 @@ function ahneAus(state: PublicState, you: string, wertung: number, sieg: boolean
   const held = me?.held;
   return {
     zeit: Date.now(),
-    name: held ? heldVoll(held) : (me?.name ?? 'Unbekannt'),
+    name: held ? `${heldVoll(held)}${held.folge > 1 ? ` (${held.folge}. Generation)` : ''}` : (me?.name ?? 'Unbekannt'),
     haus: me?.haus ?? null,
     welt: weltArtVon(state.worldSeed).name,
     wertung,
     sieg,
     tat: ahnenTat(state, you, sieg),
+    ...(held ? { lore: held } : {}),
   };
 }
 

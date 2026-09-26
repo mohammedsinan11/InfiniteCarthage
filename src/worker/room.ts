@@ -17,6 +17,8 @@
  * nicht im Arbeitsspeicher.
  */
 
+import { istAhn } from '../core/lore';
+import type { HeldLore } from '../core/lore';
 import { istWeltArt, mitWeltArt, weltArtVon, zufallsArt } from '../core/weltart';
 import type { WeltArt } from '../core/weltart';
 import { applyAction, createGame, rebuildWorld } from '../core/rules/reducer';
@@ -85,6 +87,8 @@ type RoomData = {
   rundenLimit?: number | null;
   /** Die Weltart der kommenden Partie (core/weltart.ts). */
   weltArt?: WeltArt;
+  /** Ahnen je Platz (core/lore.ts): die Helden, deren Nachfolger antreten. */
+  ahnen?: Record<PlayerId, HeldLore>;
   /** Tagesexpedition: ihr Datum (core/tages.ts). Sonst fehlt es. */
   tagesDatum?: string | null;
   /** Das Ergebnis der Tagesexpedition ist in der Bestenliste. */
@@ -419,7 +423,7 @@ export class GameRoom implements DurableObject {
           : (room.weltSeed ?? mitWeltArt(randomSeed(), room.weltArt ?? 'kernland'));
         const geheimSeed = tages ? await this.tagesGeheimSeed(tages) : randomSeed();
         this.game = createGame(
-          room.members.map((m) => ({ id: m.id, name: m.name })),
+          room.members.map((m) => ({ id: m.id, name: m.name, ...(room.ahnen?.[m.id] ? { ahn: room.ahnen[m.id] } : {}) })),
           weltSeed,
           geheimSeed,
           room.koop && !tages ? 0 : room.targetPoints,
@@ -543,6 +547,11 @@ export class GameRoom implements DurableObject {
       room.tokens[token] = playerId;
       room.members.push({ id: playerId, name: sanitizeName(msg.name), connected: true });
       room.hostId ??= playerId;
+    }
+
+    // Der Ahn gilt, solange die Partie noch nicht begonnen hat.
+    if (playerId !== undefined && !room.started && istAhn(msg.ahn)) {
+      room.ahnen = { ...(room.ahnen ?? {}), [playerId]: msg.ahn };
     }
 
     const member = room.members.find((m) => m.id === playerId);
