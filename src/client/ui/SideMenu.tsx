@@ -15,7 +15,7 @@
 
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { JAHRESZEIT_WIRKUNG, SEASON_NAME, bigRoundOf, ROUNDS_PER_BIG_ROUND, roundOf, seasonOf, yearOf } from '../../core/season';
+import { JAHRESZEIT_WIRKUNG, SEASON_NAME, bigRoundOf, ROUNDS_PER_BIG_ROUND, roundOf, roundsLeftInSeason, seasonOf, yearOf } from '../../core/season';
 import { cardById } from '../../core/cards/catalog';
 import { modifiersOf } from '../../core/cards/effects';
 import { RARITY_ORDER, dauerwirkungen } from '../../core/cards/types';
@@ -24,7 +24,7 @@ import type { Abkommen, Brand, UnitState, WandererAuftrag } from '../../core/sta
 import { hexDistance } from '../../core/coords';
 // maxLeben kennt Art, Zweig des Ernannten und Rang (core/combat.ts).
 import { maxLeben } from '../../core/combat';
-import { TAGESZEIT_NAME, WETTER_NAME } from '../../core/zeit';
+import { TAGESZEIT_NAME, WETTER_NAME, istNacht } from '../../core/zeit';
 import type { Tageszeit, Wetter } from '../../core/zeit';
 import { FRIEDEN_PREIS } from '../../core/rules/diplomatie';
 import type { Verhandlung } from '../../core/rules/diplomatie';
@@ -195,6 +195,39 @@ function statusVon(u: UnitState): { art: 'erkundet' | 'folgt' | 'zieht' | 'steht
 type LogFilter = 'alles' | 'kaempfe' | 'ertrag' | 'welt';
 const KAEMPFE = /kampf|bogenschuetzen|gefallen|lager|raubzug|pluender|hinterhalt|horde|fehde|ritter/i;
 const ERTRAG = /ertrag|wuerfelt|beute|monopol|handel|fund|karte/i;
+
+/**
+ * Was in den naechsten Runden kommt - damit Nacht, Raubzuege und Fristen
+ * keine Ueberraschung sind (Spieltests: "kam ohne Vorwarnung"). Nur aus der
+ * Zugnummer; nichts davon ist geheim.
+ */
+function Demnaechst({ turn, rundenLimit, vorhabenRest }: { turn: number; rundenLimit: number | null; vorhabenRest: number | null }) {
+  const zeilen: { in: number; text: string }[] = [];
+  const bisGross = ROUNDS_PER_BIG_ROUND - ((Math.max(1, turn) - 1) % ROUNDS_PER_BIG_ROUND);
+  zeilen.push({ in: bisGross, text: 'Grosse Runde (Raubzuege, Tribut)' });
+  if (!istNacht(turn)) {
+    for (let k = 1; k <= 12; k++) {
+      if (istNacht(turn + k)) {
+        zeilen.push({ in: k, text: 'Nacht (Horden, Schleime)' });
+        break;
+      }
+    }
+  }
+  const bisSaison = roundsLeftInSeason(turn);
+  if (bisSaison <= 6) zeilen.push({ in: bisSaison, text: `${SEASON_NAME[seasonOf(turn + bisSaison)]} beginnt` });
+  if (vorhabenRest !== null && vorhabenRest <= 6) zeilen.push({ in: vorhabenRest, text: 'Dein Vorhaben endet' });
+  if (rundenLimit !== null && rundenLimit - turn <= 10) zeilen.push({ in: Math.max(0, rundenLimit - turn), text: 'Die Partie endet' });
+  zeilen.sort((a, b) => a.in - b.in);
+  return (
+    <ul className="menu-demnaechst" title="Was in den naechsten Runden kommt">
+      {zeilen.slice(0, 3).map((z) => (
+        <li key={z.text}>
+          <b>{z.in === 0 ? 'jetzt' : `in ${z.in}`}</b> {z.text}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 /** Ein Abschnittskopf. hilfe: die Erklaerung hinter dem "?", ein Klick klappt sie auf. */
 function Kopf({ titel, hilfe, rechts, gefahr }: { titel: string; hilfe?: string; rechts?: ReactNode; gefahr?: boolean }) {
@@ -541,6 +574,7 @@ export function SideMenu({
           {zeitInfo.bisWetter}
           {zeitInfo.wirkung && <span className="menu-rest-wirkung"> !</span>}
         </div>
+        <Demnaechst turn={turn} rundenLimit={punkte.rundenLimit} vorhabenRest={vorhaben.aktiv?.rest ?? null} />
       </div>
 
       <div className="menu-reiter">

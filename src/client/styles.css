@@ -5493,3 +5493,26 @@ em.off {
   font-size: 11px;
   align-items: center;
 }
+
+/* Demnaechst (ui/SideMenu.tsx): die naechsten Runden auf einen Blick. */
+.menu-demnaechst {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 6px 0 0;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--muted);
+  text-align: left;
+}
+.menu-demnaechst b {
+  display: inline-block;
+  min-width: 38px;
+  font-family: var(--pixel);
+  font-size: 9px;
+  font-weight: normal;
+  color: var(--accent);
+}
