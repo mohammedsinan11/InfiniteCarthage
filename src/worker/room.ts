@@ -271,7 +271,7 @@ export class GameRoom implements DurableObject {
         room.tagesDatum = null;
         room.omens = wuerfleOmen(randomSeed());
         room.weltArt = zufallsArt(randomSeed());
-        // Voreingestellt: 20 Punkte oder ein Jahr, was zuerst kommt - so hat
+        // Voreingestellt: 15 Punkte oder ein Jahr, was zuerst kommt - so hat
         // jede Partie ein absehbares Ende und eine Chronik (Spieltest: allein
         // zog sich das offene Spiel zu 30 Punkten zu lange).
         room.rundenLimit = 60;

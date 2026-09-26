@@ -17,6 +17,14 @@ const STATUS_ZEICHEN: Record<HeerStatus, string> = {
   folgt: '↪',
   steht: '·',
 };
+/** Das Wort unter dem Zeichen - Spieltest: "⚑1 ➜" las niemand. */
+const STATUS_KURZ: Record<HeerStatus, string> = {
+  kaempft: 'Kampf',
+  zieht: 'zieht',
+  erkundet: 'erkundet',
+  folgt: 'folgt',
+  steht: 'steht',
+};
 const STATUS_TEXT: Record<HeerStatus, string> = {
   kaempft: 'kaempft',
   zieht: 'zieht',
@@ -68,8 +76,10 @@ export function Heerleiste({
             onClick={() => onWahl(g)}
           >
             <span className="heer-kopf">
-              <span className="heer-name">{g.schar !== null ? `⚑${g.schar}` : g.einheiten.length > 1 ? 'Verb.' : ''}</span>
-              <span className="heer-zeichen">{STATUS_ZEICHEN[s]}</span>
+              <span className="heer-name">{gruppenName(g, heldName?.split(' ')[0])}</span>
+              <span className="heer-zeichen">
+                {STATUS_ZEICHEN[s]} {STATUS_KURZ[s]}
+              </span>
             </span>
             <span className="heer-arten">
               {zahl('held') > 0 && <i className="art-held">H</i>}

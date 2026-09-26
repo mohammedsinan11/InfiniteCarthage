@@ -5715,3 +5715,13 @@ em.off {
     height: 132px;
   }
 }
+.heer-name {
+  max-width: 78px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.heer-zeichen {
+  white-space: nowrap;
+  color: var(--muted);
+}
