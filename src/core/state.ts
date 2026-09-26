@@ -74,6 +74,14 @@ export type Player = {
   loot: number;
   connected: boolean;
   /**
+   * Bis wann muss wieder ein Gebaeude stehen (Zugnummer)? null, solange eines
+   * steht. Faellt das letzte, beginnt eine kurze Frist - danach ist der
+   * Spieler besiegt (rules/untergang.ts).
+   */
+  untergang?: number | null;
+  /** Ausgeschieden: kein Gebaeude mehr und die Frist ist verstrichen. */
+  besiegt?: boolean;
+  /**
    * Wann der gefallene Held zurueckkehrt (Zugnummer). null, solange er lebt -
    * oder bevor er zum ersten Mal angetreten ist.
    */
@@ -372,11 +380,13 @@ export type Phase =
   | { t: 'main' }
   | { t: 'roadBuilding'; remaining: number }
   /**
+   * winner null: alle sind gefallen - die Partie ist verloren.
+   *
    * durch: 'ziel' - jemand hat die Siegpunkte erreicht; 'zeit' - die
    * Rundengrenze ist abgelaufen, gewonnen hat die hoechste Wertung
-   * (core/chronik.ts, wertung). Fehlt bei alten Staenden: dann 'ziel'.
+   * (core/chronik.ts, wertung). Fehlt bei alten Staenden und beim Untergang.
    */
-  | { t: 'finished'; winner: PlayerId; durch?: 'ziel' | 'zeit' };
+  | { t: 'finished'; winner: PlayerId | null; durch?: 'ziel' | 'zeit' };
 
 /**
  * Ein offenes Handelsangebot des Spielers am Zug.
@@ -463,6 +473,12 @@ export type GameState = {
   /** Zerstoerte Lager, als Feldschluessel "q:r". */
   destroyedNests: string[];
   /**
+   * Wann ein Lager zerstoert wurde (Feldschluessel -> Zug). Nur der Server
+   * liest es: nach einer Weile bezieht eine Fraktion ein zerstoertes Lager
+   * wieder (rules/bedrohung.ts, lagerNeuBesetzen).
+   */
+  nestTod?: Record<string, number>;
+  /**
    * Verbliebene Besatzung angegriffener Lager. Fehlt ein Lager hier, ist es
    * unberuehrt und hat seine volle Besatzung (units.ts, nestOccupants).
    */
@@ -543,7 +559,10 @@ export function setupPlayerId(state: GameState, step: number): PlayerId {
 }
 
 /** Sichtbare Siegpunkte (ohne verdeckte Siegpunktkarten). */
-export function publicPoints(state: GameState, id: PlayerId): number {
+export function publicPoints(
+  state: Pick<GameState, 'buildings' | 'ruhmreichster' | 'hauptstaedte'>,
+  id: PlayerId,
+): number {
   let pts = 0;
   for (const b of Object.values(state.buildings)) {
     if (b.owner === id) pts += b.type === 'city' ? 2 : 1;

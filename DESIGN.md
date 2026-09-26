@@ -73,6 +73,24 @@ Nachteil: "diese Karte kommt nur einmal vor" laesst sich so nicht ohne
 Weiteres zusichern. Das liesse sich ueber eine Liste bereits genommener
 Karten im Spielstand nachruesten - klein genug, um sie zu speichern.
 
+**Der Topf schrumpft nicht mehr leer.** Besessene Dauerkarten fielen frueher
+ganz aus der Auswahl; nach etwa 120 Runden war die Sammlung voll, episch und
+legendaer konnten nie mehr fallen (eine Stufe brauchte drei Kandidaten), und
+der Fund zeigte fuer immer dieselben drei Karten. Jetzt bleibt eine besessene
+Dauerkarte im Topf, sofern sie eine Sofortwirkung hat (`wiederholbar`): beim
+zweiten Nehmen zaehlt nur diese, die Dauerwirkung liegt ja schon vor und
+belegt keinen zweiten Platz. Karten ohne Sofortwirkung bleiben draussen. Eine
+Stufe kommt in Frage, sobald sie eine Karte hat; fehlende Plaetze fuellen die
+naechstniedrigen Stufen. Hoechstens eine Taktik je Auslage.
+
+**Kartenplaetze.** Nur so viele Dauerkarten wirken gleichzeitig, wie Plaetze da
+sind (2, mit Hauptstadt 3, mit Koenigssitz 4). Bei vollen Plaetzen sagt die
+Kartenwahl, welche aktive Karte die neue verdraengt - vorbelegt mit der
+seltensten-niedrigsten, umstellbar oder "keine" (die Karte bleibt im Besitz,
+inaktiv). Im Menue unter Karten laesst sich jede besessene Dauerkarte in der
+eigenen Bauphase ein- und ausschalten oder gegen eine aktive tauschen
+(`setLoadout`). Keine Karte geht still verloren.
+
 ### Was zu bauen waere
 
 1. `core/cards/types.ts` — Karte, Seltenheit, Wirkung
@@ -231,8 +249,26 @@ Gebaut in `core/zeit.ts`, `core/rules/army.ts` und `client/board/WetterSchicht.t
   einer Rohstoffkarte (Klick auf die Flammen oder im Menue), mit einem Ritter
   oder dem Helden daneben, oder der Regen tut es. Sonst brennt die Strasse ab
   und hinterlaesst Asche - dort baut ihr Besitzer sie fuer ein Holz wieder auf -,
-  die Stadt brennt zum Dorf herunter, das Dorf nieder. Das letzte Gebaeude eines
-  Spielers bleibt stehen.
+  die Stadt brennt zum Dorf herunter, das Dorf nieder. Auch das letzte Gebaeude
+  eines Spielers kann fallen - siehe *Untergang*.
+- **Bedrohung** (`rules/bedrohung.ts`). Ein Raubzug war in Runde 5 derselbe wie in
+  Runde 500, und zerstoerte Lager kamen nie wieder - die Gefahr nahm ab, waehrend
+  man wuchs. Jetzt richtet sie sich nach dem Ziel: Stufe = sichtbare Siegpunkte
+  / 4 (hoechstens 6). Ab Stufe 3 kommen zwei Raeuber je Raubzug, ab 6 drei; sie
+  tragen den Rang der Veteranen (Stufe / 2: je Rang +1 Angriff und Leben); ab
+  Stufe 4 bricht je grosser Runde ein Raubzug mehr auf. Wer klein bleibt, bleibt
+  verschont. Ein zerstoertes Lager bezieht nach 6 grossen Runden wieder eine
+  Fraktion - nur wenn jemand Stufe 1 erreicht hat, dort niemand steht und keine
+  Siedlung naeher als drei Felder liegt; die Besatzung waechst mit der Stufe.
+- **Untergang** (`rules/untergang.ts`). Ohne Gefahr blieb jeder Ueberfall folgenlos.
+  Faellt das letzte Gebaeude, beginnt eine Frist von drei eigenen Zuegen: in ihr
+  darf eine Siedlung zum gewohnten Preis UEBERALL stehen (keine eigene Strasse
+  noetig). Steht wieder eines, ist das Reich gerettet; sonst scheidet der Spieler
+  aus und kommt nicht mehr an die Reihe. Sind alle gefallen, ist die Partie
+  verloren; bleibt bei mehreren Spielern nur einer, gewinnt er. Vorbeugen: eine
+  Karte loescht jedes Feuer, ein Ritter daneben von selbst, Tuerme und
+  Festungsringe halten es fern. Die Meldung warnt eigens, wenn das letzte
+  Gebaeude brennt.
 - **Wachturm.** Bauteil fuer Holz, Lehm und Erz an einem eigenen Dorf oder einer
   Stadt: sieht fuenf Felder weit, auch nachts, und laesst Brandstifter nicht an
   sein Haus und die Strassen an dieser Ecke - die Antwort auf die Nacht, die
@@ -251,9 +287,12 @@ Gebaut in `core/rules/diplomatie.ts` und `core/rules/auftraege.ts`.
 - **Abkommen** gelten je Spieler und Fraktion und machen beide einander nicht
   feind (`feindlich` mit dem Spielstand): keine Raubzuege, keine Horden gegen
   ihn, keine Kaempfe. *Frieden* kostet 2 Getreide und 2 Wolle und gilt 20
-  Runden - nur Raeuberbanden nehmen ihn. *Tribut* kostet eine Karte sofort und
-  eine zu Beginn jeder grossen Runde, vom groessten Stapel; wer nicht zahlen
-  kann, hat wieder Krieg. Krieg erklaeren geht jederzeit in der Bauphase.
+  Runden - nur Raeuberbanden nehmen ihn. *Tribut* kostet sofort und zu Beginn
+  jeder grossen Runde je eine Karte pro Siegpunkt (mindestens eine), vom
+  groessten Stapel; wer nicht zahlen kann, hat wieder Krieg. Er ist damit
+  der Rettungsring des kleinen Reichs und eine echte Steuer fuer ein grosses -
+  sonst kaufte sich jedes Reich fuer eine Karte je fuenf Runden frei, und das
+  Heer rechnete sich nie. Krieg erklaeren geht jederzeit in der Bauphase.
 - **Auftraege.** Kommt ein Wanderer an einer Siedlung vorbei, bietet er ihrem
   Besitzer einen an - Lohn immer eine Kartenwahl:
   - *Lager:* ein feindliches Lager in der Naehe zerstoeren.
@@ -272,7 +311,7 @@ Gebaut in `core/rules/diplomatie.ts` und `core/rules/auftraege.ts`.
   Art einer, einer je Wanderer.
 
 Offen: Auftraege, die Rohstoffe verlangen; Fraktionen, die von selbst Frieden
-anbieten oder brechen; ob Tribut mit der Groesse des Reichs steigen soll.
+anbieten oder brechen.
 
 ## Kleinere Regeln, zuletzt geaendert
 

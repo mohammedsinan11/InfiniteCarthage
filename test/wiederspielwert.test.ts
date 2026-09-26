@@ -237,6 +237,24 @@ describe('Rundengrenze', () => {
     expect(g.state.phase.t === 'finished' && g.state.phase.winner).toBe('b');
   });
 
+  it('wer untergegangen ist, gewinnt auch nach Wertung nicht', () => {
+    const g = createGame(
+      [
+        { id: 'a', name: 'A' },
+        { id: 'b', name: 'B' },
+      ],
+      4242,
+      77,
+      NO_TARGET,
+      { rundenLimit: 4 },
+    );
+    runSetup(g);
+    g.state.players[1]!.ruhm = 50; // B laege weit vorn ...
+    g.state.players[1]!.besiegt = true; // ... ist aber gefallen
+    while (g.state.phase.t !== 'finished') spieleZug(g);
+    expect(g.state.phase.t === 'finished' && g.state.phase.winner).toBe('a');
+  });
+
   it('wertung: Siegpunkte zehnfach, Ruhm einfach', () => {
     const g = solo();
     runSetup(g);

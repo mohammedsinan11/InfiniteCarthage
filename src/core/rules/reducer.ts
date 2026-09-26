@@ -87,10 +87,14 @@ import { nextStep } from '../units';
 import { bigRoundChangedAt } from '../season';
 import { draftOptions } from '../cards/draft';
 import { cardById } from '../cards/catalog';
-import { cardKind, dauerwirkungen, istEinzigartig } from '../cards/types';
+import { cardKind, dauerwirkungen, istEinzigartig, wiederholbar } from '../cards/types';
 import type { DraftSource } from '../cards/types';
-import { aktiviereNeueReichskarte } from '../cards/loadout';
+import { aktiviereNeueReichskarte, setzeAktiveKarten } from '../cards/loadout';
 import { playTactic } from './tactics';
+import { lagerNeuBesetzen } from './bedrohung';
+import type { BedrohungEvent } from './bedrohung';
+import { imSpiel, imUntergang, untergangRunde, ueberspringeBesiegte } from './untergang';
+import type { UntergangEvent } from './untergang';
 import type { TacticEvent } from './tactics';
 import { ruhmAusEreignissen } from './ruhm';
 import { gueltigeOmen, siebenerBonus, startBeute } from '../omen';
@@ -128,7 +132,9 @@ export type Action =
   /** Anbieter zieht sein Angebot zurueck. */
   | { t: 'cancelTrade' }
   /** Eine der drei angebotenen Karten nehmen. */
-  | { t: 'chooseCard'; card: string }
+  | { t: 'chooseCard'; card: string; replace?: string | null }
+  /** Die aktiven Reichskarten neu zusammenstellen (nur aus dem eigenen Besitz). */
+  | { t: 'setLoadout'; cards: string[] }
   /** Eine ausspielbare Taktikkarte auf eine eigene Einheit oder deren Feld anwenden. */
   | { t: 'playTactic'; card: string; unit: number }
   /** Einen Ritter anwerben - er tritt an einer eigenen Siedlung an. */
@@ -206,6 +212,8 @@ export type GameEvent =
   | { t: 'win'; player: PlayerId }
   /** Heer, Raubzuege, Gefechte, Lager, Ruinen, Held und Feuer - siehe rules/army.ts. */
   | ArmyEvent
+  | UntergangEvent
+  | BedrohungEvent
   | DiplomatieEvent
   | AuftragEvent
   | TacticEvent
@@ -289,6 +297,8 @@ export function createGame(
       equipment: [],
       loot: 0,
       connected: true,
+      untergang: null,
+      besiegt: false,
       heldZurueck: null,
       held: null,
       inventar: {},
@@ -316,6 +326,7 @@ export function createGame(
     nextUnitId: 1,
     destroyedNests: [],
     nestGarrison: {},
+    nestTod: {},
     nestFraktion: {},
     exploredRuins: [],
     braende: [],
@@ -356,6 +367,7 @@ function grow(state: GameState, world: World, hexes: { q: number; r: number }[])
 
 function nextTurn(state: GameState): void {
   state.current = (state.current + 1) % state.order.length;
+  ueberspringeBesiegte(state);
   state.turn += 1;
   // Ein Angebot gehoert zum Zug seines Anbieters und verfaellt mit ihm.
   state.trade = null;
@@ -382,11 +394,19 @@ export function wuerfelFuer(secretSeed: number, turn: number): [number, number] 
 
 /**
  * Die Rundengrenze ist erreicht: die Partie endet, und es gewinnt die hoechste
- * Wertung (core/chronik.ts). Bei Gleichstand, wer in der Reihenfolge vorn sitzt.
+ * Wertung (core/chronik.ts) unter denen, die noch im Spiel sind - wer
+ * untergegangen ist (rules/untergang.ts), gewinnt nicht mehr. Bei Gleichstand,
+ * wer in der Reihenfolge vorn sitzt.
  */
 function zeitAbgelaufen(state: GameState, events: GameEvent[]): void {
-  let best = state.order[0]!;
-  for (const id of state.order) {
+  const uebrig = imSpiel(state);
+  if (uebrig.length === 0) {
+    state.phase = { t: 'finished', winner: null, durch: 'zeit' };
+    events.push({ t: 'lost' });
+    return;
+  }
+  let best = uebrig[0]!;
+  for (const id of uebrig) {
     if (wertung(state, id) > wertung(state, best)) best = id;
   }
   state.phase = { t: 'finished', winner: best, durch: 'zeit' };
@@ -470,6 +490,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
   const actorPlayer = playerById(s, actor);
   if (!actorPlayer) return fail('Unbekannter Spieler.');
   if (s.phase.t === 'finished') return fail('Die Partie ist beendet.');
+  if (actorPlayer.besiegt) return fail('Dein Reich ist gefallen.');
 
   /**
    * Eine Aktion kommt bewusst NICHT vom Spieler am Zug: die Antwort auf ein
@@ -600,15 +621,22 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       const karte = cardById(action.card);
       if (!karte) return fail('Unbekannte Karte.');
 
-      if (istEinzigartig(karte) && [...actorPlayer.cards, ...actorPlayer.equipment].includes(karte.id)) {
+      const schonDa = [...actorPlayer.cards, ...actorPlayer.equipment].includes(karte.id);
+      if (istEinzigartig(karte) && schonDa && !wiederholbar(karte)) {
         return fail('Diese einzigartige Karte besitzt du bereits.');
       }
 
-      if (cardKind(karte) === 'taktik') actorPlayer.tactics.push(karte.id);
-      else if (cardKind(karte) === 'ausruestung') actorPlayer.equipment.push(karte.id);
-      else {
-        actorPlayer.cards.push(karte.id);
-        if (dauerwirkungen(karte).length > 0) aktiviereNeueReichskarte(s, actorPlayer, karte.id);
+      // Ein zweites Mal zaehlt nur die Sofortwirkung - die Dauerwirkung liegt
+      // schon vor und wuerde weder stapeln noch einen zweiten Platz belegen.
+      if (!(istEinzigartig(karte) && schonDa)) {
+        if (cardKind(karte) === 'taktik') actorPlayer.tactics.push(karte.id);
+        else if (cardKind(karte) === 'ausruestung') actorPlayer.equipment.push(karte.id);
+        else {
+          actorPlayer.cards.push(karte.id);
+          if (dauerwirkungen(karte).length > 0) {
+            aktiviereNeueReichskarte(s, actorPlayer, karte.id, action.replace);
+          }
+        }
       }
 
       // Sofortwirkung - die Bank ist unendlich.
@@ -638,6 +666,13 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       s.phase = { t: 'main' };
       events.push({ t: 'cardTaken', player: actor, card: karte.id });
       checkWin(s, events);
+      break;
+    }
+
+    case 'setLoadout': {
+      if (phase.t !== 'main') return fail('Die Karten werden in der Bauphase umgestellt.');
+      const why = setzeAktiveKarten(s, actorPlayer, action.cards);
+      if (why) return fail(why);
       break;
     }
 
@@ -684,7 +719,9 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
 
     case 'buildSettlement': {
       if (phase.t !== 'main') return fail('Jetzt kann nicht gebaut werden.');
-      const why = canPlaceSettlement(s, world, actor, action.vertex, { setup: false });
+      // Steht kein Gebaeude mehr, darf die Siedlung ueberall stehen - ohne
+      // eigene Strasse davor (rules/untergang.ts).
+      const why = canPlaceSettlement(s, world, actor, action.vertex, { setup: imUntergang(s, actor) });
       if (why) return fail(why);
       if (!canAfford(actorPlayer.hand, COST_SETTLEMENT)) {
         return fail('Zu wenig Rohstoffe fuer eine Siedlung.');
@@ -1192,11 +1229,18 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       // Feuer: Regen und Helfer loeschen, was ein Zug lang brannte, brennt ab.
       brandRunde(s, ender, beendet, events);
 
+      // Ist ein Reich gefallen, laeuft seine Frist - und ist die Partie damit
+      // entschieden, endet sie hier (rules/untergang.ts).
+      untergangRunde(s, events);
+      if ((s.phase as GameState['phase']).t === 'finished') break;
+      ueberspringeBesiegte(s);
+
       // Zum Beginn jeder grossen Runde brechen Raubzuege auf, vielleicht eine
       // Fehde und ein Wanderer - nach dem Ziehen, damit ein frischer Raubzug
       // nicht im selben Moment schon pluendert. Und der Tribut wird faellig.
       if (bigRoundChangedAt(s.turn)) {
         beginBigRound(s, events);
+        lagerNeuBesetzen(s, events);
         tributRunde(s, events);
       }
 

@@ -383,7 +383,7 @@ function meldungenAus(
         id: naechsteId++,
         text:
           e.parties.length === 1
-            ? `Raubzug: ${name(e.parties[0]!.fraktion)}`
+            ? `Raubzug: ${name(e.parties[0]!.fraktion)}${(e.parties[0]!.anzahl ?? 1) > 1 ? ` (${e.parties[0]!.anzahl} Mann)` : ''}`
             : `${e.parties.length} Raubzuege brechen auf`,
         kind: 'raid',
       });
@@ -435,7 +435,14 @@ function meldungenAus(
     } else if (e.t === 'burn') {
       if (e.player === you) {
         playBrand();
-        meldung(`Feuer! Es brennt ${BRAND_WAS[e.art]} - loeschen mit Karte, Ritter oder Held`, 'raid');
+        const letztes =
+          e.art !== 'strasse' && state !== null && Object.values(state.buildings).filter((b) => b.owner === you).length <= 1;
+        meldung(
+          letztes
+            ? 'ALARM: Dein letztes Gebaeude brennt! Loesche es in diesem Zug (Karte, Ritter oder Held) - sonst faellt dein Reich'
+            : `Feuer! Es brennt ${BRAND_WAS[e.art]} - loeschen mit Karte, Ritter oder Held`,
+          'raid',
+        );
       }
     } else if (e.t === 'burnedDown') {
       if (e.player === you) {
@@ -446,7 +453,7 @@ function meldungenAus(
       if (e.player === you) {
         playLoeschen();
         meldung(
-          e.durch === 'regen' ? 'Der Regen loescht das Feuer' : e.durch === 'verschont' ? 'Das Feuer erlischt' : 'Feuer geloescht',
+          e.durch === 'regen' ? 'Der Regen loescht das Feuer' : 'Feuer geloescht',
           'gain',
         );
       }
@@ -538,6 +545,20 @@ function meldungenAus(
       out.push({ id: naechsteId++, text: `${wer(e.player)} spielt eine Taktik`, kind: 'info' });
     } else if (e.t === 'win') {
       out.push({ id: naechsteId++, text: `${wer(e.player)} gewinnt`, kind: 'info' });
+    } else if (e.t === 'fall') {
+      out.push({
+        id: naechsteId++,
+        text: e.player === you ? 'Dein letztes Gebaeude ist gefallen - baue bald eine Siedlung!' : `${wer(e.player)} verliert das letzte Gebaeude`,
+        kind: 'raid',
+      });
+    } else if (e.t === 'recovered') {
+      out.push({ id: naechsteId++, text: e.player === you ? 'Dein Reich steht wieder' : `${wer(e.player)} steht wieder`, kind: 'gain' });
+    } else if (e.t === 'defeated') {
+      out.push({ id: naechsteId++, text: e.player === you ? 'Dein Reich ist gefallen' : `${wer(e.player)} ist gefallen`, kind: 'raid' });
+    } else if (e.t === 'lost') {
+      out.push({ id: naechsteId++, text: 'Die Partie ist verloren', kind: 'raid' });
+    } else if (e.t === 'nestRevived') {
+      out.push({ id: naechsteId++, text: `${name(e.fraktion)} beziehen ein Lager neu`, kind: 'raid' });
     }
   }
   return out;

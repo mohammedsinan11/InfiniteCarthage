@@ -21,7 +21,7 @@
 import { Rng } from '../rng';
 import { hash3i } from '../hash';
 import { CARDS } from './catalog';
-import { RARITY_WEIGHTS, cardKind, istEinzigartig } from './types';
+import { RARITY_ORDER, RARITY_WEIGHTS, cardKind, istEinzigartig, wiederholbar } from './types';
 import type { Card, DraftSource, Rarity } from './types';
 
 const SALT_DRAFT = 61;
@@ -68,10 +68,13 @@ export function draftOptions(
 ): string[] {
   const rng = new Rng(hash3i(secretSeed, turn, QUELLE_ZU_ZAHL[source], SALT_DRAFT));
   const besitzt = new Set(owned);
-  const verfuegbar = CARDS.filter((c) => !istEinzigartig(c) || !besitzt.has(c.id));
+  const verfuegbar = CARDS.filter((c) => !istEinzigartig(c) || !besitzt.has(c.id) || wiederholbar(c));
+  // Eine Stufe kommt in Frage, sobald sie EINE Karte hat - fehlende Plaetze
+  // fuellt weiter unten die naechstniedrigere. Frueher waren es drei, und mit
+  // wachsender Sammlung fielen erst legendaer, dann episch fuer immer heraus.
   const stufen = new Set<Rarity>();
   for (const r of Object.keys(RARITY_WEIGHTS[source]) as Rarity[]) {
-    if (verfuegbar.filter((c) => c.rarity === r).length >= DRAFT_SIZE) stufen.add(r);
+    if (verfuegbar.some((c) => c.rarity === r)) stufen.add(r);
   }
 
   // Eine Seltenheit fuer die ganze Auslage: drei echte Alternativen statt
@@ -81,6 +84,15 @@ export function draftOptions(
     ? verfuegbar
     : verfuegbar.filter((c) => c.rarity === stufe);
   const gewaehlt = rng.shuffle([...passend]);
+  // Gibt die Stufe weniger als eine volle Auslage her, kommen die Karten der
+  // naechstliegenden Stufen dazu - die Auslage bleibt dreifach, ihr Kopf bleibt
+  // die gezogene Stufe. Ohne Ziehung (stufe === null) ist ohnehin alles drin.
+  if (stufe !== null && gewaehlt.length < DRAFT_SIZE) {
+    const nah = (c: Card) => Math.abs(RARITY_ORDER.indexOf(c.rarity) - RARITY_ORDER.indexOf(stufe));
+    const rest = rng.shuffle(verfuegbar.filter((c) => c.rarity !== stufe));
+    rest.sort((a, b) => nah(a) - nah(b));
+    gewaehlt.push(...rest.slice(0, DRAFT_SIZE - gewaehlt.length));
+  }
 
   /*
    * HOECHSTENS EINE TAKTIK JE AUSLAGE.

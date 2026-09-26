@@ -35,6 +35,7 @@ import { TradePanel } from '../ui/TradePanel';
 import { DiceOverlay } from '../ui/DiceOverlay';
 import { Announcements } from '../ui/Announcements';
 import { CardDraft } from '../ui/CardDraft';
+import { reichskartenPlaetze } from '../../core/cards/loadout';
 import { SideMenu } from '../ui/SideMenu';
 import { Chronik } from '../ui/Chronik';
 import { OmenListe } from '../ui/OmenListe';
@@ -52,7 +53,7 @@ import { roundOf, seasonOf } from '../../core/season';
 import { RESOURCES } from '../../core/types';
 import type { Resource } from '../../core/types';
 import { COST_CAPITAL, COST_CITY, COST_STUFE, COST_ROAD, COST_TURM_STUFE, canAfford } from '../../core/rules/costs';
-import { FRIEDEN_PREIS, TRIBUT_KARTEN, nimmtFrieden } from '../../core/rules/diplomatie';
+import { FRIEDEN_PREIS, nimmtFrieden, tributKarten } from '../../core/rules/diplomatie';
 import { brennt } from '../../core/rules/feuer';
 // maxLeben kennt Art, Zweig des Ernannten und Rang (core/combat.ts).
 import { maxLeben } from '../../core/combat';
@@ -283,6 +284,9 @@ export function Game() {
 
   /** Das Heer in Gruppen (client/heer.ts): Scharen und Felder. */
   const heer = useMemo(() => heerGruppen(meineEinheiten), [meineEinheiten]);
+  /** Kein Gebaeude mehr, aber die Frist laeuft: eine Siedlung darf ueberall stehen (rules/untergang.ts). */
+  const notbau = !!me && me.untergang !== null && !me.besiegt && !Object.values(state.buildings).some((b) => b.owner === me.id);
+  const tributPreis = useMemo(() => (you ? tributKarten(state, you) : 1), [state, you]);
   const kampfOrte = useMemo(() => new Set(kampfFelderVon(state).keys()), [state]);
   /** Wie der eigene Held heisst (core/lore.ts) - undefined, bevor er antritt. */
   const heldName = useMemo(() => {
@@ -396,7 +400,7 @@ export function Game() {
           };
         }
         if (mode === 'settlement') {
-          return { vertices: legalSettlementVertices(state, world, you, { setup: false }) };
+          return { vertices: legalSettlementVertices(state, world, you, { setup: notbau }) };
         }
         if (mode === 'city') return { vertices: legalCityVertices(state, you) };
         return {};
@@ -1044,6 +1048,9 @@ export function Game() {
           turn={state.turn}
           cards={me?.cards ?? []}
           activeCards={me?.activeCards ?? []}
+          kartenPlaetze={you ? reichskartenPlaetze(state, you) : 0}
+          kannUmstellen={isMine && phase.t === 'main'}
+          onLoadout={(cards) => act({ t: 'setLoadout', cards })}
           tactics={me?.tactics ?? []}
           equipment={me?.equipment ?? []}
           log={log}
@@ -1087,7 +1094,8 @@ export function Game() {
           onFolgen={(id, folgen) => act({ t: 'follow', unit: id, follow: folgen })}
           diplomatieMoeglich={isMine && phase.t === 'main'}
           friedenBezahlbar={!!hand && canAfford(hand, FRIEDEN_PREIS)}
-          tributBezahlbar={!!hand && RESOURCES.reduce((n, r) => n + hand[r], 0) >= TRIBUT_KARTEN}
+          tributPreis={tributPreis}
+          tributBezahlbar={!!hand && RESOURCES.reduce((n, r) => n + hand[r], 0) >= tributPreis}
           onDiplomatie={(fraktion, art) => act({ t: 'diplomacy', fraktion, art })}
           auftraege={meineAuftraege}
           onAuftrag={(id, annehmen) => act({ t: 'answerQuest', id, accept: annehmen })}
@@ -1125,7 +1133,10 @@ export function Game() {
             options={state.draft.options}
             source={state.draft.source}
             darfWaehlen={isMine}
-            onChoose={(card) => act({ t: 'chooseCard', card })}
+            besitz={me?.cards ?? []}
+            aktiv={me?.activeCards ?? []}
+            plaetze={you ? reichskartenPlaetze(state, you) : 0}
+            onChoose={(card, replace) => act({ t: 'chooseCard', card, replace })}
           />
         )}
 
@@ -1134,6 +1145,14 @@ export function Game() {
         {omenOffen && state.omens.length > 0 && (
           <div className="hud-omen-tafel">
             <OmenListe omens={state.omens} />
+          </div>
+        )}
+
+        {phase.t !== 'finished' && me?.untergang != null && !me.besiegt && (
+          <div className="hud-untergang" role="alert">
+            {notbau
+              ? `Dein letztes Gebaeude ist gefallen! Setze bis Zug ${me.untergang} eine Siedlung - auch ohne Strasse davor (${state.turn >= me.untergang ? 'jetzt' : `noch ${me.untergang - state.turn} Zuege`}).`
+              : 'Dein Reich steht wieder.'}
           </div>
         )}
 

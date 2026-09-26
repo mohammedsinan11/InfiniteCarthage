@@ -23,6 +23,7 @@ import { dauerwirkungen } from '../src/core/cards/types';
 import { tradeRatio } from '../src/core/rules/trade';
 import { RESOURCES } from '../src/core/types';
 import { aktiviereNeueReichskarte, reichskartenPlaetze } from '../src/core/cards/loadout';
+import { istEinzigartig, wiederholbar } from '../src/core/cards/types';
 
 const QUELLEN: DraftSource[] = ['fund', 'belohnung', 'markt'];
 
@@ -149,6 +150,95 @@ describe('Auswahl', () => {
         expect(taktiken.length, `${q} Runde ${runde}: ${taktiken.join(', ')}`).toBeLessThanOrEqual(1);
       }
     }
+  });
+});
+
+describe('Ein volles Deck', () => {
+  /** Alles besitzen, was sich nur einmal nehmen laesst. */
+  const alleDauerkarten = CARDS.filter(istEinzigartig).map((c) => c.id);
+
+  it('laesst episch und legendaer nicht fuer immer verschwinden', () => {
+    const stufen = new Set<string>();
+    for (let runde = 1; runde <= 400; runde++) {
+      for (const id of draftOptions(555, runde, 'fund', alleDauerkarten)) stufen.add(cardById(id)!.rarity);
+    }
+    expect(stufen.has('episch')).toBe(true);
+    expect(stufen.has('legendaer')).toBe(true);
+  });
+
+  it('bietet dann nur Karten mit Sofortwirkung an, und stets drei', () => {
+    for (const q of QUELLEN) {
+      for (let runde = 1; runde <= 200; runde++) {
+        const o = draftOptions(555, runde, q, alleDauerkarten);
+        expect(o).toHaveLength(DRAFT_SIZE);
+        expect(new Set(o).size).toBe(DRAFT_SIZE);
+        for (const id of o) {
+          const k = cardById(id)!;
+          if (istEinzigartig(k)) expect(wiederholbar(k), `${id} waere leer`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('gibt beim zweiten Nehmen nur die Sofortwirkung, keinen zweiten Platz', () => {
+    const game = solo();
+    const p = playerById(game.state, 'p0')!;
+    p.cards = ['saegewerk'];
+    p.activeCards = ['saegewerk'];
+    game.state.phase = { t: 'draft' };
+    game.state.draft = { source: 'fund', options: ['saegewerk', 'ernte', 'lehmgrube'] };
+    const holz = p.hand.lumber;
+    must(game, kartenwahl('saegewerk'), 'p0');
+    const danach = playerById(game.state, 'p0')!;
+    expect(danach.cards).toEqual(['saegewerk']);
+    expect(danach.activeCards).toEqual(['saegewerk']);
+    expect(danach.hand.lumber).toBe(holz + 3);
+  });
+});
+
+describe('Kartenplaetze', () => {
+  const mitVollenPlaetzen = () => {
+    const game = solo();
+    const p = playerById(game.state, 'p0')!;
+    p.cards = ['holzlager', 'steinbruch'];
+    p.activeCards = ['holzlager', 'steinbruch'];
+    game.state.phase = { t: 'draft' };
+    game.state.draft = { source: 'fund', options: ['schafzucht', 'ernte', 'lehmgrube'] };
+    return game;
+  };
+
+  it('laesst die Wahl, welche aktive Karte weicht', () => {
+    const game = mitVollenPlaetzen();
+    must(game, { t: 'chooseCard', card: 'schafzucht', replace: 'steinbruch' }, 'p0');
+    expect(playerById(game.state, 'p0')!.activeCards).toEqual(['holzlager', 'schafzucht']);
+  });
+
+  it('kann die neue Karte auch nur behalten, ohne dass eine weicht', () => {
+    const game = mitVollenPlaetzen();
+    must(game, { t: 'chooseCard', card: 'schafzucht', replace: null }, 'p0');
+    const p = playerById(game.state, 'p0')!;
+    expect(p.activeCards).toEqual(['holzlager', 'steinbruch']);
+    expect(p.cards).toContain('schafzucht');
+  });
+
+  it('ersetzt ohne Angabe wie bisher die aelteste', () => {
+    const game = mitVollenPlaetzen();
+    must(game, kartenwahl('schafzucht'), 'p0');
+    expect(playerById(game.state, 'p0')!.activeCards).toEqual(['steinbruch', 'schafzucht']);
+  });
+
+  it('stellt die aktiven Karten aus dem Besitz um', () => {
+    const game = solo();
+    runSetup(game);
+    const p = playerById(game.state, 'p0')!;
+    p.cards = ['holzlager', 'steinbruch', 'schafzucht'];
+    p.activeCards = ['holzlager', 'steinbruch'];
+    game.state.phase = { t: 'main' };
+    must(game, { t: 'setLoadout', cards: ['schafzucht', 'holzlager'] }, 'p0');
+    expect(playerById(game.state, 'p0')!.activeCards).toEqual(['schafzucht', 'holzlager']);
+    expect(applyAction(game, { t: 'setLoadout', cards: ['schafzucht', 'holzlager', 'steinbruch'] }, 'p0').ok).toBe(false);
+    expect(applyAction(game, { t: 'setLoadout', cards: ['der_fund'] }, 'p0').ok).toBe(false);
+    expect(applyAction(game, { t: 'setLoadout', cards: ['holzlager', 'holzlager'] }, 'p0').ok).toBe(false);
   });
 });
 

@@ -47,6 +47,9 @@ export type PublicPlayer = {
   loot: number;
   /** Wann der gefallene Held zurueckkehrt, oder null - oeffentlich wie sein Fall. */
   heldZurueck: number | null;
+  /** Frist bis zum Untergang (Zugnummer) oder null - oeffentlich: alle sehen, wer wankt. */
+  untergang: number | null;
+  besiegt: boolean;
   /** Name, Haus und Titel des Helden - oeffentlich: sein Schild steht auf der Karte. */
   held: HeldLore | null;
   /** Gesammelte Dinge, etwa Gelee - oeffentlich wie die Beute. */
@@ -151,6 +154,8 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
       equipment: [...p.equipment],
       loot: p.loot,
       heldZurueck: p.heldZurueck,
+      untergang: p.untergang ?? null,
+      besiegt: p.besiegt ?? false,
       held: p.held ?? null,
       inventar: { ...(p.inventar ?? {}) },
       ernannt: p.ernannt ? { ...p.ernannt, lore: { ...p.ernannt.lore } } : null,

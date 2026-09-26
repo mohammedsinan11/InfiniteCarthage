@@ -59,7 +59,9 @@ export type MomentArt =
   | 'auftrag'
   | 'stufe'
   | 'sieg'
-  | 'ende';
+  | 'ende'
+  /** Ein Reich verliert sein letztes Gebaeude oder geht unter (rules/untergang.ts). */
+  | 'untergang';
 
 export type Moment = {
   turn: number;
@@ -226,6 +228,18 @@ export function chronikFortschreiben(state: GameState, events: readonly GameEven
       case 'turn':
         // Der Verlauf je grosser Runde - dieselbe Stelle, an der die Raubzuege aufbrechen.
         if (bigRoundChangedAt(state.turn)) c.verlauf.push({ turn: state.turn, punkte: punkteZeile(state, false) });
+        break;
+      case 'fall':
+        moment(e.player, 'untergang', `Das letzte Gebaeude von ${nameVon(state, e.player)} ist gefallen.`);
+        break;
+      case 'recovered':
+        moment(e.player, 'stadt', `${nameVon(state, e.player)} baut das Reich wieder auf.`);
+        break;
+      case 'defeated':
+        moment(e.player, 'untergang', `Das Reich von ${nameVon(state, e.player)} geht unter.`);
+        break;
+      case 'lost':
+        moment(null, 'ende', 'Alle Reiche sind gefallen - die Partie ist verloren.');
         break;
       case 'win': {
         const zeit = state.phase.t === 'finished' && state.phase.durch === 'zeit';

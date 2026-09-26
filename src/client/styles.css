@@ -959,6 +959,35 @@ em.off {
   }
 }
 
+.hud-untergang {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  max-width: min(92vw, 560px);
+  background: rgba(60, 14, 10, 0.94);
+  border: 2px solid #c8402f;
+  padding: 10px 16px;
+  font-family: var(--pixel);
+  font-size: 12px;
+  line-height: 1.5;
+  color: #ffd9cf;
+  text-align: center;
+}
+
+.hud-niederlage {
+  border-color: #c8402f;
+  color: #ffd9cf;
+  text-align: center;
+  max-width: min(92vw, 520px);
+}
+
+.hud-win-sub {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
 .hud-win {
   position: absolute;
   top: 50%;
@@ -1860,6 +1889,34 @@ em.off {
   margin: 0 0 14px;
   font-size: 12px;
   color: var(--muted);
+}
+
+.draft-plaetze {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  align-items: center;
+  margin-top: 14px;
+  padding: 0 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.draft-plaetze button.aktiv {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.draft-nochmal {
+  display: block;
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.draft-verdraengt {
+  color: var(--accent);
 }
 
 .draft-karten {
@@ -4636,6 +4693,7 @@ em.off {
   border-left-color: var(--accent);
 }
 .chronik-momente .moment-brand,
+.chronik-momente .moment-untergang,
 .chronik-momente .moment-held,
 .chronik-momente .moment-horde,
 .chronik-momente .moment-morast {

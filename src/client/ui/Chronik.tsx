@@ -99,7 +99,8 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
   }
 
   let kopf: string;
-  if (tages) kopf = `Tagesexpedition ${tages}`;
+  if (phase.winner === null) kopf = tages ? `Tagesexpedition ${tages} - verloren` : 'Alle Reiche sind gefallen';
+  else if (tages) kopf = `Tagesexpedition ${tages}`;
   else if (phase.durch === 'zeit' && state.order.length === 1) kopf = 'Das Jahr ist um';
   else if (phase.durch === 'zeit') kopf = `Das Jahr ist um - ${sieger?.name ?? 'Jemand'} gewinnt`;
   else kopf = `${sieger?.name ?? 'Jemand'} gewinnt`;
@@ -114,6 +115,9 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
             Runde {runde} · {SEASON_NAME[seasonOf(state.turn)]} im Jahr {yearOf(state.turn)}
             {phase.durch === 'ziel' && state.targetPoints > 0 ? ` · Ziel ${state.targetPoints} Siegpunkte erreicht` : ''}
           </p>
+          {state.players.find((p) => p.id === you)?.besiegt && phase.winner !== null && (
+            <p className="note">Dein Reich ist gefallen.</p>
+          )}
           {tages && ich && (
             <p className="chronik-wertung">
               Deine Wertung: <b>{ich.wertung}</b>

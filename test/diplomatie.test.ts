@@ -10,6 +10,7 @@ import {
   FRIEDEN_PREIS,
   FRIEDEN_RUNDEN,
   abkommenRunde,
+  tributKarten,
   tributRunde,
   verhandeln,
 } from '../src/core/rules/diplomatie';
@@ -90,6 +91,24 @@ describe('Abkommen', () => {
     expect(s.abkommen).toHaveLength(0);
     expect(events.map((e) => e.t)).toEqual(['tribute', 'war']);
     expect(events[1]).toMatchObject({ grund: 'unbezahlt' });
+  });
+
+  it('Tribut waechst mit dem Reich: eine Karte je Siegpunkt', () => {
+    const game = solo();
+    const s = game.state;
+    expect(tributKarten(s, 'p0')).toBe(1);
+    for (let i = 0; i < 6; i++) s.buildings[`${i}:0:N`] = { owner: 'p0', type: 'settlement' };
+    expect(tributKarten(s, 'p0')).toBe(6);
+    const goblins = fraktionDerArt(game, 'goblin');
+    leereHand(game);
+    s.players[0]!.hand.ore = 5;
+    expect(verhandeln(s, 'p0', goblins, 'tribut', [])).toMatch(/6 noetig/);
+    s.players[0]!.hand.ore = 8;
+    expect(verhandeln(s, 'p0', goblins, 'tribut', [])).toBeNull();
+    expect(s.players[0]!.hand.ore).toBe(2);
+    const events: DiplomatieEvent[] = [];
+    tributRunde(s, events);
+    expect(events[0]).toMatchObject({ t: 'war', grund: 'unbezahlt' });
   });
 
   it('Frieden laeuft aus, und Krieg laesst sich jederzeit erklaeren', () => {
