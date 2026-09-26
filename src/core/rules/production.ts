@@ -16,6 +16,7 @@ import { emptyHand } from '../state';
 import type { Hand } from '../state';
 import { regnet, wetterOf } from '../zeit';
 import { ertragsBonus } from '../omen';
+import { hausGelaende, hausRegenfest } from '../haus';
 import type { Wetter } from '../zeit';
 
 export type Payout = Record<PlayerId, Hand>;
@@ -49,7 +50,7 @@ export function productionSources(
    * die Ertragsregel bleibt einmalig.
    */
   state: Pick<GameState, 'buildings'> & {
-    players: ReadonlyArray<{ id: PlayerId; activeCards: string[] }>;
+    players: ReadonlyArray<{ id: PlayerId; activeCards: string[]; haus?: string | null }>;
     /** Die Omen der Partie (core/omen.ts) - sie gelten fuer alle. */
     omens?: readonly string[];
   },
@@ -78,8 +79,11 @@ export function productionSources(
       // Karten koennen den Ertrag heben oder senken, aber nie unter null.
       const mods = modifiersOf(cardsOf(b.owner));
       const omen = ertragsBonus(state.omens, tile.terrain);
-      const voll = Math.max(0, terrainBonusFor(mods, tile.terrain, grund) + omen);
-      const amount = nass && tile.terrain === 'field' ? Math.floor(voll / 2) : voll;
+      // Das Haus des Besitzers (core/haus.ts) - etwa der Bergclan an Bergen.
+      const haus = state.players.find((p) => p.id === b.owner)?.haus;
+      const voll = Math.max(0, terrainBonusFor(mods, tile.terrain, grund) + omen + hausGelaende(haus, tile.terrain));
+      const halb = nass && tile.terrain === 'field' && !hausRegenfest(haus);
+      const amount = halb ? Math.floor(voll / 2) : voll;
       if (amount > 0) out.push({ hex: hk, owner: b.owner, resource, amount });
     }
   }

@@ -98,6 +98,7 @@ import type { UntergangEvent } from './untergang';
 import type { TacticEvent } from './tactics';
 import { ruhmAusEreignissen } from './ruhm';
 import { gueltigeOmen, siebenerBonus, startBeute } from '../omen';
+import { hausAngebot, hausById, hausWirkung } from '../haus';
 import { chronikBeginnen, chronikFortschreiben, neueChronik, wertung } from '../chronik';
 import type { RuhmEvent } from './ruhm';
 import {
@@ -111,6 +112,8 @@ import {
 import { drawDevCard } from './dev';
 
 export type Action =
+  /** Vor dem Aufbau: eines der angebotenen Adelshaeuser waehlen (core/haus.ts). */
+  | { t: 'chooseHouse'; haus: string }
   | { t: 'placeSettlement'; vertex: string }
   | { t: 'placeRoad'; edge: string }
   | { t: 'roll' }
@@ -209,6 +212,7 @@ export type GameEvent =
   | { t: 'cardTaken'; player: PlayerId; card: string }
   | { t: 'chunks'; coords: ChunkCoord[] }
   | { t: 'turn'; player: PlayerId }
+  | { t: 'houseChosen'; player: PlayerId; haus: string }
   | { t: 'win'; player: PlayerId }
   /** Heer, Raubzuege, Gefechte, Lager, Ruinen, Held und Feuer - siehe rules/army.ts. */
   | ArmyEvent
@@ -256,6 +260,12 @@ export type PartieOptionen = {
   rundenLimit?: number | null;
   /** Das Datum einer Tagesexpedition (core/tages.ts). */
   tagesDatum?: string | null;
+  /**
+   * Mit Adelshaeusern (core/haus.ts): vor dem Aufbau waehlt jeder eines aus
+   * drei. Aus, wenn nicht gesetzt - so bleiben Tests und alte Aufrufe, wie sie
+   * sind; der Raum schaltet es ein.
+   */
+  haeuser?: boolean;
 };
 
 export function createGame(
@@ -340,6 +350,15 @@ export function createGame(
     tagesDatum: optionen.tagesDatum ?? null,
     chronik: neueChronik({ players: players.map((p) => ({ id: p.id })) as GameState['players'] }),
   };
+
+  if (optionen.haeuser) {
+    state.phase = { t: 'hauswahl' };
+    state.hausAngebot = {};
+    state.players.forEach((p, i) => {
+      p.haus = null;
+      state.hausAngebot![p.id] = hausAngebot(secretSeed, i);
+    });
+  }
 
   return { state, world };
 }
@@ -501,12 +520,31 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
    * ein abwesender Spieler die Runde nicht anhalten kann.
    */
   const fromOthers =
-    action.t === 'respondTrade' || action.t === 'answerQuest' || action.t === 'deliverQuest';
+    action.t === 'respondTrade' ||
+    action.t === 'answerQuest' ||
+    action.t === 'deliverQuest' ||
+    action.t === 'chooseHouse';
   if (!fromOthers && actor !== currentPlayerId(s)) return fail('Du bist nicht am Zug.');
 
   const phase = s.phase;
 
   switch (action.t) {
+    // --- Hauswahl: alle gleichzeitig, dann der Aufbau ---
+    case 'chooseHouse': {
+      if (phase.t !== 'hauswahl') return fail('Die Haeuser sind schon gewaehlt.');
+      if (actorPlayer.haus) return fail('Du hast dein Haus schon gewaehlt.');
+      if (!(s.hausAngebot?.[actor] ?? []).includes(action.haus) || !hausById(action.haus)) {
+        return fail('Dieses Haus steht dir nicht zur Wahl.');
+      }
+      actorPlayer.haus = action.haus;
+      events.push({ t: 'houseChosen', player: actor, haus: action.haus });
+      if (s.players.every((p) => p.haus)) {
+        s.phase = { t: 'setup', step: 0, awaiting: 'settlement', lastVertex: null };
+        events.push({ t: 'turn', player: setupPlayerId(s, 0) });
+      }
+      break;
+    }
+
     // --- Aufbau ---
     case 'placeSettlement': {
       if (phase.t !== 'setup' || phase.awaiting !== 'settlement') {
@@ -523,7 +561,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
 
       // Die zweite Siedlung bringt sofort Ertrag.
       const n = s.order.length;
-      if (phase.step >= n) {
+      if (phase.step >= n && !hausWirkung(actorPlayer.haus).keinStartErtrag) {
         for (const h of around) {
           const tile = tileAt(world, h.q, h.r);
           if (!tile) continue;
@@ -564,6 +602,13 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         for (const id of s.order) spawnHeld(s, id, events);
         // Gruenderzeit: jeder beginnt mit einer Kartenwahl (core/omen.ts).
         for (const p of s.players) p.loot += startBeute(s.omens);
+        // Die Startausstattung der Haeuser (core/haus.ts).
+        for (const p of s.players) {
+          const w = hausWirkung(p.haus);
+          for (const r of RESOURCES) p.hand[r] += w.startHand?.[r] ?? 0;
+          p.loot += w.startBeute ?? 0;
+          for (let i = 0; i < (w.startRitter ?? 0); i++) spawnKnight(s, p.id, events);
+        }
         chronikBeginnen(s);
         events.push({ t: 'turn', player: s.order[0]! });
       } else {

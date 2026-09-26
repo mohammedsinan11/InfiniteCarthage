@@ -107,6 +107,11 @@ export type Player = {
    * und ein Spieler nun zwei haben kann.
    */
   ernannt: Ernennung | null;
+  /**
+   * Das Adelshaus dieser Partie (core/haus.ts): eine Staerke, eine Schwaeche.
+   * null, solange noch gewaehlt wird; fehlt bei alten Staenden - dann gilt keines.
+   */
+  haus?: string | null;
 };
 
 /** Die drei Helden, die der Koenigssitz freischaltet - einer davon, fuer immer. */
@@ -370,6 +375,11 @@ export type WandererAuftrag = {
  * Reihenfolge nicht verlieren.
  */
 export type Phase =
+  /**
+   * Vor dem Aufbau: jeder waehlt sein Haus aus state.hausAngebot - alle
+   * gleichzeitig, nicht der Reihe nach (core/haus.ts).
+   */
+  | { t: 'hauswahl' }
   | { t: 'setup'; step: number; awaiting: 'settlement' | 'road'; lastVertex: string | null }
   | { t: 'roll' }
   /**
@@ -523,6 +533,8 @@ export type GameState = {
   tagesDatum?: string | null;
   /** Punkteverlauf, Zahlen und Momente fuer die Schlussseite (core/chronik.ts). */
   chronik?: Chronik;
+  /** Die drei Haeuser, die jeder zur Wahl hat (core/haus.ts). Oeffentlich. */
+  hausAngebot?: Record<PlayerId, string[]>;
 };
 
 /** Eine Hauptstadt auf einem Feld. Die Stufe beginnt bei 1 - weitere folgen (DESIGN.md, Hauptstadt). */

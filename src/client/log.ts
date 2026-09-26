@@ -17,6 +17,7 @@ import { TURM_NAME } from '../core/state';
 import { REICHSBAU_NAME } from '../core/rules/reich';
 import { ZWEIG_NAME } from '../core/rules/zweig';
 import { heldKurz } from '../core/lore';
+import { hausById } from '../core/haus';
 
 const RES_NAME: Record<Resource, string> = {
   lumber: 'Holz',
@@ -341,6 +342,8 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
         : `Die Karte waechst um ${e.coords.length} Gebiete.`;
     case 'turn':
       return `${who(state, e.player)} ist am Zug.`;
+    case 'houseChosen':
+      return `${who(state, e.player)} fuehrt ${hausById(e.haus)?.name ?? 'ein Haus'}.`;
     case 'draftOffered':
       return `${who(state, e.player)} darf eine von drei Karten waehlen.`;
     case 'cardTaken':

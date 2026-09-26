@@ -38,6 +38,8 @@ import { CardDraft } from '../ui/CardDraft';
 import { reichskartenPlaetze } from '../../core/cards/loadout';
 import { SideMenu } from '../ui/SideMenu';
 import { Chronik } from '../ui/Chronik';
+import { HausWahl } from '../ui/HausWahl';
+import { hausById } from '../../core/haus';
 import { OmenListe } from '../ui/OmenListe';
 import { omenById } from '../../core/omen';
 import { neuerRaumCode } from '../net/socket';
@@ -1023,6 +1025,14 @@ export function Game() {
               {state.tagesDatum ? 'Tagesexpedition · ' : ''}Runde {Math.min(roundOf(state.turn), state.rundenLimit)} / {state.rundenLimit}
             </span>
           )}
+          {me?.haus && hausById(me.haus) && (
+            <span
+              className="hud-haus"
+              title={`${hausById(me.haus)!.name}\n+ ${hausById(me.haus)!.staerke}\n- ${hausById(me.haus)!.schwaeche}`}
+            >
+              {hausById(me.haus)!.name}
+            </span>
+          )}
           {state.omens.length > 0 && (
             <button
               className={omenOffen ? 'hud-omen offen' : 'hud-omen'}
@@ -1154,6 +1164,10 @@ export function Game() {
               ? `Dein letztes Gebaeude ist gefallen! Setze bis Zug ${me.untergang} eine Siedlung - auch ohne Strasse davor (${state.turn >= me.untergang ? 'jetzt' : `noch ${me.untergang - state.turn} Zuege`}).`
               : 'Dein Reich steht wieder.'}
           </div>
+        )}
+
+        {phase.t === 'hauswahl' && (
+          <HausWahl state={state} you={you} onChoose={(haus) => act({ t: 'chooseHouse', haus })} />
         )}
 
         {phase.t === 'finished' && (

@@ -380,6 +380,7 @@ export class GameRoom implements DurableObject {
             omens: gueltigeOmen(room.omens ?? []),
             rundenLimit: room.rundenLimit ?? null,
             tagesDatum: tages,
+            haeuser: true,
           },
         );
         room.started = true;

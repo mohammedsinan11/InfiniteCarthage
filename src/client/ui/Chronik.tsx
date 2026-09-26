@@ -20,6 +20,7 @@ import { RESOURCES } from '../../core/types';
 import { playerColor } from '../theme';
 import { OmenListe } from './OmenListe';
 import { holeTagesInfo } from '../net/socket';
+import { hausById } from '../../core/haus';
 import type { BestenEintrag } from '../../core/tages';
 
 type Props = {
@@ -38,6 +39,7 @@ type Zeile = {
   punkte: number;
   ruhm: number;
   wertung: number;
+  haus: string | null;
 };
 
 export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
@@ -78,6 +80,7 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
           punkte,
           ruhm: p.ruhm,
           wertung: punkte * 10 + p.ruhm,
+          haus: p.haus ?? null,
         };
       })
       .sort((a, b) => b.wertung - a.wertung);
@@ -148,6 +151,7 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
                   <td>{i + 1}.</td>
                   <td>
                     <span className="dot" style={{ background: z.farbe }} /> {z.name}
+                    {z.haus && <span className="chronik-haus"> · {hausById(z.haus)?.name}</span>}
                   </td>
                   <td>{z.punkte}</td>
                   <td>{z.ruhm}</td>

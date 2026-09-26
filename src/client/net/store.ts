@@ -212,6 +212,8 @@ function vervollstaendige(msg: ServerMsg): void {
     msg.state.rundenLimit ??= null;
     msg.state.tagesDatum ??= null;
     msg.state.chronik ??= null;
+    msg.state.hausAngebot ??= {};
+    for (const p of msg.state.players) p.haus ??= null;
   }
 }
 

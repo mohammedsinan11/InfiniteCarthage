@@ -4732,3 +4732,61 @@ em.off {
 .chronik section {
   overflow-x: auto;
 }
+
+/* --- Hauswahl (ui/HausWahl.tsx, core/haus.ts) ------------------------------ */
+
+.haus-karte {
+  width: 200px;
+  min-height: 250px;
+  text-align: left;
+  align-items: stretch;
+}
+.haus-karte .draft-selt,
+.haus-karte .draft-name {
+  text-align: center;
+}
+.haus-zeile {
+  font-family: system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: normal;
+}
+.haus-zeile.plus {
+  color: #9fcb86;
+}
+.haus-zeile.minus {
+  color: #e39a86;
+}
+.haus-rat {
+  font-family: system-ui, sans-serif;
+  margin-top: auto;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--muted);
+  font-style: italic;
+  white-space: normal;
+}
+.haus-stand {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+.haus-stand .dot {
+  display: inline-block;
+  margin-right: 5px;
+  vertical-align: -1px;
+}
+.hud > span.hud-haus {
+  color: var(--text);
+  white-space: nowrap;
+}
+.chronik-haus {
+  color: var(--muted);
+  font-size: 11.5px;
+}

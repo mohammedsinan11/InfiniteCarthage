@@ -72,7 +72,8 @@ check(err.message.includes('Gastgeber'), 'B darf nicht starten: ' + err.message)
 a.send({ t: 'start' });
 const stA = await a.wait((m) => m.t === 'state', 'state A');
 const stB = await b.wait((m) => m.t === 'state', 'state B');
-check(stA.state.phase.t === 'setup', 'Partie beginnt im Aufbau');
+check(stA.state.phase.t === 'hauswahl', 'Partie beginnt mit der Hauswahl');
+check((stA.state.hausAngebot[welA.you] ?? []).length === 3, 'drei Haeuser zur Wahl');
 check(stA.state.chunks.length > 0, 'Chunks werden mitgeschickt: ' + stA.state.chunks.length);
 
 // Redaktion: kein Geheimnis im Klartext.
@@ -88,8 +89,15 @@ check(meInA.hand !== undefined, 'eigene Hand ist enthalten');
 // Gelaende wird NICHT uebertragen - nur Koordinaten.
 check(!rawA.includes('forest') && !rawA.includes('terrain'), 'kein Gelaende in der Nachricht');
 
+// Beide waehlen ihr Haus - gleichzeitig -, dann beginnt der Aufbau.
+const welB0 = b.inbox.find((m) => m.t === 'welcome');
+a.send({ t: 'action', action: { t: 'chooseHouse', haus: stA.state.hausAngebot[welA.you][0] } });
+b.send({ t: 'action', action: { t: 'chooseHouse', haus: stB.state.hausAngebot[welB0.you][0] } });
+const stSetup = await a.wait((m) => m.t === 'state' && m.state.phase.t === 'setup', 'Aufbau nach der Hauswahl');
+check(stSetup.state.players.every((p) => p.haus), 'nach der Hauswahl beginnt der Aufbau, jeder hat ein Haus');
+
 // Falscher Spieler am Zug wird abgewiesen.
-const first = stA.state.currentPlayer;
+const first = stSetup.state.currentPlayer;
 const wrong = first === welA.you ? b : a;
 wrong.send({ t: 'action', action: { t: 'placeSettlement', vertex: '0:0:N' } });
 const err2 = await wrong.wait((m) => m.t === 'error' && m.message.includes('Zug'), 'Fehler falscher Spieler');

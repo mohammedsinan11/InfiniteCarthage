@@ -60,6 +60,8 @@ export type PublicPlayer = {
    */
   ernannt: GameState['players'][number]['ernannt'];
   connected: boolean;
+  /** Das Adelshaus (core/haus.ts) - oeffentlich, jeder sieht, wofuer ein Reich steht. */
+  haus: string | null;
   /** Sichtbare Punkte, ohne verdeckte Siegpunktkarten. */
   points: number;
   /** Nur beim Empfaenger gesetzt. */
@@ -125,6 +127,8 @@ export type PublicState = {
   asche: GameState['asche'];
   abkommen: GameState['abkommen'];
   auftraege: GameState['auftraege'];
+  /** Die Haeuser, die jeder zur Wahl hat (core/haus.ts) - leer ohne Hauswahl. */
+  hausAngebot: Record<PlayerId, string[]>;
   /** Die Omen - oeffentlich, sie gelten fuer alle (core/omen.ts). */
   omens: string[];
   /** Nach so vielen Runden endet die Partie; null ohne Grenze. */
@@ -160,6 +164,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
       inventar: { ...(p.inventar ?? {}) },
       ernannt: p.ernannt ? { ...p.ernannt, lore: { ...p.ernannt.lore } } : null,
       connected: p.connected,
+      haus: p.haus ?? null,
       points: publicPoints(state, p.id),
     };
     if (p.id === viewer) {
@@ -216,6 +221,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     asche: state.asche,
     abkommen: state.abkommen,
     auftraege: state.auftraege,
+    hausAngebot: state.hausAngebot ?? {},
     omens: state.omens ?? [],
     rundenLimit: state.rundenLimit ?? null,
     tagesDatum: state.tagesDatum ?? null,

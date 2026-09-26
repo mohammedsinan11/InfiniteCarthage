@@ -196,6 +196,14 @@ Seed wird im Tagesobjekt der Bestenliste gewuerfelt und verlaesst es nur
 Richtung Raumobjekt - aus dem Quelltext laesst sich nichts vorausrechnen. Das
 Ergebnis traegt das Raumobjekt selbst ein, der Client meldet nichts.
 
+**Adelshaeuser** (`src/core/haus.ts`, `src/client/ui/HausWahl.tsx`). Vor dem
+Aufbau bekommt jeder drei von sieben Haeusern angeboten und waehlt eines -
+alle gleichzeitig. Jedes hat eine Staerke, eine Schwaeche und einen Satz Rat
+fuer Einsteiger: Karthago handelt 3:1, der Bergclan foerdert mehr Erz, die
+Klingen beginnen mit zwei Rittern, die Speicherherren verlieren weniger an
+Pluenderer. Jede Wirkung greift an einer Stelle, die es schon gab (Ertrag,
+Bankhandel, Handkartengrenze, Pluenderung, Startausstattung).
+
 **Chronik** (`src/core/chronik.ts`, `src/client/ui/Chronik.tsx`). Statt
 "X gewinnt!" zeigt das Ende eine Schlussseite: Rangliste mit Wertung,
 Siegpunkte im Verlauf, die Momente der Partie (erste Stadt, Horden,

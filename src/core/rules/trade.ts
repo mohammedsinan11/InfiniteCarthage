@@ -17,6 +17,7 @@ import { modifiersOf } from '../cards/effects';
 import { sturm, wetterOf } from '../zeit';
 import { hatReichsbau } from './reich';
 import { handelsAufschlag, handelsDeckel } from '../omen';
+import { hausHandelsAufschlag, hausHandelsDeckel } from '../haus';
 
 export const DEFAULT_RATIO = 4;
 
@@ -33,7 +34,7 @@ export function haefenZu(state: { worldSeed?: number; turn?: number }): boolean 
  */
 export function tradeRatio(
   state: BoardView & {
-    players?: ReadonlyArray<{ id: PlayerId; activeCards: string[] }>;
+    players?: ReadonlyArray<{ id: PlayerId; activeCards: string[]; haus?: string | null }>;
     worldSeed?: number;
     turn?: number;
     reichsbauten?: GameState['reichsbauten'];
@@ -80,7 +81,11 @@ export function tradeRatio(
   // Zoellner schlagen auf alles eine Karte auf - auch auf den besten Hafen.
   const deckel = handelsDeckel(state.omens);
   if (deckel !== null) ratio = Math.min(ratio, deckel);
-  return Math.max(2, ratio - mods.tradeDiscount) + handelsAufschlag(state.omens);
+  // Das eigene Haus (core/haus.ts): Karthago handelt 3:1, Bergclan und Seher teurer.
+  const haus = state.players?.find((p) => p.id === player)?.haus;
+  const hausDeckel = hausHandelsDeckel(haus);
+  if (hausDeckel !== null) ratio = Math.min(ratio, hausDeckel);
+  return Math.max(2, ratio - mods.tradeDiscount) + handelsAufschlag(state.omens) + hausHandelsAufschlag(haus);
 }
 
 /** Alle Haefen, an denen dieser Spieler sitzt - fuer die Anzeige. */

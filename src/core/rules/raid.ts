@@ -14,6 +14,7 @@
 import { RESOURCES } from '../types';
 import { emptyHand, handSize } from '../state';
 import { isHoarding } from './handlimit';
+import { hausPluenderung } from '../haus';
 import type { Resource } from '../types';
 import type { GameState, Hand, PlayerId } from '../state';
 
@@ -27,7 +28,10 @@ export function raidLoss(state: GameState, id: PlayerId, raiders: number): numbe
   if (!p) return 0;
   const gehalten = handSize(p.hand);
   const gehortet = isHoarding(state, id) ? Math.floor(gehalten / 2) : 0;
-  return Math.min(gehalten, Math.max(raiders, gehortet));
+  // Das Haus (core/haus.ts): Waldvolk und Ebene verlieren eine Karte mehr, die
+  // Speicherherren eine weniger - aber nie weniger als keine.
+  const je = Math.max(0, raiders + hausPluenderung(p.haus));
+  return Math.min(gehalten, Math.max(je, gehortet));
 }
 
 /** Nimmt Karten vom jeweils groessten Stapel. Gibt zurueck, was genommen wurde. */
