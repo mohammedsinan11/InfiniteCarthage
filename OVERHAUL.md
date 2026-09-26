@@ -67,6 +67,13 @@ a pure function of seed, state and turn, so the architecture holds.
 
 ## 2. Advisors instead of menus: a diegetic interface
 
+> **Built (step 1):** the four advisors (Kanzler, Marschall, Seherin,
+> Chronist) with portrait, one line of advice and an attention badge; the
+> "Rat?" button (bot logic in words, with the field highlighted); the
+> timeline strip above the dock; camps clickable with a panel (chief,
+> garrison, army/tribute/peace); the minimap (toggle under the zoom).
+> Radial menus for all map objects are still open.
+
 **Idea.** Replace the four-tab side menu with a **council** of four advisors
 in the style of the game: the Kanzler (economy, trade, ambitions), the
 Marschall (army, raids, factions), the Seherin (omens, rumours, events,
