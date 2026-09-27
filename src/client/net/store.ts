@@ -380,6 +380,24 @@ function ruinenMeldung(e: Extract<GameEvent, { t: 'ruin' }>): string {
 }
 
 /** Welche Ereignisse sind eine Meldung wert? Nicht jedes - sonst rauscht es. */
+/*
+ * Weniger Text auf einmal (Spieltest 5: "zu viel zu lesen"). Hoechstens drei
+ * Meldungen stehen gleichzeitig, und je Schwung hoechstens eine blosse
+ * Auskunft ('info') - was einen selbst trifft (Gewinn, Raub), bleibt. Der Rest
+ * steht ohnehin im Protokoll beim Chronisten.
+ */
+const MELDUNGEN_MAX = 3;
+function ruhiger(neue: Announcement[]): Announcement[] {
+  const wichtig = neue.filter((a) => a.kind !== 'info');
+  const auskunft = neue.filter((a) => a.kind === 'info');
+  const mehr = auskunft.length - 1;
+  const eine =
+    auskunft.length === 0
+      ? []
+      : [{ ...auskunft[0]!, text: mehr > 0 ? `${auskunft[0]!.text} (+${mehr} im Protokoll)` : auskunft[0]!.text }];
+  return [...wichtig, ...eine].slice(-MELDUNGEN_MAX);
+}
+
 function meldungenAus(
   events: GameEvent[],
   state: PublicState | null,
@@ -904,7 +922,7 @@ export const useStore = create<Store>((set, get) => ({
                 state: msg.state,
                 world: buildWorld(s.world, msg.state),
                 status: 'playing' as const,
-                announcements: [...s.announcements, ...wechsel].slice(-6),
+                announcements: [...s.announcements, ...wechsel].slice(-MELDUNGEN_MAX),
                 welt: [...s.welt, ...zeit].slice(-WELT_MAX),
               };
             });
@@ -951,7 +969,7 @@ export const useStore = create<Store>((set, get) => ({
                 msg.events.map((e: GameEvent) => describeEvent(e, s.state)).filter((zeile: string) => zeile !== ''),
               ).slice(-120),
               welt: [...s.welt, ...weltNeu].slice(-WELT_MAX),
-              announcements: [...s.announcements, ...neue].slice(-6),
+              announcements: [...s.announcements, ...ruhiger(neue)].slice(-MELDUNGEN_MAX),
               // Schon beim Zustand vorgemerkt (7)? Dann dieselbe Referenz lassen,
               // sonst finge die Animation von vorn an.
               ...(wurf && wurf.t === 'roll' && !gleicherWurf(s.pendingRoll, wurf.dice)

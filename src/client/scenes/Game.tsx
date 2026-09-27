@@ -157,7 +157,17 @@ export function Game() {
    * er kam, nachdem der Regen das Feuer schon geloescht hatte). Er bleibt in
    * der Reihe und erscheint beim naechsten eigenen Feuer.
    */
-  const sichtbareTipps = tipps.filter((t) => t.id !== 'feuer' || (state?.braende ?? []).some((b) => b.owner === you));
+  // Hoechstens ein Tipp alle zwei Runden (Spieltest 5: zu viel Text auf
+  // einmal) - Aufbau und Feuer ausgenommen: das eine gehoert zum Anfang,
+  // das andere laesst nur einen Zug Zeit.
+  const [tippRuhe, setTippRuhe] = useState(-99);
+  const sichtbareTipps = tipps
+    .filter((t) => t.id !== 'feuer' || (state?.braende ?? []).some((b) => b.owner === you))
+    .filter((t) => t.id === 'aufbau' || t.id === 'feuer' || (state?.turn ?? 0) >= tippRuhe + 2);
+  const tippWeg = () => {
+    setTippRuhe(state?.turn ?? 0);
+    tippGelesen();
+  };
   const [omenOffen, setOmenOffen] = useState(false);
   const pendingRoll = useStore((s) => s.pendingRoll);
   const kunde = useStore((s) => s.kunde);
@@ -1525,7 +1535,7 @@ export function Game() {
           <ErsteSchritte state={state} you={you} />
         )}
         {sichtbareTipps.length > 0 && phase.t !== 'finished' && phase.t !== 'hauswahl' && state.draft === null && (
-          <TippBox tipp={sichtbareTipps[0]!} mehr={sichtbareTipps.length - 1} onGelesen={tippGelesen} />
+          <TippBox tipp={sichtbareTipps[0]!} mehr={0} onGelesen={tippWeg} />
         )}
 
         {kunde && phase.t !== 'ereignis' && state.draft === null && pendingRoll === null && <KundeTafel bericht={kunde} onZu={schliesseKunde} />}

@@ -20,43 +20,43 @@ export type Tipp = { id: string; titel: string; text: string };
 export const TIPPS: Record<string, Omit<Tipp, 'id'>> = {
   aufbau: {
     titel: 'Der Aufbau',
-    text: 'Setze zwei Doerfer und je eine Strasse. Gute Plaetze liegen an Feldern mit 6 und 8 (rote Zahlen) und an moeglichst verschiedenen Rohstoffen - die Sterne ★ zeigen dir einige davon. Fahre mit dem Zeiger ueber einen Platz, um seine Zahlen zu sehen.',
+    text: 'Setze zwei Doerfer und je eine Strasse. Die Sterne ★ zeigen gute Plaetze.',
   },
   wuerfeln: {
     titel: 'Wuerfeln und Ertrag',
-    text: 'Jede Runde wird gewuerfelt: jedes Feld mit dieser Zahl liefert an angrenzende Doerfer (1) und Staedte (2). Baue mit dem Ertrag unten Strassen, Doerfer und Staedte - jedes Dorf ist 1 Siegpunkt, jede Stadt 2.',
+    text: 'Der Wuerfel verteilt Ertrag an Doerfer (1) und Staedte (2) - und beendet deinen Zug. Dorf = 1 Punkt, Stadt = 2.',
   },
   fund: {
     titel: 'Eine 7 ist ein Fund',
-    text: 'Waehle eine von drei Karten. Dauerkarten wirken bis zum Ende der Partie, Sofortkarten geben gleich Rohstoffe. Taktikkarten spielst du spaeter im Kampf.',
+    text: 'Nimm eine von drei Karten. Dauerkarten wirken bis zum Ende der Partie.',
   },
   pluenderung: {
     titel: 'Pluenderer',
-    text: 'Raeuber und Goblins ziehen aus ihren Lagern zu deinen Siedlungen und nehmen Karten vom groessten Stapel. Wer mehr als die Handkartengrenze haelt, verliert die Haelfte. Ritter und Wachtuerme bei den Siedlungen halten sie auf - oder verbaue deine Karten rechtzeitig.',
+    text: 'Pluenderer nehmen Karten. Ritter und Tuerme halten sie auf - oder verbaue deine Karten rechtzeitig.',
   },
   feuer: {
     titel: 'Feuer!',
-    text: 'Pluenderer haben Feuer gelegt. Du hast einen Zug Zeit: klicke das Feuer an und loesche es mit einer Karte, oder stelle einen Ritter oder den Helden daneben. Regen loescht auch. Sonst brennt es nieder.',
+    text: 'Es brennt! Klicke das Feuer an und loesche es mit einer Karte, oder stelle einen Ritter daneben - du hast einen Zug.',
   },
   nacht: {
     titel: 'Die Nacht',
-    text: 'Nachts sieht man weniger weit, Goblins ziehen in Horden los und Schleime kriechen aus dem Dunkel. Am Morgen werden die Schleime wieder friedlich.',
+    text: 'Nachts sieht man weniger, und Goblins ziehen in Horden los.',
   },
   beute: {
     titel: 'Beute',
-    text: 'Du hast Beute gemacht. Loese sie in deinem Zug ueber den Knopf "Beute" unten ein - jede Beute ist eine Kartenwahl.',
+    text: 'Du hast Beute: der Knopf "Beute" unten gibt dir eine Kartenwahl.',
   },
   auftrag: {
     titel: 'Ein Wanderer bittet um Hilfe',
-    text: 'Wanderer bieten Auftraege an: ein Lager zerstoeren, eine Ruine erkunden, Rohstoffe bringen. Wer einen erfuellt, bekommt eine Kartenwahl. Annehmen oder ablehnen bei der Seherin im Menue.',
+    text: 'Ein Wanderer bietet einen Auftrag an - bei der Seherin im Menue.',
   },
   hilfe: {
     titel: 'Wanderhaendler',
-    text: 'An keinem deiner Doerfer liegt ein Feld fuer diese Sorte. Wanderhaendler bringen dir alle fuenf Runden eine davon - besser ist ein Dorf an einem passenden Feld. Auch der Bankhandel (Knopf mit den Pfeilen) hilft: gleiche Karten gegen 1 beliebige - wie viele, steht auf der Tafel (meist 4, mit Hafen oder Haus weniger).',
+    text: 'Diese Sorte hast du an keinem Dorf. Wanderhaendler bringen sie ab und zu; besser ist ein Dorf an einem passenden Feld.',
   },
   held: {
     titel: 'Dein Held',
-    text: 'Oben links steht dein Held. Klicke ihn an und schicke ihn mit "Erkunden" los: er deckt die Karte auf, findet Ruinen mit Schaetzen und kaempft besser als ein Ritter.',
+    text: 'Oben links steht dein Held: anklicken, dann "Erkunden".',
   },
 };
 
