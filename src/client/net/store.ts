@@ -367,7 +367,7 @@ function weltAus(
   return out;
 }
 
-const RUINE_KURZ = { schatz: 'ein Schatz', beute: 'Beute', karte: 'eine alte Karte', hinterhalt: 'ein Hinterhalt' } as const;
+const RUINE_KURZ = { schatz: 'ein Schatz', beute: 'Beute', karte: 'eine alte Karte', hinterhalt: 'ein Hinterhalt', aussenposten: 'ein Aussenposten' } as const;
 
 /** Die Meldung zu einer eigenen Ruine. */
 function ruinenMeldung(e: Extract<GameEvent, { t: 'ruin' }>): string {
@@ -380,6 +380,8 @@ function ruinenMeldung(e: Extract<GameEvent, { t: 'ruin' }>): string {
       return 'Eine alte Karte - die Umgebung ist aufgedeckt';
     case 'hinterhalt':
       return e.knightLost ? 'Hinterhalt! Dein Ritter faellt' : 'Hinterhalt in der Ruine - abgewehrt';
+    case 'aussenposten':
+      return 'Dein Held findet ein bewohnbares Haus - ein Aussenposten entsteht!';
   }
 }
 
@@ -445,6 +447,8 @@ function meldungenAus(
       if (e.player === you) meldung('Neue Vorhaben zur Wahl - beim Kanzler im Menue', 'info');
     } else if (e.t === 'ambitionDone') {
       if (e.player === you) meldung(`Vorhaben vollendet: ${vorhabenById(e.id)?.name ?? e.id}`, 'gain');
+    } else if (e.t === 'explorerDone') {
+      if (e.player === you) meldung(`${e.held ? 'Dein Held' : 'Dein Erkunder'} hat die Gegend erkundet und kehrt heim`, 'info');
     } else if (e.t === 'sippeStufe') {
       if (e.player === you) {
         const b = sippenBonusById(e.bonus);

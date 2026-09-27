@@ -58,7 +58,8 @@ import { karawaneAngekommen, karawanenRunde } from '../karawane';
 import type { KarawanenEvent } from '../karawane';
 import { szenarioById } from '../szenario';
 import { Rng } from '../rng';
-import { hexDistance, hexKey, hexesInRange, neighbors, parseVertexKey, vertexAdjacentHexes } from '../coords';
+import { hexDistance, hexKey, hexVertices, hexesInRange, neighbors, parseVertexKey, vertexAdjacentHexes, vertexKey } from '../coords';
+import { canPlaceSettlement } from './placement';
 import type { Hex } from '../coords';
 import { ensureGenerated, isGenerated } from '../world';
 import type { World } from '../world';
@@ -337,6 +338,8 @@ export type ArmyEvent =
       count: number;
     }
   | { t: 'nestDestroyed'; q: number; r: number; kind: Feind; fraktion: string; players: PlayerId[] }
+  /** Ein Erkunder findet in Reichweite nichts mehr und kehrt heim. */
+  | { t: 'explorerDone'; player: PlayerId; unit: number; held: boolean }
   /** Ein Anfuehrer schwoert Rache: sein naechster Raubzug gilt diesem Spieler. */
   | { t: 'vendetta'; fraktion: string; player: PlayerId }
   | { t: 'nestCaptured'; q: number; r: number; von: string; an: string }
@@ -1067,9 +1070,17 @@ function erkunde(
   const p = playerById(s, owner);
   // Der Held kennt die alten Wege: ein Auge mehr - kein Hinterhalt, eher Beute.
   const held = u.kind === 'held';
-  const result = ruinResultFor(Math.min(6, wurf(rng) + (held ? 1 : 0)));
+  const roh = wurf(rng) + (held ? 1 : 0);
+  // Ueber sechs - also nur der Held mit einer Sechs - findet er ein Haus, das
+  // sich wieder beziehen laesst: ein Aussenposten (core/ruins.ts).
+  const posten = s.ereignisseAn && roh >= 7 && p ? aussenpostenEcke(s, world, u.q, u.r, owner) : null;
+  const result: RuinResult = posten ? 'aussenposten' : ruinResultFor(Math.min(6, roh));
   const gained = emptyHand();
   let knightLost = false;
+  if (posten) {
+    s.buildings[posten] = { owner, type: 'settlement' };
+    wachsen(s, world, u, 3, events);
+  }
 
   if (result === 'hinterhalt') {
     if (wurf(rng) < HINTERHALT_UEBERSTEHT_AB) {
@@ -1088,6 +1099,15 @@ function erkunde(
     wachsen(s, world, u, KARTE_RADIUS, events);
   }
   events.push({ t: 'ruin', q: u.q, r: u.r, player: owner, result, gained, knightLost, held });
+}
+
+/** Eine freie Ecke an der Ruine fuer einen Aussenposten - mit Abstandsregel, ohne Strasse. */
+function aussenpostenEcke(s: GameState, world: World, q: number, r: number, owner: PlayerId): string | null {
+  for (const v of hexVertices(q, r)) {
+    const vk = vertexKey(v);
+    if (!canPlaceSettlement(s, world, owner, vk, { setup: true })) return vk;
+  }
+  return null;
 }
 
 /** Das Lager, zu dem ein Heimkehrer zieht: sein eigenes, sonst das naechste seiner Fraktion. */
@@ -1113,6 +1133,8 @@ function heimFuer(s: GameState, u: UnitState): Hex | null {
 const ERKUNDEN_SUCHE = 1500;
 /** Wie weit ein Erkunder sich hoechstens von den eigenen Siedlungen entfernt. */
 export const ERKUNDEN_WEIT = 24;
+/** Die kurze Leine in Partien mit Ereignissen. */
+export const ERKUNDEN_NAH = 12;
 
 /**
  * Wohin ein Erkunder zieht: zum naechsten Feld, das Neues bringt - eine
@@ -1125,7 +1147,9 @@ function erkundungsziel(s: GameState, world: World, u: UnitState): Hex | null {
   // Siedlungen - sonst zog der Held so weit, dass kein Weg mehr heimfand
   // (Spieltest: fuenfzig Felder draussen, "Dorthin fuehrt kein Landweg").
   const heim = u.owner === null ? [] : [...settlementApproaches(s, u.owner).keys()].map(feld);
-  const nahGenug = (h: Hex) => heim.length === 0 || heim.some((x) => hexDistance(x, h) <= ERKUNDEN_WEIT);
+  // Mit Ereignissen die kurze Leine (Spieltest 5: Helden zogen 25 Felder weit, unbemerkt).
+  const weit = s.ereignisseAn ? ERKUNDEN_NAH : ERKUNDEN_WEIT;
+  const nahGenug = (h: Hex) => heim.length === 0 || heim.some((x) => hexDistance(x, h) <= weit);
   const gesehen = new Set([hexKey(u.q, u.r)]);
   const warte: Hex[] = [{ q: u.q, r: u.r }];
   for (let i = 0; i < warte.length && gesehen.size < ERKUNDEN_SUCHE; i++) {
@@ -1227,8 +1251,15 @@ function ziehe(
         u.ziel = erkundungsziel(s, world, u);
       }
       if (!u.ziel) {
-        // Nichts mehr zu entdecken in Reichweite: stehen bleiben.
+        // Nichts mehr zu entdecken in Reichweite: stehen bleiben - mit
+        // Ereignissen heimkehren und es sagen, statt still draussen zu stehen.
         u.auftrag = 'befehl';
+        if (s.ereignisseAn && u.owner) {
+          const heim = [...settlementApproaches(s, u.owner).keys()].map(feld);
+          const naechstes = heim.sort((a, b) => hexDistance(a, u) - hexDistance(b, u))[0];
+          if (naechstes && hexDistance(naechstes, u) > 1) u.ziel = naechstes;
+          events.push({ t: 'explorerDone', player: u.owner, unit: u.id, held: u.kind === 'held' });
+        }
         return false;
       }
       return schreite(s, world, rng, u, u.kind === 'held' ? HELD_SCHRITTE : 1, events);

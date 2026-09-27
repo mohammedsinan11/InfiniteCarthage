@@ -326,6 +326,11 @@ Familie wirkt ein Bonus: mehr Ertrag, ein billigerer Markt, Gaben beim Bauen,
 Schutz, zusaetzliche Kartenwahlen fuer Lager und Ruinen. Die Kartenwahl zeigt
 auf jeder Karte, ob sie eine Stufe freischaltet.
 
+**Erkunden, das die Karte veraendert.** Findet der Held in einer Ruine eine
+Sechs, steht dort ein bewohnbares Haus: ein Aussenposten, ein Dorf ohne
+Strasse. Erkunder bleiben an einer kurzen Leine (12 Felder) und kehren heim,
+wenn es in der Naehe nichts mehr gibt - mit einer Meldung.
+
 **Verderb und Aufholen** (`src/core/verderb.ts`, `src/core/aufholen.ts`).
 Wer den Zug ueber der Handkartengrenze beendet, verliert die Haelfte des
 Ueberschusses. Ein Bot drei Punkte hinten bekommt je Wurf eine Karte.

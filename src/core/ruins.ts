@@ -24,7 +24,12 @@ const RUIN_CHANCE = 0.45;
 /** Keine Ruine direkt am Start - man soll hinziehen muessen. */
 export const RUIN_SAFE_RADIUS = 2;
 
-export type RuinResult = 'schatz' | 'beute' | 'karte' | 'hinterhalt';
+/**
+ * 'aussenposten': nur der Held, nur mit Ereignissen - in der Ruine steht noch
+ * ein Haus, das sich wieder beziehen laesst (Spieltest 5: "Erkunden, das die
+ * Karte veraendert"). rules/army.ts setzt dort ein Dorf, wenn eine Ecke frei ist.
+ */
+export type RuinResult = 'schatz' | 'beute' | 'karte' | 'hinterhalt' | 'aussenposten';
 
 /** Liegt hier eine Ruine? Rein - haengt nur von Seed und Koordinate ab. */
 export function ruinAt(seed: number, q: number, r: number): boolean {

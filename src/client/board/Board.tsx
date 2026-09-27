@@ -1921,6 +1921,12 @@ export function Board({
           const k = hexKey(t.q, t.r);
           if (nachbarn.has(k)) zeichneBesatzung(t, liftHex(t.q, t.r) + (k === hover ? LIFT : 0), g);
         }
+        /*
+         * Auch Doerfer, Staedte und Strassen stanzen sich aus (Spieltest 5:
+         * zwischen Bergen verschwanden sie unter den Gipfeln). Der Berg bleibt
+         * hoch, aber was man gebaut hat, sieht man immer.
+         */
+        zeichneBauten(g, null, 'alles');
         g.globalCompositeOperation = 'source-over';
         ctx.drawImage(schicht, 0, 0);
       }
@@ -2701,8 +2707,13 @@ export function Board({
             const n = einwohnerVon(state, vk);
             const platz = platzFuer(state, vk);
             const reif = b.owner === du && b.type === 'settlement' && n >= EINWOHNER_FUER_STADT;
+            // Weit herausgezoomt nur, was etwas bedeutet: ein Dorf, das Stadt werden kann.
+            if (scale < 0.99 && !reif) return null;
+            // Auf dem Bildschirm etwa gleich gross (Spieltest 5: "3/5" war bei
+            // normalem Zoom unlesbar klein, weit draussen nur Rauschen).
+            const k = Math.min(1.5, Math.max(0.75, 1.5 / scale));
             return (
-              <g key={'ew' + vk} className={reif ? 'einwohner ew-reif' : 'einwohner'} transform={`translate(${p.x.toFixed(1)} ${y.toFixed(1)})`}>
+              <g key={'ew' + vk} className={reif ? 'einwohner ew-reif' : 'einwohner'} transform={`translate(${p.x.toFixed(1)} ${y.toFixed(1)}) scale(${k.toFixed(2)})`}>
                 <title>{`${n} von ${platz} Einwohnern${reif ? ' - kann Stadt werden' : ''}`}</title>
                 <rect x={-8} y={0} width={16} height={8} rx={1.5} className="ew-schild" />
                 <text x={0} y={6} textAnchor="middle" className="ew-zahl">

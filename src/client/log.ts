@@ -355,6 +355,8 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
       return e.grund === 'abgelaufen'
         ? `Ein Auftrag von ${who(state, e.player)} ist abgelaufen.`
         : `Ein Auftrag von ${who(state, e.player)} ist verloren - jemand kam zuvor.`;
+    case 'explorerDone':
+      return `${e.held ? 'Der Held' : 'Ein Erkunder'} von ${who(state, e.player)} hat die Gegend erkundet und kehrt heim.`;
     case 'ruin':
       switch (e.result) {
         case 'schatz':
@@ -367,6 +369,8 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
           return e.knightLost
             ? `Hinterhalt in einer Ruine - ein Ritter von ${who(state, e.player)} faellt.`
             : `Hinterhalt in einer Ruine - ${who(state, e.player)} wehrt ihn ab.`;
+        case 'aussenposten':
+          return `Der Held von ${who(state, e.player)} findet in einer Ruine ein bewohnbares Haus: ein Aussenposten.`;
       }
       return '';
     case 'buyDev':
