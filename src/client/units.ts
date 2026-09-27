@@ -40,7 +40,7 @@ export type FigurArt =
   /** Die Stadt mit allen Einwohnern - die Ausbaustufe von stadtKlein. */
   | 'stadtGross'
   /** Der Ritter ab Rang 2. */
-  | 'ritterLanze'
+  | 'ritterEdel'
   | 'turm'
   | 'turmGeschuetz'
   | 'turmBefestigt'
@@ -240,38 +240,41 @@ const ART: Record<FigurArt, readonly string[]> = {
     '..kbkbk..',
     '..kk.kk..',
   ],
-  // Ritter: Helm, Wams in Spielerfarbe. Neun breit, damit Kopf, Rumpf und Beine
-  // in derselben Spalte stehen wie der Ankerpunkt (Spalte 4).
+  // Ritter: Helm mit Sehschlitz, Lanze und ein grosser Schild in Spielerfarbe
+  // mit goldenem Buckel - daran erkennt man, wem er dient (Spieltest 5).
+  // Kopf und Beine in Spalte 7, die Lanze in Spalte 11.
   ritter: [
-    '...kkk...',
-    '..kmmmk..',
-    '..kmMMk..',
-    '..kmmmk..',
-    '.kkkkkkk.',
-    '.kppmppmk',
-    '.kpppppmk',
-    '.kppyppmk',
-    '..kpppk..',
-    '..kMkMk..',
-    '..kMkMk..',
-    '..kk.kk..',
+    '...........n',
+    '......kkk..n',
+    '.....kmnmk.t',
+    '.....kkkkk.t',
+    '.....kmmmk.t',
+    'kkkkkkkkkkst',
+    'kqqqkmmmmk.t',
+    'kqyPkmmmmk.t',
+    'kppPkmmmmk.t',
+    'kppPkkkkkk.t',
+    '.kPk.kMkMk.t',
+    '..k..kMkMk..',
+    '.....kk.kk..',
   ],
-  // Lanzenritter: der Ritter ab Rang 2 (core/combat.ts, Stufen) - Schild,
-  // Lanze, Sehschlitz. Die Lanze steht in einer Spalte, der Kopf ueber dem
-  // Rumpf (Spieltest 5: beides war in der Mitte versetzt).
-  ritterLanze: [
-    '..........n',
-    '.....kkk..n',
-    '....kmnmk.t',
-    '....kkkkk.t',
-    '....kmmmk.t',
-    '...kkkkkkst',
-    'kppkmmmmk.t',
-    'kpypkmmmk.t',
-    'kppkmmmmk.t',
-    '.kkkkMkMk.t',
-    '....kMkMk..',
-    '....kk.kk..',
+  // Edler Ritter: der Ritter ab Rang 2 (core/combat.ts, Stufen) - Helmbusch und
+  // Waffenrock in Spielerfarbe mit goldenem Kreuz (Vorschlag aus Spieltest 5).
+  ritterEdel: [
+    '......pp...n',
+    '......ppp..n',
+    '......kkk..t',
+    '.....kmnmk.t',
+    '.....kkkkk.t',
+    '.....kmmmk.t',
+    'kkkkkkkkkkst',
+    'kqqqkpypPk.t',
+    'kqyPkyyyPk.t',
+    'kppPkpypPk.t',
+    'kppPkkkkkk.t',
+    '.kPk.kMkMk.t',
+    '..k..kMkMk..',
+    '.....kk.kk..',
   ],
   // Bogenschuetze: Lederkapuze, Wams in Spielerfarbe, rechts der Bogen. PLATZHALTER (ASSETS.md).
   bogen: [
@@ -481,27 +484,9 @@ const ART: Record<FigurArt, readonly string[]> = {
     '.kmMmmmkbkMk.',
     '.kkkkkkkkkkk.',
   ],
-  // Kleine Stadt: Turm mit Wimpel, ein Dach hinter der Mauer, Tor. 15 x 14.
+  // Stadt: Bergfried mit Wimpel, Nebenturm, breite Mauer mit Tor. 17 x 17.
   // Waechst sie auf fuenf Einwohner, wird sie zur Bluehenden Stadt (stadtGross).
   stadtKlein: [
-    '...d...........',
-    '...dpp.........',
-    '...dppp........',
-    '...d...........',
-    '.ddddd.........',
-    '.dmdmd...ddd...',
-    '.dmyMd..dqpPd..',
-    '.dmmMd.dqppPPd.',
-    '.dmmMdddddddddd',
-    'dmdmdmdmdmdmdmd',
-    'dmMmmMdddmMmmMd',
-    'dmmmMmdbdmmMmMd',
-    'dmMmmmdbdmMmmMd',
-    'ddddddddddddddd',
-  ],
-  // Bluehende Stadt: dieselbe Stadt mit allen fuenf Einwohnern (core/bevoelkerung.ts)
-  // - Bergfried, Nebenturm, breite Mauer. 17 x 17.
-  stadtGross: [
     '....kpp..........',
     '....kPpp.........',
     '....kpp..........',
@@ -517,6 +502,28 @@ const ART: Record<FigurArt, readonly string[]> = {
     'kmMpppppppppppMmk',
     'kmmmmmmkkkmmmmMMk',
     'kmMmmmkbbbkmmmMMk',
+    'kmmmmmkbbbkmmMMMk',
+    'kkkkkkkkkkkkkkkkk',
+  ],
+  // Bluehende Stadt: die Stadt mit allen fuenf Einwohnern (core/bevoelkerung.ts) -
+  // ein grosser Bergfried, zwei Fahnen, Mauerband in Spielerfarbe, erleuchtetes Tor
+  // (Vorschlag aus Spieltest 5). 17 x 17.
+  stadtGross: [
+    '.....kppp........',
+    '.....kPpppp......',
+    '.....kppp........',
+    '....kkkkkk...kpp.',
+    '...kqpppPPk..kPpp',
+    '..kqppppPPPk.kkk.',
+    '.kkkkkkkkkkkkqpk.',
+    '..kmmmmmmMk.kqpPk',
+    '..kmyymyyMk.kkkkk',
+    '..kmmmmmmMk.kmyMk',
+    'k.k.k.k.k.k.k.k.k',
+    'kkkkkkkkkkkkkkkkk',
+    'kpPpPpPpPpPpPpPpk',
+    'kmmmmmmkkkmmmmMMk',
+    'kmMmmmkyyykmmmMMk',
     'kmmmmmkbbbkmmMMMk',
     'kkkkkkkkkkkkkkkkk',
   ],
@@ -709,18 +716,18 @@ function heldKarte(gestalt: number): readonly string[] {
 /*
  * Wo der Kopf sitzt: wie viele Zeilen oben zum Kopf gehoeren und in welcher
  * Spalte seine Mitte liegt. Die Feder gehoert ueber die Kopfmitte, nicht
- * ueber die Mitte des ganzen Bildes - beim Lanzenritter liegen die zwei
+ * ueber die Mitte des ganzen Bildes - bei den Rittern liegen die zwei
  * Spalten auseinander (Spieltest 5: "Kopf und Lanze versetzt").
  */
 const KOPF: Partial<Record<FigurArt, { zeilen: number; mitte: number }>> = {
-  ritter: { zeilen: 4, mitte: 4 },
-  ritterLanze: { zeilen: 5, mitte: 6 },
+  ritter: { zeilen: 5, mitte: 7 },
+  ritterEdel: { zeilen: 6, mitte: 7 },
 };
 
-/** Welche Figur eine Einheit zeigt: der Ernannte seine eigene, der Ritter ab Rang 2 die Lanze. */
+/** Welche Figur eine Einheit zeigt: der Ernannte seine eigene, der Ritter ab Rang 2 den Waffenrock. */
 export function figurVon(u: { kind: UnitKind; zweig?: FigurArt | null; stufe?: number }): FigurArt {
   if (u.zweig) return u.zweig;
-  if (u.kind === 'ritter' && (u.stufe ?? 0) >= 2) return 'ritterLanze';
+  if (u.kind === 'ritter' && (u.stufe ?? 0) >= 2) return 'ritterEdel';
   return u.kind;
 }
 

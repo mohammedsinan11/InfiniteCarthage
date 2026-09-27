@@ -26,6 +26,6 @@ function tafel(art, farbe, stufe, text) {
   return f;
 }
 const reihe = (els) => { const d = document.createElement('div'); d.className = 'reihe'; d.append(...els); document.getElementById('inhalt').append(d); };
-reihe([0, 1, 2, 3, 4].map((st) => tafel(st >= 2 ? 'ritterLanze' : 'ritter', '#c94f3a', st, `Rang ${st}`)));
+reihe([0, 1, 2, 3, 4].map((st) => tafel(st >= 2 ? 'ritterEdel' : 'ritter', '#c94f3a', st, `Rang ${st}`)));
 reihe([tafel('stadtKlein', '#3a7ac2', 0, 'Stadt'), tafel('stadtGross', '#3a7ac2', 0, 'Bluehende Stadt'), tafel('ruine', '#000', 0, 'Ruine'), tafel('karawane', '#c94f3a', 0, 'Karawane')]);
 </script></body></html>
