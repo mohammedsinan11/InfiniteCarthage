@@ -190,8 +190,8 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
           <section className="chronik-erbe">
             <h3>Dein Erbe</h3>
             <p className="note">
-              Was gibt diese Generation der naechsten mit? Das Erbstueck wirkt in gewoehnlichen Partien allein; sonst bleibt es
-              eine Erinnerung.
+              Was gibt diese Generation der naechsten mit? Das Erbstueck wirkt in gewoehnlichen Partien, allein oder gegen Bots;
+              gegen Mitspieler, im Szenario und in der Tagesexpedition bleibt es eine Erinnerung.
             </p>
             <div className="erbe-wahl">
               {ahne.freie.map((id) => {

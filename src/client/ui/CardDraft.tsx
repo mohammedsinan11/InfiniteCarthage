@@ -17,7 +17,7 @@
 import { useEffect, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import { cardById } from '../../core/cards/catalog';
-import { RARITY_ORDER, dauerwirkungen, istEinzigartig, wiederholbar } from '../../core/cards/types';
+import { dauerwirkungen, istEinzigartig, wiederholbar } from '../../core/cards/types';
 import type { DraftSource, Rarity } from '../../core/cards/types';
 import { playCardDeal, playCardHover, playCardPick, playCardVanish } from '../audio';
 import { KartenBild } from './KartenBild';
@@ -86,18 +86,13 @@ export function CardDraft({
 }) {
   const [genommen, setGenommen] = useState<string | null>(null);
   /*
-   * Wer weicht, wenn eine neue Dauerkarte auf volle Plaetze trifft: standardmaessig
-   * die aktive mit der niedrigsten Seltenheit (bei Gleichstand die aelteste) -
-   * sichtbar und umstellbar, statt still die aelteste zu verlieren. null heisst:
-   * niemand weicht, die neue Karte bleibt nur im Besitz.
+   * Wer weicht, wenn eine neue Dauerkarte auf volle Plaetze trifft: von selbst
+   * niemand - die neue Karte bleibt im Besitz, bis man bewusst eine aktive
+   * waehlt (Spieltest 6: ein schneller Klick ersetzte eine tragende Karte).
+   * null heisst: niemand weicht.
    */
-  const schwaechste = [...aktiv].sort((a, b) => {
-    const ra = RARITY_ORDER.indexOf(cardById(a)?.rarity ?? 'gewoehnlich');
-    const rb = RARITY_ORDER.indexOf(cardById(b)?.rarity ?? 'gewoehnlich');
-    return ra - rb;
-  })[0];
-  const [wahlErsetze, setWahlErsetze] = useState<string | null | undefined>(undefined);
-  const ersetze = wahlErsetze === undefined ? (schwaechste ?? null) : wahlErsetze;
+  const [wahlErsetze, setWahlErsetze] = useState<string | null>(null);
+  const ersetze = wahlErsetze;
   const voll = plaetze > 0 && aktiv.length >= plaetze;
   const bringtNeueDauer = (id: string): boolean => {
     const k = cardById(id);
@@ -212,6 +207,13 @@ export function CardDraft({
       {fragtErsetzen && darfWaehlen && genommen === null && (
         <div className="draft-plaetze">
           <span>Deine {plaetze} Plaetze sind voll. Eine neue Dauerkarte ersetzt:</span>
+          <button
+            className={ersetze === null ? 'aktiv' : ''}
+            onClick={() => setWahlErsetze(null)}
+            title="Die neue Karte bleibt in deinem Besitz, nimmt aber keinen Platz ein - beim Kanzler im Menue tauschbar."
+          >
+            keine (nur behalten)
+          </button>
           {aktiv.map((id) => (
             <button
               key={id}
@@ -222,13 +224,6 @@ export function CardDraft({
               {cardById(id)?.name ?? id}
             </button>
           ))}
-          <button
-            className={ersetze === null ? 'aktiv' : ''}
-            onClick={() => setWahlErsetze(null)}
-            title="Die neue Karte bleibt in deinem Besitz, nimmt aber keinen Platz ein - beim Kanzler im Menue tauschbar."
-          >
-            keine (nur behalten)
-          </button>
         </div>
       )}
     </div>

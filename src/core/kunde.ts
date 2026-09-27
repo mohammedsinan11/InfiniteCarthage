@@ -84,7 +84,7 @@ export function kundeFortschreiben(s: GameState, geschehen: readonly Ereignis[])
         merke(`Fehde im Land: ${imSatz(frak(s, e.fraktion as string))} gegen ${imSatz(frak(s, e.gegen as string))}.`);
         break;
       case 'feast':
-        merke(`${frak(s, e.fraktion as string)} feierten ein grosses Fest.`);
+        merke(`${frak(s, e.fraktion as string)}: ein grosses Fest im Lager.`);
         break;
       case 'chiefChanged':
         merke(`${e.alt} fiel; ${e.neu} fuehrt nun ${imSatz(frak(s, e.fraktion as string))}.`);

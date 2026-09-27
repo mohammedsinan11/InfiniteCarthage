@@ -145,12 +145,13 @@ const DEVICE_FACTORS = [1, 2, 3, 4, 6, 8, 12, 16] as const;
 const zoomStufen = (dpr: number): number[] => DEVICE_FACTORS.map((f) => f / (SCALE * dpr));
 
 /**
- * Startstufe: rund zwei CSS-Pixel je Kunstpixel, also Kacheln von etwa 48
- * Pixeln Breite. Bei hoher Bildschirmskalierung entspricht das mehr
+ * Startstufe: rund drei CSS-Pixel je Kunstpixel, also Kacheln von etwa 72
+ * Pixeln Breite (Spieltest 6: bei zwei waren Ritter, Doerfer und Strassen nur
+ * Kleckse). Bei hoher Bildschirmskalierung entspricht das mehr
  * Geraetepixeln - die Kachel bleibt dabei gleich gross, nur schaerfer.
  */
 const startStufe = (dpr: number): number => {
-  const wunsch = 2 * dpr;
+  const wunsch = 3 * dpr;
   let best = 0;
   for (let i = 1; i < DEVICE_FACTORS.length; i++) {
     if (Math.abs(DEVICE_FACTORS[i]! - wunsch) < Math.abs(DEVICE_FACTORS[best]! - wunsch)) {
@@ -860,6 +861,19 @@ export function Board({
     for (const hk of Object.keys(state.hauptstaedte ?? {})) out.delete(hk);
     return out;
   }, [state.buildings, state.hauptstaedte, du]);
+  /** Felder, auf deren unterer Ecke ein Haus steht - es ragt bis zur Zahl in der Mitte. */
+  const hausUnterZahl = useMemo(() => {
+    const out = new Set<string>();
+    for (const vk of Object.keys(state.buildings)) {
+      const v = parseVertexKey(vk);
+      const p = vertexToPixel(v, LAYOUT);
+      for (const h of vertexAdjacentHexes(v)) {
+        const c = hexToPixel(h.q, h.r, LAYOUT);
+        if (Math.abs(c.x - p.x) < 1 && c.y < p.y) out.add(hexKey(h.q, h.r));
+      }
+    }
+    return out;
+  }, [state.buildings]);
 
   /** Die Farbe einer Seite: Spielerfarbe, Fraktionsfarbe oder Grau fuer Neutrale. */
   const farbeSeite = useCallback(
@@ -2646,6 +2660,10 @@ export function Board({
       >
         {/* Zahlenmarker */}
         {visible.map((t) => {
+          // Steht ein Haus auf der unteren Ecke, ragt es bis zur Mitte - dann
+          // weicht die Zahl nach oben und wird durchsichtig (Spieltest 6: die
+          // Zahlen lagen ueber den eigenen Staedten).
+          const unterHaus = hausUnterZahl.has(hexKey(t.q, t.r));
           const hk = hexKey(t.q, t.r);
           const c = hexToPixel(t.q, t.r, LAYOUT);
           const red = t.number === 6 || t.number === 8;
@@ -2677,7 +2695,7 @@ export function Board({
           return (
             <g key={'n' + hk} pointerEvents="none" transform={`translate(0 ${-lift})`}>
               {showNumber && (
-                <g transform={`translate(${c.x} ${c.y})`} opacity={besetzt ? 0.42 : 1}>
+                <g transform={`translate(${c.x} ${c.y - (unterHaus ? 8 : 0)})`} opacity={besetzt || unterHaus ? 0.42 : 1}>
                   <circle cx={0} cy={0} r={9} className="token" />
                   <text x={0} y={1} textAnchor="middle" className={red ? 'token-num red' : 'token-num'}>
                     {t.number}

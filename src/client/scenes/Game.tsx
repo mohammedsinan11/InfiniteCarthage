@@ -158,12 +158,12 @@ export function Game() {
    * der Reihe und erscheint beim naechsten eigenen Feuer.
    */
   // Hoechstens ein Tipp alle zwei Runden (Spieltest 5: zu viel Text auf
-  // einmal) - Aufbau und Feuer ausgenommen: das eine gehoert zum Anfang,
-  // das andere laesst nur einen Zug Zeit.
+  // einmal) - Aufbau, Feuer und Fund ausgenommen: sie gehoeren zu genau
+  // dem Moment, in dem sie kommen (Spieltest 6: der Fund-Tipp kam zu spaet).
   const [tippRuhe, setTippRuhe] = useState(-99);
   const sichtbareTipps = tipps
     .filter((t) => t.id !== 'feuer' || (state?.braende ?? []).some((b) => b.owner === you))
-    .filter((t) => t.id === 'aufbau' || t.id === 'feuer' || (state?.turn ?? 0) >= tippRuhe + 2);
+    .filter((t) => t.id === 'aufbau' || t.id === 'feuer' || t.id === 'fund' || (state?.turn ?? 0) >= tippRuhe + 2);
   const tippWeg = () => {
     setTippRuhe(state?.turn ?? 0);
     tippGelesen();

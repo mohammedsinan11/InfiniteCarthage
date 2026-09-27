@@ -790,7 +790,7 @@ export function Aktionsleiste({
           tip={
             stadtMoeglich || !state.ereignisseAn
               ? `Ein Dorf zur Stadt ausbauen: doppelter Ertrag, 2 Siegpunkte. ${kostenText(COST_CITY)}${state.ereignisseAn ? ' - das Dorf braucht 2 Einwohner.' : ''}`
-              : 'Noch kein Dorf hat 2 Einwohner - sie wachsen jede grosse Runde (die Figuren unter dem Dorf).'
+              : 'Noch kein Dorf hat 2 Einwohner - sie wachsen jede grosse Runde (das Schild 1/3 am Dorf).'
           }
           onClick={bau('city')}
         />

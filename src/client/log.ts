@@ -125,14 +125,15 @@ export function fraktionName(state: PublicState | null, id: string): string {
   return state && istFraktion(id) ? fraktionById(state.worldSeed, id).name : 'Unbekannte';
 }
 
-/** Der Name einer Kampfseite. Wer liest (du), heisst "deine Ritter". */
+/** Der Name einer Kampfseite. Wer liest (du), heisst "deine Truppen" - auch der Held allein. */
 export function seiteName(state: PublicState | null, seite: Seite, du: string | null = null): string {
   if (istSpielerSeite(seite)) {
     const id = spielerAus(seite);
-    return id === du ? 'deine Ritter' : `Ritter von ${who(state, id)}`;
+    return id === du ? 'deine Truppen' : `die Truppen von ${who(state, id)}`;
   }
   if (istFraktion(seite)) return fraktionName(state, seite);
-  return 'Niemand';
+  // Schleime, Moraeste, die Hexe: kein Name, aber auch nicht "Niemand" (Spieltest 6).
+  return 'die Wildnis';
 }
 
 /** Wer in einer Kampfrunde fiel, als Text. Leer, wenn niemand fiel. */

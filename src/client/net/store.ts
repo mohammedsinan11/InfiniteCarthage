@@ -492,7 +492,7 @@ function meldungenAus(
           .join(' und ');
         if (e.neu) playClash();
         if (e.neu && !e.ende) {
-          out.push({ id: naechsteId++, text: `Deine Ritter kaempfen gegen ${gegner}`, kind: 'raid' });
+          out.push({ id: naechsteId++, text: `Deine Truppen kaempfen gegen ${gegner}`, kind: 'raid' });
         }
         if (e.ende) {
           const sieg = e.sieger === eigene;

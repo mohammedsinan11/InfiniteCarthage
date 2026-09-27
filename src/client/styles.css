@@ -4845,6 +4845,12 @@ em.off {
   transform: translateX(-50%);
   z-index: 8;
 }
+/* Wie beim Wuerfelknopf (.roll-button): die allgemeine Druckregel ersetzte das
+   translateX(-50%), der Knopf sprang beim Druecken zur Seite, und das Loslassen
+   lag daneben - kein click (Spieltest 5 und 6). */
+.chronik-schild:active:not(:disabled) {
+  transform: translate(calc(-50% + 1px), 1px);
+}
 
 @media (max-width: 560px) {
   .chronik {
@@ -5028,19 +5034,29 @@ em.off {
   }
 }
 
-/* Marken fuer Punkte-, Regel-, Sieben- und Schildkarten (ui/KartenBild.tsx). */
+/* Marken fuer Punkte-, Regel-, Sieben- und Schildkarten (ui/KartenBild.tsx).
+   Im Bild, nicht daran gehaengt: die allgemeine Regel .karten-teil b setzt
+   Zahlen absolut an die Ecke - eine lange Marke ragte so aus der Karte und
+   im Menue ueber die Nachbarkacheln (Spieltest 6). */
 .karten-marke b {
+  position: static;
+  display: block;
+  max-width: 100%;
+  text-align: center;
   font-family: var(--pixel);
   font-size: 10px;
   color: var(--accent);
-  white-space: nowrap;
+  white-space: normal;
   background: rgba(0, 0, 0, 0.35);
   padding: 3px 6px;
   border: 1px solid var(--line);
 }
 .karten-bild.klein .karten-marke b {
-  font-size: 8px;
-  padding: 2px 4px;
+  font-size: 7px;
+  padding: 1px 2px;
+}
+.karten-marke {
+  max-width: 100%;
 }
 
 /* --- Ereignisse (ui/EreignisTafel.tsx, core/ereignis.ts) ------------------- */
@@ -6045,4 +6061,18 @@ em.off {
 .sippe-chip.ruht {
   opacity: 0.55;
   border-style: dashed;
+}
+
+/* Handy: das offene Menue endet ueber dem Block unten (Game.tsx misst ihn),
+   statt Leiste und Wuerfel zu decken; die Reiter brechen nicht mitten im Wort
+   (Spieltest 6: "Marschal-l"). */
+@media (max-width: 700px) {
+  .menu {
+    bottom: calc(var(--unten-oben, 150px) + 6px);
+  }
+  .menu-reiter-knopf span {
+    word-break: keep-all;
+    font-size: 7px;
+    letter-spacing: 0;
+  }
 }
