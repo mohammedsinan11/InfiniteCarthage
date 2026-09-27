@@ -207,6 +207,10 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
       const b = sippenBonusById(e.bonus);
       return `${who(state, e.player)} erreicht ${b?.name ?? e.bonus}: ${b?.text ?? ''}`;
     }
+    case 'tradeRoute':
+      return e.player
+        ? `${who(state, e.player)} traegt jetzt die Handelsstrasse: ${e.laenge} Strassen zwischen zwei Siedlungen (+2 Punkte).`
+        : `Die Handelsstrasse hat niemand mehr.`;
     case 'sippenRuhm':
       return `${sippenBonusById(e.bonus)?.name ?? 'Die Sippe'}: ${who(state, e.player)} gewinnt ${e.amount} Ruhm fuer die neue Stadt.`;
     case 'sippenBeute':

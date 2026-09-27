@@ -11,6 +11,7 @@
  * erneut geprueft.
  */
 
+import { HANDELSSTRASSE_AB, laengsteRoute } from '../../core/handelswege';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
@@ -709,6 +710,11 @@ export function Game() {
         { text: 'Siegpunktkarten', wert: karten > 0 ? karten : null },
         { text: 'Punktekarten', wert: you && kartenPunkte(state, you) > 0 ? kartenPunkte(state, you) : null },
         { text: 'Ruhmreichster', wert: state.ruhmreichster === you ? 2 : null },
+        // Die Handelsstrasse (core/handelswege.ts): der laengste Weg zwischen zwei eigenen Siedlungen.
+        {
+          text: `Handelsstrasse${you ? ` (dein Weg: ${laengsteRoute(state, you)?.laenge ?? 0}, ab ${HANDELSSTRASSE_AB})` : ''}`,
+          wert: state.handelsstrasse === you ? 2 : null,
+        },
       ],
     };
   }, [state, you]);

@@ -3,7 +3,9 @@
  * "traders on the roads"; Vorbild Against the Storm).
  *
  * Wer zwei Siedlungen hat, die weit genug auseinander liegen, bekommt zu
- * Beginn einer grossen Runde eine Karawane. Sie zieht von selbst zwischen den
+ * Beginn einer grossen Runde eine Karawane. Mit Ereignissen muessen die
+ * beiden durch eigene Strassen verbunden sein - die Karawane zieht nur auf
+ * ihnen, und je laenger der Weg, desto mehr bringt sie (core/handelswege.ts). Sie zieht von selbst zwischen den
  * beiden hin und her; jede Ankunft bringt zwei Karten der Sorten, von denen
  * man am wenigsten hat - Handel ohne Bank. Raeuber halten sie fuer Beute: wer
  * sie schuetzen will, schickt Ritter mit. Faellt sie, kommt die naechste erst
@@ -19,6 +21,7 @@ import { RESOURCES } from './types';
 import type { Resource } from './types';
 import type { GameState, PlayerId, UnitState } from './state';
 import { einheitVorlage, nextStep, settlementApproaches } from './units';
+import { KARAWANE_MIN_WEG, handelsLohn, laengsteRoute, routenFeld } from './handelswege';
 
 /** So weit muessen die Endpunkte auseinander liegen. */
 export const KARAWANE_ABSTAND = 4;
@@ -32,8 +35,23 @@ export type KarawanenEvent =
 
 type Ereignisse = { push(...e: KarawanenEvent[]): number };
 
+/**
+ * Mit Ereignissen: der laengste Handelsweg im eigenen Strassennetz
+ * (core/handelswege.ts) - die Karawane zieht nur auf Strassen, und je laenger
+ * der Weg, desto mehr bringt sie (Spieltest 6: "was bringt die Strasse?").
+ */
+function strassenEndpunkte(s: GameState, id: PlayerId): [Hex, Hex] | null {
+  const route = laengsteRoute(s, id);
+  if (!route || route.laenge < KARAWANE_MIN_WEG) return null;
+  const a = routenFeld(s, id, route.von);
+  const b = routenFeld(s, id, route.nach);
+  if (!a || !b || (a.q === b.q && a.r === b.r)) return null;
+  return [a, b];
+}
+
 /** Die zwei am weitesten auseinander liegenden Felder an eigenen Siedlungen - mit Landweg. */
 function endpunkte(s: GameState, id: PlayerId): [Hex, Hex] | null {
+  if (s.ereignisseAn) return strassenEndpunkte(s, id);
   const felder = [...settlementApproaches(s, id).keys()].map(parseHexKey);
   let best: [Hex, Hex] | null = null;
   let weit = KARAWANE_ABSTAND - 1;
@@ -71,7 +89,9 @@ export function karawaneAngekommen(s: GameState, u: UnitState, events: Ereigniss
   // Die knappsten Sorten zuerst - der Grund, warum man sonst zur Bank ginge.
   const knapp = [...RESOURCES].sort((x, y) => p.hand[x] - p.hand[y]);
   const gained: Partial<Record<Resource, number>> = {};
-  for (let i = 0; i < KARAWANE_LOHN; i++) {
+  // Auf Strassen: der Lohn waechst mit dem Weg (core/handelswege.ts).
+  const lohn = s.ereignisseAn ? handelsLohn(laengsteRoute(s, p.id)?.laenge ?? 0) : KARAWANE_LOHN;
+  for (let i = 0; i < lohn; i++) {
     const r = knapp[i % knapp.length]!;
     p.hand[r] += 1;
     gained[r] = (gained[r] ?? 0) + 1;

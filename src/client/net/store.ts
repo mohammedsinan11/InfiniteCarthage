@@ -244,6 +244,7 @@ function vervollstaendige(msg: ServerMsg): void {
     msg.state.einwohner ??= {};
     msg.state.marktZug ??= {};
     msg.state.wahlen ??= null;
+    msg.state.handelsstrasse ??= null;
     msg.state.koop ??= false;
     msg.state.szenario ??= null;
     msg.state.szenarioErgebnis ??= null;
@@ -449,6 +450,9 @@ function meldungenAus(
       if (e.player === you) meldung('Neue Vorhaben zur Wahl - beim Kanzler im Menue', 'info');
     } else if (e.t === 'ambitionDone') {
       if (e.player === you) meldung(`Vorhaben vollendet: ${vorhabenById(e.id)?.name ?? e.id}`, 'gain');
+    } else if (e.t === 'tradeRoute') {
+      if (e.player === you) meldung(`Du traegst die Handelsstrasse: ${e.laenge} Strassen (+2 Punkte)`, 'gain');
+      else if (e.von === you) meldung(`Die Handelsstrasse ist verloren - ${e.player ? wer(e.player) : 'niemand'} hat den laengeren Weg`, 'raid');
     } else if (e.t === 'explorerDone') {
       if (e.player === you) meldung(`${e.held ? 'Dein Held' : 'Dein Erkunder'} hat die Gegend erkundet und kehrt heim`, 'info');
     } else if (e.t === 'sippeStufe') {

@@ -55,6 +55,7 @@
  */
 
 import { karawaneAngekommen, karawanenRunde } from '../karawane';
+import { strassenFelder } from '../handelswege';
 import type { KarawanenEvent } from '../karawane';
 import { szenarioById } from '../szenario';
 import { Rng } from '../rng';
@@ -1110,6 +1111,16 @@ function aussenpostenEcke(s: GameState, world: World, q: number, r: number, owne
   return null;
 }
 
+/** Steht ein eigener Wachturm hoechstens zwei Felder von der Karawane? Dann greift sie niemand an. */
+export const KARAWANE_TURM_REICHWEITE = 2;
+function karawaneBewacht(s: GameState, u: UnitState): boolean {
+  for (const [vk, t] of Object.entries(s.tuerme ?? {})) {
+    if (t.owner !== u.owner) continue;
+    if (vertexAdjacentHexes(parseVertexKey(vk)).some((h) => hexDistance(h, u) <= KARAWANE_TURM_REICHWEITE)) return true;
+  }
+  return false;
+}
+
 /** Das Lager, zu dem ein Heimkehrer zieht: sein eigenes, sonst das naechste seiner Fraktion. */
 function heimFuer(s: GameState, u: UnitState): Hex | null {
   if (u.heimat) {
@@ -1203,13 +1214,22 @@ function schreite(
   const seed = s.worldSeed;
   const gesperrt = mauerSperrt(s.mauern, u.owner);
   let gezogen = false;
+  // Auf eigenen Strassen ein Feld mehr je Runde (core/handelswege.ts): das
+  // Strassennetz ist die Ader, auf der das Heer schnell ist.
+  const netz = s.ereignisseAn && u.owner ? strassenFelder(s, u.owner) : null;
+  let strassenSchritt = netz ? 1 : 0;
   for (let i = 0; i < schritte && u.ziel; i++) {
     const zk = hexKey(u.ziel.q, u.ziel.r);
     const weg = nextStep(seed, u, new Set([zk]), SUCHE_RITTER, gesperrt);
     if (weg) {
+      const vonStrasse = netz?.has(hexKey(u.q, u.r)) ?? false;
       u.q = weg.step.q;
       u.r = weg.step.r;
       gezogen = true;
+      if (strassenSchritt > 0 && vonStrasse && netz!.has(hexKey(u.q, u.r))) {
+        strassenSchritt -= 1;
+        i -= 1;
+      }
       wachsen(s, world, u, u.kind === 'held' ? ERKUNDUNG_HELD : ERKUNDUNG_RADIUS, events);
     }
     // Am Ziel oder ohne Weg: der Befehl ist erledigt. Die Schar bleibt beisammen -
@@ -1376,7 +1396,11 @@ function ziehe(
       if (!u.ziel) return false;
       if (u.q === u.ziel.q && u.r === u.ziel.r) karawaneAngekommen(s, u, events);
       if (!u.ziel) return false;
-      const weg = nextStep(seed, u, new Set([hexKey(u.ziel.q, u.ziel.r)]), SUCHE_RAEUBER);
+      // Mit Ereignissen nur auf den eigenen Strassen (core/handelswege.ts) -
+      // ist der Weg unterbrochen, wartet sie.
+      const netz = s.ereignisseAn && u.owner ? strassenFelder(s, u.owner) : null;
+      const abseits = netz ? (_a: Hex, b: Hex) => !netz.has(hexKey(b.q, b.r)) : undefined;
+      const weg = nextStep(seed, u, new Set([hexKey(u.ziel.q, u.ziel.r)]), SUCHE_RAEUBER, abseits);
       if (weg) {
         schritt(weg.step);
         return true;
@@ -1737,6 +1761,17 @@ export function tickArmy(s: GameState, world: World, events: Ereignisse): void {
     let m = zielCache.get(k);
     if (!m) {
       m = settlementApproaches(s, undefined, imKriegMit(s, fraktion));
+      // Karawanen auf ungeschuetzten Strassen sind Beute (core/handelswege.ts):
+      // wer sie schuetzen will, baut Wachtuerme an den Weg.
+      if (s.ereignisseAn) {
+        const krieg = imKriegMit(s, fraktion);
+        for (const u of s.units) {
+          if (u.kind !== 'karawane' || !u.owner || !krieg(u.owner)) continue;
+          if (karawaneBewacht(s, u)) continue;
+          const hk = hexKey(u.q, u.r);
+          if (!m.has(hk)) m.set(hk, u.owner);
+        }
+      }
       zielCache.set(k, m);
     }
     return m;

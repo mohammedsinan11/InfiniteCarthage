@@ -16,6 +16,7 @@ import type { SippenZaehler } from '../cards/sippen';
 import { EINWOHNER_FUER_STADT, bevoelkerungRunde, einwohnerAbgleichen, einwohnerNehmen, einwohnerVerlieren, einwohnerVon } from '../bevoelkerung';
 import type { BevoelkerungEvent } from '../bevoelkerung';
 import { verderbAmZugende } from '../verderb';
+import { handelsstrasseNeu, laengsteRoute } from '../handelswege';
 import { botAufholen } from '../aufholen';
 import type { AufholenEvent } from '../aufholen';
 import type { VerderbEvent } from '../verderb';
@@ -283,6 +284,8 @@ export type GameEvent =
   | { t: 'bauGabe'; player: PlayerId; gained: Hand }
   /** Eine Sippenstufe ist erreicht (cards/sippen.ts). */
   | { t: 'sippeStufe'; player: PlayerId; bonus: string }
+  /** Die Handelsstrasse wechselt (core/handelswege.ts). */
+  | { t: 'tradeRoute'; player: PlayerId | null; von: PlayerId | null; laenge: number }
   /** Die Bau-Sippe bringt Ruhm fuer jede neue Stadt (rules/ruhm.ts verbucht ihn). */
   | { t: 'sippenRuhm'; player: PlayerId; bonus: string; amount: number }
   /** Sippenstufen bringen Kartenwahlen: fuer Lager und Ruinen. */
@@ -1735,6 +1738,19 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       ruhmAusEreignissen(s, erfuellt as never, ruhm);
       events.push(...erfuellt, ...ruhm);
       chronikFortschreiben(s, [...erfuellt, ...ruhm]);
+    }
+  }
+
+  // Die Handelsstrasse (core/handelswege.ts): wer den laengsten Weg zwischen
+  // zwei eigenen Siedlungen hat, traegt sie - zwei Siegpunkte.
+  if (s.ereignisseAn && (s.phase as GameState['phase']).t !== 'finished') {
+    const neu = handelsstrasseNeu(s);
+    if (neu !== (s.handelsstrasse ?? null)) {
+      const alt = s.handelsstrasse ?? null;
+      s.handelsstrasse = neu;
+      const route = neu ? laengsteRoute(s, neu) : null;
+      events.push({ t: 'tradeRoute', player: neu, von: alt, laenge: route?.laenge ?? 0 });
+      checkWin(s, events);
     }
   }
 

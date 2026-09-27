@@ -766,7 +766,7 @@ export function SideMenu({
                 (punkte.rundenLimit !== null
                   ? `Nach Runde ${punkte.rundenLimit} gewinnt die hoechste Wertung: Siegpunkte x 10 + Ruhm. `
                   : '') +
-                'Dorf 1, Stadt 2, Hauptstadt 2 und je Ausbaustufe 1 mehr, Siegpunktkarten 1, Ruhmreichster ab 5 Ruhm 2.'
+                'Dorf 1, Stadt 2, Hauptstadt 2 und je Ausbaustufe 1 mehr, Siegpunktkarten 1, Ruhmreichster ab 5 Ruhm 2, Handelsstrasse (laengster Weg zwischen zwei eigenen Siedlungen, ab 5 Strassen) 2.'
               }
             />
             <div className="menu-box">

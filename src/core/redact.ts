@@ -100,6 +100,7 @@ export type PublicState = {
   lastRoll: [number, number] | null;
   targetPoints: number;
   ruhmreichster: PlayerId | null;
+  handelsstrasse: PlayerId | null;
   /** Offene, bis zur naechsten Heeresrunde vorbereitete Taktiken. */
   tacticBuffs: GameState['tacticBuffs'];
   /** Die offene Kartenwahl - fuer alle sichtbar, gewaehlt wird vom Spieler am Zug. */
@@ -239,6 +240,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     lastRoll: state.lastRoll,
     targetPoints: state.targetPoints,
     ruhmreichster: state.ruhmreichster,
+    handelsstrasse: state.handelsstrasse ?? null,
     tacticBuffs: state.tacticBuffs,
     draft: state.draft,
     trade: state.trade,

@@ -490,6 +490,8 @@ export type GameState = {
   targetPoints: number;
   /** Wer mindestens fuenf Ruhm und mehr als alle Herausforderer hat. */
   ruhmreichster: PlayerId | null;
+  /** Wer die Handelsstrasse traegt - den laengsten Weg zwischen zwei eigenen Siedlungen (core/handelswege.ts). */
+  handelsstrasse?: PlayerId | null;
   /** VERALTET: nur fuer die Migration alter Staende. */
   largestArmy?: PlayerId | null;
   chunks: ChunkCoord[];
@@ -648,7 +650,7 @@ export function setupPlayerId(state: GameState, step: number): PlayerId {
 /** Sichtbare Siegpunkte (ohne verdeckte Siegpunktkarten). */
 export function publicPoints(
   state: Pick<GameState, 'buildings' | 'ruhmreichster' | 'hauptstaedte'> &
-    Partial<Pick<GameState, 'roads' | 'players' | 'chronik' | 'wunder'>>,
+    Partial<Pick<GameState, 'roads' | 'players' | 'chronik' | 'wunder' | 'handelsstrasse'>>,
   id: PlayerId,
 ): number {
   let pts = 0;
@@ -656,6 +658,8 @@ export function publicPoints(
     if (b.owner === id) pts += b.type === 'city' ? 2 : 1;
   }
   if (state.ruhmreichster === id) pts += 2;
+  // Die Handelsstrasse (core/handelswege.ts, HANDELSSTRASSE_PUNKTE).
+  if (state.handelsstrasse === id) pts += 2;
   for (const h of Object.values(state.hauptstaedte ?? {})) {
     if (h.owner === id) pts += HAUPTSTADT_PUNKTE + (h.stufe - 1) * STUFE_PUNKTE;
   }

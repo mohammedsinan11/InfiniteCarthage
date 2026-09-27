@@ -315,8 +315,15 @@ siedelten.
 **Bevoelkerung und Karawanen** (`src/core/bevoelkerung.ts`,
 `src/core/karawane.ts`). Siedlungen haben Einwohner, die wachsen und bei
 Pluenderungen verschleppt werden; eine Stadt braucht zwei, ein Ritter nimmt
-einen. Zwischen den zwei fernsten Siedlungen zieht eine Karawane und bringt
-die knappsten Sorten - Raeuber jagen sie.
+einen.
+
+**Handelswege** (`src/core/handelswege.ts`). Strassen sind Adern: die
+Karawane zieht nur auf eigenen Strassen, zwischen den zwei Siedlungen mit dem
+laengsten Weg dazwischen, und bringt je Ankunft 1 Karte und je 4 Strassen eine
+mehr (hoechstens 4) - die knappsten Sorten. Raeuber ueberfallen Karawanen, die
+kein eigener Wachturm (zwei Felder) schuetzt. Eigene Einheiten ziehen auf
+eigenen Strassen ein Feld weiter. Wer den laengsten Weg zwischen zwei eigenen
+Siedlungen hat (ab 5 Strassen), traegt die Handelsstrasse: 2 Siegpunkte.
 
 **Sippen und Gruendungen** (`src/core/cards/sippen.ts`). Die Kartenwahl ist
 der Kern: jede neue Stadt bringt eine Wahl (nur Karten, die bleiben -

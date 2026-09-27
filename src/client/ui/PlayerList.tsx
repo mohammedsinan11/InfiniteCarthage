@@ -24,6 +24,7 @@ export function PlayerList({ state, you }: { state: PublicState; you: string | n
               <span title="Entwicklungskarten">{p.devCount} E</span>
               <span title="Ruhm aus Lagern, Auftraegen, Veteranen und dem Morast">
                 {p.ruhm} Ruhm{state.ruhmreichster === id ? '+' : ''}
+                {state.handelsstrasse === id ? ' · Handelsstrasse' : ''}
               </span>
             </span>
           </li>
