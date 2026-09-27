@@ -19,6 +19,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { verderbZahl } from '../../core/verderb';
 import { RESOURCES } from '../../core/types';
 import type { Resource } from '../../core/types';
 import type { Hand } from '../../core/state';
@@ -63,24 +64,27 @@ function schmalAnfangs(): boolean {
  * verliert bei einer Pluenderung die Haelfte. Spieltest: das wusste niemand,
  * und Raeuber nahmen die Haelfte aller Ertraege.
  */
-function GrenzSchild({ total, grenze }: { total: number; grenze: number }) {
+function GrenzSchild({ total, grenze, verderb }: { total: number; grenze: number; verderb: boolean }) {
   const ueber = total > grenze;
+  const weg = verderbZahl(total, grenze);
   return (
     <span
       className={ueber ? 'hand-grenze ueber' : 'hand-grenze'}
       title={
         ueber
-          ? `Du haeltst ${total} Karten, die Grenze ist ${grenze}: Pluenderer nehmen dir die Haelfte. Ausgeben oder tauschen!`
-          : `${total} von ${grenze} Karten. Wer mehr haelt, verliert bei einer Pluenderung die Haelfte.`
+          ? verderb
+            ? `Du haeltst ${total} Karten, die Grenze ist ${grenze}: am Zugende verderben ${weg}, und Pluenderer nehmen die Haelfte. Ausgeben oder tauschen!`
+            : `Du haeltst ${total} Karten, die Grenze ist ${grenze}: Pluenderer nehmen dir die Haelfte. Ausgeben oder tauschen!`
+          : `${total} von ${grenze} Karten. Wer mehr haelt, verliert${verderb ? ' am Zugende die Haelfte des Ueberschusses und' : ''} bei einer Pluenderung die Haelfte.`
       }
     >
       {total}/{grenze}
-      {ueber ? ' !' : ''}
+      {ueber ? (verderb ? ` -${weg}` : ' !') : ''}
     </span>
   );
 }
 
-export function HandPanel({ hand, grenze }: { hand: Hand; grenze?: number }) {
+export function HandPanel({ hand, grenze, verderb = false }: { hand: Hand; grenze?: number; verderb?: boolean }) {
   const total = RESOURCES.reduce((n, r) => n + hand[r], 0);
   const [schmalGewaehlt, setSchmalGewaehlt] = useState(schmalAnfangs);
   const [handy, setHandy] = useState(istHandy);
@@ -149,7 +153,7 @@ export function HandPanel({ hand, grenze }: { hand: Hand; grenze?: number }) {
             <b>{hand[r]}</b>
           </span>
         ))}
-        {grenze !== undefined && <GrenzSchild total={total} grenze={grenze} />}
+        {grenze !== undefined && <GrenzSchild total={total} grenze={grenze} verderb={verderb} />}
       </button>
     );
   }
@@ -178,7 +182,7 @@ export function HandPanel({ hand, grenze }: { hand: Hand; grenze?: number }) {
       <button className="hand-zu" title="Hand einklappen" onClick={() => umschalten(true)}>
         –
       </button>
-      {grenze !== undefined && <GrenzSchild total={total} grenze={grenze} />}
+      {grenze !== undefined && <GrenzSchild total={total} grenze={grenze} verderb={verderb} />}
       {RESOURCES.map((r) => (
         <div
           key={r}

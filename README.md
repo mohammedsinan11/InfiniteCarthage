@@ -322,10 +322,12 @@ die knappsten Sorten - Raeuber jagen sie.
 Karten gegen eine Kartenwahl. Jeder weitere Bankhandel im selben Zug kostet
 mehr. Dort beginnt zu mehreren auch ein Angebot an die Mitspieler.
 
-**Die Leiste unten** (`src/client/ui/Aktionsleiste.tsx`). Sieben feste
+**Die Leiste unten** (`src/client/ui/Aktionsleiste.tsx`). Sechs feste
 Knoepfe: Strasse, Dorf, Stadt, Befestigen (klappt Turm, Palisade, Tor auf),
-Truppe (Ritter, Bogen), Karten (mit "Neue Karte kaufen") und Zug Ende; Beute
-und Hauptstadt erscheinen nur, wenn es sie gibt. Esc hebt eine Bauwahl auf.
+Truppe (Ritter, Bogen) und Karten (mit "Neue Karte kaufen"); Beute und
+Hauptstadt erscheinen nur, wenn es sie gibt. Den Zug beendet der
+Wuerfelknopf: allein oder gegen Bots wirft er gleich den naechsten Wurf,
+gegen Menschen heisst er "Zug beenden". Esc hebt eine Bauwahl auf.
 Auf dem Handy steht die Leiste in zwei Reihen mit lesbarer Schrift.
 
 **Siegwege** (`src/core/siegwege.ts`). Neben dem Siegpunktziel gewinnt auch,

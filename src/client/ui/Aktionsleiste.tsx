@@ -189,11 +189,6 @@ const SymBeute = () => (
     <rect x={9} y={10} width={2} height={3} fill="#d9a441" />
   </Symbol>
 );
-const SymZugEnde = () => (
-  <Symbol>
-    <path d="M4 4 L11 10 L4 16 Z M11 4 L18 10 L11 16 Z" fill="#c9a46a" stroke="#2a2016" strokeWidth={1.2} strokeLinejoin="round" />
-  </Symbol>
-);
 
 /** Die drei Ernannten: Schwert, Kelch, Waage - und der Rueckweg. */
 const SymZweig = ({ zweig }: { zweig: HeldZweig | 'zurueck' }) => (
@@ -754,7 +749,8 @@ export function Aktionsleiste({
 
       <div className="dock-reihe">
         {/*
-          Die feste Leiste: sieben Plaetze (Spieltest 4 - "zu viele Knoepfe").
+          Die feste Leiste: sechs Plaetze (Spieltest 4 - "zu viele Knoepfe").
+          Den Zug beendet der Wuerfelknopf daneben (Spieltest 5).
           Was selten gebraucht wird, liegt in zwei Klappen: Befestigen (Turm,
           Palisade, Tor) und Truppe (Ritter, Bogen). Die Entwicklungskarte
           kauft man in der Kartentafel. Beute und Hauptstadt erscheinen nur,
@@ -956,9 +952,6 @@ export function Aktionsleiste({
         />
         {(me?.loot ?? 0) > 0 && (
           <DockKnopf titel="Beute" symbol={<SymBeute />} zahl={me?.loot} leuchtet hops={bauen && (me?.loot ?? 0) > 0} darf={bauen} tip="Beute einloesen: eine Kartenwahl" onClick={() => act({ t: 'claimLoot' })} />
-        )}
-        {state.order.length > 1 && (
-          <DockKnopf titel="Zug Ende" symbol={<SymZugEnde />} darf={bauen} tip="Zug beenden" onClick={() => act({ t: 'endTurn' })} />
         )}
       </div>
       {hinweis && <div className="dock-hinweis">{hinweis}</div>}

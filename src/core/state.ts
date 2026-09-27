@@ -576,6 +576,8 @@ export type GameState = {
   stufe?: number;
   /** Kommen Ereignisse mit Wahl (core/ereignis.ts)? Fehlt bei alten Staenden: nein. */
   ereignisseAn?: boolean;
+  /** Welche Plaetze Bots sind (worker/room.ts) - fuer das Aufholen (core/aufholen.ts). */
+  bots?: PlayerId[];
   /** Das offene Ereignis (core/ereignis.ts) - wer antwortet und worauf. Oeffentlich. */
   ereignis?: { id: string; player: PlayerId } | null;
   /** Schon erlebte Ereignisse - sie kommen erst wieder, wenn alle durch sind. */

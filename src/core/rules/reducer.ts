@@ -13,6 +13,10 @@
 
 import { EINWOHNER_FUER_STADT, bevoelkerungRunde, einwohnerAbgleichen, einwohnerNehmen, einwohnerVerlieren, einwohnerVon } from '../bevoelkerung';
 import type { BevoelkerungEvent } from '../bevoelkerung';
+import { verderbAmZugende } from '../verderb';
+import { botAufholen } from '../aufholen';
+import type { AufholenEvent } from '../aufholen';
+import type { VerderbEvent } from '../verderb';
 import { erbstueckById, istErbstueck } from '../erbe';
 import { kundeFortschreiben, kundeSchreiben } from '../kunde';
 import type { KundeEvent } from '../kunde';
@@ -265,6 +269,8 @@ export type GameEvent =
   | FraktionsEvent
   | KundeEvent
   | BevoelkerungEvent
+  | VerderbEvent
+  | AufholenEvent
   | BedrohungEvent
   | DiplomatieEvent
   | AuftragEvent
@@ -428,6 +434,7 @@ export function createGame(
   };
 
   if (optionen.ereignisse) state.ereignisseAn = true;
+  if (optionen.bots && optionen.bots.length > 0) state.bots = [...optionen.bots];
   // Erbstuecke geben ihre Gabe nur einem einzelnen Menschen (Bots duerfen dabei
   // sein - Spieltest 5) und nur in gewoehnlichen Partien (core/erbe.ts).
   const menschen = state.players.filter((p) => !(optionen.bots ?? []).includes(p.id)).length;
@@ -868,6 +875,8 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         durstLindern(s, payout, events);
         s.phase = { t: 'main' };
       }
+      // Ein weit zurueckliegender Bot bekommt eine Karte (core/aufholen.ts).
+      botAufholen(s, actor, events);
       // Alle paar eigenen Zuege ein Ereignis mit einer Wahl (core/ereignis.ts) -
       // bei einer 7 erst nach der Kartenwahl.
       if (s.ereignisseAn && ereignisFaellig(s.turn, s.order.length)) {
@@ -1525,6 +1534,8 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         zeitAbgelaufen(s, events);
         break;
       }
+      // Was ueber die Grenze hinaus lagert, verdirbt zur Haelfte (core/verderb.ts).
+      verderbAmZugende(s, ender, events);
       nextTurn(s);
 
       // Jede Runde zieht das Heer: Ritter, der Held, Raubzuege, Fehden,

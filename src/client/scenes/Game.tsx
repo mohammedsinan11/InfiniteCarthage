@@ -69,7 +69,7 @@ import { maxLeben } from '../../core/combat';
 import { kampfFelder as kampfFelderVon } from '../../core/combat';
 import type { UnitState as HeerEinheit } from '../../core/state';
 import { bundleText } from '../log';
-import { eckenWert } from '../../core/bot';
+import { eckenWert, istBotId } from '../../core/bot';
 import { weltArtVon } from '../../core/weltart';
 import { stadtReif } from '../../core/bevoelkerung';
 import { erstarkt, fraktionIn, stimmungText, stimmungVon } from '../../core/fraktionsleben';
@@ -1038,13 +1038,20 @@ export function Game() {
     }
   });
   const [tafelOffen, setTafelOffen] = useState(false);
+  /*
+   * Der Wuerfel beendet auch den Zug (Spieltest 5: "Zug Ende" war doppelt).
+   * Allein oder nur gegen Bots wirft er danach gleich den naechsten Wurf -
+   * die Bots ziehen auf dem Server sofort. Gegen Menschen beendet er nur den
+   * Zug und heisst dann auch so.
+   */
+  const nurBots = state.order.every((id) => id === you || istBotId(id));
   const wurfMoeglich =
-    isMine &&
-    pendingRoll === null &&
-    !wurfUnterwegs &&
-    (phase.t === 'roll' || (phase.t === 'main' && state.order.length === 1));
+    isMine && pendingRoll === null && !wurfUnterwegs && (phase.t === 'roll' || phase.t === 'main');
+  const nurZugEnde = phase.t === 'main' && !nurBots;
   const uhrLaeuft =
     wurfMoeglich &&
+    // Gegen Menschen beendet die Uhr den Zug nicht von selbst.
+    !nurZugEnde &&
     autoWurf &&
     mode === null &&
     kandidaten.length === 0 &&
@@ -1063,11 +1070,29 @@ export function Game() {
     setWurfStoss((n) => n + 1);
     initAudio();
     playWurfStart();
-    if (phase.t === 'main') act({ t: 'endTurn' });
+    if (phase.t === 'main') {
+      act({ t: 'endTurn' });
+      if (state.order.length > 1) {
+        // Gegen Bots: geworfen wird, sobald der eigene Zug wieder da ist.
+        if (nurBots) wurfNachZug.current = true;
+        return;
+      }
+    }
     act({ t: 'roll' });
   };
   const wuerfelnRef = useRef(wuerfeln);
   wuerfelnRef.current = wuerfeln;
+  const wurfNachZug = useRef(false);
+  useEffect(() => {
+    if (!wurfNachZug.current || !isMine || phase.t !== 'roll' || pendingRoll !== null) return;
+    wurfNachZug.current = false;
+    setWurfUnterwegs(false);
+    act({ t: 'roll' });
+  }, [isMine, phase.t, pendingRoll]);
+  // Ein Zug ohne Wurf danach (gegen Menschen): der Knopf ist wieder frei.
+  useEffect(() => {
+    if (!isMine) setWurfUnterwegs(false);
+  }, [isMine]);
 
   useEffect(() => {
     if (!uhrLaeuft) return;
@@ -1564,7 +1589,7 @@ export function Game() {
             immer da, ausgegraut, solange nichts geht (ui/Aktionsleiste.tsx).
           */}
           <div className="unten" ref={untenRef}>
-            {hand && <HandPanel hand={hand} grenze={you ? limitFor(state, you) : undefined} />}
+            {hand && <HandPanel hand={hand} grenze={you ? limitFor(state, you) : undefined} verderb={!!state.ereignisseAn} />}
             {/*
               Der Handel steht als EIGENES Feld neben dem Rohstoffblatt, mit
               eigenem Rahmen und eigenem Hintergrund - er gehoert sichtbar
@@ -1617,8 +1642,8 @@ export function Game() {
               />
             )}
             {/*
-              Der Wuerfelknopf rechts neben der Aktionsleiste. Allein erledigt er
-              Zug beenden und Wuerfeln in einem. Die Leiste am Fuss schrumpft
+              Der Wuerfelknopf rechts neben der Aktionsleiste. Er erledigt Zug
+              beenden und Wuerfeln in einem - gegen Menschen nur Zug beenden. Die Leiste am Fuss schrumpft
               mit der Zeit, die bis zum Selbstwurf bleibt.
             */}
             {hand && (
@@ -1638,7 +1663,7 @@ export function Game() {
                   <span className="wuerfel-symbol">
                     <DieIcon />
                   </span>
-                  <span className="wuerfel-text">Wuerfeln</span>
+                  <span className="wuerfel-text">{nurZugEnde ? 'Zug beenden' : 'Wuerfeln'}</span>
                 </span>
                 {uhrLaeuft && (
                   <>

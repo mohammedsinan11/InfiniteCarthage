@@ -68,7 +68,12 @@ export function Lobby() {
             <li key={m.id}>
               <span className="dot" style={{ background: playerColor(i) }} />
               {m.name}
-              {m.bot && <em title="Wie der Rivale spielt (core/bot.ts)"> Bot · {NATUR_NAME[botNatur(m.id)]}</em>}
+              {m.bot && (
+                <em title="Wie der Rivale spielt (core/bot.ts). Liegt er 3 Punkte oder mehr zurueck, bekommt er bei jedem Wurf eine Karte dazu.">
+                  {' '}
+                  Bot · {NATUR_NAME[botNatur(m.id)]}
+                </em>
+              )}
               {m.id === room.hostId && <em> Gastgeber</em>}
               {m.id === you && <em> du</em>}
               {!m.connected && <em className="off"> offline</em>}

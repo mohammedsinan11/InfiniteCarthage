@@ -199,6 +199,10 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
     }
     case 'ambitionFailed':
       return `${who(state, e.player)} laesst das Vorhaben "${vorhabenById(e.id)?.name ?? e.id}" fallen - die Zeit ist um.`;
+    case 'botCatchUp':
+      return `${who(state, e.player)} liegt weit zurueck und holt auf: +1 ${resourceName(e.resource)}.`;
+    case 'spoiled':
+      return `Bei ${who(state, e.player)} verdirbt, was ueber die Grenze hinaus lagerte: ${bundleText(e.lost)}.`;
     case 'caravanSet':
       return `${who(state, e.player)} schickt eine Karawane zwischen ihren Siedlungen los.`;
     case 'caravanArrived':

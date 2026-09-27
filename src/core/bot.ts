@@ -47,6 +47,9 @@ import { isNestActive } from './units';
  */
 export type BotNatur = 'baumeister' | 'haendler' | 'krieger';
 
+/** Bots tragen Plaetze mit 'bot_' vorn (worker/room.ts) - so erkennt sie auch der Client. */
+export const istBotId = (id: PlayerId): boolean => id.startsWith('bot_');
+
 export function botNatur(id: PlayerId): BotNatur {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;

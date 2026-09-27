@@ -423,6 +423,8 @@ function meldungenAus(
       if (e.player === you) meldung('Neue Vorhaben zur Wahl - beim Kanzler im Menue', 'info');
     } else if (e.t === 'ambitionDone') {
       if (e.player === you) meldung(`Vorhaben vollendet: ${vorhabenById(e.id)?.name ?? e.id}`, 'gain');
+    } else if (e.t === 'spoiled') {
+      if (e.player === you) meldung(`Zu viel gelagert - verdorben: ${bundleText(e.lost)}`, 'raid');
     } else if (e.t === 'caravanSet') {
       if (e.player === you) meldung('Deine Karawane bricht auf - sie zieht zwischen deinen Siedlungen', 'info');
     } else if (e.t === 'caravanArrived') {
