@@ -5892,11 +5892,16 @@ em.off {
   pointer-events: visiblePainted;
   cursor: help;
 }
-.ew-da rect {
-  fill: #f2e2b8;
+.ew-schild {
+  fill: rgba(242, 226, 184, 0.92);
   stroke: #2a1c0c;
-  stroke-width: 0.6;
+  stroke-width: 0.8;
 }
-.ew-frei rect {
-  fill: rgba(20, 14, 8, 0.55);
+.ew-zahl {
+  font-family: var(--pixel);
+  font-size: 6px;
+  fill: #2a1c0c;
+}
+.ew-reif .ew-schild {
+  fill: #f2c94c;
 }

@@ -14,7 +14,7 @@
  *    in ihre obere Nachbarin.
  */
 
-import { einwohnerVon, platzFuer } from '../../core/bevoelkerung';
+import { EINWOHNER_FUER_STADT, einwohnerVon, platzFuer } from '../../core/bevoelkerung';
 import { fraktionIn } from '../../core/fraktionsleben';
 import { Uebersicht } from './Uebersicht';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -2681,27 +2681,28 @@ export function Board({
         })}
 
         {/*
-          Einwohner (core/bevoelkerung.ts): kleine Figuren unter jeder Siedlung,
-          hell die Bewohner, dunkel der freie Platz. Im Nebel nur die eigenen.
+          Einwohner (core/bevoelkerung.ts): ein Schildchen "3/5" unter jeder
+          Siedlung. Vorher fuenf winzige Figuren, die man erst beim Zoomen
+          lesen konnte (Spieltest 4). Gold, wenn ein eigenes Dorf Stadt werden
+          kann. Im Nebel nur die eigenen.
         */}
         {state.ereignisseAn &&
           Object.entries(state.buildings).map(([vk, b]) => {
             if (sicht !== null && b.owner !== du && !vertexAdjacentHexes(parseVertexKey(vk)).some((h) => sicht.has(hexKey(h.q, h.r)))) return null;
             const ecke = parseVertexKey(vk);
             const p = vertexToPixel(ecke, LAYOUT);
-            const y = p.y - liftVertex(ecke) + 9;
+            // Auf dem Sockel des Hauses: tiefer laege es auf der Zahl des Feldes darunter.
+            const y = p.y - liftVertex(ecke) + 3;
             const n = einwohnerVon(state, vk);
             const platz = platzFuer(state, vk);
-            const breite = platz * 4;
+            const reif = b.owner === du && b.type === 'settlement' && n >= EINWOHNER_FUER_STADT;
             return (
-              <g key={'ew' + vk} className="einwohner" transform={`translate(${(p.x - breite / 2).toFixed(1)} ${y.toFixed(1)})`}>
-                <title>{`${n} von ${platz} Einwohnern`}</title>
-                {Array.from({ length: platz }, (_, i) => (
-                  <g key={i} className={i < n ? 'ew-da' : 'ew-frei'}>
-                    <rect x={i * 4 + 1} y={0} width={2} height={2} />
-                    <rect x={i * 4} y={2} width={4} height={3} />
-                  </g>
-                ))}
+              <g key={'ew' + vk} className={reif ? 'einwohner ew-reif' : 'einwohner'} transform={`translate(${p.x.toFixed(1)} ${y.toFixed(1)})`}>
+                <title>{`${n} von ${platz} Einwohnern${reif ? ' - kann Stadt werden' : ''}`}</title>
+                <rect x={-8} y={0} width={16} height={8} rx={1.5} className="ew-schild" />
+                <text x={0} y={6} textAnchor="middle" className="ew-zahl">
+                  {n}/{platz}
+                </text>
               </g>
             );
           })}

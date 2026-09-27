@@ -236,44 +236,47 @@ const ART: Record<FigurArt, readonly string[]> = {
     '..kbkbk..',
     '..kk.kk..',
   ],
+  // Ritter: Helm mit Sehschlitz, Schild in Spielerfarbe, Lanze (Spieltest 4:
+  // vorher ein grauer Klotz, schwer vom Bogenschuetzen zu unterscheiden).
   ritter: [
-    '..kkk...',
-    '.kmmmk..',
-    '.kmMMk..',
-    '.kmmmk..',
-    'kkkkkkk.',
-    'kppmppmk',
-    'kpppppmk',
-    'kppyppmk',
-    '.kpppk..',
-    '.kMkMk..',
-    '.kMkMk..',
-    '.kk.kk..',
+    '........n..',
+    '...kkk..n..',
+    '..kmnmk.t..',
+    '..kkkkk.t..',
+    '..kmmmk.t..',
+    '.kkkkkkkts.',
+    'kppkmmmmkt.',
+    'kpypkmmmkt.',
+    'kppkmmmmkt.',
+    '.kkkkMkMkt.',
+    '....kMkMk..',
+    '....kk.kk..',
   ],
   // Bogenschuetze: Lederkapuze, Wams in Spielerfarbe, rechts der Bogen. PLATZHALTER (ASSETS.md).
   bogen: [
-    '..kkk....',
-    '.kbbbk.k.',
-    '.kbssk..t',
-    '..kssk..t',
-    '.kppppk.t',
-    'kpppppskt',
-    'kpppppk.t',
-    '.kpppk..t',
-    '.kbbbk.k.',
-    '.kBkBk...',
-    '.kBkBk...',
-    '.kk.kk...',
+    '..kkk...t..',
+    '.kbbbk...t.',
+    '.kbsskw..t.',
+    '..ksskw...t',
+    '.kppppkw..t',
+    'kpppppssssT',
+    'kpppppkw..t',
+    '.kpppk.w..t',
+    '.kbbbk.w.t.',
+    '.kBkBk..wt.',
+    '.kBkBk...t.',
+    '.kk.kk..t..',
   ],
-  // Die Karawane (core/karawane.ts): ein Kamel mit Packen. PLATZHALTER (ASSETS.md).
+  // Die Karawane (core/karawane.ts): ein Kamel mit Packen in Spielerfarbe -
+  // so sieht man, wessen Handel da zieht. PLATZHALTER (ASSETS.md).
   karawane: [
     '.........kk..',
     '........kffk.',
     '........kfk..',
-    '..kkkk..kfk..',
-    '.krrrrk.kffk.',
-    'kcCcCcCkfffk.',
-    'kfffffffffk..',
+    '..kkkkk.kfk..',
+    '.kqpppPk.kffk',
+    'kcCpPpCCkfffk',
+    'kfffffffffffk',
     '.kffEfffffk..',
     '..kfk..kfk...',
     '..kfk..kfk...',
@@ -304,20 +307,22 @@ const ART: Record<FigurArt, readonly string[]> = {
     'kMMMmMMMmMk',
     '.kkkkkkkkk.',
   ],
+  // Lager: Zelt in Fraktionsfarbe, Totem mit Schaedel, Lagerfeuer - damit es
+  // nicht mehr wie ein Holzstapel aussieht (Spieltest 4).
   lager: [
-    '......k........',
-    '......kpp......',
-    '......kppp.....',
-    '......k........',
-    '.....kkk.......',
-    '....kcckk......',
-    '...kcctckk.T..T',
-    '..kcctTtcckT..T',
-    '.kcctTTTtcckTTT',
-    'kkkkkkkkkkkkkTT',
-    'TtTtT.....TtTtT',
-    'TtTtT.....TtTtT',
-    '.kkk.......kkk.',
+    '..w......kpp...',
+    '.wkw.....kPpp..',
+    '..k......kpp...',
+    '..k.....kkk....',
+    '..k....kpPpk...',
+    '..k...kpPkPpk..',
+    '..k..kpPkkkPpk.',
+    '..k.kpPpkkkpPpk',
+    '.kkkkkkkkkkkkkk',
+    'T.T..oyo..T.T.T',
+    'TtT.kyoyk.TtT.T',
+    'TtT.kkkkk.TtTtT',
+    '.kk........kk..',
   ],
   // Dorf: Fachwerkhaus auf Steinsockel, Satteldach in Spielerfarbe mit
   // Ziegelreihen, Schornstein, erleuchtete Fenster, Tuer.
@@ -429,36 +434,44 @@ const ART: Record<FigurArt, readonly string[]> = {
     '..pkbkbkp..',
     '...kk.kk...',
   ],
-  // Kleines Dorf: dasselbe Fachwerkhaus, auf die Ecke zwischen drei Kacheln
-  // verkleinert, damit es nicht ueber die Nachbarfelder ragt.
+  // Kleines Dorf auf der Ecke: Satteldach in Spielerfarbe mit Wimpel, damit
+  // man das eigene Reich auf einen Blick erkennt (Spieltest 4: die alten
+  // 11 x 10 Punkte waren bei normalem Zoom kaum zu lesen). 13 x 13.
   dorfKlein: [
-    '....ddd....',
-    '...dqpPd...',
-    '..dqppPPd..',
-    '.dqpPpPPPd.',
-    'dqppppPPPPd',
-    'ddddddddddd',
-    '.dcTyycTCd.',
-    '.dcTcdbdCd.',
-    '.dmMmdbdMd.',
-    '.ddddddddd.',
+    '......kpp....',
+    '......kPpp...',
+    '......kpp....',
+    '....kkkkk....',
+    '...kqqpppk...',
+    '..kqqpppPPk..',
+    '.kqqppppPPPk.',
+    'kqppppppPPPPk',
+    'kkkkkkkkkkkkk',
+    '.kccTyyTccCk.',
+    '.kccTcckbkCk.',
+    '.kmMmmmkbkMk.',
+    '.kkkkkkkkkkk.',
   ],
-  // Kleine Stadt: Turm mit Wimpel, ein Dach hinter der Mauer, Tor.
+  // Kleine Stadt: Bergfried mit Wimpel, Nebenturm, breite Mauer mit Tor -
+  // deutlich groesser als das Dorf, damit der Ausbau zu sehen ist. 17 x 17.
   stadtKlein: [
-    '...d...........',
-    '...dpp.........',
-    '...dppp........',
-    '...d...........',
-    '.ddddd.........',
-    '.dmdmd...ddd...',
-    '.dmyMd..dqpPd..',
-    '.dmmMd.dqppPPd.',
-    '.dmmMdddddddddd',
-    'dmdmdmdmdmdmdmd',
-    'dmMmmMdddmMmmMd',
-    'dmmmMmdbdmmMmMd',
-    'dmMmmmdbdmMmmMd',
-    'ddddddddddddddd',
+    '....kpp..........',
+    '....kPpp.........',
+    '....kpp..........',
+    '...kkkk......k...',
+    '..kqpPPk....kpk..',
+    '.kqppPPPk..kqpPk.',
+    '.kkkkkkkk.kqppPPk',
+    '..kmmmMk..kkkkkkk',
+    '..kmyyMk...kmyMk.',
+    '..kmmmMk...kmmMk.',
+    'k.kmmmMk.k.kmmMkk',
+    'kkkkkkkkkkkkkkkkk',
+    'kmMpppppppppppMmk',
+    'kmmmmmmkkkmmmmMMk',
+    'kmMmmmkbbbkmmmMMk',
+    'kmmmmmkbbbkmmMMMk',
+    'kkkkkkkkkkkkkkkkk',
   ],
   // Wachturm: Steinturm mit Feuerschale oben und Band in Spielerfarbe.
   turm: [
@@ -750,8 +763,9 @@ export function zeichneFigur(
  *
  * (x, y) ist die Ecke selbst. Frueher stand hier das grosse Haus (15 x 15, die
  * Stadt 21 x 19) mit den Fuessen knapp unter der Ecke - es ragte weit ueber die
- * drei Nachbarfelder. Jetzt steht ein kompaktes Haus (11 x 10, die Stadt
- * 15 x 14) ueber der Ecke und deckt wenig (Variante A). Eine Fassung mit
+ * drei Nachbarfelder. Dann ein kompaktes Haus (11 x 10, die Stadt 15 x 14),
+ * das Spieltest 4 zu klein fand; jetzt 13 x 13 und 17 x 17 mit Wimpel in
+ * Spielerfarbe - noch immer kleiner als das alte Haus (Variante A). Eine Fassung mit
  * Lichtung darunter (B) war die erste Wahl - ohne wirkt es ruhiger. Die
  * Varianten zum Vergleich: labor.html?art=gebaeude. Der Wachturm steht rechts
  * hinter dem Haus.
@@ -1146,8 +1160,11 @@ export function zeichneStrassen(
   };
   const alle = stuecke.map((s) => ({ s, p: punkte(s) }));
 
+  // Der Rand in Spielerfarbe (im Schatten): wem die Strasse gehoert, sieht man
+  // an der ganzen Laenge, nicht nur am Wimpel (Spieltest 4 - "das eigene Reich
+  // ist schwer zu lesen"). Asche bleibt grau.
   for (const { s, p } of alle) {
-    ctx.fillStyle = s.verbrannt ? '#1f1813' : '#3a2a1e';
+    ctx.fillStyle = s.verbrannt ? '#1f1813' : dunkler(s.farbe);
     for (const q of p) ctx.fillRect(q.x - 2 * f, q.y - 2 * f, 4 * f, 4 * f);
   }
   for (const { s, p } of alle) {
