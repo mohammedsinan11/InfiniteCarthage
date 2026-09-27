@@ -3238,6 +3238,15 @@ em.off {
   max-height: 55%;
   overflow-y: auto;
 }
+/*
+ * Nicht ganz deckend - mit Absicht. Ueber der Wetterschicht (einem
+ * WebGL-Canvas) liess eine voll deckende Tafel Chromium ueber ihr ein
+ * Rechteck ohne Wetter zeichnen (Spieltest 4: "leerer dunkler Kasten ueber
+ * Handel anbieten"). Bei 97 % Deckkraft tritt das nicht auf.
+ */
+.handel-schwebe .trade {
+  background: rgba(50, 39, 28, 0.97);
+}
 
 /*
  * Der Block passt sich dem Platz an: Game.tsx misst, wie viel Raum bis zum

@@ -52,7 +52,7 @@ export const TIPPS: Record<string, Omit<Tipp, 'id'>> = {
   },
   hilfe: {
     titel: 'Wanderhaendler',
-    text: 'An keinem deiner Doerfer liegt ein Feld fuer diese Sorte. Wanderhaendler bringen dir alle fuenf Runden eine davon - besser ist ein Dorf an einem passenden Feld. Auch der Bankhandel (Knopf mit den Pfeilen) hilft: 4 gleiche gegen 1 beliebige.',
+    text: 'An keinem deiner Doerfer liegt ein Feld fuer diese Sorte. Wanderhaendler bringen dir alle fuenf Runden eine davon - besser ist ein Dorf an einem passenden Feld. Auch der Bankhandel (Knopf mit den Pfeilen) hilft: gleiche Karten gegen 1 beliebige - wie viele, steht auf der Tafel (meist 4, mit Hafen oder Haus weniger).',
   },
   held: {
     titel: 'Dein Held',

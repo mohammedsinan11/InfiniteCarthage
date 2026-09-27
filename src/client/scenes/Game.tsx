@@ -152,6 +152,12 @@ export function Game() {
   const connect = useStore((s) => s.connect);
   const tipps = useStore((s) => s.tipps);
   const tippGelesen = useStore((s) => s.tippGelesen);
+  /*
+   * Der Feuer-Tipp wartet, solange es bei einem nicht brennt (Spieltest 4:
+   * er kam, nachdem der Regen das Feuer schon geloescht hatte). Er bleibt in
+   * der Reihe und erscheint beim naechsten eigenen Feuer.
+   */
+  const sichtbareTipps = tipps.filter((t) => t.id !== 'feuer' || (state?.braende ?? []).some((b) => b.owner === you));
   const [omenOffen, setOmenOffen] = useState(false);
   const pendingRoll = useStore((s) => s.pendingRoll);
   const kunde = useStore((s) => s.kunde);
@@ -429,7 +435,8 @@ export function Game() {
   /** Ausgeblendete Warnungen: Fraktion -> bis zu welcher Runde (Spieltest: kam jede Runde wieder). */
   const [weggeklickt, setWeggeklickt] = useState<Record<string, number>>({});
   const raubWarnung = useMemo(() => {
-    if (!you || meineFelder.length === 0) return null;
+    // Nach dem Ende warnt nichts mehr (Spieltest 4: die Warnung zaehlte weiter).
+    if (!you || meineFelder.length === 0 || state.phase.t === 'finished') return null;
     const felder = new Set(meineFelder.map((h) => hexKey(h.q, h.r)));
     let best: { u: HeerEinheit; weg: number; anzahl: number; schluessel: string; tribut: number } | null = null;
     for (const u of state.units) {
@@ -506,15 +513,24 @@ export function Game() {
     // Sterne um dieselbe gute Stelle.
     const empfohlen: string[] = [];
     const belegt = new Set<string>();
-    for (const vk of [...vertices].sort((a, b) => wert.get(b)! - wert.get(a)!)) {
-      if (empfohlen.length >= n) break;
-      const nachbarn = vertexAdjacentHexes(parseVertexKey(vk));
-      const felder = nachbarn.map((h) => hexKey(h.q, h.r));
-      if (felder.some((k) => belegt.has(k))) continue;
-      // Nicht neben ein Lager empfehlen - dort brennt das erste Dorf (Spieltest).
-      if (nachbarn.some((h) => hexesInRange(h, 1).some((n) => isNestActive(state, n.q, n.r)))) continue;
-      empfohlen.push(vk);
-      for (const k of felder) belegt.add(k);
+    const sortiert = [...vertices].sort((a, b) => wert.get(b)! - wert.get(a)!);
+    /*
+     * Nicht nahe an ein Lager empfehlen - dort brennt das erste Dorf
+     * (Spieltests 3 und 4: der Stern im Lehrgang lag gleich neben den
+     * Goblins). Zuerst mit drei Feldern Abstand; reicht das nicht fuer genug
+     * Sterne, mit zwei.
+     */
+    for (const abstand of [2, 1]) {
+      for (const vk of sortiert) {
+        if (empfohlen.length >= n) break;
+        if (empfohlen.includes(vk)) continue;
+        const nachbarn = vertexAdjacentHexes(parseVertexKey(vk));
+        const felder = nachbarn.map((h) => hexKey(h.q, h.r));
+        if (felder.some((k) => belegt.has(k))) continue;
+        if (nachbarn.some((h) => hexesInRange(h, abstand).some((x) => isNestActive(state, x.q, x.r)))) continue;
+        empfohlen.push(vk);
+        for (const k of felder) belegt.add(k);
+      }
     }
     return { vertices, empfohlen };
   };
@@ -1262,13 +1278,17 @@ export function Game() {
             </span>
           )}
           {state.order.length > 1 && !state.koop && (
-            <span className="hud-rivalen" title="Siegpunkte der anderen">
+            <span
+              className="hud-rivalen"
+              title="Sichtbare Siegpunkte der anderen. +? heisst: verdeckte Entwicklungskarten - darunter koennen Siegpunkte sein, die erst am Ende zaehlen."
+            >
               {state.players
                 .filter((p) => p.id !== you)
                 .map((p) => (
                   <span key={p.id} className={p.besiegt ? 'besiegt' : undefined}>
                     <i className="dot" style={{ background: p.color }} />
                     {p.name} ★{p.points}
+                    {p.devCount > 0 ? '+?' : ''}
                   </span>
                 ))}
             </span>
@@ -1462,11 +1482,11 @@ export function Game() {
         {phase.t !== 'hauswahl' && phase.t !== 'setup' && phase.t !== 'finished' && you && (
           <ErsteSchritte state={state} you={you} />
         )}
-        {tipps.length > 0 && phase.t !== 'finished' && phase.t !== 'hauswahl' && state.draft === null && (
-          <TippBox tipp={tipps[0]!} mehr={tipps.length - 1} onGelesen={tippGelesen} />
+        {sichtbareTipps.length > 0 && phase.t !== 'finished' && phase.t !== 'hauswahl' && state.draft === null && (
+          <TippBox tipp={sichtbareTipps[0]!} mehr={sichtbareTipps.length - 1} onGelesen={tippGelesen} />
         )}
 
-        {kunde && phase.t !== 'ereignis' && pendingRoll === null && <KundeTafel bericht={kunde} onZu={schliesseKunde} />}
+        {kunde && phase.t !== 'ereignis' && state.draft === null && pendingRoll === null && <KundeTafel bericht={kunde} onZu={schliesseKunde} />}
 
         {phase.t === 'ereignis' && pendingRoll === null && (
           <EreignisTafel state={state} you={you} onWahl={(wahl) => act({ t: 'answerEvent', wahl })} />

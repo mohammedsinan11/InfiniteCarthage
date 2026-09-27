@@ -725,9 +725,13 @@ export const useStore = create<Store>((set, get) => ({
   announcements: [],
   tipps: [],
   tippGelesen: () => {
-    const [erster, ...rest] = get().tipps;
-    if (erster) tippGesehen(erster.id);
-    set({ tipps: rest });
+    // Gelesen wird der gezeigte - ein wartender Feuer-Tipp (scenes/Game.tsx) bleibt in der Reihe.
+    const s = get().state;
+    const brennt = (s?.braende ?? []).some((b) => b.owner === get().you);
+    const erster = get().tipps.find((t) => t.id !== 'feuer' || brennt);
+    if (!erster) return;
+    tippGesehen(erster.id);
+    set({ tipps: get().tipps.filter((t) => t !== erster) });
   },
   produceEffect: null,
   pfeile: [],
