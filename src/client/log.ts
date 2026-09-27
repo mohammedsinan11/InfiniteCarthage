@@ -4,6 +4,7 @@
  */
 
 import { genitiv } from '../core/factions';
+import { sippenBonusById } from '../core/cards/sippen';
 import { vorhabenById } from '../core/vorhaben';
 import { WESEN } from '../core/factions';
 import { SEASON_NAME } from '../core/season';
@@ -199,6 +200,14 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
     }
     case 'ambitionFailed':
       return `${who(state, e.player)} laesst das Vorhaben "${vorhabenById(e.id)?.name ?? e.id}" fallen - die Zeit ist um.`;
+    case 'bauGabe':
+      return `Die Bauhuette von ${who(state, e.player)} gibt ${bundleText(e.gained)}.`;
+    case 'sippeStufe': {
+      const b = sippenBonusById(e.bonus);
+      return `${who(state, e.player)} erreicht ${b?.name ?? e.bonus}: ${b?.text ?? ''}`;
+    }
+    case 'sippenBeute':
+      return `${sippenBonusById(e.bonus)?.name ?? 'Die Sippe'}: ${who(state, e.player)} bekommt ${e.anzahl === 1 ? 'eine Kartenwahl' : `${e.anzahl} Kartenwahlen`}.`;
     case 'botCatchUp':
       return `${who(state, e.player)} liegt weit zurueck und holt auf: +1 ${resourceName(e.resource)}.`;
     case 'spoiled':

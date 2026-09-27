@@ -21,6 +21,8 @@ import { RARITY_ORDER, dauerwirkungen, istEinzigartig, wiederholbar } from '../.
 import type { DraftSource, Rarity } from '../../core/cards/types';
 import { playCardDeal, playCardHover, playCardPick, playCardVanish } from '../audio';
 import { KartenBild } from './KartenBild';
+import { SippenLeiste, SippenSchild } from './SippenLeiste';
+import type { SippenZaehler } from '../../core/cards/sippen';
 
 const RARITY_NAME: Record<Rarity, string> = {
   gewoehnlich: 'gewoehnlich',
@@ -31,7 +33,7 @@ const RARITY_NAME: Record<Rarity, string> = {
 };
 
 /** Ueberschrift je Herkunft - ein Fund faellt vom Himmel, Beute ist verdient. */
-const TITEL: Record<DraftSource, string> = { fund: 'Ein Fund', belohnung: 'Beute', markt: 'Markt' };
+const TITEL: Record<DraftSource, string> = { fund: 'Ein Fund', belohnung: 'Beute', markt: 'Markt', gruendung: 'Eine Gruendung' };
 
 const STUFEN: readonly Rarity[] = ['gewoehnlich', 'ungewoehnlich', 'selten', 'episch', 'legendaer'];
 
@@ -64,8 +66,11 @@ export function CardDraft({
   besitz = [],
   aktiv = [],
   plaetze = 0,
+  sippe,
   onChoose,
 }: {
+  /** Karten je Familie (core/cards/sippen.ts) - nur mit Ereignissen. */
+  sippe?: SippenZaehler;
   options: string[];
   /** Woher die Wahl kommt - bestimmt die Ueberschrift. */
   source?: DraftSource;
@@ -128,6 +133,8 @@ export function CardDraft({
         </p>
       )}
 
+      {darfWaehlen && sippe !== undefined && <SippenLeiste sippe={sippe} />}
+
       <div className="draft-karten">
         {options.map((id, i) => {
           const karte = cardById(id);
@@ -173,6 +180,7 @@ export function CardDraft({
                 <span className="draft-name">{karte.name}</span>
                 <KartenBild karte={karte} />
                 <span className="draft-text">{karte.text}</span>
+                {sippe !== undefined && <SippenSchild card={id} sippe={sippe} />}
                 {istEinzigartig(karte) && besitz.includes(id) && wiederholbar(karte) && (
                   <span className="draft-nochmal">Schon im Besitz - nur die Sofortwirkung</span>
                 )}

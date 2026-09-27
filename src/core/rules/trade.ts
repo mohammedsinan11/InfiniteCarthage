@@ -6,6 +6,7 @@
  * nichts: wer an der richtigen Ecke baut, handelt guenstiger.
  */
 
+import { wirksameKarten } from '../cards/sippen';
 import { portAt } from '../world';
 import type { World } from '../world';
 import { RESOURCES } from '../types';
@@ -60,7 +61,8 @@ export function tradeRatioErklaert(
       gruende.push(`${grund}: ${neu}:1`);
     }
   };
-  const karten = state.players?.find((p) => p.id === player)?.activeCards ?? [];
+  const spieler = state.players?.find((p) => p.id === player);
+  const karten = spieler ? wirksameKarten(spieler) : [];
   const mods = modifiersOf(karten);
   const zu = haefenZu(state) && !mods.stormPorts;
   for (const [vk, b] of Object.entries(state.buildings)) {

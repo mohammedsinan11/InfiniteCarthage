@@ -27,7 +27,7 @@ export const RARITY_ORDER: readonly Rarity[] = [
  * Woher eine Auswahl stammt. Bestimmt, wie selten die Karten ausfallen und
  * ob sie etwas kosten.
  */
-export type DraftSource = 'fund' | 'belohnung' | 'markt';
+export type DraftSource = 'fund' | 'belohnung' | 'markt' | 'gruendung';
 
 /**
  * Drei getrennte Kartenbereiche.
@@ -77,7 +77,21 @@ export type Lasting =
   /** Bei jeder 7 - gleich wer wuerfelt - so viele zufaellige Rohstoffe. */
   | { t: 'siebenGabe'; anzahl: number }
   /** Pluenderer nehmen dir so viele Karten weniger. */
-  | { t: 'schutz'; amount: number };
+  | { t: 'schutz'; amount: number }
+  /*
+   * Die folgenden tragen nur die Sippenstufen (cards/sippen.ts) - keine Karte
+   * im Katalog hat sie.
+   */
+  /** Der Markt kostet so viele Karten weniger. */
+  | { t: 'marktRabatt'; amount: number }
+  /** Jedes neue Dorf und jede neue Stadt bringt so viele zufaellige Rohstoffe. */
+  | { t: 'bauGabe'; amount: number }
+  /** Jede neue Stadt bringt so viele Kartenwahlen mehr. */
+  | { t: 'stadtBeute'; amount: number }
+  /** Jedes zerstoerte Lager bringt so viele Kartenwahlen mehr. */
+  | { t: 'lagerBeute'; amount: number }
+  /** Jede erkundete Ruine bringt so viele Kartenwahlen mehr. */
+  | { t: 'ruinenBeute'; amount: number };
 
 export type KartenPunkteQuelle = 'stadt' | 'lager' | 'ruine' | 'auftrag' | 'strasse';
 
@@ -145,4 +159,7 @@ export const RARITY_WEIGHTS: Record<DraftSource, Record<Rarity, number>> = {
   fund: { gewoehnlich: 0, ungewoehnlich: 2, selten: 6, episch: 3, legendaer: 1 },
   belohnung: { gewoehnlich: 3, ungewoehnlich: 6, selten: 3, episch: 1, legendaer: 0 },
   markt: { gewoehnlich: 8, ungewoehnlich: 4, selten: 1, episch: 0, legendaer: 0 },
+  // Jede Gruendung - ein neues Dorf, eine neue Stadt - bringt eine Wahl
+  // (Spieltest 5: die Wahl zum Kern machen). Meist kleine Karten, selten mehr.
+  gruendung: { gewoehnlich: 5, ungewoehnlich: 5, selten: 2, episch: 1, legendaer: 0 },
 };

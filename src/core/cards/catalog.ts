@@ -25,6 +25,7 @@
  */
 
 import type { Card } from './types';
+import { SIPPEN_BONI } from './sippen';
 
 export const CARDS: readonly Card[] = [
   // --- gewoehnlich: Wert 3 bis 6 --------------------------------------------
@@ -70,6 +71,14 @@ export const CARDS: readonly Card[] = [
     rarity: 'gewoehnlich',
     text: 'Nimm 3 Erz und 1 Getreide.',
     instant: { t: 'gain', resources: { ore: 3, grain: 1 } },
+  },
+
+  {
+    id: 'proviant',
+    name: 'Proviant',
+    rarity: 'gewoehnlich',
+    text: 'Proviant fuer die Reise: nimm 2 Getreide, 1 Wolle und 1 Holz.',
+    instant: { t: 'gain', resources: { grain: 2, wool: 1, lumber: 1 } },
   },
 
   // Regelkarten: kleine Verschiebungen der Wuerfel (DESIGN.md, "Regel").
@@ -121,6 +130,15 @@ export const CARDS: readonly Card[] = [
     text: 'Nimm 3 zufaellige Rohstoffe. Du darfst dauerhaft 2 Karten mehr halten.',
     instant: { t: 'gainAny', count: 3 },
     lasting: { t: 'handLimit', amount: 2 },
+  },
+  // Wildnis (cards/sippen.ts): fuer Helden, Ruinen und Wanderer.
+  {
+    id: 'spaeherpfad',
+    name: 'Spaeherpfad',
+    rarity: 'ungewoehnlich',
+    text: 'Nimm 2 zufaellige Rohstoffe. Je 4 erkundete Ruinen: 1 Siegpunkt.',
+    instant: { t: 'gainAny', count: 2 },
+    lasting: { t: 'siegpunkte', je: 'ruine', pro: 4 },
   },
   {
     id: 'wanderhaendler',
@@ -223,6 +241,14 @@ export const CARDS: readonly Card[] = [
     rarity: 'selten',
     text: 'Je 2 erkundete Ruinen: 1 Siegpunkt.',
     lasting: { t: 'siegpunkte', je: 'ruine', pro: 2 },
+  },
+  {
+    id: 'schatzkarte',
+    name: 'Schatzkarte',
+    rarity: 'selten',
+    text: 'Nimm 3 zufaellige Rohstoffe. Je 3 erkundete Ruinen: 1 Siegpunkt.',
+    instant: { t: 'gainAny', count: 3 },
+    lasting: { t: 'siegpunkte', je: 'ruine', pro: 3 },
   },
   {
     id: 'freund_der_wanderer',
@@ -403,7 +429,10 @@ export const CARDS: readonly Card[] = [
 ];
 
 const BY_ID = new Map(CARDS.map((c) => [c.id, c]));
+const SIPPEN_BY_ID = new Map<string, Card>(SIPPEN_BONI.map((c) => [c.id, c]));
 
 export function cardById(id: string): Card | undefined {
-  return BY_ID.get(id);
+  // Die Sippenstufen (cards/sippen.ts) sind unsichtbare Karten - nicht im
+  // Katalog, also nie im Angebot, aber fuer modifiersOf lesbar.
+  return BY_ID.get(id) ?? SIPPEN_BY_ID.get(id);
 }

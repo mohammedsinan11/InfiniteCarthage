@@ -1394,6 +1394,7 @@ export function Game() {
         </button>
 
         <SideMenu
+          sippe={state.ereignisseAn ? (me?.sippe ?? {}) : undefined}
           turn={state.turn}
           cards={me?.cards ?? []}
           activeCards={me?.activeCards ?? []}
@@ -1511,6 +1512,7 @@ export function Game() {
             besitz={me?.cards ?? []}
             aktiv={me?.activeCards ?? []}
             plaetze={you ? reichskartenPlaetze(state, you) : 0}
+            sippe={state.ereignisseAn ? (me?.sippe ?? {}) : undefined}
             onChoose={(card, replace) => act({ t: 'chooseCard', card, replace })}
           />
         )}

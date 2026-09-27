@@ -11,6 +11,8 @@
  */
 
 import { cardById } from './catalog';
+import { wirksameKarten } from './sippen';
+import type { SippenZaehler } from './sippen';
 import { dauerwirkungen } from './types';
 import type { KartenPunkteQuelle } from './types';
 import type { Terrain } from '../types';
@@ -34,6 +36,12 @@ export type Modifiers = {
   schutz: number;
   /** Siegpunkte fuer eine Spielweise. */
   siegpunkte: { je: KartenPunkteQuelle; pro: number }[];
+  /** Sippenstufen (cards/sippen.ts): Markt billiger, Gaben und Wahlen beim Bauen, Lager und Ruinen. */
+  marktRabatt: number;
+  bauGabe: number;
+  stadtBeute: number;
+  lagerBeute: number;
+  ruinenBeute: number;
 };
 
 const leer = (): Modifiers => ({
@@ -46,6 +54,11 @@ const leer = (): Modifiers => ({
   siebenGabe: 0,
   schutz: 0,
   siegpunkte: [],
+  marktRabatt: 0,
+  bauGabe: 0,
+  stadtBeute: 0,
+  lagerBeute: 0,
+  ruinenBeute: 0,
 });
 const LEER: Modifiers = leer();
 
@@ -90,6 +103,21 @@ export function modifiersOf(cardIds: readonly string[]): Modifiers {
         case 'siegpunkte':
           m.siegpunkte.push({ je: l.je, pro: l.pro });
           break;
+        case 'marktRabatt':
+          m.marktRabatt += l.amount;
+          break;
+        case 'bauGabe':
+          m.bauGabe += l.amount;
+          break;
+        case 'stadtBeute':
+          m.stadtBeute += l.amount;
+          break;
+        case 'lagerBeute':
+          m.lagerBeute += l.amount;
+          break;
+        case 'ruinenBeute':
+          m.ruinenBeute += l.amount;
+          break;
       }
     }
   }
@@ -109,7 +137,7 @@ export function terrainBonusFor(m: Modifiers, terrain: Terrain, base: number): n
 
 /** Was kartenPunkte vom Spielstand braucht - auch die redigierte Sicht hat es. */
 export type PunkteSicht = {
-  players: ReadonlyArray<{ id: string; activeCards: readonly string[] }>;
+  players: ReadonlyArray<{ id: string; activeCards: readonly string[]; sippe?: SippenZaehler }>;
   buildings: Record<string, { owner: string; type: 'settlement' | 'city' }>;
   roads: Record<string, string>;
   chronik?: { stats: Record<string, { lager: number; ruinen: number; auftraege: number }> } | null;
@@ -122,7 +150,7 @@ export type PunkteSicht = {
 export function kartenPunkte(state: PunkteSicht, id: string): number {
   const p = state.players.find((x) => x.id === id);
   if (!p) return 0;
-  const m = modifiersOf(p.activeCards);
+  const m = modifiersOf(wirksameKarten(p));
   if (m.siegpunkte.length === 0) return 0;
   const stats = state.chronik?.stats[id];
   const zahl = (je: KartenPunkteQuelle): number => {

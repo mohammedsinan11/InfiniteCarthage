@@ -14,6 +14,8 @@
  * wer spielt, liest sie einmal, danach nehmen sie nur Platz.
  */
 
+import { SippenLeiste } from './SippenLeiste';
+import type { SippenZaehler } from '../../core/cards/sippen';
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { JAHRESZEIT_WIRKUNG, SEASON_NAME, bigRoundOf, ROUNDS_PER_BIG_ROUND, roundOf, seasonOf, yearOf } from '../../core/season';
@@ -332,7 +334,10 @@ export function SideMenu({
   onZeigenAuftrag,
   kannLiefern,
   onLiefern,
+  sippe,
 }: {
+  /** Karten je Familie (core/cards/sippen.ts) - fehlt ohne Ereignisse. */
+  sippe?: SippenZaehler;
   turn: number;
   /** Die eigenen genommenen Karten, in der Reihenfolge der Wahl. */
   cards: readonly string[];
@@ -1160,6 +1165,15 @@ export function SideMenu({
 
         {reiter === 'kanzler' && (
           <>
+            {sippe !== undefined && (
+              <>
+                <Kopf
+                  titel="Sippen"
+                  hilfe="Jede genommene Karte gehoert einer Familie. Mit 2 und mit 4 Karten einer Familie wirkt ein Bonus - Zeiger auf ein Zeichen zeigt, welcher."
+                />
+                <SippenLeiste sippe={sippe} />
+              </>
+            )}
             <Kopf
               titel={`Reichskarten${cards.length > 0 ? ` · ${cards.length}` : ''}`}
               hilfe="Nur Karten mit dem Siegel Aktiv liefern eine Dauerwirkung. Anfangs hast du zwei Plaetze; eine Hauptstadt erweitert sie. Tippe eine Dauerkarte an, um sie ein- oder auszuschalten - in deiner Bauphase. Bei vollen Plaetzen waehlst du, welche weicht."

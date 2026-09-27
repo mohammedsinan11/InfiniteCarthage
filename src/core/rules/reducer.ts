@@ -11,6 +11,8 @@
  * Kopie, die nur bei Erfolg uebernommen wird.
  */
 
+import { sippeVon, sippenBoni, wirksameKarten } from '../cards/sippen';
+import type { SippenZaehler } from '../cards/sippen';
 import { EINWOHNER_FUER_STADT, bevoelkerungRunde, einwohnerAbgleichen, einwohnerNehmen, einwohnerVerlieren, einwohnerVon } from '../bevoelkerung';
 import type { BevoelkerungEvent } from '../bevoelkerung';
 import { verderbAmZugende } from '../verderb';
@@ -144,6 +146,12 @@ import { drawDevCard } from './dev';
 /** Was der Markt kostet, in Karten. */
 export const MARKT_PREIS = 3;
 
+/** Was der Markt diesen Spieler kostet - die Handels-Sippe macht ihn billiger (cards/sippen.ts). */
+export function marktPreisFuer(state: { players: ReadonlyArray<{ id: PlayerId; activeCards: readonly string[]; sippe?: SippenZaehler }> }, id: PlayerId): number {
+  const p = state.players.find((x) => x.id === id);
+  return Math.max(1, MARKT_PREIS - (p ? modifiersOf(wirksameKarten(p)).marktRabatt : 0));
+}
+
 export type Action =
   /** Ein Weltwunder auf einer Staette errichten, an der ein eigenes Gebaeude steht (core/wunder.ts). */
   | { t: 'buildWonder'; q: number; r: number }
@@ -271,6 +279,12 @@ export type GameEvent =
   | BevoelkerungEvent
   | VerderbEvent
   | AufholenEvent
+  /** Die Bau-Sippe gibt beim Gruenden (cards/sippen.ts). */
+  | { t: 'bauGabe'; player: PlayerId; gained: Hand }
+  /** Eine Sippenstufe ist erreicht (cards/sippen.ts). */
+  | { t: 'sippeStufe'; player: PlayerId; bonus: string }
+  /** Sippenstufen bringen Kartenwahlen: fuer Lager, Ruinen, Staedte. */
+  | { t: 'sippenBeute'; player: PlayerId; bonus: string; anzahl: number }
   | BedrohungEvent
   | DiplomatieEvent
   | AuftragEvent
@@ -683,6 +697,43 @@ function enterDraft(
   });
 }
 
+/**
+ * Eine Gruendung: jedes neue Dorf und jede neue Stadt bringt eine Kartenwahl
+ * (Spieltest 5: "die Wahl zum Kern machen") - dazu, was die Bau-Sippe gibt
+ * (cards/sippen.ts). Nur mit Ereignissen, und nicht, wenn der Bau die Partie
+ * entschieden hat.
+ */
+function gruendung(s: GameState, actor: PlayerId, stadt: boolean, events: GameEvent[]): void {
+  if (!s.ereignisseAn || s.phase.t !== 'main') return;
+  const p = playerById(s, actor);
+  if (!p) return;
+  const m = modifiersOf(wirksameKarten(p));
+  if (m.bauGabe > 0) {
+    const rng = new Rng(s.rngState);
+    const gained = emptyHand();
+    for (let i = 0; i < m.bauGabe; i++) gained[RESOURCES[rng.int(RESOURCES.length)]!] += 1;
+    s.rngState = rng.getState();
+    for (const r of RESOURCES) p.hand[r] += gained[r];
+    events.push({ t: 'bauGabe', player: actor, gained });
+  }
+  if (stadt && m.stadtBeute > 0) {
+    p.loot += m.stadtBeute;
+    events.push({ t: 'sippenBeute', player: actor, bonus: 'sippe:bau:4', anzahl: m.stadtBeute });
+  }
+  const zahl = Object.values(s.buildings).filter((b) => b.owner === actor).length;
+  enterDraft(s, 'gruendung', events, 100 + zahl + (stadt ? 40 : 0));
+}
+
+/** Eine genommene Karte zaehlt fuer ihre Familie; eine neue Stufe wird gemeldet (cards/sippen.ts). */
+function sippeZaehlen(s: GameState, p: Player, card: string, events: GameEvent[]): void {
+  if (!s.ereignisseAn) return;
+  const sippe = sippeVon(card);
+  if (!sippe) return;
+  const vorher = new Set(sippenBoni(p.sippe));
+  p.sippe = { ...(p.sippe ?? {}), [sippe]: (p.sippe?.[sippe] ?? 0) + 1 };
+  for (const b of sippenBoni(p.sippe)) if (!vorher.has(b)) events.push({ t: 'sippeStufe', player: p.id, bonus: b });
+}
+
 // --- Hauptfunktion ----------------------------------------------------------
 
 export function applyAction(game: Game, action: Action, actor: PlayerId): Result {
@@ -853,7 +904,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         const payout: Record<PlayerId, Hand> = {};
         const rng = new Rng(s.rngState);
         for (const p of s.players) {
-          const n = (p.id === actor ? siebenerBonus(s.omens) : 0) + modifiersOf(p.activeCards).siebenGabe;
+          const n = (p.id === actor ? siebenerBonus(s.omens) : 0) + modifiersOf(wirksameKarten(p)).siebenGabe;
           if (n <= 0) continue;
           const gain = emptyHand();
           for (let i = 0; i < n; i++) gain[RESOURCES[rng.int(RESOURCES.length)]!] += 1;
@@ -939,6 +990,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         }
       }
 
+      sippeZaehlen(s, actorPlayer, karte.id, events);
       s.draft = null;
       s.phase = s.ereignis ? { t: 'ereignis' } : { t: 'main' };
       events.push({ t: 'cardTaken', player: actor, card: karte.id });
@@ -1011,6 +1063,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       const added = grow(s, world, vertexAdjacentHexes(parseVertexKey(action.vertex)));
       if (added.length) events.push({ t: 'chunks', coords: added });
       checkWin(s, events);
+      gruendung(s, actor, false, events);
       break;
     }
 
@@ -1031,6 +1084,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       s.buildings[action.vertex] = { owner: actor, type: 'city' };
       events.push({ t: 'build', player: actor, kind: 'city', at: action.vertex });
       checkWin(s, events);
+      gruendung(s, actor, true, events);
       break;
     }
 
@@ -1141,8 +1195,9 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (!s.ereignisseAn) return fail('Einen Markt gibt es in dieser Partie nicht.');
       if (phase.t !== 'main') return fail('Der Markt hat nur in der Bauphase offen.');
       if (s.marktZug?.[actor] === s.turn) return fail('Auf dem Markt warst du in diesem Zug schon.');
-      if (handSize(actorPlayer.hand) < MARKT_PREIS) return fail(`Fuer den Markt brauchst du ${MARKT_PREIS} Karten.`);
-      const genommen = takeFromLargest(actorPlayer.hand, MARKT_PREIS);
+      const preis = marktPreisFuer(s, actor);
+      if (handSize(actorPlayer.hand) < preis) return fail(`Fuer den Markt brauchst du ${preis} Karten.`);
+      const genommen = takeFromLargest(actorPlayer.hand, preis);
       for (const r of RESOURCES) actorPlayer.hand[r] -= genommen[r];
       s.marktZug = { ...(s.marktZug ?? {}), [actor]: s.turn };
       events.push({ t: 'market', player: actor, paid: genommen });
@@ -1606,6 +1661,21 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
   ruhmAusEreignissen(s, geschehen, events);
   // Die Fraktionen reagieren: Nachfolger, Beute, Stimmung (core/fraktionsleben.ts).
   fraktionsLeben(s, geschehen, events);
+  // Sippenstufen bringen Kartenwahlen fuer Lager und Ruinen (cards/sippen.ts).
+  if (s.ereignisseAn) {
+    for (const e of geschehen) {
+      const wer = e.t === 'nestDestroyed' ? (e.players as PlayerId[]) : e.t === 'ruin' ? [e.player as PlayerId] : [];
+      for (const id of wer) {
+        const p = playerById(s, id);
+        if (!p) continue;
+        const m = modifiersOf(wirksameKarten(p));
+        const n = e.t === 'nestDestroyed' ? m.lagerBeute : m.ruinenBeute;
+        if (n <= 0) continue;
+        p.loot += n;
+        events.push({ t: 'sippenBeute', player: id, bonus: e.t === 'nestDestroyed' ? 'sippe:krieg:4' : 'sippe:wildnis:2', anzahl: n });
+      }
+    }
+  }
   // Einwohner: Pluenderungen kosten einen, neue Siedlungen bekommen ihren ersten.
   for (const e of geschehen) {
     if (e.t === 'plunder' && (e.count as number) > 0) {

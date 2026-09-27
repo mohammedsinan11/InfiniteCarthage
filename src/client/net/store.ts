@@ -7,6 +7,7 @@
  * der Server, ohne dass ein einziges Gelaendefeld uebertragen wird.
  */
 
+import { sippenBonusById } from '../../core/cards/sippen';
 import { genitiv } from '../../core/factions';
 import type { Bericht } from '../../core/kunde';
 import { vorhabenById } from '../../core/vorhaben';
@@ -246,7 +247,10 @@ function vervollstaendige(msg: ServerMsg): void {
     msg.state.szenario ??= null;
     msg.state.szenarioErgebnis ??= null;
     msg.state.koopErgebnis ??= null;
-    for (const p of msg.state.players) p.haus ??= null;
+    for (const p of msg.state.players) {
+      p.haus ??= null;
+      p.sippe ??= {};
+    }
   }
 }
 
@@ -441,6 +445,13 @@ function meldungenAus(
       if (e.player === you) meldung('Neue Vorhaben zur Wahl - beim Kanzler im Menue', 'info');
     } else if (e.t === 'ambitionDone') {
       if (e.player === you) meldung(`Vorhaben vollendet: ${vorhabenById(e.id)?.name ?? e.id}`, 'gain');
+    } else if (e.t === 'sippeStufe') {
+      if (e.player === you) {
+        const b = sippenBonusById(e.bonus);
+        meldung(`${b?.name ?? 'Neue Sippenstufe'}: ${b?.text ?? ''}`, 'gain');
+      }
+    } else if (e.t === 'sippenBeute') {
+      if (e.player === you) meldung(`${sippenBonusById(e.bonus)?.name ?? 'Sippe'}: +${e.anzahl} Kartenwahl`, 'gain');
     } else if (e.t === 'spoiled') {
       if (e.player === you) meldung(`Zu viel gelagert - verdorben: ${bundleText(e.lost)}`, 'raid');
     } else if (e.t === 'caravanSet') {
@@ -621,7 +632,14 @@ function meldungenAus(
     } else if (e.t === 'draftOffered') {
       out.push({
         id: naechsteId++,
-        text: e.source === 'belohnung' ? 'Beute! Waehle eine Karte' : 'Ein Fund! Waehle eine Karte',
+        text:
+          e.source === 'belohnung'
+            ? 'Beute! Waehle eine Karte'
+            : e.source === 'gruendung'
+              ? 'Gruendung! Waehle eine Karte'
+              : e.source === 'markt'
+                ? 'Markt: waehle eine Karte'
+                : 'Ein Fund! Waehle eine Karte',
         kind: 'gain',
       });
     } else if (e.t === 'monopoly') {

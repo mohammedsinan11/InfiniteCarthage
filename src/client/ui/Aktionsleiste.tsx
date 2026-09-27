@@ -37,7 +37,7 @@ import { REICHSBAU_NAME, REICHSBAU_ZWECK } from '../../core/rules/reich';
 import { COST_REICHSBAU } from '../../core/rules/costs';
 import type { Cost } from '../../core/rules/costs';
 import type { Action } from '../../core/rules/reducer';
-import { MARKT_PREIS } from '../../core/rules/reducer';
+import { marktPreisFuer } from '../../core/rules/reducer';
 import type { PublicPlayer, PublicState } from '../../core/redact';
 import type { DevCardType, Hand, HeldZweig } from '../../core/state';
 import { ZWEIGE, ZWEIG_NAME, ZWEIG_ZWECK } from '../../core/rules/zweig';
@@ -339,7 +339,7 @@ function HandelTafel({
   onAngebot,
 }: {
   /** Der Markt (rules/reducer.ts, visitMarket): Ueberschuss gegen eine Kartenwahl. */
-  markt?: { darf: boolean; besucht: boolean; onMarkt: () => void };
+  markt?: { darf: boolean; besucht: boolean; preis: number; onMarkt: () => void };
   /** Mit Mitspielern handeln - nur zu mehreren (ui/TradePanel.tsx). */
   onAngebot?: () => void;
   hand: Hand;
@@ -381,10 +381,10 @@ function HandelTafel({
         <div className="dock-markt">
           <button
             disabled={!markt.darf}
-            title={markt.besucht ? 'In diesem Zug warst du schon auf dem Markt.' : `${MARKT_PREIS} Karten von deinen groessten Stapeln - dafuer eine Kartenwahl`}
+            title={markt.besucht ? 'In diesem Zug warst du schon auf dem Markt.' : `${markt.preis} Karten von deinen groessten Stapeln - dafuer eine Kartenwahl`}
             onClick={markt.onMarkt}
           >
-            Auf den Markt: {MARKT_PREIS} Karten gegen eine Kartenwahl
+            Auf den Markt: {markt.preis} Karten gegen eine Kartenwahl
           </button>
           <p className="dock-tafel-klein">
             {markt.besucht ? 'Heute warst du schon dort.' : 'Nimmt vom groessten Stapel - einmal je Zug. Gut fuer Ueberschuss.'}
@@ -723,7 +723,8 @@ export function Aktionsleiste({
           markt={
             state.ereignisseAn
               ? {
-                  darf: bauen && me?.id !== undefined && state.marktZug[me.id] !== state.turn && RESOURCES.reduce((n, r) => n + hand[r], 0) >= MARKT_PREIS,
+                  darf: bauen && me?.id !== undefined && state.marktZug[me.id] !== state.turn && RESOURCES.reduce((n, r) => n + hand[r], 0) >= marktPreisFuer(state, me.id),
+                  preis: me ? marktPreisFuer(state, me.id) : 3,
                   besucht: me?.id !== undefined && state.marktZug[me.id] === state.turn,
                   onMarkt: () => {
                     act({ t: 'visitMarket' });

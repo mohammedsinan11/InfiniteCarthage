@@ -6,6 +6,7 @@
  * reichte; das ist mit dem Bestand verschwunden.
  */
 
+import { wirksameKarten } from '../cards/sippen';
 import { hexVertices, hexKey, vertexKey } from '../coords';
 import type { World } from '../world';
 import { TERRAIN_RESOURCE } from '../types';
@@ -72,8 +73,11 @@ export function productionSources(
   const out: ProductionSource[] = [];
   const nass = regnet(wetter);
   const saison = state.turn !== undefined && state.turn > 0 ? JAHRESZEIT_WIRKUNG[seasonOf(state.turn)] : null;
-  const cardsOf = (id: PlayerId): string[] =>
-    state.players.find((p) => p.id === id)?.activeCards ?? [];
+  // Aktive Karten und erreichte Sippenstufen (cards/sippen.ts).
+  const cardsOf = (id: PlayerId): string[] => {
+    const p = state.players.find((x) => x.id === id);
+    return p ? wirksameKarten(p) : [];
+  };
   // Regelkarten (cards/effects.ts): "die 6 zaehlt auch als 8" - dann liefern
   // bei einer 6 auch die 8er-Felder, aber nur an den Besitzer der Karte.
   const alsZahlVon = (id: PlayerId): number[] =>

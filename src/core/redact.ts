@@ -39,6 +39,8 @@ export type PublicPlayer = {
   cards: string[];
   /** Aktive Reichskarten; nur diese liefern eine Dauerwirkung. */
   activeCards: string[];
+  /** Karten je Familie (cards/sippen.ts) - oeffentlich wie die Karten selbst. */
+  sippe: Partial<Record<'ernte' | 'handel' | 'bau' | 'krieg' | 'wildnis', number>>;
   /** Taktikkarten bleiben bis zum Ausspielen geheim; nur ihre Zahl ist sichtbar. */
   tacticCount: number;
   /** Ausruestung ist wie die Figur, die sie traegt, oeffentlich. */
@@ -181,6 +183,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
       ruhm: p.ruhm,
       cards: [...p.cards],
       activeCards: [...p.activeCards],
+      sippe: { ...(p.sippe ?? {}) },
       tacticCount: p.tactics.length,
       equipment: [...p.equipment],
       loot: p.loot,

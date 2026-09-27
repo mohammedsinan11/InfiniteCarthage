@@ -21,7 +21,7 @@
 import { Rng } from '../rng';
 import { hash3i } from '../hash';
 import { CARDS } from './catalog';
-import { RARITY_ORDER, RARITY_WEIGHTS, cardKind, istEinzigartig, wiederholbar } from './types';
+import { RARITY_ORDER, RARITY_WEIGHTS, cardKind, dauerwirkungen, istEinzigartig, wiederholbar } from './types';
 import type { Card, DraftSource, Rarity } from './types';
 
 const SALT_DRAFT = 61;
@@ -33,6 +33,7 @@ const QUELLE_ZU_ZAHL: Record<DraftSource, number> = {
   fund: 1,
   belohnung: 2,
   markt: 3,
+  gruendung: 4,
 };
 
 /** Eine Seltenheitsstufe nach den Gewichten der Quelle ziehen. */
@@ -68,7 +69,23 @@ export function draftOptions(
 ): string[] {
   const rng = new Rng(hash3i(secretSeed, turn, QUELLE_ZU_ZAHL[source], SALT_DRAFT));
   const besitzt = new Set(owned);
-  const verfuegbar = CARDS.filter((c) => !istEinzigartig(c) || !besitzt.has(c.id) || wiederholbar(c));
+  /*
+   * Die Gruendung (jedes neue Dorf, jede neue Stadt) bietet nur Karten, die
+   * bleiben: Dauerkarten, die man noch nicht hat, und Taktiken. Sie formt das
+   * Deck und die Sippen (cards/sippen.ts), nicht die Hand - mit Sofortkarten
+   * bei jedem Bau waren die Partien ein Drittel kuerzer (Simulation mit drei
+   * Bots: Runde 40 statt 60 bis 15 Punkte).
+   */
+  const gruendung = source === 'gruendung';
+  const bleibt = (c: Card) => dauerwirkungen(c).length > 0 || cardKind(c) === 'taktik';
+  const alle = CARDS.filter((c) =>
+    gruendung ? bleibt(c) && !(istEinzigartig(c) && besitzt.has(c.id)) : !istEinzigartig(c) || !besitzt.has(c.id) || wiederholbar(c),
+  );
+  // Reicht der Topf nicht fuer eine Auslage (fast alles schon im Besitz), gilt der gewoehnliche.
+  const verfuegbar =
+    gruendung && alle.length < DRAFT_SIZE
+      ? CARDS.filter((c) => !istEinzigartig(c) || !besitzt.has(c.id) || wiederholbar(c))
+      : alle;
   // Eine Stufe kommt in Frage, sobald sie EINE Karte hat - fehlende Plaetze
   // fuellt weiter unten die naechstniedrigere. Frueher waren es drei, und mit
   // wachsender Sammlung fielen erst legendaer, dann episch fuer immer heraus.

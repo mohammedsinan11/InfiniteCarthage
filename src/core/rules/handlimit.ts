@@ -10,6 +10,8 @@
  * weil sie jemanden anziehen - nicht, weil eine Zahl faellt.
  */
 
+import { wirksameKarten } from '../cards/sippen';
+import type { SippenZaehler } from '../cards/sippen';
 import { handSize } from '../state';
 import { modifiersOf } from '../cards/effects';
 import { handGrenzeBonus } from '../omen';
@@ -22,7 +24,7 @@ import type { Hand, PlayerId } from '../state';
  * eigene Hand, fremde nicht.
  */
 export type HandView = {
-  players: ReadonlyArray<{ id: PlayerId; activeCards: readonly string[]; hand?: Hand; haus?: string | null }>;
+  players: ReadonlyArray<{ id: PlayerId; activeCards: readonly string[]; sippe?: SippenZaehler; hand?: Hand; haus?: string | null }>;
   /** Volle Speicher, Leere Taschen (core/omen.ts). */
   omens?: readonly string[];
 };
@@ -35,7 +37,7 @@ export function limitFor(state: HandView, id: PlayerId): number {
   const p = state.players.find((x) => x.id === id);
   const omen = handGrenzeBonus(state.omens);
   if (!p) return HAND_LIMIT + omen;
-  return HAND_LIMIT + modifiersOf(p.activeCards).handLimitBonus + omen + hausHandGrenze(p.haus);
+  return HAND_LIMIT + modifiersOf(wirksameKarten(p)).handLimitBonus + omen + hausHandGrenze(p.haus);
 }
 
 /** Haelt dieser Spieler mehr, als ihm zusteht? */

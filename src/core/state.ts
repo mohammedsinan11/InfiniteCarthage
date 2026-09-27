@@ -70,6 +70,8 @@ export type Player = {
   cards: string[];
   /** Die wenigen Reichskarten, deren Dauerwirkung gerade aktiv ist. */
   activeCards: string[];
+  /** Wie viele Karten je Familie genommen wurden (cards/sippen.ts) - nur mit Ereignissen. */
+  sippe?: Partial<Record<'ernte' | 'handel' | 'bau' | 'krieg' | 'wildnis', number>>;
   /** Ausspielbare und danach verbrauchte Kampf- und Heldenkarten. */
   tactics: string[];
   /** Fuer die kommenden Gegenstaende des Abenteuerzweigs. */

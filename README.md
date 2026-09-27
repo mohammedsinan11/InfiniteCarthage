@@ -318,6 +318,18 @@ Pluenderungen verschleppt werden; eine Stadt braucht zwei, ein Ritter nimmt
 einen. Zwischen den zwei fernsten Siedlungen zieht eine Karawane und bringt
 die knappsten Sorten - Raeuber jagen sie.
 
+**Sippen und Gruendungen** (`src/core/cards/sippen.ts`). Die Kartenwahl ist
+der Kern: jedes neue Dorf und jede neue Stadt bringt eine Wahl (nur Karten,
+die bleiben - Dauerkarten und Taktiken). Jede Karte gehoert einer von fuenf
+Familien - Ernte, Handel, Bau, Krieg, Wildnis. Mit 2 und mit 4 Karten einer
+Familie wirkt ein Bonus: mehr Ertrag, ein billigerer Markt, Gaben beim Bauen,
+Schutz, zusaetzliche Kartenwahlen fuer Lager und Ruinen. Die Kartenwahl zeigt
+auf jeder Karte, ob sie eine Stufe freischaltet.
+
+**Verderb und Aufholen** (`src/core/verderb.ts`, `src/core/aufholen.ts`).
+Wer den Zug ueber der Handkartengrenze beendet, verliert die Haelfte des
+Ueberschusses. Ein Bot drei Punkte hinten bekommt je Wurf eine Karte.
+
 **Markt und Bankhandel.** Im Bankhandel liegt der Markt: einmal je Zug drei
 Karten gegen eine Kartenwahl. Jeder weitere Bankhandel im selben Zug kostet
 mehr. Dort beginnt zu mehreren auch ein Angebot an die Mitspieler.
