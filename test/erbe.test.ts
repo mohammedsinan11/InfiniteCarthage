@@ -19,6 +19,9 @@ describe('Erbstuecke', () => {
     expect(sz.state.players[0]!.ruhm).toBe(0);
     const aus = createGame([{ id: 'p0', name: 'S', erbstueck: 'kriegsbanner' }], 1, 2, 15, {});
     expect(aus.state.players[0]!.ruhm).toBe(0);
+    // Ein Bot ist kein Mitspieler: dann wirkt das Erbe.
+    const mitBot = createGame([{ id: 'a', name: 'A', erbstueck: 'kriegsbanner' }, { id: 'bot_x', name: 'Hanno' }], 1, 2, 15, { erbeAn: true, bots: ['bot_x'] });
+    expect(mitBot.state.players[0]!.ruhm).toBe(2);
     const falsch = createGame([{ id: 'p0', name: 'S', erbstueck: 'zauberstab' }], 1, 2, 15, { erbeAn: true });
     expect(falsch.state.players[0]!.erbstueck).toBeUndefined();
   });

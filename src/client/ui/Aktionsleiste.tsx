@@ -543,6 +543,7 @@ export function Aktionsleiste({
   reichOffen = false,
   onHauptstadt,
   onAngebot,
+  dorfPlatz = true,
 }: {
   state: PublicState;
   me: PublicPlayer | undefined;
@@ -575,6 +576,8 @@ export function Aktionsleiste({
    * der ueber der Hand schwebte (Spieltest 4) - jetzt steht er beim Bankhandel.
    */
   onAngebot?: () => void;
+  /** Gibt es einen freien Platz fuer ein Dorf (scenes/Game.tsx rechnet es aus)? */
+  dorfPlatz?: boolean;
 }) {
   const phase = state.phase;
   const bauen = isMine && phase.t === 'main';
@@ -625,6 +628,8 @@ export function Aktionsleiste({
 
   const bau = (m: Exclude<BuildMode, null>) => () => {
     setKlappe(null);
+    // Eine offene Tafel laege ueber den Bauplaetzen (Spieltest 5).
+    setTafel(null);
     setMode(mode === m ? null : m);
   };
   /** Aus einer Klappe waehlen: der Bau ist gewaehlt, die Klappe geht zu. */
@@ -764,7 +769,19 @@ export function Aktionsleiste({
           tip={`Strasse: ${kostenText(COST_ROAD)}${eigeneAsche ? ` - auf eigener Asche nur ${kostenText(COST_REBUILD_ROAD)}` : ''}`}
           onClick={bau('road')}
         />
-        <DockKnopf titel="Dorf" symbol={<SymSiedlung />} kosten={COST_SETTLEMENT} gewaehlt={mode === 'settlement'} darf={bauen && canAfford(hand, COST_SETTLEMENT)} tip={`Dorf: ${kostenText(COST_SETTLEMENT)}`} onClick={bau('settlement')} />
+        <DockKnopf
+          titel="Dorf"
+          symbol={<SymSiedlung />}
+          kosten={COST_SETTLEMENT}
+          gewaehlt={mode === 'settlement'}
+          darf={bauen && canAfford(hand, COST_SETTLEMENT) && dorfPlatz}
+          tip={
+            dorfPlatz
+              ? `Dorf: ${kostenText(COST_SETTLEMENT)}`
+              : 'Kein freier Platz: ein Dorf braucht eine eigene Strasse und zwei Kanten Abstand zum naechsten Haus - erst eine Strasse bauen.'
+          }
+          onClick={bau('settlement')}
+        />
         <DockKnopf
           titel="Stadt"
           symbol={<SymStadt />}

@@ -5958,16 +5958,17 @@ em.off {
   .dock-aufklapp .dock-knopf {
     width: 72px;
   }
+  /*
+   * Die Schilder oben: hoechstens zwei kurze Reihen, nichts ausserhalb des
+   * Bildes (Spieltest 5: in einer schiebbaren Zeile lagen Runde, Rivalen,
+   * Rat und Omen hinter dem Rand). Was im Menue oder am Wuerfel ohnehin
+   * steht, faellt weg: Raumcode, Hausname, Welt, Ton, "du bist dran" und
+   * der Wettername (das Symbol bleibt, der Text steht im Tooltip).
+   */
   .hud {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-    pointer-events: auto;
+    flex-wrap: wrap;
     gap: 4px;
     max-width: calc(100% - 96px);
-  }
-  .hud::-webkit-scrollbar {
-    display: none;
   }
   .hud > span,
   .hud > button {
@@ -5975,9 +5976,11 @@ em.off {
     padding: 4px 6px;
     font-size: 9px;
   }
-  /* Raumcode und Hausname stehen im Menue - oben zaehlt, was sich aendert. */
   .hud > span.hud-room,
-  .hud > span.hud-haus {
+  .hud > span.hud-haus,
+  .hud > span.hud-turn,
+  .hud > .hud-ton,
+  .hud-wetter-text {
     display: none;
   }
 }

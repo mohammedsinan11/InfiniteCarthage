@@ -587,6 +587,12 @@ export function Game() {
     }
   }, [state, world, you, isMine, phase, mode, hand]);
 
+  /** Gibt es ueberhaupt einen Platz fuer ein Dorf? Sonst bleibt der Knopf aus (Spieltest 5). */
+  const dorfPlatz = useMemo(
+    () => !!you && isMine && phase.t === 'main' && legalSettlementVertices(state, world, you, { setup: notbau }).length > 0,
+    [state, world, you, isMine, phase.t, notbau],
+  );
+
   const onPick = (kind: 'vertex' | 'edge' | 'hex', key: string) => {
     if (!you) return;
     if (phase.t === 'setup') {
@@ -1107,7 +1113,9 @@ export function Game() {
       const natur = el.scrollWidth;
       if (natur === 0) return;
       const links = el.getBoundingClientRect().left;
-      const menu = document.querySelector('.menu');
+      // Auf dem Handy liegt das Menue ueber der Karte, statt neben ihr: dann
+      // schrumpft die Leiste nicht mit (Spieltest 5 - sie wurde unlesbar klein).
+      const menu = window.innerWidth > 700 ? document.querySelector('.menu') : null;
       const rechts = menu ? menu.getBoundingClientRect().left - 12 : window.innerWidth - 36;
       const skala = Math.min(1, Math.max(0.5, (rechts - links) / natur));
       el.style.setProperty('--unten-skala', skala.toFixed(3));
@@ -1225,7 +1233,9 @@ export function Game() {
               .join(' · ')}
           >
             <WetterSymbol tageszeit={tageszeit} wetter={wetter} />
-            {TAGESZEIT_NAME[tageszeit]} · {WETTER_NAME[wetter]}
+            <span className="hud-wetter-text">
+              {TAGESZEIT_NAME[tageszeit]} · {WETTER_NAME[wetter]}
+            </span>
             {WETTER_WIRKUNG[echtesWetter] && <span className="hud-wirkung">!</span>}
           </span>
           <button
@@ -1237,9 +1247,11 @@ export function Game() {
           </button>
           {state.order.length > 1 && (
             <span className="hud-turn">
-              {isMine
-                ? 'du bist dran'
-                : `${state.players.find((p) => p.id === state.currentPlayer)?.name} ist dran`}
+              {phase.t === 'finished'
+                ? 'Partie beendet'
+                : isMine
+                  ? 'du bist dran'
+                  : `${state.players.find((p) => p.id === state.currentPlayer)?.name} ist dran`}
             </span>
           )}
           {/* Siegpunkte: eigene, bei mehreren auch die der anderen im Tooltip. */}
@@ -1601,6 +1613,7 @@ export function Game() {
                   setAusbauOrt({ art: 'feld', key: hexKey(k.q, k.r) });
                 }}
                 onAngebot={state.order.length > 1 ? () => setAngebotOffen(true) : undefined}
+                dorfPlatz={dorfPlatz}
               />
             )}
             {/*
@@ -1669,7 +1682,7 @@ export function Game() {
             der Kartentafel und der Befehlstafel). Die Klappen der Leiste
             blendet styles.css aus, sie leben in der Aktionsleiste.
           */}
-          {you && phase.t !== 'setup' && phase.t !== 'hauswahl' && tafel === null && kandidaten.length === 0 && state.trade === null && !angebotOffen && lagerTafel === null && (
+          {you && phase.t !== 'setup' && phase.t !== 'hauswahl' && phase.t !== 'finished' && tafel === null && kandidaten.length === 0 && state.trade === null && !angebotOffen && lagerTafel === null && (
             <Zeitleiste
               turn={state.turn}
               rundenLimit={state.rundenLimit ?? null}

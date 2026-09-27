@@ -134,7 +134,15 @@ export function vorhabenPruefen(s: GameState, events: Ereignisse): void {
     const v = a ? vorhabenById(a.id) : undefined;
     const p = s.players.find((x) => x.id === id);
     if (!a || !v || !p) continue;
-    if (v.mass(s, id) - a.start < v.n) continue;
+    if (v.mass(s, id) - a.start < v.n) {
+      // Abgelaufen verfaellt es sofort, nicht erst zur naechsten grossen Runde
+      // (Spieltest 5: "noch 0 Rd." blieb stehen).
+      if (a.bis < s.turn) {
+        s.vorhaben = { ...s.vorhaben, [id]: { ...stand, aktiv: null } };
+        events.push({ t: 'ambitionFailed', player: id, id: a.id });
+      }
+      continue;
+    }
     const ruhm = v.lohn.ruhm ?? 0;
     const beute = v.lohn.beute ?? 0;
     // Den Ruhm verbucht rules/ruhm.ts aus dem Ereignis - wie jeden anderen.

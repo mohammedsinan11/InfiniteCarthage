@@ -7,9 +7,10 @@
  * Wunder baute, den Plan des Baumeisters. Der Nachfolger in der naechsten
  * Partie beginnt damit.
  *
- * FAIRNESS. Ein Erbstueck wirkt nur in gewoehnlichen Partien allein - nicht in
- * der Tagesexpedition und nicht im Szenario (dort zaehlen Vergleiche), und
- * nicht gegen Mitspieler. Dort ist es nur ein Name in der Chronik.
+ * FAIRNESS. Ein Erbstueck wirkt nur in gewoehnlichen Partien mit einem
+ * einzigen Menschen (Bots duerfen mitspielen) - nicht in der Tagesexpedition
+ * und nicht im Szenario (dort zaehlen Vergleiche), und nicht gegen
+ * Mitspieler. Dort ist es nur ein Name in der Chronik.
  *
  * Kleine Gaben zum Start, keine Regeln: ein paar Rohstoffe, eine Kartenwahl,
  * etwas Ruhm. Es soll sich nach Familie anfuehlen, nicht nach Aufruesten.

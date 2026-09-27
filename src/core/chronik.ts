@@ -374,7 +374,9 @@ export function saga(s: SagaSicht, du: PlayerId): string {
   const stadt = erste('stadt');
   if (stadt) saetze.push(`${gross(wann(stadt.turn))} stand die erste Stadt.`);
   const horde = erste('horde');
-  const brand = erste('brand');
+  // Nur, was die Zahlen auch zeigen (Spieltest 5: "nicht alles ueberstand das
+  // Feuer" neben "Abgebrannt 0").
+  const brand = erste('brand') && (s.chronik?.stats[du]?.abgebrannt ?? 0) > 0;
   if (horde && brand) saetze.push(`Horden kamen aus dem Dunkel, und nicht alles ueberstand das Feuer.`);
   else if (horde) saetze.push(`Horden kamen aus dem Dunkel - das Reich hielt stand.`);
   const heldFiel = erste('held');

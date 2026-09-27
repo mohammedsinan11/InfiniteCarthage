@@ -444,6 +444,8 @@ export class GameRoom implements DurableObject {
             ereignisse: true,
             // Erbstuecke nur in gewoehnlichen Partien (core/erbe.ts) - createGame prueft auch "allein".
             erbeAn: !tages && !room.szenario,
+            // Bots zaehlen beim Erbe nicht als Mitspieler (Spieltest 5).
+            bots: room.members.filter((m) => m.bot).map((m) => m.id),
             stufe: tages ? 0 : (room.stufe ?? 0),
             koop: !tages && !room.szenario && (room.koop ?? false),
             szenario: room.szenario ?? null,

@@ -543,7 +543,7 @@ function DeineChronik() {
                     <b>Ein Haus der {FAMILIENART[art].name}.</b> {FAMILIENART[art].text}{' '}
                   </>
                 ) : null}
-                {erb ? `Die naechste Generation traegt ${erb.name}: ${erb.wirkung}` : 'Noch kein Erbstueck gewaehlt.'}
+                {erb ? `Die naechste Generation traegt ${erb.name}: ${erb.wirkung} (in gewoehnlichen Partien, allein oder gegen Bots)` : 'Noch kein Erbstueck gewaehlt.'}
               </p>
             );
           })()}
@@ -551,7 +551,7 @@ function DeineChronik() {
             {p.ahnen.map((a, i) => (
               <li key={a.zeit} className={a.sieg ? 'sieg' : ''}>
                 <span className="stammbaum-knoten" aria-hidden />
-                <span className="ahnen-gen">{i === 0 ? 'Zuletzt' : `${i + 1} Generationen zurueck`}</span>
+                <span className="ahnen-gen">{i === 0 ? 'Zuletzt' : i === 1 ? 'Eine Generation davor' : `${i} Generationen davor`}</span>
                 <b>{a.name}</b>
                 <span className="ahnen-info">
                   {a.haus && hausById(a.haus) ? `${hausById(a.haus)!.name} · ` : ''}

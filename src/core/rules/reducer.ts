@@ -331,6 +331,8 @@ export type PartieOptionen = {
   szenario?: string | null;
   /** Wirken Erbstuecke (core/erbe.ts)? Nur in gewoehnlichen Partien allein. */
   erbeAn?: boolean;
+  /** Welche Plaetze Bots sind - sie zaehlen beim Erbe nicht als Mitspieler. */
+  bots?: readonly PlayerId[];
 };
 
 /** Im gemeinsamen Spiel: so viele Siegpunkte je Spieler soll die Summe erreichen. */
@@ -426,8 +428,10 @@ export function createGame(
   };
 
   if (optionen.ereignisse) state.ereignisseAn = true;
-  // Erbstuecke geben ihre Gabe nur allein und nur in gewoehnlichen Partien (core/erbe.ts).
-  if (optionen.erbeAn && state.players.length === 1 && !optionen.szenario && !optionen.tagesDatum) {
+  // Erbstuecke geben ihre Gabe nur einem einzelnen Menschen (Bots duerfen dabei
+  // sein - Spieltest 5) und nur in gewoehnlichen Partien (core/erbe.ts).
+  const menschen = state.players.filter((p) => !(optionen.bots ?? []).includes(p.id)).length;
+  if (optionen.erbeAn && menschen === 1 && !optionen.szenario && !optionen.tagesDatum) {
     for (const p of state.players) {
       const e = erbstueckById(p.erbstueck);
       if (!e) continue;
@@ -1294,9 +1298,15 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (!feld) return fail('Dieses Feld ist noch nicht erkundet.');
       if (feld.terrain === 'water') return fail('Einheiten gehen nicht uebers Wasser.');
       const zk = hexKey(action.q, action.r);
-      if (gruppe.some((m) => hexKey(m.q, m.r) !== zk && !nextStep(s.worldSeed, m, new Set([zk])))) {
-        return fail('Dorthin fuehrt kein Landweg.');
-      }
+      /*
+       * Wer keinen Weg findet (zu weit auf Erkundung, hinter Wasser), bleibt
+       * bei seinem Auftrag - die anderen ziehen los. Frueher scheiterte der
+       * ganze Befehl an einem einzigen Fernen (Spieltest 5: "Heer entgegen"
+       * tat nichts).
+       */
+      const mitWeg = gruppe.filter((m) => hexKey(m.q, m.r) === zk || nextStep(s.worldSeed, m, new Set([zk])));
+      if (mitWeg.length === 0) return fail('Dorthin fuehrt kein Landweg.');
+      gruppe.splice(0, gruppe.length, ...mitWeg);
       /*
        * Das Banner: ist genau eine bestehende Schar gewaehlt, behaelt sie es.
        * Sonst bekommen die Gewaehlten ein neues - aus dem Zaehler der Einheiten,

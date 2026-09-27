@@ -137,14 +137,21 @@ const GOBLIN_MEHR = ['zaehne', 'fresser', 'beisser', 'kriecher', 'schlucker', 'n
 function nameFuer(seed: number, cx: number, cy: number, art: FraktionArt): string {
   const rng = new Rng(hash3i(seed, cx, cy, SALT_NAME));
   const eins = (liste: readonly string[]) => liste[rng.int(liste.length)]!;
+  /*
+   * Der tragende Teil des Namens haengt an der Zelle, wie beim Anfuehrer:
+   * 3*cx + cy unterscheidet sich zwischen Nachbarzellen immer um 1 bis 4, so
+   * heissen zwei Nachbarn nie gleich (Spieltest 5: "Bande von Rabenstein
+   * gegen Bande von Rabenstein"). Der Seed verschiebt nur den Anfang.
+   */
+  const zelle = (liste: readonly string[]) => liste[mod(cx * 3 + cy + (seed % 97), liste.length)]!;
   if (art === 'goblin') {
     return rng.int(2) === 0
-      ? `Stamm ${eins(GOBLIN_SILBE)}${eins(GOBLIN_ENDE)}`
-      : `Die ${eins(GOBLIN_STOFF)}${eins(GOBLIN_MEHR)}`;
+      ? `Stamm ${zelle(GOBLIN_SILBE)}${eins(GOBLIN_ENDE)}`
+      : `Die ${zelle(GOBLIN_STOFF)}${eins(GOBLIN_MEHR)}`;
   }
   return rng.int(2) === 0
-    ? `Die ${eins(RAEUBER_VORN)}${eins(RAEUBER_TIER)}`
-    : `Bande von ${eins(RAEUBER_ORT)}`;
+    ? `Die ${eins(RAEUBER_VORN)}${zelle(RAEUBER_TIER)}`
+    : `Bande von ${zelle(RAEUBER_ORT)}`;
 }
 
 /*
