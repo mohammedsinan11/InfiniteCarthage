@@ -37,6 +37,10 @@ export type FigurArt =
   | 'stadt'
   | 'dorfKlein'
   | 'stadtKlein'
+  /** Die Stadt mit allen Einwohnern - die Ausbaustufe von stadtKlein. */
+  | 'stadtGross'
+  /** Der Ritter ab Rang 2. */
+  | 'ritterLanze'
   | 'turm'
   | 'turmGeschuetz'
   | 'turmBefestigt'
@@ -236,19 +240,36 @@ const ART: Record<FigurArt, readonly string[]> = {
     '..kbkbk..',
     '..kk.kk..',
   ],
-  // Ritter: Helm mit Sehschlitz, Schild in Spielerfarbe, Lanze (Spieltest 4:
-  // vorher ein grauer Klotz, schwer vom Bogenschuetzen zu unterscheiden).
+  // Ritter: Helm, Wams in Spielerfarbe. Neun breit, damit Kopf, Rumpf und Beine
+  // in derselben Spalte stehen wie der Ankerpunkt (Spalte 4).
   ritter: [
-    '........n..',
-    '...kkk..n..',
-    '..kmnmk.t..',
-    '..kkkkk.t..',
-    '..kmmmk.t..',
-    '.kkkkkkkts.',
-    'kppkmmmmkt.',
-    'kpypkmmmkt.',
-    'kppkmmmmkt.',
-    '.kkkkMkMkt.',
+    '...kkk...',
+    '..kmmmk..',
+    '..kmMMk..',
+    '..kmmmk..',
+    '.kkkkkkk.',
+    '.kppmppmk',
+    '.kpppppmk',
+    '.kppyppmk',
+    '..kpppk..',
+    '..kMkMk..',
+    '..kMkMk..',
+    '..kk.kk..',
+  ],
+  // Lanzenritter: der Ritter ab Rang 2 (core/combat.ts, Stufen) - Schild,
+  // Lanze, Sehschlitz. Die Lanze steht in einer Spalte, der Kopf ueber dem
+  // Rumpf (Spieltest 5: beides war in der Mitte versetzt).
+  ritterLanze: [
+    '..........n',
+    '.....kkk..n',
+    '....kmnmk.t',
+    '....kkkkk.t',
+    '....kmmmk.t',
+    '...kkkkkkst',
+    'kppkmmmmk.t',
+    'kpypkmmmk.t',
+    'kppkmmmmk.t',
+    '.kkkkMkMk.t',
     '....kMkMk..',
     '....kk.kk..',
   ],
@@ -267,20 +288,23 @@ const ART: Record<FigurArt, readonly string[]> = {
     '.kBkBk...t.',
     '.kk.kk..t..',
   ],
-  // Die Karawane (core/karawane.ts): ein Kamel mit Packen in Spielerfarbe -
-  // so sieht man, wessen Handel da zieht. PLATZHALTER (ASSETS.md).
+  // Die Karawane (core/karawane.ts): ein Kamel mit langen Beinen, Hoecker-
+  // packen und Wimpel in Spielerfarbe (Spieltest 5). PLATZHALTER (ASSETS.md).
   karawane: [
-    '.........kk..',
-    '........kffk.',
-    '........kfk..',
-    '..kkkkk.kfk..',
-    '.kqpppPk.kffk',
-    'kcCpPpCCkfffk',
-    'kfffffffffffk',
-    '.kffEfffffk..',
-    '..kfk..kfk...',
-    '..kfk..kfk...',
-    '..kkk..kkk...',
+    '...kpp.........',
+    '...kPpp.....kk.',
+    '...kpp.....kffk',
+    '...k.......kfkk',
+    '..kkkkk....kfk.',
+    '.kqppppk...kfk.',
+    'kqpPpPpPk..kfk.',
+    'kfkkkkkfkkkffk.',
+    'kfffffffffffk..',
+    '.kffEffffEfk...',
+    '..kfk....kfk...',
+    '..kfk....kfk...',
+    '..kfk....kfk...',
+    '..kkk....kkk...',
   ],
   wanderer: [
     '..kkk....',
@@ -296,15 +320,20 @@ const ART: Record<FigurArt, readonly string[]> = {
     '.kb.bk..t',
     '.kk.kk..k',
   ],
+  // Ruine: ein gebrochener Bogen mit Goldschimmer - "hier liegt ein Schatz"
+  // (Spieltest 5: die alte las sich wie ein Zaun).
   ruine: [
-    '..k.....k..',
-    '.kmk...kmk.',
-    '.kmk...kMk.',
-    '.kmk.k.kmk.',
-    '.kmkkmkkmk.',
-    '.kMkkmkkMk.',
+    '..kkkkk....',
+    '.kmmmmMk...',
+    'kmMkkkMMk..',
+    'kmk...kkk..',
+    'kmk........',
+    'kMk....kk..',
+    'kmk...kmMk.',
+    'kmk.y.kmMk.',
+    'kmkyYykMmk.',
     'kkkkkkkkkkk',
-    'kMMMmMMMmMk',
+    'kMmfMmMfmMk',
     '.kkkkkkkkk.',
   ],
   // Lager: Zelt in Fraktionsfarbe, Totem mit Schaedel, Lagerfeuer - damit es
@@ -452,9 +481,27 @@ const ART: Record<FigurArt, readonly string[]> = {
     '.kmMmmmkbkMk.',
     '.kkkkkkkkkkk.',
   ],
-  // Kleine Stadt: Bergfried mit Wimpel, Nebenturm, breite Mauer mit Tor -
-  // deutlich groesser als das Dorf, damit der Ausbau zu sehen ist. 17 x 17.
+  // Kleine Stadt: Turm mit Wimpel, ein Dach hinter der Mauer, Tor. 15 x 14.
+  // Waechst sie auf fuenf Einwohner, wird sie zur Bluehenden Stadt (stadtGross).
   stadtKlein: [
+    '...d...........',
+    '...dpp.........',
+    '...dppp........',
+    '...d...........',
+    '.ddddd.........',
+    '.dmdmd...ddd...',
+    '.dmyMd..dqpPd..',
+    '.dmmMd.dqppPPd.',
+    '.dmmMdddddddddd',
+    'dmdmdmdmdmdmdmd',
+    'dmMmmMdddmMmmMd',
+    'dmmmMmdbdmmMmMd',
+    'dmMmmmdbdmMmmMd',
+    'ddddddddddddddd',
+  ],
+  // Bluehende Stadt: dieselbe Stadt mit allen fuenf Einwohnern (core/bevoelkerung.ts)
+  // - Bergfried, Nebenturm, breite Mauer. 17 x 17.
+  stadtGross: [
     '....kpp..........',
     '....kPpp.........',
     '....kpp..........',
@@ -659,8 +706,27 @@ function heldKarte(gestalt: number): readonly string[] {
  * Keine Narbe im Gesicht: in neun Kunstpixeln Breite sind zwei rote Punkte
  * nicht zu erkennen, sie sehen aus wie ein Zeichenfehler.
  */
-function stufenKarte(karte: readonly string[], stufe: number): readonly string[] {
-  const kopf = Math.min(4, karte.length);
+/*
+ * Wo der Kopf sitzt: wie viele Zeilen oben zum Kopf gehoeren und in welcher
+ * Spalte seine Mitte liegt. Die Feder gehoert ueber die Kopfmitte, nicht
+ * ueber die Mitte des ganzen Bildes - beim Lanzenritter liegen die zwei
+ * Spalten auseinander (Spieltest 5: "Kopf und Lanze versetzt").
+ */
+const KOPF: Partial<Record<FigurArt, { zeilen: number; mitte: number }>> = {
+  ritter: { zeilen: 4, mitte: 4 },
+  ritterLanze: { zeilen: 5, mitte: 6 },
+};
+
+/** Welche Figur eine Einheit zeigt: der Ernannte seine eigene, der Ritter ab Rang 2 die Lanze. */
+export function figurVon(u: { kind: UnitKind; zweig?: FigurArt | null; stufe?: number }): FigurArt {
+  if (u.zweig) return u.zweig;
+  if (u.kind === 'ritter' && (u.stufe ?? 0) >= 2) return 'ritterLanze';
+  return u.kind;
+}
+
+function stufenKarte(karte: readonly string[], stufe: number, art?: FigurArt): readonly string[] {
+  const lage = art ? KOPF[art] : undefined;
+  const kopf = lage?.zeilen ?? Math.min(4, karte.length);
   const helm = stufe >= 4 ? 'y' : 'n';
   // Helm faerben: nur die Kopfzeilen, damit die Ruestung Stahl bleibt.
   let neu = karte.map((zeile, i) => (i < kopf ? zeile.replace(/m/g, helm) : zeile));
@@ -674,7 +740,8 @@ function stufenKarte(karte: readonly string[], stufe: number): readonly string[]
   if (stufe >= 2) {
     // Feder: ein Pixel ueber dem Helm, mittig.
     const breite = Math.max(...neu.map((z) => z.length));
-    const mitte = Math.floor(breite / 2);
+    // Mit Umhang ist alles eine Spalte nach rechts gerueckt.
+    const mitte = lage ? lage.mitte + (stufe >= 4 ? 1 : 0) : Math.floor(breite / 2);
     const farbe = stufe >= 3 ? 'y' : 'r';
     neu = [
       '.'.repeat(mitte) + farbe + '.'.repeat(Math.max(0, breite - mitte - 1)),
@@ -695,7 +762,7 @@ function figurBild(
   const da = BILDER.get(schluessel);
   if (da) return da;
   const grund0 = art === 'held' && gestalt !== undefined ? heldKarte(gestalt) : ART[art];
-  const karte = stufe > 0 ? stufenKarte(grund0, stufe) : grund0;
+  const karte = stufe > 0 ? stufenKarte(grund0, stufe, art) : grund0;
   const breite = Math.max(...karte.map((z) => z.length));
   const c = document.createElement('canvas');
   c.width = breite * f;
@@ -781,6 +848,8 @@ export function zeichneGebaeude(
   turm = false,
   /** Nur beim Turm: seine Ausbaustufe - waehlt das Sprite (1 Grenzposten, 2 Geschuetzturm, 3 befestigt). */
   turmStufe = 1,
+  /** Nur bei der Stadt: alle Einwohner da - dann steht die Bluehende Stadt. */
+  bluehend = false,
 ): void {
   const fy = y + 3 * f;
   if (art === 'turm') {
@@ -791,7 +860,7 @@ export function zeichneGebaeude(
     return;
   }
   if (turm) zeichneFigur(ctx, 'turm', x + 8 * f, fy - 2 * f, f, farbe);
-  zeichneFigur(ctx, art === 'stadt' ? 'stadtKlein' : 'dorfKlein', x, fy, f, farbe);
+  zeichneFigur(ctx, art === 'stadt' ? (bluehend ? 'stadtGross' : 'stadtKlein') : 'dorfKlein', x, fy, f, farbe);
 }
 
 /*

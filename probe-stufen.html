@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<title>Probe: Ausbaustufen</title>
+<style>
+  body { margin: 0; padding: 16px; background: #16110b; color: #f2e7d0; font: 12px system-ui, sans-serif; }
+  .reihe { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 10px; }
+  figure { margin: 0; text-align: center; }
+  canvas { display: block; image-rendering: pixelated; background: #2a2016; }
+</style></head>
+<body>
+<div id="inhalt"></div>
+<script type="module">
+// Ritter je Rang, Stadt und Bluehende Stadt, Ruine, Karawane - mit der echten Zeichenfunktion.
+import { zeichneFigur } from '/src/client/units.ts';
+const S = 6;
+function tafel(art, farbe, stufe, text) {
+  const c = document.createElement('canvas');
+  c.width = 150; c.height = 150;
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  g.fillStyle = '#6a5a3a'; g.fillRect(0, 130, 150, 20);
+  g.fillStyle = 'rgba(255,255,255,0.15)'; g.fillRect(75, 0, 1, 150);
+  zeichneFigur(g, art, 75, 124, S, farbe, undefined, stufe);
+  const f = document.createElement('figure');
+  f.append(c, text);
+  return f;
+}
+const reihe = (els) => { const d = document.createElement('div'); d.className = 'reihe'; d.append(...els); document.getElementById('inhalt').append(d); };
+reihe([0, 1, 2, 3, 4].map((st) => tafel(st >= 2 ? 'ritterLanze' : 'ritter', '#c94f3a', st, `Rang ${st}`)));
+reihe([tafel('stadtKlein', '#3a7ac2', 0, 'Stadt'), tafel('stadtGross', '#3a7ac2', 0, 'Bluehende Stadt'), tafel('ruine', '#000', 0, 'Ruine'), tafel('karawane', '#c94f3a', 0, 'Karawane')]);
+</script></body></html>

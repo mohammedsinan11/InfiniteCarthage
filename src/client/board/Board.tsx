@@ -14,7 +14,7 @@
  *    in ihre obere Nachbarin.
  */
 
-import { EINWOHNER_FUER_STADT, einwohnerVon, platzFuer } from '../../core/bevoelkerung';
+import { EINWOHNER_FUER_STADT, EINWOHNER_STADT, einwohnerVon, platzFuer } from '../../core/bevoelkerung';
 import { fraktionIn } from '../../core/fraktionsleben';
 import { Uebersicht } from './Uebersicht';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -53,6 +53,7 @@ import {
   aufstellung,
   preloadUnitSprites,
   zeichneFigur,
+  figurVon,
   zeichneGebaeude,
   zeichneHauptstadt,
   zeichneReichsbau,
@@ -1092,7 +1093,7 @@ export function Board({
       // Die Figuren stehen im Raster der Schichten - also mit demselben Versatz.
       const x = Math.round(sx + (fx - sx) * e) + vx;
       const y = Math.round(sy + (fy - sy) * e) - hops + vy;
-      zeichneFigur(ctx, u.zweig ?? u.kind, x, y, d.f, farbeSeite(seiteVon(u)));
+      zeichneFigur(ctx, figurVon(u), x, y, d.f, farbeSeite(seiteVon(u)));
       if (d.fackeln) zeichneFigur(ctx, 'fackel', x + 5 * d.f, y - 2 * d.f, d.f);
       const max = maxLeben(u);
       if (u.leben < max) zeichneLeben(ctx, u.kind, x, y, d.f, u.leben, max);
@@ -1254,7 +1255,7 @@ export function Board({
          * die Art 'held', sieht aber anders aus. Der gewoehnliche Held traegt
          * die Gestalt seines Hauses, eine von zehn (core/lore.ts).
          */
-        const figur = u.zweig ?? u.kind;
+        const figur = figurVon(u);
         const gestalt =
           u.kind === 'held' && !u.zweig
             ? state.players.find((p) => p.id === u.owner)?.held?.gestalt
@@ -1661,6 +1662,10 @@ export function Board({
                       p.y - 3 * f,
                       f,
                       spielerFarbe(b.owner),
+                      false,
+                      1,
+                      // Voll bewohnt: die Bluehende Stadt (core/bevoelkerung.ts).
+                      b.type === 'city' && !!state.ereignisseAn && einwohnerVon(state, vk) >= EINWOHNER_STADT,
                     ),
           };
         });
