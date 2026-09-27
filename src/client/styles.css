@@ -2774,7 +2774,9 @@ em.off {
  */
 .ausbau-tafel.befehls-tafel.angedockt {
   left: 50%;
-  bottom: 96px;
+  /* Ueber dem Block unten (Game.tsx misst ihn) - mit festen 96 lag sie auf dem
+     Handy ueber Wuerfel und Hand (Spieltest 4). */
+  bottom: calc(var(--unten-oben, 118px) + 8px);
   top: auto;
   transform: translateX(-50%);
   max-width: min(320px, calc(100vw - 20px));
@@ -3232,7 +3234,8 @@ em.off {
 .handel-schwebe {
   position: absolute;
   left: 10px;
-  bottom: 150px;
+  /* Direkt ueber dem Block unten (Game.tsx misst ihn), nicht auf der Hand. */
+  bottom: calc(var(--unten-oben, 140px) + 8px);
   z-index: 7;
   max-width: min(560px, calc(100% - 250px));
   max-height: 55%;
@@ -3242,10 +3245,10 @@ em.off {
  * Nicht ganz deckend - mit Absicht. Ueber der Wetterschicht (einem
  * WebGL-Canvas) liess eine voll deckende Tafel Chromium ueber ihr ein
  * Rechteck ohne Wetter zeichnen (Spieltest 4: "leerer dunkler Kasten ueber
- * Handel anbieten"). Bei 97 % Deckkraft tritt das nicht auf.
+ * Handel anbieten"). Bei 99 % Deckkraft tritt das nicht auf.
  */
 .handel-schwebe .trade {
-  background: rgba(50, 39, 28, 0.97);
+  background: rgba(50, 39, 28, 0.99);
 }
 
 /*
@@ -5904,4 +5907,77 @@ em.off {
 }
 .ew-reif .ew-schild {
   fill: #f2c94c;
+}
+
+/* --- Handy hochkant, dritter Anlauf (Spieltest 4) --------------------------
+   Seit die Leiste nur noch sieben feste Knoepfe hat, passt sie in ein Raster
+   aus vier Spalten: zwei Reihen breiter Knoepfe mit lesbarer Beschriftung
+   statt einer Reihe mit 6-Punkt-Schrift, in der Karten und Beute hinter dem
+   Rand verschwanden. Die Schilder oben stehen in einer Zeile und lassen sich
+   seitlich schieben, statt vier Zeilen der Karte zu decken. */
+@media (max-width: 600px) {
+  .unten {
+    width: calc(100vw - 20px);
+  }
+  /* Tafeln und Klappen haengen am ganzen Block, nicht an der Leiste - sonst
+     lagen sie auf der Hand, die hier ueber der Leiste steht. */
+  .unten .dock {
+    position: static;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .unten .dock-tafel {
+    max-width: 100%;
+    max-height: 60dvh;
+    overflow-y: auto;
+  }
+  .dock-reihe {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    overflow: visible;
+  }
+  .dock-klappe {
+    display: block;
+  }
+  .dock-knopf,
+  .dock-klappe > .dock-knopf {
+    width: 100%;
+    min-height: 44px;
+  }
+  .dock-titel {
+    font-size: 9px;
+  }
+  .dock-kosten-teil b {
+    font-size: 8px;
+  }
+  .dock-aufklapp {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  .dock-aufklapp .dock-knopf {
+    width: 72px;
+  }
+  .hud {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    pointer-events: auto;
+    gap: 4px;
+    max-width: calc(100% - 96px);
+  }
+  .hud::-webkit-scrollbar {
+    display: none;
+  }
+  .hud > span,
+  .hud > button {
+    flex-shrink: 0;
+    padding: 4px 6px;
+    font-size: 9px;
+  }
+  /* Raumcode und Hausname stehen im Menue - oben zaehlt, was sich aendert. */
+  .hud > span.hud-room,
+  .hud > span.hud-haus {
+    display: none;
+  }
 }

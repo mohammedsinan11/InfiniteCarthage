@@ -14,7 +14,7 @@
  * wer spielt, liest sie einmal, danach nehmen sie nur Platz.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { JAHRESZEIT_WIRKUNG, SEASON_NAME, bigRoundOf, ROUNDS_PER_BIG_ROUND, roundOf, seasonOf, yearOf } from '../../core/season';
 import { cardById } from '../../core/cards/catalog';
@@ -449,6 +449,17 @@ export function SideMenu({
   const [offen, setOffen] = useState(
     () => typeof window === 'undefined' || !window.matchMedia('(max-width: 700px)').matches,
   );
+  // Wird das Fenster schmal (Handy gedreht, Fenster verkleinert), geht das Menue
+  // zu - sonst deckte es halb die Karte (Spieltest 4).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(max-width: 700px)');
+    const wechsel = (e: MediaQueryListEvent) => {
+      if (e.matches) setOffen(false);
+    };
+    mq.addEventListener('change', wechsel);
+    return () => mq.removeEventListener('change', wechsel);
+  }, []);
   const [reiter, setReiter] = useState<Reiter>('kanzler');
   /** Welche Einheit in der Liste aufgeklappt ist - hoechstens eine. */
   const [offenerRitter, setOffenerRitter] = useState<number | null>(null);

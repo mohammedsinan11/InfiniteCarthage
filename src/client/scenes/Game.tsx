@@ -211,6 +211,8 @@ export function Game() {
    * anderen Rasterfeld der unteren Leiste - beide brauchen denselben Zustand.
    */
   const [tafel, setTafel] = useState<null | 'handel' | 'karten'>(null);
+  /** Das Angebot an Mitspieler (ui/TradePanel.tsx) - geoeffnet aus dem Bankhandel. */
+  const [angebotOffen, setAngebotOffen] = useState(false);
 
   /**
    * Ein Wurf ist abgeschickt, das Ergebnis aber noch nicht da.
@@ -499,6 +501,9 @@ export function Game() {
   const hand = me?.hand;
   const phase = state.phase;
   const isMine = state.currentPlayer === you && phase.t !== 'finished';
+  useEffect(() => {
+    if (!isMine) setAngebotOffen(false);
+  }, [isMine]);
 
   /**
    * Die besten Bauplaetze hervorheben: viele Wurfpunkte, dazu Sorten, die man
@@ -1595,6 +1600,7 @@ export function Game() {
                   zeigeFeld(k.q, k.r);
                   setAusbauOrt({ art: 'feld', key: hexKey(k.q, k.r) });
                 }}
+                onAngebot={state.order.length > 1 ? () => setAngebotOffen(true) : undefined}
               />
             )}
             {/*
@@ -1651,9 +1657,9 @@ export function Game() {
           {hand &&
             you &&
             state.order.length > 1 &&
-            (state.trade !== null || (isMine && phase.t === 'main')) && (
+            (state.trade !== null || (angebotOffen && isMine && phase.t === 'main')) && (
               <div className="handel-schwebe">
-                <TradePanel state={state} you={you} hand={hand} act={act} />
+                <TradePanel state={state} you={you} hand={hand} act={act} onZu={() => setAngebotOffen(false)} />
               </div>
             )}
 
@@ -1663,7 +1669,7 @@ export function Game() {
             der Kartentafel und der Befehlstafel). Die Klappen der Leiste
             blendet styles.css aus, sie leben in der Aktionsleiste.
           */}
-          {you && phase.t !== 'setup' && phase.t !== 'hauswahl' && tafel === null && kandidaten.length === 0 && state.trade === null && lagerTafel === null && (
+          {you && phase.t !== 'setup' && phase.t !== 'hauswahl' && tafel === null && kandidaten.length === 0 && state.trade === null && !angebotOffen && lagerTafel === null && (
             <Zeitleiste
               turn={state.turn}
               rundenLimit={state.rundenLimit ?? null}

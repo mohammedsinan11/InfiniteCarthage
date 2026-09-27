@@ -186,6 +186,18 @@ new product, not a feature.
 
 ---
 
+## 5b. Clean-up after playtest 4
+
+> **Built:** the dock has seven fixed buttons (fortifications and troops fold
+> out, the card purchase lives in the card panel, the player-trade offer in
+> the bank panel); Esc and unaffordable builds clear the build mode; the
+> timeline gives way to open panels; the season report waits for the card
+> draft; the fire tip waits for an actual fire; rival scores show "+?" for
+> hidden cards; start stars keep three hexes from camps. New sprites for
+> village, city, knight, archer, camp and caravan, a "3/5" population badge,
+> roads edged in the owner's colour. On phones the dock is a two-row grid
+> with readable labels and the HUD is a single scrollable row.
+
 ## 6. Recommendation
 
 | Step | What | Why first | Size |

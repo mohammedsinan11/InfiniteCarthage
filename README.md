@@ -320,7 +320,13 @@ die knappsten Sorten - Raeuber jagen sie.
 
 **Markt und Bankhandel.** Im Bankhandel liegt der Markt: einmal je Zug drei
 Karten gegen eine Kartenwahl. Jeder weitere Bankhandel im selben Zug kostet
-mehr.
+mehr. Dort beginnt zu mehreren auch ein Angebot an die Mitspieler.
+
+**Die Leiste unten** (`src/client/ui/Aktionsleiste.tsx`). Sieben feste
+Knoepfe: Strasse, Dorf, Stadt, Befestigen (klappt Turm, Palisade, Tor auf),
+Truppe (Ritter, Bogen), Karten (mit "Neue Karte kaufen") und Zug Ende; Beute
+und Hauptstadt erscheinen nur, wenn es sie gibt. Esc hebt eine Bauwahl auf.
+Auf dem Handy steht die Leiste in zwei Reihen mit lesbarer Schrift.
 
 **Siegwege** (`src/core/siegwege.ts`). Neben dem Siegpunktziel gewinnt auch,
 wer als Eroberer, Entdecker, Wunderbauer oder Handelsfuerst weit genug kommt.

@@ -341,9 +341,12 @@ function HandelTafel({
   onTausch,
   onZu,
   markt,
+  onAngebot,
 }: {
   /** Der Markt (rules/reducer.ts, visitMarket): Ueberschuss gegen eine Kartenwahl. */
   markt?: { darf: boolean; besucht: boolean; onMarkt: () => void };
+  /** Mit Mitspielern handeln - nur zu mehreren (ui/TradePanel.tsx). */
+  onAngebot?: () => void;
   hand: Hand;
   verhaeltnis: (r: Resource) => number;
   /** Warum der Kurs so ist, wie er ist (rules/trade.ts, tradeRatioErklaert). */
@@ -391,6 +394,13 @@ function HandelTafel({
           <p className="dock-tafel-klein">
             {markt.besucht ? 'Heute warst du schon dort.' : 'Nimmt vom groessten Stapel - einmal je Zug. Gut fuer Ueberschuss.'}
           </p>
+        </div>
+      )}
+      {onAngebot && (
+        <div className="dock-markt">
+          <button disabled={!darf} onClick={onAngebot}>
+            Mitspielern etwas anbieten
+          </button>
         </div>
       )}
     </Tafel>
@@ -532,6 +542,7 @@ export function Aktionsleiste({
   hauptstadtBereit = false,
   reichOffen = false,
   onHauptstadt,
+  onAngebot,
 }: {
   state: PublicState;
   me: PublicPlayer | undefined;
@@ -559,6 +570,11 @@ export function Aktionsleiste({
   reichOffen?: boolean;
   /** Zur Hauptstadt fahren und ihre Tafel oeffnen. */
   onHauptstadt?: () => void;
+  /**
+   * Ein Angebot an die Mitspieler zusammenstellen. Frueher ein eigener Knopf,
+   * der ueber der Hand schwebte (Spieltest 4) - jetzt steht er beim Bankhandel.
+   */
+  onAngebot?: () => void;
 }) {
   const phase = state.phase;
   const bauen = isMine && phase.t === 'main';
@@ -696,6 +712,14 @@ export function Aktionsleiste({
           onTausch={(give, receive) => act({ t: 'bankTrade', give, receive })}
           sturm={haefenZu(state)}
           onZu={() => setTafel(null)}
+          onAngebot={
+            onAngebot
+              ? () => {
+                  setTafel(null);
+                  onAngebot();
+                }
+              : undefined
+          }
           markt={
             state.ereignisseAn
               ? {

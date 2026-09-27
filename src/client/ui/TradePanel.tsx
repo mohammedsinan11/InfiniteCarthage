@@ -25,6 +25,8 @@ type Props = {
   you: PlayerId;
   hand: Hand;
   act: (action: Action) => void;
+  /** Das Angebot schliessen - geoeffnet wird es beim Bankhandel (ui/Aktionsleiste.tsx). */
+  onZu?: () => void;
 };
 
 const emptyBundle = (): Bundle => ({});
@@ -32,12 +34,12 @@ const emptyBundle = (): Bundle => ({});
 const size = (b: Bundle): number =>
   RESOURCES.reduce((n, r) => n + (b[r] ?? 0), 0);
 
-export function TradePanel({ state, you, hand, act }: Props) {
+export function TradePanel({ state, you, hand, act, onZu }: Props) {
   const offer = state.trade;
   const isMine = state.currentPlayer === you;
 
   if (offer === null) {
-    return isMine ? <OfferForm hand={hand} act={act} /> : null;
+    return isMine ? <OfferForm hand={hand} act={act} onZu={onZu} /> : null;
   }
 
   return offer.from === you ? (
@@ -49,8 +51,13 @@ export function TradePanel({ state, you, hand, act }: Props) {
 
 // --- Angebot zusammenstellen -----------------------------------------------
 
-function OfferForm({ hand, act }: { hand: Hand; act: (a: Action) => void }) {
-  const [open, setOpen] = useState(false);
+function OfferForm({ hand, act, onZu }: { hand: Hand; act: (a: Action) => void; onZu?: () => void }) {
+  // Mit onZu oeffnet es ein Knopf von aussen - dann steht die Form gleich offen.
+  const [open, setOpenIntern] = useState(onZu !== undefined);
+  const setOpen = (o: boolean) => {
+    setOpenIntern(o);
+    if (!o) onZu?.();
+  };
   const [give, setGive] = useState<Bundle>(emptyBundle);
   const [want, setWant] = useState<Bundle>(emptyBundle);
 
