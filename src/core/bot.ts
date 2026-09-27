@@ -24,7 +24,7 @@ import type { World } from './world';
 import { RESOURCES, TERRAIN_RESOURCE } from './types';
 import type { Resource } from './types';
 import type { GameState, PlayerId } from './state';
-import { applyAction } from './rules/reducer';
+import { applyAction, wahlFrei } from './rules/reducer';
 import type { Action, Game, GameEvent } from './rules/reducer';
 import { legalCityVertices, legalRoadEdges, legalSettlementVertices } from './rules/placement';
 import { COST_CITY, COST_DEV, COST_KNIGHT, COST_ROAD, COST_SETTLEMENT, canAfford } from './rules/costs';
@@ -215,7 +215,7 @@ export function botAktion(state: GameState, world: World, id: PlayerId, versucht
   }
 
   // Beute einloesen.
-  if (p.loot > 0) {
+  if (p.loot > 0 && wahlFrei(state)) {
     const a = neu({ t: 'claimLoot' });
     if (a) return a;
   }

@@ -9,6 +9,7 @@ import type { PlayerId } from '../src/core/state';
 import { CARDS } from '../src/core/cards/catalog';
 import { SIPPEN_BONI, SIPPE_VON, naechsteStufe, sippenBoni, wirksameKarten } from '../src/core/cards/sippen';
 import { modifiersOf } from '../src/core/cards/effects';
+import { draftOptions } from '../src/core/cards/draft';
 
 function must(game: Game, action: Action, actor: PlayerId) {
   const r = applyAction(game, action, actor);
@@ -28,6 +29,12 @@ function aufgebaut(ereignisse: boolean): Game {
 }
 
 describe('Sippen', () => {
+  it('die grossen Rohstoffkarten gibt es nur als Beute', () => {
+    for (let t = 1; t < 200; t++) {
+      for (const src of ['fund', 'markt', 'gruendung'] as const) expect(draftOptions(7, t, src)).not.toContain('grosse_scheune');
+    }
+  });
+
   it('jede Katalogkarte gehoert einer Familie, keine Stufe steht im Katalog', () => {
     for (const c of CARDS) expect(SIPPE_VON[c.id], c.id).toBeDefined();
     const ids = new Set(CARDS.map((c) => c.id));
@@ -52,7 +59,7 @@ describe('Sippen', () => {
     expect(marktPreisFuer(g.state, 'p0')).toBe(2);
   });
 
-  it('ein neues Dorf bringt eine Gruendungswahl, die genommene Karte zaehlt fuer ihre Familie', () => {
+  it('eine neue Stadt bringt eine Gruendungswahl, ein Dorf nicht; hoechstens zwei Wahlen je Zug', () => {
     const g = aufgebaut(true);
     must(g, { t: 'roll' }, 'p0');
     for (let i = 0; i < 5 && g.state.phase.t !== 'main'; i++) {
@@ -60,21 +67,35 @@ describe('Sippen', () => {
       else if (g.state.phase.t === 'ereignis') must(g, { t: 'answerEvent', wahl: 0 }, 'p0');
     }
     const p = g.state.players[0]!;
-    // Eine Strasse und ein freier Platz dahinter - zur Not mit mehreren Strassen.
-    p.hand = { lumber: 20, brick: 20, wool: 5, grain: 5, ore: 0 };
+    p.hand = { lumber: 20, brick: 20, wool: 5, grain: 20, ore: 20 };
     let platz: string | undefined;
     for (let i = 0; i < 6 && !platz; i++) {
       must(g, { t: 'buildRoad', edge: legalRoadEdges(g.state, g.world, 'p0')[0]! }, 'p0');
       platz = legalSettlementVertices(g.state, g.world, 'p0', { setup: false })[0];
     }
-    expect(platz).toBeDefined();
-    const vorher = Object.values(p.sippe ?? {}).reduce((n, x) => n + (x ?? 0), 0);
     must(g, { t: 'buildSettlement', vertex: platz! }, 'p0');
+    expect(g.state.phase.t).toBe('main');
+
+    // Alle Doerfer bewohnt genug fuer eine Stadt.
+    const doerfer = Object.keys(g.state.buildings).filter((vk) => g.state.buildings[vk]!.owner === 'p0');
+    g.state.einwohner = Object.fromEntries(doerfer.map((vk) => [vk, 3]));
+    const vorher = Object.values(p.sippe ?? {}).reduce((n, x) => n + (x ?? 0), 0);
+    must(g, { t: 'buildCity', vertex: doerfer[0]! }, 'p0');
     expect(g.state.phase.t).toBe('draft');
     expect(g.state.draft!.source).toBe('gruendung');
+    const erste = [...g.state.draft!.options];
+    must(g, { t: 'chooseCard', card: erste[0]! }, 'p0');
+    expect(Object.values(g.state.players[0]!.sippe ?? {}).reduce((n, x) => n + (x ?? 0), 0)).toBe(vorher + 1);
+
+    // Die zweite Stadt im selben Zug: eine neue Auslage, nicht dieselbe.
+    must(g, { t: 'buildCity', vertex: doerfer[1]! }, 'p0');
+    expect(g.state.phase.t).toBe('draft');
+    expect(g.state.draft!.options).not.toEqual(erste);
     must(g, { t: 'chooseCard', card: g.state.draft!.options[0]! }, 'p0');
-    const nachher = Object.values(g.state.players[0]!.sippe ?? {}).reduce((n, x) => n + (x ?? 0), 0);
-    expect(nachher).toBe(vorher + 1);
+
+    // Die dritte Wahl in diesem Zug gibt es nicht - weder Gruendung noch Beute.
+    g.state.players[0]!.loot = 1;
+    expect(applyAction(g, { t: 'claimLoot' }, 'p0').ok).toBe(false);
   });
 
   it('ohne Ereignisse keine Gruendungswahl', () => {

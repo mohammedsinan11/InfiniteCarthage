@@ -206,6 +206,8 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
       const b = sippenBonusById(e.bonus);
       return `${who(state, e.player)} erreicht ${b?.name ?? e.bonus}: ${b?.text ?? ''}`;
     }
+    case 'sippenRuhm':
+      return `${sippenBonusById(e.bonus)?.name ?? 'Die Sippe'}: ${who(state, e.player)} gewinnt ${e.amount} Ruhm fuer die neue Stadt.`;
     case 'sippenBeute':
       return `${sippenBonusById(e.bonus)?.name ?? 'Die Sippe'}: ${who(state, e.player)} bekommt ${e.anzahl === 1 ? 'eine Kartenwahl' : `${e.anzahl} Kartenwahlen`}.`;
     case 'botCatchUp':

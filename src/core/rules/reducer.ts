@@ -283,7 +283,9 @@ export type GameEvent =
   | { t: 'bauGabe'; player: PlayerId; gained: Hand }
   /** Eine Sippenstufe ist erreicht (cards/sippen.ts). */
   | { t: 'sippeStufe'; player: PlayerId; bonus: string }
-  /** Sippenstufen bringen Kartenwahlen: fuer Lager, Ruinen, Staedte. */
+  /** Die Bau-Sippe bringt Ruhm fuer jede neue Stadt (rules/ruhm.ts verbucht ihn). */
+  | { t: 'sippenRuhm'; player: PlayerId; bonus: string; amount: number }
+  /** Sippenstufen bringen Kartenwahlen: fuer Lager und Ruinen. */
   | { t: 'sippenBeute'; player: PlayerId; bonus: string; anzahl: number }
   | BedrohungEvent
   | DiplomatieEvent
@@ -683,7 +685,14 @@ function enterDraft(
 ): void {
   // Mit salt zeigen mehrere Wahlen derselben Runde verschiedene Karten - etwa
   // zwei eingeloeste Beuten hintereinander. Ohne salt bleibt alles wie gehabt.
-  const runde = salt === 0 ? state.turn : state.turn * 64 + salt;
+  // Mit Ereignissen zieht jede Wahl mit ihrer eigenen Nummer (Spieltest 6:
+  // dieselbe Auslage kam im selben Zug sechsmal).
+  let runde = salt === 0 ? state.turn : state.turn * 64 + salt;
+  if (state.ereignisseAn) {
+    const w = state.wahlen ?? { gesamt: 0, zug: state.turn, imZug: 0 };
+    state.wahlen = { ...w, gesamt: w.gesamt + 1 };
+    runde = state.turn * 4096 + ((w.gesamt + 1) % 4096);
+  }
   const spieler = playerById(state, state.order[state.current]!);
   const owned = spieler ? [...spieler.cards, ...spieler.equipment] : [];
   const options = draftOptions(state.secretSeed, runde, source, owned);
@@ -716,12 +725,31 @@ function gruendung(s: GameState, actor: PlayerId, stadt: boolean, events: GameEv
     for (const r of RESOURCES) p.hand[r] += gained[r];
     events.push({ t: 'bauGabe', player: actor, gained });
   }
-  if (stadt && m.stadtBeute > 0) {
-    p.loot += m.stadtBeute;
-    events.push({ t: 'sippenBeute', player: actor, bonus: 'sippe:bau:4', anzahl: m.stadtBeute });
+  if (stadt && m.stadtRuhm > 0) {
+    events.push({ t: 'sippenRuhm', player: actor, bonus: 'sippe:bau:4', amount: m.stadtRuhm });
   }
-  const zahl = Object.values(s.buildings).filter((b) => b.owner === actor).length;
-  enterDraft(s, 'gruendung', events, 100 + zahl + (stadt ? 40 : 0));
+  // Eine Wahl nur fuer eine neue Stadt, und hoechstens WAHLEN_JE_ZUG
+  // Gruendungs- und Beutewahlen je Zug (Spieltest 6: 42 Wahlen in einer
+  // Partie, dreissig in einem Zug).
+  if (!stadt || !wahlFrei(s)) return;
+  wahlZaehlen(s);
+  enterDraft(s, 'gruendung', events);
+}
+
+/** So viele Gruendungs- und Beutewahlen gibt es je Zug; Fund und Markt zaehlen nicht mit. */
+export const WAHLEN_JE_ZUG = 2;
+
+/** Ist in diesem Zug noch eine Gruendungs- oder Beutewahl frei? Ohne Ereignisse immer. */
+export function wahlFrei(s: Pick<GameState, 'ereignisseAn' | 'wahlen' | 'turn'>): boolean {
+  if (!s.ereignisseAn) return true;
+  const w = s.wahlen;
+  return !w || w.zug !== s.turn || w.imZug < WAHLEN_JE_ZUG;
+}
+
+function wahlZaehlen(s: GameState): void {
+  if (!s.ereignisseAn) return;
+  const w = s.wahlen ?? { gesamt: 0, zug: s.turn, imZug: 0 };
+  s.wahlen = w.zug === s.turn ? { ...w, imZug: w.imZug + 1 } : { ...w, zug: s.turn, imZug: 1 };
 }
 
 /** Eine genommene Karte zaehlt fuer ihre Familie; eine neue Stufe wird gemeldet (cards/sippen.ts). */
@@ -1405,6 +1433,8 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
     case 'claimLoot': {
       if (phase.t !== 'main') return fail('Beute wird in der Bauphase eingeloest.');
       if (actorPlayer.loot <= 0) return fail('Keine Beute vorhanden.');
+      if (!wahlFrei(s)) return fail(`Mehr als ${WAHLEN_JE_ZUG} Kartenwahlen gibt es nicht je Zug - die Beute wartet bis zum naechsten.`);
+      wahlZaehlen(s);
       actorPlayer.loot -= 1;
       enterDraft(s, 'belohnung', events, 1 + actorPlayer.cards.length);
       break;

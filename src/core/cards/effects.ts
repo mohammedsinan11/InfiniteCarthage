@@ -39,7 +39,7 @@ export type Modifiers = {
   /** Sippenstufen (cards/sippen.ts): Markt billiger, Gaben und Wahlen beim Bauen, Lager und Ruinen. */
   marktRabatt: number;
   bauGabe: number;
-  stadtBeute: number;
+  stadtRuhm: number;
   lagerBeute: number;
   ruinenBeute: number;
 };
@@ -56,7 +56,7 @@ const leer = (): Modifiers => ({
   siegpunkte: [],
   marktRabatt: 0,
   bauGabe: 0,
-  stadtBeute: 0,
+  stadtRuhm: 0,
   lagerBeute: 0,
   ruinenBeute: 0,
 });
@@ -109,8 +109,8 @@ export function modifiersOf(cardIds: readonly string[]): Modifiers {
         case 'bauGabe':
           m.bauGabe += l.amount;
           break;
-        case 'stadtBeute':
-          m.stadtBeute += l.amount;
+        case 'stadtRuhm':
+          m.stadtRuhm += l.amount;
           break;
         case 'lagerBeute':
           m.lagerBeute += l.amount;

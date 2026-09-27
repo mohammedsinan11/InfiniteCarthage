@@ -243,6 +243,7 @@ function vervollstaendige(msg: ServerMsg): void {
     msg.state.bankZug ??= {};
     msg.state.einwohner ??= {};
     msg.state.marktZug ??= {};
+    msg.state.wahlen ??= null;
     msg.state.koop ??= false;
     msg.state.szenario ??= null;
     msg.state.szenarioErgebnis ??= null;

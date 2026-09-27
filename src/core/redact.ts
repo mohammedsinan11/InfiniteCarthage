@@ -148,6 +148,8 @@ export type PublicState = {
   /** Bankgeschaefte im laufenden Zug und Marktbesuche (rules/trade.ts) - fuer den angezeigten Kurs. */
   bankZug: NonNullable<GameState['bankZug']>;
   marktZug: NonNullable<GameState['marktZug']>;
+  /** Wie viele Kartenwahlen es gab, und wie viele in diesem Zug (rules/reducer.ts, wahlFrei). */
+  wahlen: GameState['wahlen'] | null;
   /** Die Kunde aus dem Land der letzten Jahreszeiten (core/kunde.ts). */
   berichte: NonNullable<GameState['berichte']>;
   /** Was aus den Fraktionen wurde (core/fraktionsleben.ts) - fuer alle sichtbar. */
@@ -262,6 +264,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     bankZug: state.bankZug ?? {},
     einwohner: state.einwohner ?? {},
     marktZug: state.marktZug ?? {},
+    wahlen: state.wahlen ?? null,
     koop: state.koop ?? false,
     ereignisseAn: state.ereignisseAn ?? false,
     szenario: state.szenario ?? null,

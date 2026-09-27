@@ -22,6 +22,7 @@ import { tradeRatio } from '../core/rules/trade';
 import { resourceName } from './log';
 import { limitFor } from '../core/rules/handlimit';
 import { verderbZahl } from '../core/verderb';
+import { wahlFrei } from '../core/rules/reducer';
 
 export type Rat = { text: string; ort?: { q: number; r: number } };
 
@@ -39,7 +40,7 @@ export function ratschlag(state: PublicState, world: World, you: string): Rat | 
         text: `Du haeltst ${karten} Karten, erlaubt sind ${grenze}: baue${markt ? ', geh auf den Markt (im Bankhandel)' : ''} oder tausche, sonst ${state.ereignisseAn ? `verderben am Zugende ${verderbZahl(karten, grenze)}` : 'nehmen Pluenderer die Haelfte'}.`,
       };
     }
-    if (me.loot > 0) return { text: 'Loese deine Beute ein: eine Kartenwahl (Knopf Beute unten).' };
+    if (me.loot > 0 && wahlFrei({ ...state, wahlen: state.wahlen ?? undefined })) return { text: 'Loese deine Beute ein: eine Kartenwahl (Knopf Beute unten).' };
   }
   let a;
   try {

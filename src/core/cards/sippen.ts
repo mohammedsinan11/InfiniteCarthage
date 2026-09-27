@@ -106,7 +106,7 @@ export const SIPPEN_BONI: readonly (Card & { sippe: Sippe; ab: number })[] = [
   { id: 'sippe:handel:2', sippe: 'handel', ab: 2, name: 'Haendlersippe', rarity: 'selten', text: 'Der Markt kostet dich eine Karte weniger.', lasting: { t: 'marktRabatt', amount: 1 } },
   { id: 'sippe:handel:4', sippe: 'handel', ab: 4, name: 'Handelshaus', rarity: 'episch', text: 'Du darfst 3 Karten mehr halten, und deine Haefen bleiben im Sturm offen.', lasting: [{ t: 'handLimit', amount: 3 }, { t: 'stormPorts' }] },
   { id: 'sippe:bau:2', sippe: 'bau', ab: 2, name: 'Bauhuette', rarity: 'selten', text: 'Jedes neue Dorf und jede neue Stadt bringt einen zufaelligen Rohstoff.', lasting: { t: 'bauGabe', amount: 1 } },
-  { id: 'sippe:bau:4', sippe: 'bau', ab: 4, name: 'Dombaumeister', rarity: 'episch', text: 'Jede neue Stadt bringt eine Kartenwahl mehr.', lasting: { t: 'stadtBeute', amount: 1 } },
+  { id: 'sippe:bau:4', sippe: 'bau', ab: 4, name: 'Dombaumeister', rarity: 'episch', text: 'Jede neue Stadt bringt 2 Ruhm.', lasting: { t: 'stadtRuhm', amount: 2 } },
   { id: 'sippe:krieg:2', sippe: 'krieg', ab: 2, name: 'Wehrsippe', rarity: 'selten', text: 'Pluenderer nehmen dir eine Karte weniger.', lasting: { t: 'schutz', amount: 1 } },
   { id: 'sippe:krieg:4', sippe: 'krieg', ab: 4, name: 'Kriegsherr', rarity: 'episch', text: 'Jedes zerstoerte Lager bringt eine Kartenwahl mehr.', lasting: { t: 'lagerBeute', amount: 1 } },
   { id: 'sippe:wildnis:2', sippe: 'wildnis', ab: 2, name: 'Pfadfinder', rarity: 'selten', text: 'Jede erkundete Ruine bringt eine Kartenwahl mehr.', lasting: { t: 'ruinenBeute', amount: 1 } },

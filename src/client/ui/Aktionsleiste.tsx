@@ -37,7 +37,7 @@ import { REICHSBAU_NAME, REICHSBAU_ZWECK } from '../../core/rules/reich';
 import { COST_REICHSBAU } from '../../core/rules/costs';
 import type { Cost } from '../../core/rules/costs';
 import type { Action } from '../../core/rules/reducer';
-import { marktPreisFuer } from '../../core/rules/reducer';
+import { marktPreisFuer, wahlFrei } from '../../core/rules/reducer';
 import type { PublicPlayer, PublicState } from '../../core/redact';
 import type { DevCardType, Hand, HeldZweig } from '../../core/state';
 import { ZWEIGE, ZWEIG_NAME, ZWEIG_ZWECK } from '../../core/rules/zweig';
@@ -652,6 +652,8 @@ export function Aktionsleiste({
     Object.values(state.tuerme ?? {}).some((t) => t.owner === me?.id) ||
     Object.values(state.roads).some((id) => id === me?.id);
   const umschalten = (t: 'handel' | 'karten') => () => setTafel((alt) => (alt === t ? null : t));
+  // Hoechstens zwei Gruendungs- und Beutewahlen je Zug (rules/reducer.ts, wahlFrei).
+  const beuteFrei = wahlFrei({ ...state, wahlen: state.wahlen ?? undefined });
 
   /*
    * Ein gewaehlter Bau, der nicht mehr bezahlbar ist, verfaellt (Spieltest 4:
@@ -952,7 +954,16 @@ export function Aktionsleiste({
           onClick={umschalten('karten')}
         />
         {(me?.loot ?? 0) > 0 && (
-          <DockKnopf titel="Beute" symbol={<SymBeute />} zahl={me?.loot} leuchtet hops={bauen && (me?.loot ?? 0) > 0} darf={bauen} tip="Beute einloesen: eine Kartenwahl" onClick={() => act({ t: 'claimLoot' })} />
+          <DockKnopf
+            titel="Beute"
+            symbol={<SymBeute />}
+            zahl={me?.loot}
+            leuchtet
+            hops={bauen && beuteFrei && (me?.loot ?? 0) > 0}
+            darf={bauen && beuteFrei}
+            tip={beuteFrei ? 'Beute einloesen: eine Kartenwahl' : 'Zwei Kartenwahlen je Zug - die Beute wartet bis zum naechsten.'}
+            onClick={() => act({ t: 'claimLoot' })}
+          />
         )}
       </div>
       {hinweis && <div className="dock-hinweis">{hinweis}</div>}

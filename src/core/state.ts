@@ -592,6 +592,12 @@ export type GameState = {
   bankZug?: Record<PlayerId, { turn: number; n: number }>;
   /** Wann jeder zuletzt auf dem Markt war - einmal je Zug (MARKT_PREIS). */
   marktZug?: Record<PlayerId, number>;
+  /**
+   * Kartenwahlen (cards/sippen.ts, Spieltest 6): wie viele es insgesamt gab -
+   * jede zieht mit einem eigenen Salz, so wiederholt sich keine Auslage im
+   * selben Zug - und wie viele Gruendungs- und Beutewahlen in diesem Zug.
+   */
+  wahlen?: { gesamt: number; zug: number; imZug: number };
   /** Was in der laufenden Jahreszeit geschah (core/kunde.ts). */
   saisonBuch?: SaisonBuch;
   /** Die Berichte der letzten Jahreszeiten, "Kunde aus dem Land" (core/kunde.ts). */

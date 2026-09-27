@@ -86,8 +86,8 @@ export type Lasting =
   | { t: 'marktRabatt'; amount: number }
   /** Jedes neue Dorf und jede neue Stadt bringt so viele zufaellige Rohstoffe. */
   | { t: 'bauGabe'; amount: number }
-  /** Jede neue Stadt bringt so viele Kartenwahlen mehr. */
-  | { t: 'stadtBeute'; amount: number }
+  /** Jede neue Stadt bringt so viel Ruhm. */
+  | { t: 'stadtRuhm'; amount: number }
   /** Jedes zerstoerte Lager bringt so viele Kartenwahlen mehr. */
   | { t: 'lagerBeute'; amount: number }
   /** Jede erkundete Ruine bringt so viele Kartenwahlen mehr. */
@@ -119,6 +119,12 @@ export type Card = {
   lasting?: Lasting | readonly Lasting[];
   /** Eine oder mehrere Wirkungen einer ausspielbaren Taktikkarte. */
   tactic?: TacticEffect | readonly TacticEffect[];
+  /**
+   * Nur als Beute (Ruinen, Lager, Auftraege) - nie im Fund, auf dem Markt oder
+   * bei einer Gruendung. Fuer die grossen Rohstoffkarten (Spieltest 6: die
+   * Grosse Scheune kam staendig und war immer richtig).
+   */
+  nurBeute?: boolean;
 };
 
 export const cardKind = (c: Pick<Card, 'kind'>): CardKind => c.kind ?? 'reich';

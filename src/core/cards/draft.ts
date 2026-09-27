@@ -77,14 +77,15 @@ export function draftOptions(
    * Bots: Runde 40 statt 60 bis 15 Punkte).
    */
   const gruendung = source === 'gruendung';
+  const erlaubt = (c: Card) => !c.nurBeute || source === 'belohnung';
   const bleibt = (c: Card) => dauerwirkungen(c).length > 0 || cardKind(c) === 'taktik';
-  const alle = CARDS.filter((c) =>
+  const alle = CARDS.filter(erlaubt).filter((c) =>
     gruendung ? bleibt(c) && !(istEinzigartig(c) && besitzt.has(c.id)) : !istEinzigartig(c) || !besitzt.has(c.id) || wiederholbar(c),
   );
   // Reicht der Topf nicht fuer eine Auslage (fast alles schon im Besitz), gilt der gewoehnliche.
   const verfuegbar =
     gruendung && alle.length < DRAFT_SIZE
-      ? CARDS.filter((c) => !istEinzigartig(c) || !besitzt.has(c.id) || wiederholbar(c))
+      ? CARDS.filter(erlaubt).filter((c) => !istEinzigartig(c) || !besitzt.has(c.id) || wiederholbar(c))
       : alle;
   // Eine Stufe kommt in Frage, sobald sie EINE Karte hat - fehlende Plaetze
   // fuellt weiter unten die naechstniedrigere. Frueher waren es drei, und mit
