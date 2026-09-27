@@ -1621,7 +1621,7 @@ export function Game() {
               </button>
             )}
             {/* Gesammeltes - der Knopf steht rechts neben dem Wuerfel (ui/Inventar.tsx). */}
-            {hand && <Inventar inventar={me?.inventar ?? {}} />}
+            {hand && Object.values(me?.inventar ?? {}).some((n) => n > 0) && <Inventar inventar={me?.inventar ?? {}} />}
           </div>
 
           {/*
@@ -1637,7 +1637,13 @@ export function Game() {
               </div>
             )}
 
-          {you && phase.t !== 'setup' && phase.t !== 'hauswahl' && (
+          {/*
+            Die Zeitleiste weicht allem, was sich unten oeffnet - Tafeln,
+            Klappen, Befehle, Handel (Spieltest 4: sie lag ueber dem Markt,
+            der Kartentafel und der Befehlstafel). Die Klappen der Leiste
+            blendet styles.css aus, sie leben in der Aktionsleiste.
+          */}
+          {you && phase.t !== 'setup' && phase.t !== 'hauswahl' && tafel === null && kandidaten.length === 0 && state.trade === null && lagerTafel === null && (
             <Zeitleiste
               turn={state.turn}
               rundenLimit={state.rundenLimit ?? null}

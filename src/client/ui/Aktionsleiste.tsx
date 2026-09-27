@@ -31,6 +31,8 @@ import {
   canAfford,
 } from '../../core/rules/costs';
 import { haefenZu } from '../../core/rules/trade';
+import { legalCityVertices } from '../../core/rules/placement';
+import { stadtReif } from '../../core/bevoelkerung';
 import { REICHSBAU_NAME, REICHSBAU_ZWECK } from '../../core/rules/reich';
 import { COST_REICHSBAU } from '../../core/rules/costs';
 import type { Cost } from '../../core/rules/costs';
@@ -64,15 +66,6 @@ export type BuildMode =
 export const reichArtVon = (m: BuildMode): string | null =>
   typeof m === 'string' && m.startsWith('reich:') ? m.slice(6) : null;
 
-/**
- * Bauen als eigene Zeile (Entwurf V2): "Bauen" tauscht die Leiste gegen
- * Strasse, Dorf, Stadt, Turm und - wenn moeglich - Hauptstadt; ein Pfeil fuehrt
- * zurueck. Auf dem Handy passte die lange Leiste nicht mehr in eine Reihe.
- * Vorerst aus: die Leiste war noch nicht so breit, dass es sich lohnte - und in
- * der Bauzeile fehlten Beute, Handel und Zug Ende, solange sie offen stand.
- * true schaltet die Bauzeile wieder ein.
- */
-export const BAU_ZEILE = false;
 
 const kostenText = (c: Cost): string =>
   RESOURCES.filter((r) => (c[r] ?? 0) > 0)
@@ -202,13 +195,6 @@ const SymZugEnde = () => (
   </Symbol>
 );
 
-const SymBauen = () => (
-  <Symbol>
-    <path d="M4 17 L11 10" stroke="#2a2016" strokeWidth={4} strokeLinecap="round" />
-    <path d="M4 17 L11 10" stroke="#8a6a45" strokeWidth={2} strokeLinecap="round" />
-    <path d="M8 5 L13 2 L18 7 L15 12 Z" fill="#b9b3a6" stroke="#2a2016" strokeWidth={1.5} strokeLinejoin="round" />
-  </Symbol>
-);
 /** Die drei Ernannten: Schwert, Kelch, Waage - und der Rueckweg. */
 const SymZweig = ({ zweig }: { zweig: HeldZweig | 'zurueck' }) => (
   <Symbol>
@@ -417,9 +403,12 @@ function KartenTafel({
   einheiten,
   darfTaktik,
   kannSpielen,
+  kaufen,
   act,
   onZu,
 }: {
+  /** Eine neue Karte kaufen - frueher ein eigener Knopf in der Leiste. */
+  kaufen: { darf: boolean; hand: Hand };
   anzahl: Map<DevCardType, number>;
   taktiken: string[];
   einheiten: PublicState['units'];
@@ -449,6 +438,18 @@ function KartenTafel({
 
   return (
     <Tafel titel="Karten" onZu={onZu}>
+      <div className="dock-karte dock-kaufen">
+        <SymKarte />
+        <span className="dock-karte-name">Neue Karte</span>
+        <Kosten c={COST_DEV} />
+        <button
+          disabled={!kaufen.darf || !canAfford(kaufen.hand, COST_DEV)}
+          title={`Entwicklungskarte kaufen: ${kostenText(COST_DEV)} - Ritter, Fortschritt oder ein Siegpunkt`}
+          onClick={() => act({ t: 'buyDev' })}
+        >
+          Kaufen
+        </button>
+      </div>
       {[...anzahl.keys()].map((t) => {
         switch (t) {
           case 'knight':
@@ -565,14 +566,14 @@ export function Aktionsleiste({
   // Welcher Ernannte gerade zur Bestaetigung ansteht (rules/zweig.ts).
   const [ernennen, setErnennen] = useState<HeldZweig | null>(null);
 
-  /** Steht die Bauzeile statt der Leiste? (BAU_ZEILE) */
-  const [bauOffen, setBauOffen] = useState(false);
+  /** Welche Klappe offen ist: Befestigen oder Truppe. */
+  const [klappe, setKlappe] = useState<null | 'befestigen' | 'truppe'>(null);
 
   // Nicht am Zug: offene Tafeln zu, die Bauzeile auch, ein halb gewaehlter Bau verfaellt.
   useEffect(() => {
     if (!isMine) {
       setTafel(null);
-      setBauOffen(false);
+      setKlappe(null);
     }
   }, [isMine]);
   useEffect(() => {
@@ -606,7 +607,14 @@ export function Aktionsleiste({
             ? 'Bauplatz auf der Karte waehlen'
             : '';
 
-  const bau = (m: Exclude<BuildMode, null>) => () => setMode(mode === m ? null : m);
+  const bau = (m: Exclude<BuildMode, null>) => () => {
+    setKlappe(null);
+    setMode(mode === m ? null : m);
+  };
+  /** Aus einer Klappe waehlen: der Bau ist gewaehlt, die Klappe geht zu. */
+  const waehle = bau;
+  // Kein Dorf reif (core/bevoelkerung.ts)? Dann gibt es nichts auszubauen.
+  const stadtMoeglich = me ? legalCityVertices(state, me.id).some((vk) => stadtReif(state, vk)) : false;
   // Auf eigener Asche kostet eine Strasse nur Holz (rules/feuer.ts).
   const eigeneAsche = Object.values(state.asche).some((id) => id === me?.id);
   const strasseGeht = canAfford(hand, COST_ROAD) || (eigeneAsche && canAfford(hand, COST_REBUILD_ROAD));
@@ -628,6 +636,54 @@ export function Aktionsleiste({
     Object.values(state.tuerme ?? {}).some((t) => t.owner === me?.id) ||
     Object.values(state.roads).some((id) => id === me?.id);
   const umschalten = (t: 'handel' | 'karten') => () => setTafel((alt) => (alt === t ? null : t));
+
+  /*
+   * Ein gewaehlter Bau, der nicht mehr bezahlbar ist, verfaellt (Spieltest 4:
+   * Turm gewaehlt, das Holz in einen Bogen gesteckt - der Turm blieb gewaehlt
+   * und liess sich nicht mehr abwaehlen).
+   */
+  const modusKosten: Cost | null =
+    mode === 'road'
+      ? eigeneAsche && !canAfford(hand, COST_ROAD)
+        ? COST_REBUILD_ROAD
+        : COST_ROAD
+      : mode === 'settlement'
+        ? COST_SETTLEMENT
+        : mode === 'city'
+          ? COST_CITY
+          : mode === 'tower'
+            ? COST_TOWER
+            : mode === 'mauer'
+              ? COST_MAUER
+              : mode === 'tor'
+                ? COST_TOR
+                : mode?.startsWith('reich:')
+                  ? (COST_REICHSBAU[mode.slice(6) as keyof typeof COST_REICHSBAU] ?? null)
+                  : null;
+  const modusBezahlbar = modusKosten === null || canAfford(hand, modusKosten);
+  useEffect(() => {
+    if (mode !== null && phase.t === 'main' && !modusBezahlbar) setMode(null);
+  }, [mode, modusBezahlbar, phase.t]);
+  // Esc: erst die Klappe zu, dann den gewaehlten Bau ab.
+  useEffect(() => {
+    if (klappe === null && mode === null) return;
+    const taste = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (klappe !== null) setKlappe(null);
+      else setMode(null);
+    };
+    window.addEventListener('keydown', taste);
+    return () => window.removeEventListener('keydown', taste);
+  }, [klappe, mode]);
+  // Ein Klick neben die Klappe schliesst sie.
+  useEffect(() => {
+    if (klappe === null) return;
+    const klick = (e: PointerEvent) => {
+      if (!(e.target as Element | null)?.closest?.('.dock-klappe')) setKlappe(null);
+    };
+    window.addEventListener('pointerdown', klick);
+    return () => window.removeEventListener('pointerdown', klick);
+  }, [klappe]);
 
   return (
     <div className="dock">
@@ -661,39 +717,20 @@ export function Aktionsleiste({
           einheiten={eigeneEinheiten}
           darfTaktik={isMine && phase.t === 'main'}
           kannSpielen={kannSpielen}
+          kaufen={{ darf: bauen, hand }}
           act={act}
           onZu={() => setTafel(null)}
         />
       )}
 
       <div className="dock-reihe">
-        {BAU_ZEILE && !bauOffen && (
-          <>
-            <DockKnopf
-              titel="Bauen"
-              symbol={<SymBauen />}
-              darf
-              leuchtet={hauptstadtBereit}
-              tip={hauptstadtBereit ? 'Bauen - eine Hauptstadt ist moeglich' : 'Bauen: Strasse, Dorf, Stadt, Turm'}
-              onClick={() => setBauOffen(true)}
-            />
-            <span className="dock-trenner" />
-          </>
-        )}
-        {BAU_ZEILE && bauOffen && (
-          <button
-            className="dock-knopf dock-zurueck"
-            title="Zurueck zur Leiste"
-            onClick={() => {
-              setBauOffen(false);
-              setMode(null);
-            }}
-          >
-            &lsaquo;
-          </button>
-        )}
-        {(!BAU_ZEILE || bauOffen) && (
-          <>
+        {/*
+          Die feste Leiste: sieben Plaetze (Spieltest 4 - "zu viele Knoepfe").
+          Was selten gebraucht wird, liegt in zwei Klappen: Befestigen (Turm,
+          Palisade, Tor) und Truppe (Ritter, Bogen). Die Entwicklungskarte
+          kauft man in der Kartentafel. Beute und Hauptstadt erscheinen nur,
+          wenn es sie gibt.
+        */}
         <DockKnopf
           titel="Strasse"
           symbol={<SymStrasse />}
@@ -703,34 +740,19 @@ export function Aktionsleiste({
           tip={`Strasse: ${kostenText(COST_ROAD)}${eigeneAsche ? ` - auf eigener Asche nur ${kostenText(COST_REBUILD_ROAD)}` : ''}`}
           onClick={bau('road')}
         />
-        <DockKnopf titel="Dorf" symbol={<SymSiedlung />} kosten={COST_SETTLEMENT} gewaehlt={mode === 'settlement'} darf={bauen && canAfford(hand, COST_SETTLEMENT)} onClick={bau('settlement')} />
-        <DockKnopf titel="Stadt" symbol={<SymStadt />} kosten={COST_CITY} gewaehlt={mode === 'city'} darf={bauen && canAfford(hand, COST_CITY)} tip={`Ein Dorf zur Stadt ausbauen: doppelter Ertrag, 2 Siegpunkte. ${kostenText(COST_CITY)}${state.ereignisseAn ? ' - das Dorf braucht 2 Einwohner.' : ''}`} onClick={bau('city')} />
+        <DockKnopf titel="Dorf" symbol={<SymSiedlung />} kosten={COST_SETTLEMENT} gewaehlt={mode === 'settlement'} darf={bauen && canAfford(hand, COST_SETTLEMENT)} tip={`Dorf: ${kostenText(COST_SETTLEMENT)}`} onClick={bau('settlement')} />
         <DockKnopf
-          titel="Turm"
-          symbol={<SymTurm />}
-          kosten={COST_TOWER}
-          gewaehlt={mode === 'tower'}
-          darf={bauen && turmPlatz && canAfford(hand, COST_TOWER)}
-          tip={`Wachturm auf eine freie Ecke an einer eigenen Strasse oder im eigenen Einflussbereich - ohne Abstandsregel. Sieht weit, auch nachts, und laesst Brandstifter nicht an Haeuser und Strassen nebenan. ${kostenText(COST_TOWER)}`}
-          onClick={bau('tower')}
-        />
-        <DockKnopf
-          titel="Palisade"
-          symbol={<SymPalisade />}
-          kosten={COST_MAUER}
-          gewaehlt={mode === 'mauer'}
-          darf={bauen && palisadenPlatz && canAfford(hand, COST_MAUER)}
-          tip={`Palisade auf eine freie Kante im eigenen Einflussbereich. Haelt fremde Einheiten auf - nur durch ein Tor kommen sie durch. ${kostenText(COST_MAUER)}`}
-          onClick={bau('mauer')}
-        />
-        <DockKnopf
-          titel="Tor"
-          symbol={<SymTor />}
-          kosten={COST_TOR}
-          gewaehlt={mode === 'tor'}
-          darf={bauen && palisadenPlatz && canAfford(hand, COST_TOR)}
-          tip={`Ein Tor statt eines Wandstuecks: derselbe Platz, aber jeder kommt durch - auch fremde Einheiten. ${kostenText(COST_TOR)}`}
-          onClick={bau('tor')}
+          titel="Stadt"
+          symbol={<SymStadt />}
+          kosten={COST_CITY}
+          gewaehlt={mode === 'city'}
+          darf={bauen && canAfford(hand, COST_CITY) && stadtMoeglich}
+          tip={
+            stadtMoeglich || !state.ereignisseAn
+              ? `Ein Dorf zur Stadt ausbauen: doppelter Ertrag, 2 Siegpunkte. ${kostenText(COST_CITY)}${state.ereignisseAn ? ' - das Dorf braucht 2 Einwohner.' : ''}`
+              : 'Noch kein Dorf hat 2 Einwohner - sie wachsen jede grosse Runde (die Figuren unter dem Dorf).'
+          }
+          onClick={bau('city')}
         />
         {hauptstadtBereit && (
           <DockKnopf
@@ -743,10 +765,88 @@ export function Aktionsleiste({
             onClick={() => onHauptstadt?.()}
           />
         )}
+        <span className="dock-trenner" />
+        <div className="dock-klappe">
+          <DockKnopf
+            titel="Befestigen"
+            symbol={<SymTurm />}
+            gewaehlt={klappe === 'befestigen' || mode === 'tower' || mode === 'mauer' || mode === 'tor'}
+            darf={bauen}
+            tip="Turm, Palisade und Tor"
+            onClick={() => setKlappe((k) => (k === 'befestigen' ? null : 'befestigen'))}
+          />
+          {klappe === 'befestigen' && (
+            <div className="dock-aufklapp">
+              <DockKnopf
+                titel="Turm"
+                symbol={<SymTurm />}
+                kosten={COST_TOWER}
+                gewaehlt={mode === 'tower'}
+                darf={bauen && turmPlatz && canAfford(hand, COST_TOWER)}
+                tip={`Wachturm auf eine freie Ecke an einer eigenen Strasse oder im eigenen Einflussbereich - ohne Abstandsregel. Sieht weit, auch nachts, und laesst Brandstifter nicht an Haeuser und Strassen nebenan. ${kostenText(COST_TOWER)}`}
+                onClick={waehle('tower')}
+              />
+              <DockKnopf
+                titel="Palisade"
+                symbol={<SymPalisade />}
+                kosten={COST_MAUER}
+                gewaehlt={mode === 'mauer'}
+                darf={bauen && palisadenPlatz && canAfford(hand, COST_MAUER)}
+                tip={`Palisade auf eine freie Kante im eigenen Einflussbereich. Haelt fremde Einheiten auf - nur durch ein Tor kommen sie durch. ${kostenText(COST_MAUER)}`}
+                onClick={waehle('mauer')}
+              />
+              <DockKnopf
+                titel="Tor"
+                symbol={<SymTor />}
+                kosten={COST_TOR}
+                gewaehlt={mode === 'tor'}
+                darf={bauen && palisadenPlatz && canAfford(hand, COST_TOR)}
+                tip={`Ein Tor statt eines Wandstuecks: derselbe Platz, aber jeder kommt durch - auch fremde Einheiten. ${kostenText(COST_TOR)}`}
+                onClick={waehle('tor')}
+              />
+            </div>
+          )}
+        </div>
+        <div className="dock-klappe">
+          <DockKnopf
+            titel="Truppe"
+            symbol={<SymRitter />}
+            gewaehlt={klappe === 'truppe'}
+            darf={bauen}
+            tip="Ritter oder Bogenschuetzen anwerben"
+            onClick={() => setKlappe((k) => (k === 'truppe' ? null : 'truppe'))}
+          />
+          {klappe === 'truppe' && (
+            <div className="dock-aufklapp">
+              <DockKnopf
+                titel="Ritter"
+                symbol={<SymRitter />}
+                kosten={COST_KNIGHT}
+                darf={bauen && canAfford(hand, COST_KNIGHT)}
+                tip={`Ein Ritter tritt an einer deiner Siedlungen oder Burgfesten an: ${kostenText(COST_KNIGHT)}${state.ereignisseAn ? ' - er kommt aus einer Siedlung mit 2 Einwohnern.' : ''}`}
+                onClick={() => {
+                  act({ t: 'recruitKnight' });
+                  setKlappe(null);
+                }}
+              />
+              <DockKnopf
+                titel="Bogen"
+                symbol={<SymBogen />}
+                kosten={COST_ARCHER}
+                darf={bauen && canAfford(hand, COST_ARCHER)}
+                tip={`Ein Bogenschuetze tritt an einer deiner Siedlungen oder Burgfesten an. Schiesst auf Feinde nebenan, neben einem Wachturm zwei Felder weit: ${kostenText(COST_ARCHER)}`}
+                onClick={() => {
+                  act({ t: 'recruitArcher' });
+                  setKlappe(null);
+                }}
+              />
+            </div>
+          )}
+        </div>
         {/*
-          Phase 2: die drei Reichsbauten. Sie erscheinen erst, wenn ein
-          Koenigssitz steht (rules/reich.ts, hatKoenigssitz) - vorher gibt es
-          kein Reich, in dem sie stehen koennten.
+          Phase 2: die drei Reichsbauten, sobald ein Koenigssitz steht
+          (rules/reich.ts) - und die einmalige Ernennung (rules/zweig.ts), in
+          zwei Schritten, weil sie endgueltig ist.
         */}
         {reichOffen && (
           <>
@@ -765,13 +865,6 @@ export function Aktionsleiste({
             ))}
           </>
         )}
-        {/*
-          Phase 2: der Held, den der Koenig ernennt (rules/zweig.ts). Sichtbar,
-          solange die Wahl offen ist - danach steht er auf der Karte.
-
-          Zwei Schritte, weil die Wahl ENDGUELTIG ist: ein Fehlklick soll nicht
-          die groesste Entscheidung der Partie treffen.
-        */}
         {reichOffen && !me?.ernannt && (
           <>
             <span className="dock-trenner" />
@@ -810,25 +903,21 @@ export function Aktionsleiste({
             )}
           </>
         )}
-          </>
-        )}
-        {(!BAU_ZEILE || !bauOffen) && (
-          <>
-        {!BAU_ZEILE && <span className="dock-trenner" />}
-        <DockKnopf titel="Karte" symbol={<SymKarte />} kosten={COST_DEV} darf={bauen && canAfford(hand, COST_DEV)} tip={`Entwicklungskarte kaufen (${state.deckLeft} im Stapel): ${kostenText(COST_DEV)}`} onClick={() => act({ t: 'buyDev' })} />
-        <DockKnopf titel="Ritter" symbol={<SymRitter />} kosten={COST_KNIGHT} darf={bauen && canAfford(hand, COST_KNIGHT)} tip={`Ein Ritter tritt an einer deiner Siedlungen oder Burgfesten an: ${kostenText(COST_KNIGHT)}`} onClick={() => act({ t: 'recruitKnight' })} />
-        <DockKnopf titel="Bogen" symbol={<SymBogen />} kosten={COST_ARCHER} darf={bauen && canAfford(hand, COST_ARCHER)} tip={`Ein Bogenschuetze tritt an einer deiner Siedlungen oder Burgfesten an. Schiesst auf Feinde nebenan, neben einem Wachturm zwei Felder weit: ${kostenText(COST_ARCHER)}`} onClick={() => act({ t: 'recruitArcher' })} />
         <span className="dock-trenner" />
-        {/* Handel steht jetzt oben als Karte neben der Hand (scenes/Game.tsx). */}
-        <DockKnopf titel="Karten" symbol={<SymKarten />} zahl={offen.length + taktiken.length} gewaehlt={tafel === 'karten'} darf={offen.length + taktiken.length > 0} tip="Deine Entwicklungs- und Taktikkarten" onClick={umschalten('karten')} />
-        {/* Beute rechts neben Handel und Karten - dort, wo Karten ohnehin hingehen. */}
+        <DockKnopf
+          titel="Karten"
+          symbol={<SymKarten />}
+          zahl={offen.length + taktiken.length}
+          gewaehlt={tafel === 'karten'}
+          darf={bauen || offen.length + taktiken.length > 0}
+          tip="Deine Entwicklungs- und Taktikkarten - und eine neue kaufen"
+          onClick={umschalten('karten')}
+        />
         {(me?.loot ?? 0) > 0 && (
           <DockKnopf titel="Beute" symbol={<SymBeute />} zahl={me?.loot} leuchtet hops={bauen && (me?.loot ?? 0) > 0} darf={bauen} tip="Beute einloesen: eine Kartenwahl" onClick={() => act({ t: 'claimLoot' })} />
         )}
         {state.order.length > 1 && (
           <DockKnopf titel="Zug Ende" symbol={<SymZugEnde />} darf={bauen} tip="Zug beenden" onClick={() => act({ t: 'endTurn' })} />
-        )}
-          </>
         )}
       </div>
       {hinweis && <div className="dock-hinweis">{hinweis}</div>}

@@ -2962,11 +2962,33 @@ em.off {
     animation: none;
   }
 }
-/* Bauzeile (Aktionsleiste, BAU_ZEILE): der schmale Pfeil zurueck zur Leiste. */
-.dock-knopf.dock-zurueck {
-  width: 26px;
-  justify-content: center;
-  font-size: 16px;
+/*
+ * Die Klappen Befestigen und Truppe (Spieltest 4: sieben feste Knoepfe statt
+ * zwoelf). Die Klappe selbst ist nicht positioniert: ihr Inhalt haengt an der
+ * ganzen Leiste (.dock) und steht ueber ihr wie die Tafeln - so schneidet ihn
+ * die Leiste auch dann nicht ab, wenn sie auf dem Handy scrollt.
+ */
+.dock-klappe {
+  display: flex;
+}
+.dock-aufklapp {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+  z-index: 3;
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  background: rgba(23, 18, 12, 0.97);
+  border: 2px solid var(--line-bright);
+}
+.dock-kaufen {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
 }
 
 /* --- Hauptstadt: Krone ueber dem Feld und die Ausbau-Tafel --- PLATZHALTER (ASSETS.md) */
@@ -5590,6 +5612,9 @@ em.off {
 }
 
 /* Zeitleiste (ui/Zeitleiste.tsx): die naechsten sechs Runden ueber der Bauleiste. */
+.main:has(.dock-aufklapp) .zeitleiste {
+  display: none;
+}
 .zeitleiste {
   position: absolute;
   left: 50%;

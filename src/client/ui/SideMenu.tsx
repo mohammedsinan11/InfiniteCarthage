@@ -1254,21 +1254,22 @@ export function SideMenu({
               </ul>
             )}
 
-            <Kopf titel={`Ausruestung${equipment.length > 0 ? ` · ${equipment.length}` : ''}`} hilfe="Ausruestung ist ein eigener Kartenbereich fuer den kuenftigen Abenteuer- und Heldenzweig." />
-            {equipment.length === 0 ? (
-              <p className="menu-leer">Noch keine.</p>
-            ) : (
-              <ul className="menu-kartenraster">
-                {kartenStapel(equipment).map(({ karte, anzahl }) => (
-                  <li key={karte.id}>
-                    <button className={`menu-karte-kachel selt-${karte.rarity}`} title={karte.text}>
-                      <KartenBild karte={karte} klein />
-                      <span className="menu-karte-kachel-name">{karte.name}</span>
-                      {anzahl > 1 && <span className="menu-karte-anzahl">×{anzahl}</span>}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+            {/* Erst da, wenn es etwas gibt (Spieltest 4: ein leerer Platzhalter mehr). */}
+            {equipment.length > 0 && (
+              <>
+                <Kopf titel={`Ausruestung · ${equipment.length}`} hilfe="Ausruestung ist ein eigener Kartenbereich fuer den Helden." />
+                <ul className="menu-kartenraster">
+                  {kartenStapel(equipment).map(({ karte, anzahl }) => (
+                    <li key={karte.id}>
+                      <button className={`menu-karte-kachel selt-${karte.rarity}`} title={karte.text}>
+                        <KartenBild karte={karte} klein />
+                        <span className="menu-karte-kachel-name">{karte.name}</span>
+                        {anzahl > 1 && <span className="menu-karte-anzahl">×{anzahl}</span>}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
 
           </>
