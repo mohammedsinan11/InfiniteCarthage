@@ -34,8 +34,16 @@ export const SIPPE_NAME: Record<Sippe, string> = {
   wildnis: 'Wildnis',
 };
 
-/** Ab so vielen Karten einer Familie wirkt ihre erste, dann ihre zweite Stufe. */
-export const SIPPEN_STUFEN = [2, 4] as const;
+/** Ab so vielen Karten einer Familie wirkt ihre erste, zweite, dritte Stufe. */
+export const SIPPEN_STUFEN = [2, 4, 6] as const;
+
+/**
+ * Nur die zwei staerksten Familien wirken (Spieltest 6: zur Mitte der Partie
+ * standen alle fuenf auf voller Stufe, und die Leiste war nur noch Rauschen).
+ * Wer eine dritte gross zieht, laesst eine andere ruhen - eine Wahl, keine
+ * Sammlung.
+ */
+export const WIRKENDE_SIPPEN = 2;
 
 /** Zu welcher Familie jede Karte gehoert. Unbekannte zaehlen nirgends. */
 export const SIPPE_VON: Record<string, Sippe> = {
@@ -104,21 +112,46 @@ export const SIPPEN_BONI: readonly (Card & { sippe: Sippe; ab: number })[] = [
   { id: 'sippe:ernte:2', sippe: 'ernte', ab: 2, name: 'Bauernsippe', rarity: 'selten', text: 'Felder liefern dir +1 Getreide.', lasting: { t: 'terrainBonus', terrain: 'field', amount: 1 } },
   { id: 'sippe:ernte:4', sippe: 'ernte', ab: 4, name: 'Grosse Ernte', rarity: 'episch', text: 'Weiden liefern dir +1 Wolle.', lasting: { t: 'terrainBonus', terrain: 'pasture', amount: 1 } },
   { id: 'sippe:handel:2', sippe: 'handel', ab: 2, name: 'Haendlersippe', rarity: 'selten', text: 'Der Markt kostet dich eine Karte weniger.', lasting: { t: 'marktRabatt', amount: 1 } },
-  { id: 'sippe:handel:4', sippe: 'handel', ab: 4, name: 'Handelshaus', rarity: 'episch', text: 'Du darfst 3 Karten mehr halten, und deine Haefen bleiben im Sturm offen.', lasting: [{ t: 'handLimit', amount: 3 }, { t: 'stormPorts' }] },
+  { id: 'sippe:handel:4', sippe: 'handel', ab: 4, name: 'Handelshaus', rarity: 'episch', text: 'Du darfst 3 Karten mehr halten - zusaetzlich zu Vorratskarten -, und deine Haefen bleiben im Sturm offen.', lasting: [{ t: 'handLimit', amount: 3, stapelt: true }, { t: 'stormPorts' }] },
   { id: 'sippe:bau:2', sippe: 'bau', ab: 2, name: 'Bauhuette', rarity: 'selten', text: 'Jedes neue Dorf und jede neue Stadt bringt einen zufaelligen Rohstoff.', lasting: { t: 'bauGabe', amount: 1 } },
   { id: 'sippe:bau:4', sippe: 'bau', ab: 4, name: 'Dombaumeister', rarity: 'episch', text: 'Jede neue Stadt bringt 2 Ruhm.', lasting: { t: 'stadtRuhm', amount: 2 } },
   { id: 'sippe:krieg:2', sippe: 'krieg', ab: 2, name: 'Wehrsippe', rarity: 'selten', text: 'Pluenderer nehmen dir eine Karte weniger.', lasting: { t: 'schutz', amount: 1 } },
   { id: 'sippe:krieg:4', sippe: 'krieg', ab: 4, name: 'Kriegsherr', rarity: 'episch', text: 'Jedes zerstoerte Lager bringt eine Kartenwahl mehr.', lasting: { t: 'lagerBeute', amount: 1 } },
   { id: 'sippe:wildnis:2', sippe: 'wildnis', ab: 2, name: 'Pfadfinder', rarity: 'selten', text: 'Jede erkundete Ruine bringt eine Kartenwahl mehr.', lasting: { t: 'ruinenBeute', amount: 1 } },
   { id: 'sippe:wildnis:4', sippe: 'wildnis', ab: 4, name: 'Weltkundige', rarity: 'episch', text: 'Je 2 erkundete Ruinen: 1 Siegpunkt.', lasting: { t: 'siegpunkte', je: 'ruine', pro: 2 } },
+  // Die dritte Stufe: nur fuer eine Familie, auf die man wirklich gesetzt hat.
+  { id: 'sippe:ernte:6', sippe: 'ernte', ab: 6, name: 'Kornkammer', rarity: 'legendaer', text: 'Felder liefern dir noch einmal +1 Getreide.', lasting: { t: 'terrainBonus', terrain: 'field', amount: 1 } },
+  { id: 'sippe:handel:6', sippe: 'handel', ab: 6, name: 'Handelsmacht', rarity: 'legendaer', text: 'Bankhandel kostet dich eine Karte weniger.', lasting: { t: 'tradeDiscount', amount: 1 } },
+  { id: 'sippe:bau:6', sippe: 'bau', ab: 6, name: 'Baumeisterzunft', rarity: 'legendaer', text: 'Je 3 eigene Staedte: 1 Siegpunkt.', lasting: { t: 'siegpunkte', je: 'stadt', pro: 3 } },
+  { id: 'sippe:krieg:6', sippe: 'krieg', ab: 6, name: 'Kriegsruhm', rarity: 'legendaer', text: 'Je 2 zerstoerte Lager: 1 Siegpunkt.', lasting: { t: 'siegpunkte', je: 'lager', pro: 2 } },
+  { id: 'sippe:wildnis:6', sippe: 'wildnis', ab: 6, name: 'Legendenerzaehler', rarity: 'legendaer', text: 'Je 2 erfuellte Auftraege: 1 Siegpunkt.', lasting: { t: 'siegpunkte', je: 'auftrag', pro: 2 } },
 ];
 
 export type SippenZaehler = Partial<Record<Sippe, number>>;
 
-/** Welche Stufen jemand erreicht hat - als Kennungen der unsichtbaren Karten. */
-export function sippenBoni(sippe: SippenZaehler | undefined): string[] {
+/**
+ * Die wirkenden Familien: die mit den meisten Karten (mindestens der ersten
+ * Stufe). Bei Gleichstand bleibt, wer seine Zahl frueher erreichte (seit: die
+ * wievielte Wahl das war) - eine neue Familie verdraengt eine alte erst, wenn
+ * sie sie ueberholt.
+ */
+export function wirkendeSippen(sippe: SippenZaehler | undefined, seit?: SippenZaehler): Sippe[] {
   if (!sippe) return [];
-  return SIPPEN_BONI.filter((b) => (sippe[b.sippe] ?? 0) >= b.ab).map((b) => b.id);
+  return SIPPEN.filter((s) => (sippe[s] ?? 0) >= SIPPEN_STUFEN[0])
+    .sort(
+      (a, b) =>
+        (sippe[b] ?? 0) - (sippe[a] ?? 0) ||
+        (seit?.[a] ?? Infinity) - (seit?.[b] ?? Infinity) ||
+        SIPPEN.indexOf(a) - SIPPEN.indexOf(b),
+    )
+    .slice(0, WIRKENDE_SIPPEN);
+}
+
+/** Welche Stufen wirken - als Kennungen der unsichtbaren Karten. */
+export function sippenBoni(sippe: SippenZaehler | undefined, seit?: SippenZaehler): string[] {
+  if (!sippe) return [];
+  const wirken = new Set(wirkendeSippen(sippe, seit));
+  return SIPPEN_BONI.filter((b) => wirken.has(b.sippe) && (sippe[b.sippe] ?? 0) >= b.ab).map((b) => b.id);
 }
 
 /** Die naechste Stufe einer Familie: wie viele noch fehlen und was sie bringt. null, wenn alle erreicht sind. */
@@ -129,8 +162,8 @@ export function naechsteStufe(sippe: SippenZaehler | undefined, s: Sippe): { feh
 }
 
 /** Aktive Karten plus erreichte Sippenstufen - das, was modifiersOf rechnen soll. */
-export function wirksameKarten(p: { activeCards: readonly string[]; sippe?: SippenZaehler }): string[] {
-  const boni = sippenBoni(p.sippe);
+export function wirksameKarten(p: { activeCards: readonly string[]; sippe?: SippenZaehler; sippeSeit?: SippenZaehler }): string[] {
+  const boni = sippenBoni(p.sippe, p.sippeSeit);
   return boni.length === 0 ? [...p.activeCards] : [...p.activeCards, ...boni];
 }
 

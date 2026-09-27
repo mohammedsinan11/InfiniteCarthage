@@ -72,6 +72,8 @@ export type Player = {
   activeCards: string[];
   /** Wie viele Karten je Familie genommen wurden (cards/sippen.ts) - nur mit Ereignissen. */
   sippe?: Partial<Record<'ernte' | 'handel' | 'bau' | 'krieg' | 'wildnis', number>>;
+  /** Wann jede Familie ihre Zahl erreichte (die wievielte genommene Karte) - entscheidet Gleichstaende (cards/sippen.ts). */
+  sippeSeit?: Partial<Record<'ernte' | 'handel' | 'bau' | 'krieg' | 'wildnis', number>>;
   /** Ausspielbare und danach verbrauchte Kampf- und Heldenkarten. */
   tactics: string[];
   /** Fuer die kommenden Gegenstaende des Abenteuerzweigs. */

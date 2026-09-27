@@ -41,6 +41,7 @@ export type PublicPlayer = {
   activeCards: string[];
   /** Karten je Familie (cards/sippen.ts) - oeffentlich wie die Karten selbst. */
   sippe: Partial<Record<'ernte' | 'handel' | 'bau' | 'krieg' | 'wildnis', number>>;
+  sippeSeit: Partial<Record<'ernte' | 'handel' | 'bau' | 'krieg' | 'wildnis', number>>;
   /** Taktikkarten bleiben bis zum Ausspielen geheim; nur ihre Zahl ist sichtbar. */
   tacticCount: number;
   /** Ausruestung ist wie die Figur, die sie traegt, oeffentlich. */
@@ -186,6 +187,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
       cards: [...p.cards],
       activeCards: [...p.activeCards],
       sippe: { ...(p.sippe ?? {}) },
+      sippeSeit: { ...(p.sippeSeit ?? {}) },
       tacticCount: p.tactics.length,
       equipment: [...p.equipment],
       loot: p.loot,

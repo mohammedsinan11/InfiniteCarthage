@@ -67,10 +67,12 @@ export function CardDraft({
   aktiv = [],
   plaetze = 0,
   sippe,
+  sippeSeit,
   onChoose,
 }: {
   /** Karten je Familie (core/cards/sippen.ts) - nur mit Ereignissen. */
   sippe?: SippenZaehler;
+  sippeSeit?: SippenZaehler;
   options: string[];
   /** Woher die Wahl kommt - bestimmt die Ueberschrift. */
   source?: DraftSource;
@@ -133,7 +135,7 @@ export function CardDraft({
         </p>
       )}
 
-      {darfWaehlen && sippe !== undefined && <SippenLeiste sippe={sippe} />}
+      {darfWaehlen && sippe !== undefined && <SippenLeiste sippe={sippe} seit={sippeSeit} />}
 
       <div className="draft-karten">
         {options.map((id, i) => {
@@ -180,7 +182,7 @@ export function CardDraft({
                 <span className="draft-name">{karte.name}</span>
                 <KartenBild karte={karte} />
                 <span className="draft-text">{karte.text}</span>
-                {sippe !== undefined && <SippenSchild card={id} sippe={sippe} />}
+                {sippe !== undefined && <SippenSchild card={id} sippe={sippe} seit={sippeSeit} />}
                 {istEinzigartig(karte) && besitz.includes(id) && wiederholbar(karte) && (
                   <span className="draft-nochmal">Schon im Besitz - nur die Sofortwirkung</span>
                 )}

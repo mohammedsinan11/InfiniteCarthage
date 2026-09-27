@@ -757,9 +757,11 @@ function sippeZaehlen(s: GameState, p: Player, card: string, events: GameEvent[]
   if (!s.ereignisseAn) return;
   const sippe = sippeVon(card);
   if (!sippe) return;
-  const vorher = new Set(sippenBoni(p.sippe));
+  const vorher = new Set(sippenBoni(p.sippe, p.sippeSeit));
   p.sippe = { ...(p.sippe ?? {}), [sippe]: (p.sippe?.[sippe] ?? 0) + 1 };
-  for (const b of sippenBoni(p.sippe)) if (!vorher.has(b)) events.push({ t: 'sippeStufe', player: p.id, bonus: b });
+  const genommen = Object.values(p.sippe).reduce((n, x) => n + (x ?? 0), 0);
+  p.sippeSeit = { ...(p.sippeSeit ?? {}), [sippe]: genommen };
+  for (const b of sippenBoni(p.sippe, p.sippeSeit)) if (!vorher.has(b)) events.push({ t: 'sippeStufe', player: p.id, bonus: b });
 }
 
 // --- Hauptfunktion ----------------------------------------------------------

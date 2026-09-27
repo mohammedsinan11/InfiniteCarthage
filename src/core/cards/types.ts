@@ -61,7 +61,8 @@ export type Lasting =
   /** Bankhandel wird um so viele Karten guenstiger, nie unter zwei. */
   | { t: 'tradeDiscount'; amount: number }
   /** Die Handkartengrenze vor dem Abwerfen steigt. */
-  | { t: 'handLimit'; amount: number }
+  /** stapelt: zaehlt zusaetzlich zur besten Vorratskarte (die Sippenstufen, cards/sippen.ts). */
+  | { t: 'handLimit'; amount: number; stapelt?: boolean }
   /** Haefen bleiben auch im Sturm geoeffnet. */
   | { t: 'stormPorts' }
   /**

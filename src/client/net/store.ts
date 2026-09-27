@@ -251,6 +251,7 @@ function vervollstaendige(msg: ServerMsg): void {
     for (const p of msg.state.players) {
       p.haus ??= null;
       p.sippe ??= {};
+      p.sippeSeit ??= {};
     }
   }
 }

@@ -46,10 +46,22 @@ describe('Sippen', () => {
     expect(sippenBoni({ ernte: 2 })).toEqual(['sippe:ernte:2']);
     expect(sippenBoni({ ernte: 4, krieg: 2 })).toEqual(['sippe:ernte:2', 'sippe:ernte:4', 'sippe:krieg:2']);
     expect(naechsteStufe({ handel: 3 }, 'handel')!.fehlt).toBe(1);
-    expect(naechsteStufe({ handel: 4 }, 'handel')).toBeNull();
+    expect(naechsteStufe({ handel: 4 }, 'handel')!.bonus.id).toBe('sippe:handel:6');
+    expect(naechsteStufe({ handel: 6 }, 'handel')).toBeNull();
     const m = modifiersOf(wirksameKarten({ activeCards: [], sippe: { krieg: 2, handel: 2 } }));
     expect(m.schutz).toBe(1);
     expect(m.marktRabatt).toBe(1);
+  });
+
+  it('nur die zwei staerksten Familien wirken; Gleichstand gewinnt, wer frueher da war', () => {
+    expect(sippenBoni({ ernte: 3, handel: 2, bau: 2 }, { ernte: 5, handel: 7, bau: 4 })).toEqual(['sippe:ernte:2', 'sippe:bau:2']);
+    expect(sippenBoni({ ernte: 3, handel: 2, bau: 2 }, { ernte: 5, handel: 4, bau: 7 })).toEqual(['sippe:ernte:2', 'sippe:handel:2']);
+    expect(sippenBoni({ ernte: 6, krieg: 5, bau: 4 })).toEqual(['sippe:ernte:2', 'sippe:ernte:4', 'sippe:krieg:2', 'sippe:krieg:4', 'sippe:ernte:6']);
+  });
+
+  it('das Handelshaus stapelt mit der besten Vorratskarte', () => {
+    const m = modifiersOf(wirksameKarten({ activeCards: ['grosse_scheune'], sippe: { handel: 4 } }));
+    expect(m.handLimitBonus).toBe(4 + 3);
   });
 
   it('die Handels-Sippe macht den Markt billiger', () => {

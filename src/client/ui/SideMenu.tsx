@@ -335,9 +335,11 @@ export function SideMenu({
   kannLiefern,
   onLiefern,
   sippe,
+  sippeSeit,
 }: {
   /** Karten je Familie (core/cards/sippen.ts) - fehlt ohne Ereignisse. */
   sippe?: SippenZaehler;
+  sippeSeit?: SippenZaehler;
   turn: number;
   /** Die eigenen genommenen Karten, in der Reihenfolge der Wahl. */
   cards: readonly string[];
@@ -1169,9 +1171,9 @@ export function SideMenu({
               <>
                 <Kopf
                   titel="Sippen"
-                  hilfe="Jede genommene Karte gehoert einer Familie. Mit 2 und mit 4 Karten einer Familie wirkt ein Bonus - Zeiger auf ein Zeichen zeigt, welcher."
+                  hilfe="Jede genommene Karte gehoert einer Familie. Mit 2, 4 und 6 Karten einer Familie wirkt ein Bonus - aber nur fuer deine zwei staerksten Familien. Zeiger auf ein Zeichen zeigt die Stufen."
                 />
-                <SippenLeiste sippe={sippe} />
+                <SippenLeiste sippe={sippe} seit={sippeSeit} />
               </>
             )}
             <Kopf

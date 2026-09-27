@@ -24,7 +24,7 @@ import type { Hand, PlayerId } from '../state';
  * eigene Hand, fremde nicht.
  */
 export type HandView = {
-  players: ReadonlyArray<{ id: PlayerId; activeCards: readonly string[]; sippe?: SippenZaehler; hand?: Hand; haus?: string | null }>;
+  players: ReadonlyArray<{ id: PlayerId; activeCards: readonly string[]; sippe?: SippenZaehler; sippeSeit?: SippenZaehler; hand?: Hand; haus?: string | null }>;
   /** Volle Speicher, Leere Taschen (core/omen.ts). */
   omens?: readonly string[];
 };

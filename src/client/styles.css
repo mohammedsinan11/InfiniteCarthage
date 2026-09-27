@@ -6041,3 +6041,8 @@ em.off {
   color: #21170a;
   background: #f2c94c;
 }
+
+.sippe-chip.ruht {
+  opacity: 0.55;
+  border-style: dashed;
+}

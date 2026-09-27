@@ -319,12 +319,13 @@ einen. Zwischen den zwei fernsten Siedlungen zieht eine Karawane und bringt
 die knappsten Sorten - Raeuber jagen sie.
 
 **Sippen und Gruendungen** (`src/core/cards/sippen.ts`). Die Kartenwahl ist
-der Kern: jedes neue Dorf und jede neue Stadt bringt eine Wahl (nur Karten,
-die bleiben - Dauerkarten und Taktiken). Jede Karte gehoert einer von fuenf
-Familien - Ernte, Handel, Bau, Krieg, Wildnis. Mit 2 und mit 4 Karten einer
-Familie wirkt ein Bonus: mehr Ertrag, ein billigerer Markt, Gaben beim Bauen,
-Schutz, zusaetzliche Kartenwahlen fuer Lager und Ruinen. Die Kartenwahl zeigt
-auf jeder Karte, ob sie eine Stufe freischaltet.
+der Kern: jede neue Stadt bringt eine Wahl (nur Karten, die bleiben -
+Dauerkarten und Taktiken); hoechstens zwei Gruendungs- und Beutewahlen je Zug.
+Jede Karte gehoert einer von fuenf Familien - Ernte, Handel, Bau, Krieg,
+Wildnis. Mit 2, 4 und 6 Karten einer Familie wirkt ein Bonus, aber nur fuer
+die zwei staerksten Familien: wer eine dritte gross zieht, laesst eine andere
+ruhen. Die Kartenwahl zeigt auf jeder Karte, ob sie eine Stufe freischaltet
+oder ruhen wuerde.
 
 **Erkunden, das die Karte veraendert.** Findet der Held in einer Ruine eine
 Sechs, steht dort ein bewohnbares Haus: ein Aussenposten, ein Dorf ohne

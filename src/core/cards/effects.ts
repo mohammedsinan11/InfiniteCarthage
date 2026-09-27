@@ -66,6 +66,7 @@ export function modifiersOf(cardIds: readonly string[]): Modifiers {
   if (cardIds.length === 0) return LEER;
 
   const m: Modifiers = leer();
+  let stapelnd = 0;
   for (const id of cardIds) {
     const karte = cardById(id);
     if (!karte) continue;
@@ -82,8 +83,11 @@ export function modifiersOf(cardIds: readonly string[]): Modifiers {
           m.tradeDiscount = Math.min(1, m.tradeDiscount + l.amount);
           break;
         case 'handLimit':
-          // Nur die beste aktive Vorratskarte wirkt.
-          m.handLimitBonus = Math.max(m.handLimitBonus, l.amount);
+          // Nur die beste aktive Vorratskarte wirkt - eine Sippenstufe kommt
+          // obendrauf (Spieltest 6: das Handelshaus tat neben der Grossen
+          // Scheune stumm nichts).
+          if (l.stapelt) stapelnd += l.amount;
+          else m.handLimitBonus = Math.max(m.handLimitBonus, l.amount);
           break;
         case 'stormPorts':
           m.stormPorts = true;
@@ -121,6 +125,7 @@ export function modifiersOf(cardIds: readonly string[]): Modifiers {
       }
     }
   }
+  m.handLimitBonus += stapelnd;
   return m;
 }
 
@@ -137,7 +142,7 @@ export function terrainBonusFor(m: Modifiers, terrain: Terrain, base: number): n
 
 /** Was kartenPunkte vom Spielstand braucht - auch die redigierte Sicht hat es. */
 export type PunkteSicht = {
-  players: ReadonlyArray<{ id: string; activeCards: readonly string[]; sippe?: SippenZaehler }>;
+  players: ReadonlyArray<{ id: string; activeCards: readonly string[]; sippe?: SippenZaehler; sippeSeit?: SippenZaehler }>;
   buildings: Record<string, { owner: string; type: 'settlement' | 'city' }>;
   roads: Record<string, string>;
   chronik?: { stats: Record<string, { lager: number; ruinen: number; auftraege: number }> } | null;

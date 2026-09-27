@@ -8,7 +8,7 @@
  * will ich". PLATZHALTER-Zeichen (ASSETS.md).
  */
 
-import { SIPPEN, SIPPEN_BONI, SIPPEN_STUFEN, SIPPE_NAME, naechsteStufe, sippeVon } from '../../core/cards/sippen';
+import { SIPPEN, SIPPEN_BONI, SIPPEN_STUFEN, SIPPE_NAME, naechsteStufe, sippeVon, wirkendeSippen } from '../../core/cards/sippen';
 import type { Sippe, SippenZaehler } from '../../core/cards/sippen';
 
 export const SIPPE_FARBE: Record<Sippe, string> = {
@@ -60,19 +60,22 @@ function stufenText(s: Sippe): string {
     .join('\n');
 }
 
-export function SippenLeiste({ sippe }: { sippe: SippenZaehler | undefined }) {
+export function SippenLeiste({ sippe, seit }: { sippe: SippenZaehler | undefined; seit?: SippenZaehler }) {
+  const wirken = new Set(wirkendeSippen(sippe, seit));
   return (
-    <div className="sippen-leiste">
+    <div className="sippen-leiste" title="Nur deine zwei staerksten Familien wirken - die anderen ruhen, bis sie eine davon ueberholen.">
       {SIPPEN.map((s) => {
         const n = sippe?.[s] ?? 0;
         const naechste = naechsteStufe(sippe, s);
         const stufe = SIPPEN_STUFEN.filter((ab) => n >= ab).length;
+        const wirkt = wirken.has(s);
+        const ruht = stufe > 0 && !wirkt;
         return (
           <span
             key={s}
-            className={stufe > 0 ? 'sippe-chip erreicht' : 'sippe-chip'}
-            style={{ borderColor: stufe > 0 ? SIPPE_FARBE[s] : undefined }}
-            title={`${SIPPE_NAME[s]}: ${n} ${n === 1 ? 'Karte' : 'Karten'}${naechste ? ` - noch ${naechste.fehlt} bis ${naechste.bonus.name}` : ' - alle Stufen erreicht'}\n${stufenText(s)}`}
+            className={['sippe-chip', wirkt ? 'erreicht' : '', ruht ? 'ruht' : ''].filter(Boolean).join(' ')}
+            style={{ borderColor: wirkt ? SIPPE_FARBE[s] : undefined }}
+            title={`${SIPPE_NAME[s]}: ${n} ${n === 1 ? 'Karte' : 'Karten'}${ruht ? ' - ruht (nur die zwei staerksten Familien wirken)' : ''}${naechste ? ` - noch ${naechste.fehlt} bis ${naechste.bonus.name}` : ' - alle Stufen erreicht'}\n${stufenText(s)}`}
           >
             <SippenZeichen sippe={s} />
             <b>{n}</b>
@@ -89,16 +92,20 @@ export function SippenLeiste({ sippe }: { sippe: SippenZaehler | undefined }) {
 }
 
 /** Das Schild auf einer angebotenen Karte: Familie und ob sie eine Stufe bringt. */
-export function SippenSchild({ card, sippe }: { card: string; sippe: SippenZaehler | undefined }) {
+export function SippenSchild({ card, sippe, seit }: { card: string; sippe: SippenZaehler | undefined; seit?: SippenZaehler }) {
   const s = sippeVon(card);
   if (!s) return null;
   const naechste = naechsteStufe(sippe, s);
-  const schaltetFrei = naechste !== null && naechste.fehlt === 1;
+  // Wirkt die Familie nach dieser Karte? Sonst schaltet sie nichts frei, sie ruht.
+  const danach = { ...(sippe ?? {}), [s]: (sippe?.[s] ?? 0) + 1 };
+  const nachSeit = { ...(seit ?? {}), [s]: Infinity };
+  const wirktDann = wirkendeSippen(danach, nachSeit).includes(s);
+  const schaltetFrei = naechste !== null && naechste.fehlt === 1 && wirktDann;
   return (
     <span className={schaltetFrei ? 'sippe-schild frei' : 'sippe-schild'} style={{ borderColor: SIPPE_FARBE[s] }}>
       <SippenZeichen sippe={s} groesse={12} />
       {SIPPE_NAME[s]} {(sippe?.[s] ?? 0) + 1}
-      {schaltetFrei ? ` - ${naechste.bonus.name}!` : naechste ? ` (noch ${naechste.fehlt - 1})` : ''}
+      {schaltetFrei ? ` - ${naechste.bonus.name}!` : !wirktDann && (danach[s] ?? 0) >= SIPPEN_STUFEN[0] ? ' (ruht)' : naechste ? ` (noch ${naechste.fehlt - 1})` : ''}
     </span>
   );
 }
