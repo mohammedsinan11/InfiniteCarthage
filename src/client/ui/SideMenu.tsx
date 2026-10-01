@@ -28,7 +28,7 @@ import { TAGESZEIT_NAME, WETTER_NAME } from '../../core/zeit';
 import type { Tageszeit, Wetter } from '../../core/zeit';
 import { getVolume, initAudio, setVolume } from '../audio';
 import { LogPanel } from './LogPanel';
-import { KartenBild } from './KartenBild';
+import { Spielkarte } from './Spielkarte';
 import { OmenListe } from './OmenListe';
 import type { Bericht } from '../../core/kunde';
 import type { WeltEintrag } from '../net/store';
@@ -548,14 +548,13 @@ export function SideMenu({
                   {kartenStapel(cards).map(({ karte, anzahl }) => (
                     <li key={karte.id}>
                       <button
-                        className={[`menu-karte-kachel selt-${karte.rarity}`, karteOffen === karte.id ? 'aktiv' : '', dauerwirkungen(karte).length > 0 && !activeCards.includes(karte.id) ? 'inaktiv' : '']
+                        className={[`menu-karte-kachel sk-kachel selt-${karte.rarity}`, karteOffen === karte.id ? 'aktiv' : '', dauerwirkungen(karte).length > 0 && !activeCards.includes(karte.id) ? 'inaktiv' : '']
                           .filter(Boolean)
                           .join(' ')}
                         title={karte.text}
                         onClick={() => setKarteOffen((k) => (k === karte.id ? null : karte.id))}
                       >
-                        <KartenBild karte={karte} klein />
-                        <span className="menu-karte-kachel-name">{karte.name}</span>
+                        <Spielkarte karte={karte} groesse="mini" />
                         {dauerwirkungen(karte).length > 0 && activeCards.includes(karte.id) && <span className="menu-karte-status">Aktiv</span>}
                         {anzahl > 1 && <span className="menu-karte-anzahl">×{anzahl}</span>}
                       </button>
@@ -637,9 +636,8 @@ export function SideMenu({
               <ul className="menu-kartenraster">
                 {kartenStapel(tactics).map(({ karte, anzahl }) => (
                   <li key={karte.id}>
-                    <button className={`menu-karte-kachel selt-${karte.rarity}`} title={karte.text}>
-                      <KartenBild karte={karte} klein />
-                      <span className="menu-karte-kachel-name">{karte.name}</span>
+                    <button className={`menu-karte-kachel sk-kachel selt-${karte.rarity}`} title={karte.text}>
+                      <Spielkarte karte={karte} groesse="mini" />
                       {anzahl > 1 && <span className="menu-karte-anzahl">×{anzahl}</span>}
                     </button>
                   </li>
@@ -654,9 +652,8 @@ export function SideMenu({
                 <ul className="menu-kartenraster">
                   {kartenStapel(equipment).map(({ karte, anzahl }) => (
                     <li key={karte.id}>
-                      <button className={`menu-karte-kachel selt-${karte.rarity}`} title={karte.text}>
-                        <KartenBild karte={karte} klein />
-                        <span className="menu-karte-kachel-name">{karte.name}</span>
+                      <button className={`menu-karte-kachel sk-kachel selt-${karte.rarity}`} title={karte.text}>
+                        <Spielkarte karte={karte} groesse="mini" />
                         {anzahl > 1 && <span className="menu-karte-anzahl">×{anzahl}</span>}
                       </button>
                     </li>

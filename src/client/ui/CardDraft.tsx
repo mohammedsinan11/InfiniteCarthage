@@ -8,6 +8,11 @@
  * Kein Abbrechen. Wer nicht waehlt, blockiert die Runde, und eine Wahl ohne
  * Folgen waere keine.
  *
+ * Die Karte selbst ist eine Sammelkarte (ui/Spielkarte.tsx): Rahmen nach
+ * Seltenheit, Wappen nach Sippe, Bild aus der Wirkung. Sippe und Hinweise zur
+ * Wahl stehen darunter, nicht darauf. Auf dem Handy stehen die drei Karten
+ * schmal nebeneinander.
+ *
  * EFFEKTE SIND PLATZHALTER. Austeilen, Neigen unter dem Zeiger, Glanz je
  * Seltenheit, Funken, Strahlen, Aufblitzen und Zerfallen - alles CSS, damit
  * sich die Wahl nach etwas anfuehlt, solange es keine gezeichneten Karten
@@ -20,17 +25,9 @@ import { cardById } from '../../core/cards/catalog';
 import { dauerwirkungen, istEinzigartig, wiederholbar } from '../../core/cards/types';
 import type { DraftSource, Rarity } from '../../core/cards/types';
 import { playCardDeal, playCardHover, playCardPick, playCardVanish } from '../audio';
-import { KartenBild } from './KartenBild';
+import { Spielkarte } from './Spielkarte';
 import { SippenLeiste, SippenSchild } from './SippenLeiste';
 import type { SippenZaehler } from '../../core/cards/sippen';
-
-const RARITY_NAME: Record<Rarity, string> = {
-  gewoehnlich: 'gewoehnlich',
-  ungewoehnlich: 'ungewoehnlich',
-  selten: 'selten',
-  episch: 'episch',
-  legendaer: 'legendaer',
-};
 
 /** Ueberschrift je Herkunft - ein Fund faellt vom Himmel, Beute ist verdient. */
 const TITEL: Record<DraftSource, string> = { fund: 'Ein Fund', belohnung: 'Beute', markt: 'Markt', gruendung: 'Eine Gruendung' };
@@ -132,7 +129,7 @@ export function CardDraft({
 
       {darfWaehlen && sippe !== undefined && <SippenLeiste sippe={sippe} seit={sippeSeit} />}
 
-      <div className="draft-karten">
+      <div className={darfWaehlen ? 'draft-karten' : 'draft-karten zuschauen'}>
         {options.map((id, i) => {
           const karte = cardById(id);
           if (!karte) return null;
@@ -157,6 +154,7 @@ export function CardDraft({
               <button
                 className={[
                   'draft-karte',
+                  'sk-huelle',
                   `selt-${karte.rarity}`,
                   gewaehlt ? 'gewaehlt' : '',
                 ]
@@ -173,25 +171,23 @@ export function CardDraft({
                 onClick={nehmen}
               >
                 <span className="draft-glanz" aria-hidden />
-                <span className="draft-selt">{RARITY_NAME[karte.rarity]}</span>
-                <span className="draft-name">{karte.name}</span>
-                <KartenBild karte={karte} />
-                <span className="draft-text">{karte.text}</span>
-                {sippe !== undefined && <SippenSchild card={id} sippe={sippe} seit={sippeSeit} />}
-                {istEinzigartig(karte) && besitz.includes(id) && wiederholbar(karte) && (
-                  <span className="draft-nochmal">Schon im Besitz - nur die Sofortwirkung</span>
-                )}
-                {rabattDoppelt(id) && (
-                  <span className="draft-nochmal draft-verdraengt">
-                    Bankrabatt zaehlt nur einmal - {cardById(rabattDa!)?.name} gibt ihn schon
-                  </span>
-                )}
-                {voll && bringtNeueDauer(id) && (
-                  <span className="draft-nochmal draft-verdraengt">
-                    {ersetze === null ? 'Kein Platz - bleibt inaktiv' : `Ersetzt ${cardById(ersetze)?.name ?? '?'}`}
-                  </span>
-                )}
+                <Spielkarte karte={karte} />
               </button>
+              {/* Unter der Karte, nicht darauf: Sippe und Hinweise zur Wahl. */}
+              {sippe !== undefined && <SippenSchild card={id} sippe={sippe} seit={sippeSeit} />}
+              {istEinzigartig(karte) && besitz.includes(id) && wiederholbar(karte) && (
+                <span className="draft-nochmal">Schon im Besitz - nur die Sofortwirkung</span>
+              )}
+              {rabattDoppelt(id) && (
+                <span className="draft-nochmal draft-verdraengt">
+                  Bankrabatt zaehlt nur einmal - {cardById(rabattDa!)?.name} gibt ihn schon
+                </span>
+              )}
+              {voll && bringtNeueDauer(id) && (
+                <span className="draft-nochmal draft-verdraengt">
+                  {ersetze === null ? 'Kein Platz - bleibt inaktiv' : `Ersetzt ${cardById(ersetze)?.name ?? '?'}`}
+                </span>
+              )}
               {stufe >= 3 && (
                 <span className={stufe === 3 ? 'draft-funken episch' : 'draft-funken'} aria-hidden>
                   {Array.from({ length: 10 }, (_, k) => (
