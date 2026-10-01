@@ -9,3 +9,4 @@ dist/
 # Versionskontrolle.
 mockups/
 dogfood-output/
+.claude/worktrees/
