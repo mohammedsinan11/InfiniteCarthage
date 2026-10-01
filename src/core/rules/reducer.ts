@@ -112,7 +112,7 @@ import { hatSystem, istSystem } from '../systeme';
 import type { SystemId } from '../systeme';
 import { nextStep } from '../units';
 import { bigRoundChangedAt, seasonChangedAt } from '../season';
-import { draftOptions } from '../cards/draft';
+import { DRAFT_SIZE, draftOptions } from '../cards/draft';
 import { cardById } from '../cards/catalog';
 import { cardKind, dauerwirkungen, istEinzigartig, wiederholbar } from '../cards/types';
 import { gesperrt } from '../cards/effects';
@@ -276,6 +276,8 @@ export type GameEvent =
   | { t: 'tradeCancelled'; player: PlayerId }
   | { t: 'draftOffered'; player: PlayerId; source: DraftSource; options: string[] }
   | { t: 'cardTaken'; player: PlayerId; card: string }
+  /** Eine Stadt brachte keine Wahl - die Wahlen dieses Zuges sind aufgebraucht. */
+  | { t: 'wahlGedeckelt'; player: PlayerId }
   | { t: 'chunks'; coords: ChunkCoord[] }
   | { t: 'turn'; player: PlayerId }
   | { t: 'houseChosen'; player: PlayerId; haus: string }
@@ -743,7 +745,12 @@ function enterDraft(
   }
   const spieler = playerById(state, state.order[state.current]!);
   const owned = spieler ? [...spieler.cards, ...spieler.equipment] : [];
-  const options = draftOptions(state.secretSeed, runde, source, owned, state.gesperrt ?? []);
+  // Was in diesem Zug schon angeboten wurde, kommt moeglichst nicht wieder
+  // (Spieltest 7: Fund und Gruendung zeigten dieselben Karten).
+  const schon = state.angeboteZug?.turn === state.turn ? state.angeboteZug.ids : [];
+  const ohne = schon.length > 0 ? draftOptions(state.secretSeed, runde, source, owned, [...(state.gesperrt ?? []), ...schon]) : [];
+  const options = ohne.length === DRAFT_SIZE && new Set(ohne).size === DRAFT_SIZE ? ohne : draftOptions(state.secretSeed, runde, source, owned, state.gesperrt ?? []);
+  state.angeboteZug = { turn: state.turn, ids: [...schon, ...options] };
   state.draft = { source, options };
   state.phase = { t: 'draft' };
   events.push({
@@ -779,7 +786,12 @@ function gruendung(s: GameState, actor: PlayerId, stadt: boolean, events: GameEv
   // Eine Wahl nur fuer eine neue Stadt, und hoechstens WAHLEN_JE_ZUG
   // Gruendungs- und Beutewahlen je Zug (Spieltest 6: 42 Wahlen in einer
   // Partie, dreissig in einem Zug).
-  if (!stadt || !wahlFrei(s)) return;
+  if (!stadt) return;
+  if (!wahlFrei(s)) {
+    // Nicht still schlucken (Spieltest 7): sagen, warum keine Wahl kam.
+    events.push({ t: 'wahlGedeckelt', player: actor });
+    return;
+  }
   if (gesperrt(m, 'gruendungswahl')) return;
   wahlZaehlen(s);
   enterDraft(s, 'gruendung', events);

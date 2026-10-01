@@ -94,6 +94,11 @@ button.chosen {
   border-color: var(--accent);
   color: #21170a;
 }
+/* Gewaehlt bleibt gewaehlt, auch wenn man es gerade nicht aendern darf (Spieltest 7: sah ausgegraut aus). */
+button.chosen:disabled {
+  opacity: 1;
+  filter: none;
+}
 button.ghost {
   background: transparent;
 }
@@ -410,13 +415,14 @@ em.off {
   fill: rgba(0, 0, 0, 0.4);
 }
 
+/* Strassen kraeftiger (Spieltest 7: auf Lehm kaum zu sehen): dunkler, breiter Rand. */
 .road-base {
-  stroke: #1c140c;
-  stroke-width: 11;
+  stroke: #0b0805;
+  stroke-width: 12.5;
   stroke-linecap: round;
 }
 .road {
-  stroke-width: 7;
+  stroke-width: 8;
   stroke-linecap: round;
 }
 .piece {
@@ -6976,4 +6982,14 @@ em.off {
 .lauf-sippen,
 .lauf-bosse {
   color: var(--muted);
+}
+
+/* Bankaufschlag sichtbar (ui/Aktionsleiste.tsx, rules/trade.ts). */
+.dock-tafel-warnung {
+  margin: 4px 0;
+  padding: 4px 6px;
+  font-size: 11px;
+  color: #ffd76a;
+  border: 1px solid #c9a227;
+  background: rgba(201, 162, 39, 0.12);
 }

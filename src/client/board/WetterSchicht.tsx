@@ -185,7 +185,8 @@ void main() {
   float stufe = floor(licht * 4.0 + 0.5) / 4.0;
 
   // Nacht mit Lichtloechern, Tageslichttoenung, warmer Schein.
-  acc = ueber(acc, vec3(0.02, 0.03, 0.09), uNacht * (0.7 - 0.62 * stufe));
+  // Nachts dunkel, aber lesbar (Spieltest 7: die Naechte waren zu dunkel).
+  acc = ueber(acc, vec3(0.02, 0.03, 0.09), uNacht * (0.55 - 0.48 * stufe));
   acc = ueber(acc, uTintFarbe, uTint * (1.0 - 0.6 * stufe));
   acc = ueber(acc, vec3(1.0, 0.62, 0.24), stufe * uNacht * 0.2 * waerme);
 

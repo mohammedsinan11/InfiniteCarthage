@@ -415,6 +415,8 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
       return `${who(state, e.player)} zieht das Angebot zurueck.`;
     case 'glory':
       return `${who(state, e.player)} gewinnt ${e.amount} Ruhm.`;
+    case 'wahlGedeckelt':
+      return `${who(state, e.player)}: keine Kartenwahl mehr in diesem Zug - die naechste Stadt bringt wieder eine.`;
     case 'geschmiedet':
       return `${who(state, e.player)} ${e.art === 'verbessern' ? 'verbessert' : 'verbrennt'} ${cardById(e.card)?.name ?? 'eine Karte'}.`;
     case 'kartenLohn': {

@@ -516,6 +516,8 @@ export type GameState = {
   systeme?: SystemId[];
   /** Noch nicht freigeschaltete Karten (core/freischalt.ts) - nie im Angebot. Oeffentlich. */
   gesperrt?: string[];
+  /** Was in diesem Zug schon zur Wahl stand - kommt moeglichst nicht wieder. Nur serverseitig. */
+  angeboteZug?: { turn: number; ids: string[] };
   /** VERALTET: nur fuer die Migration alter Staende. */
   largestArmy?: PlayerId | null;
   chunks: ChunkCoord[];

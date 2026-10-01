@@ -7,6 +7,7 @@
  * der Server, ohne dass ein einziges Gelaendefeld uebertragen wird.
  */
 
+import { WAHLEN_JE_ZUG } from '../../core/rules/reducer';
 import { bossById } from '../../core/akte';
 import { sippenBonusById } from '../../core/cards/sippen';
 import { genitiv } from '../../core/factions';
@@ -439,6 +440,10 @@ function meldungenAus(
     }
     if (e.t === 'bossNaht' && e.player === you) {
       meldung(`${bossById(e.boss)?.name ?? 'Der Boss'}: sein Heer bricht auf (${e.anzahl} Kaempfer)`, 'raid');
+      continue;
+    }
+    if (e.t === 'wahlGedeckelt' && e.player === you) {
+      meldung(`Mehr als ${WAHLEN_JE_ZUG} Kartenwahlen gibt es nicht je Zug - die Stadt steht, die Wahl kommt mit der naechsten.`, 'info');
       continue;
     }
     if (e.t === 'bossBesiegt') {

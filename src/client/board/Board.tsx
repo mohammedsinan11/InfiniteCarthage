@@ -2735,8 +2735,9 @@ export function Board({
             if (sicht !== null && b.owner !== du && !vertexAdjacentHexes(parseVertexKey(vk)).some((h) => sicht.has(hexKey(h.q, h.r)))) return null;
             const ecke = parseVertexKey(vk);
             const p = vertexToPixel(ecke, LAYOUT);
-            // Auf dem Sockel des Hauses: tiefer laege es auf der Zahl des Feldes darunter.
-            const y = p.y - liftVertex(ecke) + 3;
+            // Rechts neben dem Haus: auf dem Sockel lag es noch auf den
+            // Zahlen der Felder darunter (Spieltest 7).
+            const y = p.y - liftVertex(ecke) - 4;
             const n = einwohnerVon(state, vk);
             const platz = platzFuer(state, vk);
             const reif = b.owner === du && b.type === 'settlement' && n >= EINWOHNER_FUER_STADT;
@@ -2746,7 +2747,7 @@ export function Board({
             // normalem Zoom unlesbar klein, weit draussen nur Rauschen).
             const k = Math.min(1.5, Math.max(0.75, 1.5 / scale));
             return (
-              <g key={'ew' + vk} className={reif ? 'einwohner ew-reif' : 'einwohner'} transform={`translate(${p.x.toFixed(1)} ${y.toFixed(1)}) scale(${k.toFixed(2)})`}>
+              <g key={'ew' + vk} className={reif ? 'einwohner ew-reif' : 'einwohner'} transform={`translate(${(p.x + 11).toFixed(1)} ${y.toFixed(1)}) scale(${k.toFixed(2)})`}>
                 <title>{`${n} von ${platz} Einwohnern${reif ? ' - kann Stadt werden' : ''}`}</title>
                 <rect x={-8} y={0} width={16} height={8} rx={1.5} className="ew-schild" />
                 <text x={0} y={6} textAnchor="middle" className="ew-zahl">

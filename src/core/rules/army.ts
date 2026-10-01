@@ -1917,6 +1917,10 @@ export function tickArmy(s: GameState, world: World, events: Ereignisse): void {
   for (const u of s.units.filter((x) => x.auftrag === 'raub').sort(nachNummer)) {
     const owner = besitzerFuer(u.fraktion).get(hexKey(u.q, u.r));
     if (owner === undefined || imKampf(s, u)) continue;
+    // Eine Wache haelt sie auf (Spieltest 7: "der Ritter am Dorf half nicht"):
+    // steht eine eigene Einheit auf dem Feld oder daneben, wird nicht
+    // gepluendert - sie stellt die Raeuber in der naechsten Runde.
+    if (s.units.some((x) => x.owner === owner && befehlbar(x.kind) && x.kind !== 'karawane' && hexDistance(x, u) <= 1)) continue;
     const p = playerById(s, owner);
     if (!p) continue;
     // Gierige Fraktionen (core/factions.ts) nehmen eine Karte mehr.

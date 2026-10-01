@@ -313,6 +313,12 @@ function HandelTafel({
         <span className="dock-tafel-label">Nimm 1</span>
         <ResWahl wert={nimm} setze={setNimm} />
       </div>
+      {/* Der Aufschlag stand nur im Kleingedruckten (Spieltest 7) - jetzt sichtbar. */}
+      {(gruende?.(gib) ?? []).some((g) => g.includes('Tausch in diesem Zug')) ? (
+        <p className="dock-tafel-warnung">Teurer: jeder weitere Tausch in diesem Zug kostet mehr - der Markt ist oft guenstiger.</p>
+      ) : (
+        <p className="dock-tafel-klein">Der erste Tausch je Zug zum Grundkurs, jeder weitere kostet mehr.</p>
+      )}
       <button className="primary dock-tafel-los" disabled={!geht} onClick={() => onTausch(gib, nimm)}>
         {v}x {resourceName(gib)} gegen {resourceName(nimm)}
       </button>
