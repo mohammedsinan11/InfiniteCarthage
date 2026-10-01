@@ -44,7 +44,7 @@ import { TippBox } from '../ui/TippBox';
 import { EreignisTafel } from '../ui/EreignisTafel';
 import { ErsteSchritte } from '../ui/ErsteSchritte';
 import { hausById } from '../../core/haus';
-import { kartenPunkte } from '../../core/cards/effects';
+import { kartenPunkte } from '../../core/cards/wirkung';
 import { COST_WUNDER, WUNDER, wunderAt } from '../../core/wunder';
 import { szenarioById, szenarioStand } from '../../core/szenario';
 import { KOOP_ZIEL_JE, wahlFrei, wunderHindernis } from '../../core/rules/reducer';
@@ -138,6 +138,9 @@ import { tradeRatio, tradeRatioErklaert } from '../../core/rules/trade';
 import { Aktionsleiste, SymHandel } from '../ui/Aktionsleiste';
 import { aktPunkte, bossById } from '../../core/akte';
 import { hatSystem, neuesSystem } from '../../core/systeme';
+import { wirkungenVon } from '../../core/cards/wirkung';
+import { kannBezahlen } from '../../core/rules/kosten';
+import type { Bauwerk } from '../../core/cards/types';
 import { leseProfil } from '../profil';
 import { BossTafel, aktZahl } from '../ui/BossTafel';
 import type { BuildMode } from '../ui/Aktionsleiste';
@@ -545,7 +548,7 @@ export function Game() {
           // Reicht es nur fuer den Wiederaufbau, stehen nur die eigenen Aschekanten zur Wahl.
           const alle = legalRoadEdges(state, world, you);
           return {
-            edges: hand && !canAfford(hand, COST_ROAD) ? alle.filter((ek) => state.asche[ek] === you) : alle,
+            edges: hand && you && !kannBezahlen(hand, COST_ROAD, wirkungenVon(state, you), 'strasse') ? alle.filter((ek) => state.asche[ek] === you) : alle,
           };
         }
         if (mode === 'tower') {
@@ -858,7 +861,9 @@ export function Game() {
     if (!ausbauOrt || !you) return null;
     const jetzt = isMine && phase.t === 'main';
     const warum = !isMine ? 'Nicht dein Zug' : phase.t === 'roll' ? 'Erst wuerfeln' : phase.t !== 'main' ? 'Jetzt nicht' : undefined;
-    const bezahlbar = (k: Cost) => !!hand && canAfford(hand, k);
+    // Rabatt und Ersatz der Karten (rules/kosten.ts) gelten auch hier.
+    const wk = wirkungenVon(state, you);
+    const bezahlbar = (k: Cost, was?: Bauwerk) => !!hand && (was ? kannBezahlen(hand, k, wk, was) : canAfford(hand, k));
     const armut = (k: Cost) => (bezahlbar(k) ? undefined : 'Zu wenig Rohstoffe');
     const dann = (f: () => void) => () => {
       f();
@@ -1004,7 +1009,7 @@ export function Game() {
       optionen.push({
         name: 'Stadt',
         kosten: COST_CITY,
-        darf: jetzt && !feuer && bezahlbar(COST_CITY),
+        darf: jetzt && !feuer && bezahlbar(COST_CITY, 'stadt'),
         hinweis: warum ?? feuer ?? armut(COST_CITY),
         wahl: dann(() => {
           act({ t: 'buildCity', vertex: ausbauOrt.key });

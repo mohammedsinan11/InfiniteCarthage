@@ -6,7 +6,7 @@
  * nichts: wer an der richtigen Ecke baut, handelt guenstiger.
  */
 
-import { wirksameKarten } from '../cards/sippen';
+import { wirkungenVon } from '../cards/wirkung';
 import { portAt } from '../world';
 import type { World } from '../world';
 import { RESOURCES } from '../types';
@@ -14,7 +14,6 @@ import type { Bundle, Resource } from '../types';
 import { handSize, playerById } from '../state';
 import type { GameState, Hand, PlayerId } from '../state';
 import type { BoardView } from './placement';
-import { modifiersOf } from '../cards/effects';
 import { sturm, wetterOf } from '../zeit';
 import { hatReichsbau } from './reich';
 import { handelsAufschlag, handelsDeckel } from '../omen';
@@ -62,8 +61,7 @@ export function tradeRatioErklaert(
     }
   };
   const spieler = state.players?.find((p) => p.id === player);
-  const karten = spieler ? wirksameKarten(spieler) : [];
-  const mods = modifiersOf(karten);
+  const mods = spieler ? wirkungenVon({ players: state.players ?? [], buildings: state.buildings, roads: state.roads }, player) : wirkungenVon({ players: [] }, player);
   const zu = haefenZu(state) && !mods.stormPorts;
   for (const [vk, b] of Object.entries(state.buildings)) {
     if (zu) break;
@@ -101,6 +99,8 @@ export function tradeRatioErklaert(
   const hausDeckel = hausHandelsDeckel(haus);
   if (hausDeckel !== null) setze(hausDeckel, 'Dein Haus');
   if (hatWunder(state, player, 'kothon')) setze(3, 'Kothon');
+  // Fester Kurs einer Karte (Handelsmonopol: 2:1 auf alles).
+  for (const k of mods.kurs) if (!k.nur || k.nur === give) setze(k.ratio, 'Karte');
   if (zu) gruende.push('Sturm: Haefen zu');
   if (mods.tradeDiscount > 0) {
     if (ratio > 2) gruende.push(`Karte: -${mods.tradeDiscount}`);
@@ -112,7 +112,7 @@ export function tradeRatioErklaert(
   if (hausPlus > 0) gruende.push(`Dein Haus: +${hausPlus}`);
   const heute = bankAufschlag(state, player);
   if (heute > 0) gruende.push(`${heute === 1 ? '2.' : 'weiterer'} Tausch in diesem Zug: +${heute}`);
-  return { ratio: Math.max(2, ratio - mods.tradeDiscount) + omenPlus + hausPlus + heute, gruende };
+  return { ratio: Math.max(2, ratio - mods.tradeDiscount - mods.tradeSkaliert) + omenPlus + hausPlus + heute, gruende };
 }
 
 /**

@@ -12,6 +12,10 @@
  * dauerhaft Platz zu belegen. Symbole sind PLATZHALTER (ASSETS.md).
  */
 
+import { wirkungenVon } from '../../core/cards/wirkung';
+import { gesperrt } from '../../core/cards/effects';
+import { kannBezahlen } from '../../core/rules/kosten';
+import type { Bauwerk } from '../../core/cards/types';
 import { useEffect, useState } from 'react';
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import { RESOURCES } from '../../core/types';
@@ -571,7 +575,10 @@ export function Aktionsleiste({
   const stadtMoeglich = me ? legalCityVertices(state, me.id).some((vk) => stadtReif(state, vk)) : false;
   // Auf eigener Asche kostet eine Strasse nur Holz (rules/feuer.ts).
   const eigeneAsche = Object.values(state.asche).some((id) => id === me?.id);
-  const strasseGeht = canAfford(hand, COST_ROAD) || (eigeneAsche && canAfford(hand, COST_REBUILD_ROAD));
+  // Rabatt und Ersatz der Karten (rules/kosten.ts) - dieselbe Rechnung wie im Reducer.
+  const wk = me ? wirkungenVon(state, me.id) : null;
+  const geht = (k: Cost, was: Bauwerk): boolean => (wk ? kannBezahlen(hand, k, wk, was) : canAfford(hand, k));
+  const strasseGeht = geht(COST_ROAD, 'strasse') || (eigeneAsche && geht(COST_REBUILD_ROAD, 'strasse'));
 
   /*
    * Ein gewaehlter Bau, der nicht mehr bezahlbar ist, verfaellt (Spieltest 4:
@@ -596,7 +603,8 @@ export function Aktionsleiste({
                 : mode?.startsWith('reich:')
                   ? (COST_REICHSBAU[mode.slice(6) as keyof typeof COST_REICHSBAU] ?? null)
                   : null;
-  const modusBezahlbar = modusKosten === null || canAfford(hand, modusKosten);
+  const modusWerk: Bauwerk | null = mode === 'road' ? 'strasse' : mode === 'settlement' ? 'dorf' : mode === 'city' ? 'stadt' : null;
+  const modusBezahlbar = modusKosten === null || (modusWerk ? geht(modusKosten, modusWerk) : canAfford(hand, modusKosten));
   useEffect(() => {
     if (mode !== null && phase.t === 'main' && !modusBezahlbar) setMode(null);
   }, [mode, modusBezahlbar, phase.t]);
@@ -691,7 +699,7 @@ export function Aktionsleiste({
           symbol={<SymSiedlung />}
           kosten={COST_SETTLEMENT}
           gewaehlt={mode === 'settlement'}
-          darf={bauen && canAfford(hand, COST_SETTLEMENT) && dorfPlatz}
+          darf={bauen && geht(COST_SETTLEMENT, 'dorf') && dorfPlatz}
           tip={
             dorfPlatz
               ? `Dorf: ${kostenText(COST_SETTLEMENT)}`
@@ -704,7 +712,7 @@ export function Aktionsleiste({
           symbol={<SymStadt />}
           kosten={COST_CITY}
           gewaehlt={mode === 'city'}
-          darf={bauen && canAfford(hand, COST_CITY) && stadtMoeglich}
+          darf={bauen && geht(COST_CITY, 'stadt') && stadtMoeglich && !(wk && gesperrt(wk, 'stadt'))}
           tip={
             stadtMoeglich || !state.ereignisseAn
               ? `Ein Dorf zur Stadt ausbauen: doppelter Ertrag, 2 Siegpunkte. ${kostenText(COST_CITY)}${state.ereignisseAn ? ' - das Dorf braucht 2 Einwohner.' : ''}`

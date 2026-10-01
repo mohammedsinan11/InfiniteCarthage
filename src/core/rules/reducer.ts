@@ -11,8 +11,8 @@
  * Kopie, die nur bei Erfolg uebernommen wird.
  */
 
-import { sippeVon, sippenBoni, wirksameKarten } from '../cards/sippen';
-import type { SippenZaehler } from '../cards/sippen';
+import { sippeVon, sippenBoni } from '../cards/sippen';
+import { eigeneWirkKarten, sippenRegeln, wirkungenVon } from '../cards/wirkung';
 import { EINWOHNER_FUER_STADT, bevoelkerungRunde, einwohnerAbgleichen, einwohnerNehmen, einwohnerVerlieren, einwohnerVon } from '../bevoelkerung';
 import type { BevoelkerungEvent } from '../bevoelkerung';
 import { verderbAmZugende } from '../verderb';
@@ -94,7 +94,8 @@ import {
   canPlaceTower,
   legalRoadEdges,
 } from './placement';
-import { computeProduction } from './production';
+import { computeProduction, productionSources } from './production';
+import { wetterOf } from '../zeit';
 import { beginBigRound, beginDay, beginNight, ernenne, heldenRunde, spawnHeld, spawnKnight, tickArmy } from './army';
 import { brandRunde, brennt, mitKarteLoeschen } from './feuer';
 import { STUFE_NAME, ausbauHindernis, festungsSchutz, hauptstadtHindernis } from './hauptstadt';
@@ -114,7 +115,10 @@ import { bigRoundChangedAt, seasonChangedAt } from '../season';
 import { draftOptions } from '../cards/draft';
 import { cardById } from '../cards/catalog';
 import { cardKind, dauerwirkungen, istEinzigartig, wiederholbar } from '../cards/types';
-import { modifiersOf } from '../cards/effects';
+import { gesperrt } from '../cards/effects';
+import { ausloeserAusEreignissen } from '../cards/ausloeser';
+import type { AusloeserEvent } from '../cards/ausloeser';
+import { bezahle, kannBezahlen } from './kosten';
 import type { DraftSource } from '../cards/types';
 import { aktiviereNeueReichskarte, setzeAktiveKarten } from '../cards/loadout';
 import { playTactic } from './tactics';
@@ -153,9 +157,8 @@ import { drawDevCard } from './dev';
 export const MARKT_PREIS = 3;
 
 /** Was der Markt diesen Spieler kostet - die Handels-Sippe macht ihn billiger (cards/sippen.ts). */
-export function marktPreisFuer(state: { players: ReadonlyArray<{ id: PlayerId; activeCards: readonly string[]; sippe?: SippenZaehler }> }, id: PlayerId): number {
-  const p = state.players.find((x) => x.id === id);
-  return Math.max(1, MARKT_PREIS - (p ? modifiersOf(wirksameKarten(p)).marktRabatt : 0));
+export function marktPreisFuer(state: Parameters<typeof wirkungenVon>[0], id: PlayerId): number {
+  return Math.max(1, MARKT_PREIS - wirkungenVon(state, id).marktRabatt);
 }
 
 export type Action =
@@ -213,6 +216,8 @@ export type Action =
   | { t: 'disbandGroup'; verband: number }
   /** Eine Beute einloesen: eine Kartenwahl. */
   | { t: 'claimLoot' }
+  /** Eine eigene Schluesselkarte in den Kronplatz legen (ENGINE_KARTEN.md). */
+  | { t: 'setKrone'; card: string }
   /** Tribut an den Boss des Aktes zahlen: so viel von dieser Sorte, wie fehlt (core/akte.ts). */
   | { t: 'bossZahlen'; resource: Resource }
   /** Ein eigenes Feuer mit einer Rohstoffkarte loeschen (rules/feuer.ts). */
@@ -280,6 +285,7 @@ export type GameEvent =
   /** Heer, Raubzuege, Gefechte, Lager, Ruinen, Held und Feuer - siehe rules/army.ts. */
   | ArmyEvent
   | AktEvent
+  | AusloeserEvent
   | UntergangEvent
   | HilfeEvent
   | VorhabenEvent
@@ -739,7 +745,7 @@ function gruendung(s: GameState, actor: PlayerId, stadt: boolean, events: GameEv
   if (!s.ereignisseAn || s.phase.t !== 'main') return;
   const p = playerById(s, actor);
   if (!p) return;
-  const m = modifiersOf(wirksameKarten(p));
+  const m = wirkungenVon(s, p.id);
   if (m.bauGabe > 0) {
     const rng = new Rng(s.rngState);
     const gained = emptyHand();
@@ -755,8 +761,36 @@ function gruendung(s: GameState, actor: PlayerId, stadt: boolean, events: GameEv
   // Gruendungs- und Beutewahlen je Zug (Spieltest 6: 42 Wahlen in einer
   // Partie, dreissig in einem Zug).
   if (!stadt || !wahlFrei(s)) return;
+  if (gesperrt(m, 'gruendungswahl')) return;
   wahlZaehlen(s);
   enterDraft(s, 'gruendung', events);
+}
+
+/**
+ * Siebenstern (ENGINE_KARTEN.md): faellt die eigene 7, liefert die beste
+ * eigene Zahl - die mit den meisten Ertraegen - nur fuer den Werfer.
+ */
+function siebenLiefert(s: GameState, world: World, actor: PlayerId, events: GameEvent[]): void {
+  const zaehlung = new Map<number, number>();
+  for (const [vk, b] of Object.entries(s.buildings)) {
+    if (b.owner !== actor) continue;
+    for (const h of vertexAdjacentHexes(parseVertexKey(vk))) {
+      const z = world.tiles.get(hexKey(h.q, h.r))?.number;
+      if (z === null || z === undefined) continue;
+      zaehlung.set(z, (zaehlung.get(z) ?? 0) + (b.type === 'city' ? 2 : 1));
+    }
+  }
+  const beste = [...zaehlung].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0];
+  if (beste === undefined) return;
+  const p = playerById(s, actor);
+  if (!p) return;
+  const gain = emptyHand();
+  for (const q of productionSources(s, world, beste, wetterOf(s.worldSeed, s.turn))) {
+    if (q.owner !== actor) continue;
+    gain[q.resource] += q.amount;
+  }
+  for (const r of RESOURCES) p.hand[r] += gain[r];
+  events.push({ t: 'production', payout: { [actor]: gain } });
 }
 
 /** So viele Gruendungs- und Beutewahlen gibt es je Zug; Fund und Markt zaehlen nicht mit. */
@@ -780,11 +814,12 @@ function sippeZaehlen(s: GameState, p: Player, card: string, events: GameEvent[]
   if (!s.ereignisseAn) return;
   const sippe = sippeVon(card);
   if (!sippe) return;
-  const vorher = new Set(sippenBoni(p.sippe, p.sippeSeit));
+  const regeln = sippenRegeln(eigeneWirkKarten(p));
+  const vorher = new Set(sippenBoni(p.sippe, p.sippeSeit, regeln));
   p.sippe = { ...(p.sippe ?? {}), [sippe]: (p.sippe?.[sippe] ?? 0) + 1 };
   const genommen = Object.values(p.sippe).reduce((n, x) => n + (x ?? 0), 0);
   p.sippeSeit = { ...(p.sippeSeit ?? {}), [sippe]: genommen };
-  for (const b of sippenBoni(p.sippe, p.sippeSeit)) if (!vorher.has(b)) events.push({ t: 'sippeStufe', player: p.id, bonus: b });
+  for (const b of sippenBoni(p.sippe, p.sippeSeit, regeln)) if (!vorher.has(b)) events.push({ t: 'sippeStufe', player: p.id, bonus: b });
 }
 
 // --- Hauptfunktion ----------------------------------------------------------
@@ -953,13 +988,16 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         // Nur noch der Fund. Das Abwerfen sass frueher auch hier und machte
         // dieselbe Zahl zu Geschenk und Strafe zugleich; es haengt jetzt an
         // den Pluenderungen.
-        enterDraft(s, 'fund', events);
+        // Siebenstern (ENGINE_KARTEN.md): kein Fund, dafuer liefert die beste Zahl.
+        const wkWerfer = wirkungenVon(s, actor);
+        if (!gesperrt(wkWerfer, 'fund')) enterDraft(s, 'fund', events);
+        if (wkWerfer.siebenLiefert) siebenLiefert(s, world, actor, events);
         // Glueckliche Sieben (core/omen.ts) fuer den Werfer, Siebenergaben
         // aus Karten (cards/effects.ts) fuer jeden, der sie aktiv hat.
         const payout: Record<PlayerId, Hand> = {};
         const rng = new Rng(s.rngState);
         for (const p of s.players) {
-          const n = (p.id === actor ? siebenerBonus(s.omens) : 0) + modifiersOf(wirksameKarten(p)).siebenGabe;
+          const n = (p.id === actor ? siebenerBonus(s.omens) : 0) + wirkungenVon(s, p.id).siebenGabe;
           if (n <= 0) continue;
           const gain = emptyHand();
           for (let i = 0; i < n; i++) gain[RESOURCES[rng.int(RESOURCES.length)]!] += 1;
@@ -1014,7 +1052,11 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (!(istEinzigartig(karte) && schonDa)) {
         if (cardKind(karte) === 'taktik') actorPlayer.tactics.push(karte.id);
         else if (cardKind(karte) === 'ausruestung') actorPlayer.equipment.push(karte.id);
-        else {
+        else if (karte.schluessel) {
+          // Schluesselkarten gehen in den Kronplatz - die alte bleibt im Besitz, ruht aber.
+          actorPlayer.cards.push(karte.id);
+          actorPlayer.krone = karte.id;
+        } else {
           actorPlayer.cards.push(karte.id);
           if (dauerwirkungen(karte).length > 0) {
             aktiviereNeueReichskarte(s, actorPlayer, karte.id, action.replace);
@@ -1053,6 +1095,14 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       break;
     }
 
+    case 'setKrone': {
+      if (phase.t !== 'main') return fail('Die Krone wird in der Bauphase gewechselt.');
+      const k = cardById(action.card);
+      if (!k?.schluessel || !actorPlayer.cards.includes(action.card)) return fail('Diese Schluesselkarte besitzt du nicht.');
+      actorPlayer.krone = action.card;
+      break;
+    }
+
     case 'setLoadout': {
       if (phase.t !== 'main') return fail('Die Karten werden in der Bauphase umgestellt.');
       const why = setzeAktiveKarten(s, actorPlayer, action.cards);
@@ -1075,11 +1125,12 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (why) return fail(why);
       // Auf eigener Asche fehlen nur die Bohlen (rules/feuer.ts).
       const kosten = s.asche[action.edge] === actor ? COST_REBUILD_ROAD : COST_ROAD;
-      if (!inRoadBuilding && !canAfford(actorPlayer.hand, kosten)) {
+      const wk = wirkungenVon(s, actor);
+      if (!inRoadBuilding && !kannBezahlen(actorPlayer.hand, kosten, wk, 'strasse')) {
         return fail('Zu wenig Rohstoffe fuer eine Strasse.');
       }
 
-      if (!inRoadBuilding) pay(actorPlayer.hand, kosten);
+      if (!inRoadBuilding) bezahle(actorPlayer.hand, kosten, wk, 'strasse');
       s.roads[action.edge] = actor;
       delete s.asche[action.edge];
       events.push({ t: 'build', player: actor, kind: 'road', at: action.edge });
@@ -1107,11 +1158,12 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       // eigene Strasse davor (rules/untergang.ts).
       const why = canPlaceSettlement(s, world, actor, action.vertex, { setup: imUntergang(s, actor) });
       if (why) return fail(why);
-      if (!canAfford(actorPlayer.hand, COST_SETTLEMENT)) {
+      const wk = wirkungenVon(s, actor);
+      if (!kannBezahlen(actorPlayer.hand, COST_SETTLEMENT, wk, 'dorf')) {
         return fail('Zu wenig Rohstoffe fuer eine Siedlung.');
       }
 
-      pay(actorPlayer.hand, COST_SETTLEMENT);
+      bezahle(actorPlayer.hand, COST_SETTLEMENT, wk, 'dorf');
       s.buildings[action.vertex] = { owner: actor, type: 'settlement' };
       events.push({ t: 'build', player: actor, kind: 'settlement', at: action.vertex });
 
@@ -1127,7 +1179,9 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       const why = canPlaceCity(s, actor, action.vertex);
       if (why) return fail(why);
       if (brennt(s, action.vertex)) return fail('Dort brennt es gerade.');
-      if (!canAfford(actorPlayer.hand, COST_CITY)) {
+      const wk = wirkungenVon(s, actor);
+      if (gesperrt(wk, 'stadt')) return fail('Deine Krone verbietet Staedte.');
+      if (!kannBezahlen(actorPlayer.hand, COST_CITY, wk, 'stadt')) {
         return fail('Zu wenig Rohstoffe fuer eine Stadt.');
       }
       // Eine Stadt braucht Menschen (core/bevoelkerung.ts).
@@ -1135,7 +1189,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         return fail(`Fuer eine Stadt braucht das Dorf ${EINWOHNER_FUER_STADT} Einwohner - es waechst jede grosse Runde.`);
       }
 
-      pay(actorPlayer.hand, COST_CITY);
+      bezahle(actorPlayer.hand, COST_CITY, wk, 'stadt');
       s.buildings[action.vertex] = { owner: actor, type: 'city' };
       events.push({ t: 'build', player: actor, kind: 'city', at: action.vertex });
       checkWin(s, events);
@@ -1231,6 +1285,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
     // --- Handel ---
     case 'bankTrade': {
       if (phase.t !== 'main') return fail('Jetzt kann nicht gehandelt werden.');
+      if (gesperrt(wirkungenVon(s, actor), 'bank')) return fail('Deine Krone verbietet den Bankhandel.');
       const why = canBankTrade(s, world, actor, action.give, action.receive);
       if (why) return fail(why);
       const ratio = tradeRatio(s, world, actor, action.give);
@@ -1250,6 +1305,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (!s.ereignisseAn) return fail('Einen Markt gibt es in dieser Partie nicht.');
       if (phase.t !== 'main') return fail('Der Markt hat nur in der Bauphase offen.');
       if (s.marktZug?.[actor] === s.turn) return fail('Auf dem Markt warst du in diesem Zug schon.');
+      if (gesperrt(wirkungenVon(s, actor), 'markt')) return fail('Deine Krone verbietet den Markt.');
       const preis = marktPreisFuer(s, actor);
       if (handSize(actorPlayer.hand) < preis) return fail(`Fuer den Markt brauchst du ${preis} Karten.`);
       const genommen = takeFromLargest(actorPlayer.hand, preis);
@@ -1326,12 +1382,14 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
     // --- Heer ---
     case 'recruitKnight': {
       if (phase.t !== 'main') return fail('Jetzt kann niemand angeworben werden.');
-      if (!canAfford(actorPlayer.hand, COST_KNIGHT)) {
+      const wk = wirkungenVon(s, actor);
+      if (gesperrt(wk, 'truppe')) return fail('Deine Krone verbietet Truppen.');
+      if (!kannBezahlen(actorPlayer.hand, COST_KNIGHT, wk, 'truppe')) {
         return fail('Zu wenig Rohstoffe fuer einen Ritter.');
       }
       // Ein Ritter kommt aus einer Siedlung mit wenigstens zwei Einwohnern.
       if (!einwohnerNehmen(s, actor)) return fail('Keine Siedlung hat Einwohner uebrig - sie wachsen jede grosse Runde.');
-      pay(actorPlayer.hand, COST_KNIGHT);
+      bezahle(actorPlayer.hand, COST_KNIGHT, wk, 'truppe');
       if (!spawnKnight(s, actor, events)) {
         return fail('Keine Siedlung, an der ein Ritter antreten koennte.');
       }
@@ -1340,10 +1398,12 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
 
     case 'recruitArcher': {
       if (phase.t !== 'main') return fail('Jetzt kann niemand angeworben werden.');
-      if (!canAfford(actorPlayer.hand, COST_ARCHER)) {
+      const wk = wirkungenVon(s, actor);
+      if (gesperrt(wk, 'truppe')) return fail('Deine Krone verbietet Truppen.');
+      if (!kannBezahlen(actorPlayer.hand, COST_ARCHER, wk, 'truppe')) {
         return fail('Zu wenig Rohstoffe fuer einen Bogenschuetzen.');
       }
-      pay(actorPlayer.hand, COST_ARCHER);
+      bezahle(actorPlayer.hand, COST_ARCHER, wk, 'truppe');
       if (!spawnKnight(s, actor, events, 'bogen')) {
         return fail('Keine Siedlung, an der ein Bogenschuetze antreten koennte.');
       }
@@ -1506,6 +1566,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (phase.t !== 'main') return fail('Jetzt kann nicht gebaut werden.');
       const why = canPlaceMauer(s, world, actor, action.edge);
       if (why) return fail(why);
+      if (gesperrt(wirkungenVon(s, actor), 'mauer')) return fail('Deine Krone verbietet Palisaden und Tore.');
       const kosten = action.art === 'tor' ? COST_TOR : COST_MAUER;
       const name = action.art === 'tor' ? 'ein Tor' : 'eine Palisade';
       if (!canAfford(actorPlayer.hand, kosten)) return fail(`Zu wenig Rohstoffe fuer ${name}.`);
@@ -1732,6 +1793,12 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
   // Kampf, Lager, Auftraege und Veteranen laufen in verschiedenen Regeln.
   // Ihre bereits erzeugten Ereignisse bilden an einer Stelle den Ruhm.
   const geschehen = [...events] as Array<{ t: string } & Record<string, unknown>>;
+  // Engine-Karten (cards/ausloeser.ts): Wenn X, dann Y - nicht im Aufbau.
+  if (action.t !== 'placeSettlement' && action.t !== 'placeRoad') {
+    const lohn: GameEvent[] = [];
+    ausloeserAusEreignissen(s, geschehen, lohn, { jahreszeit: action.t === 'endTurn' && seasonChangedAt(s.turn) });
+    events.push(...lohn);
+  }
   ruhmAusEreignissen(s, geschehen, events);
   // Die Fraktionen reagieren: Nachfolger, Beute, Stimmung (core/fraktionsleben.ts).
   fraktionsLeben(s, geschehen, events);
@@ -1742,7 +1809,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       for (const id of wer) {
         const p = playerById(s, id);
         if (!p) continue;
-        const m = modifiersOf(wirksameKarten(p));
+        const m = wirkungenVon(s, p.id);
         const n = e.t === 'nestDestroyed' ? m.lagerBeute : m.ruinenBeute;
         if (n <= 0) continue;
         p.loot += n;

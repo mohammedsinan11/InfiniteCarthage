@@ -415,6 +415,15 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
       return `${who(state, e.player)} zieht das Angebot zurueck.`;
     case 'glory':
       return `${who(state, e.player)} gewinnt ${e.amount} Ruhm.`;
+    case 'kartenLohn': {
+      const teile = [
+        bundleText(e.gained),
+        e.ruhm > 0 ? `${e.ruhm} Ruhm` : '',
+        e.wahl > 0 ? `${e.wahl === 1 ? 'eine Kartenwahl' : `${e.wahl} Kartenwahlen`}` : '',
+        e.zaehler > 0 ? `Zaehler +${e.zaehler}` : '',
+      ].filter((x) => x && x !== 'nichts');
+      return `${cardById(e.card)?.name ?? 'Eine Karte'} (${who(state, e.player)}): ${teile.join(', ')}.`;
+    }
     case 'tacticPlayed':
       return `${who(state, e.player)} spielt ${cardById(e.card)?.name ?? 'eine Taktik'}.`;
     case 'chunks':

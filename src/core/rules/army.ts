@@ -59,6 +59,7 @@ import { strassenFelder } from '../handelswege';
 import type { KarawanenEvent } from '../karawane';
 import { szenarioById } from '../szenario';
 import { hatSystem } from '../systeme';
+import { wirkungenVon } from '../cards/wirkung';
 import { Rng } from '../rng';
 import { hexDistance, hexKey, hexVertices, hexesInRange, neighbors, parseVertexKey, vertexAdjacentHexes, vertexKey } from '../coords';
 import { canPlaceSettlement } from './placement';
@@ -1921,8 +1922,14 @@ export function tickArmy(s: GameState, world: World, events: Ereignisse): void {
     // Gierige Fraktionen (core/factions.ts) nehmen eine Karte mehr.
     const menge = raidLoss(s, owner, u.fraktion !== null && wesenIn(s, u.fraktion) === 'gierig' ? 2 : 1);
     const taken = takeFromLargest(p.hand, menge);
-    for (const r of RESOURCES) p.hand[r] -= taken[r];
-    ladeAuf(u, taken, owner);
+    // Raubritter (ENGINE_KARTEN.md): wer die Krone traegt, bekommt, was ihm
+    // genommen wuerde - die Pluenderer ziehen mit leeren Haenden ab.
+    const raubritter = wirkungenVon(s, owner).beuteStattVerlust;
+    if (raubritter) for (const r of RESOURCES) p.hand[r] += taken[r];
+    else {
+      for (const r of RESOURCES) p.hand[r] -= taken[r];
+      ladeAuf(u, taken, owner);
+    }
     u.auftrag = 'heimkehr';
     u.ziel = null;
     events.push({

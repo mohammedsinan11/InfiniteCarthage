@@ -200,8 +200,8 @@ describe('Kartenplaetze', () => {
   const mitVollenPlaetzen = () => {
     const game = solo();
     const p = playerById(game.state, 'p0')!;
-    p.cards = ['holzlager', 'steinbruch'];
-    p.activeCards = ['holzlager', 'steinbruch'];
+    p.cards = ['holzlager', 'steinbruch', 'ziegelei'];
+    p.activeCards = ['holzlager', 'steinbruch', 'ziegelei'];
     game.state.phase = { t: 'draft' };
     game.state.draft = { source: 'fund', options: ['schafzucht', 'ernte', 'lehmgrube'] };
     return game;
@@ -210,47 +210,48 @@ describe('Kartenplaetze', () => {
   it('laesst die Wahl, welche aktive Karte weicht', () => {
     const game = mitVollenPlaetzen();
     must(game, { t: 'chooseCard', card: 'schafzucht', replace: 'steinbruch' }, 'p0');
-    expect(playerById(game.state, 'p0')!.activeCards).toEqual(['holzlager', 'schafzucht']);
+    expect(playerById(game.state, 'p0')!.activeCards).toEqual(['holzlager', 'schafzucht', 'ziegelei']);
   });
 
   it('kann die neue Karte auch nur behalten, ohne dass eine weicht', () => {
     const game = mitVollenPlaetzen();
     must(game, { t: 'chooseCard', card: 'schafzucht', replace: null }, 'p0');
     const p = playerById(game.state, 'p0')!;
-    expect(p.activeCards).toEqual(['holzlager', 'steinbruch']);
+    expect(p.activeCards).toEqual(['holzlager', 'steinbruch', 'ziegelei']);
     expect(p.cards).toContain('schafzucht');
   });
 
   it('ersetzt ohne Angabe wie bisher die aelteste', () => {
     const game = mitVollenPlaetzen();
     must(game, kartenwahl('schafzucht'), 'p0');
-    expect(playerById(game.state, 'p0')!.activeCards).toEqual(['steinbruch', 'schafzucht']);
+    expect(playerById(game.state, 'p0')!.activeCards).toEqual(['steinbruch', 'ziegelei', 'schafzucht']);
   });
 
   it('stellt die aktiven Karten aus dem Besitz um', () => {
     const game = solo();
     runSetup(game);
     const p = playerById(game.state, 'p0')!;
-    p.cards = ['holzlager', 'steinbruch', 'schafzucht'];
+    p.cards = ['holzlager', 'steinbruch', 'schafzucht', 'ziegelei'];
     p.activeCards = ['holzlager', 'steinbruch'];
     game.state.phase = { t: 'main' };
     must(game, { t: 'setLoadout', cards: ['schafzucht', 'holzlager'] }, 'p0');
     expect(playerById(game.state, 'p0')!.activeCards).toEqual(['schafzucht', 'holzlager']);
-    expect(applyAction(game, { t: 'setLoadout', cards: ['schafzucht', 'holzlager', 'steinbruch'] }, 'p0').ok).toBe(false);
+    expect(applyAction(game, { t: 'setLoadout', cards: ['schafzucht', 'holzlager', 'steinbruch', 'ziegelei'] }, 'p0').ok).toBe(false);
     expect(applyAction(game, { t: 'setLoadout', cards: ['der_fund'] }, 'p0').ok).toBe(false);
     expect(applyAction(game, { t: 'setLoadout', cards: ['holzlager', 'holzlager'] }, 'p0').ok).toBe(false);
   });
 });
 
 describe('Dauerwirkungen', () => {
-  it('hat anfangs zwei aktive Plaetze und ersetzt bei einer neuen Wahl die aelteste Karte', () => {
+  it('hat anfangs drei aktive Plaetze und ersetzt bei einer neuen Wahl die aelteste Karte', () => {
     const game = solo();
     const p = playerById(game.state, 'p0')!;
-    expect(reichskartenPlaetze(game.state, 'p0')).toBe(2);
+    expect(reichskartenPlaetze(game.state, 'p0')).toBe(3);
     aktiviereNeueReichskarte(game.state, p, 'holzlager');
     aktiviereNeueReichskarte(game.state, p, 'steinbruch');
+    aktiviereNeueReichskarte(game.state, p, 'ziegelei');
     aktiviereNeueReichskarte(game.state, p, 'schafzucht');
-    expect(p.activeCards).toEqual(['steinbruch', 'schafzucht']);
+    expect(p.activeCards).toEqual(['steinbruch', 'ziegelei', 'schafzucht']);
   });
 
   it('begrenzt gleichartige Ertragsboni', () => {

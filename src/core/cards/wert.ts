@@ -58,6 +58,8 @@ export const WERT_SPANNE: Record<Rarity, readonly [number, number]> = {
 };
 
 export function kartenWert(c: Card): number {
+  // Engine-Karten tragen ihren Wert selbst (ENGINE_KARTEN.md, Spalte Balance).
+  if (c.wert !== undefined) return c.wert;
   let w = 0;
   if (c.instant?.t === 'gain') {
     for (const r of RESOURCES) w += (c.instant.resources[r] ?? 0) * WERT.rohstoff;

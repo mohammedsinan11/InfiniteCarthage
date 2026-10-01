@@ -11,11 +11,9 @@
  */
 
 import { cardById } from './catalog';
-import { wirksameKarten } from './sippen';
-import type { SippenZaehler } from './sippen';
 import { dauerwirkungen } from './types';
-import type { KartenPunkteQuelle } from './types';
-import type { Terrain } from '../types';
+import type { Anlass, Bauwerk, Groesse, KartenPunkteQuelle, Lasting, Sperre } from './types';
+import type { Resource, Terrain } from '../types';
 
 export type Modifiers = {
   /** Zusaetzlicher Ertrag je Gelaende, kann negativ sein. */
@@ -42,7 +40,35 @@ export type Modifiers = {
   stadtRuhm: number;
   lagerBeute: number;
   ruinenBeute: number;
+  /*
+   * ENGINE (ENGINE_KARTEN.md). Was ueber `je` skaliert, umgeht die Deckel
+   * der gewoehnlichen Karten - sonst waere Skalierung tot.
+   */
+  /** Gelaendebonus aus Skalierung, zusaetzlich zum gedeckelten. */
+  terrainSkaliert: Partial<Record<Terrain, number>>;
+  /** Bankrabatt aus Skalierung, zusaetzlich zum gedeckelten. */
+  tradeSkaliert: number;
+  /** Feste Siegpunkte (punkte, auch skaliert). */
+  punkte: number;
+  ersatz: { von: Resource; fuer: Resource | 'alle'; bei: Bauwerk | 'alle' }[];
+  rabatt: { bei: Bauwerk; resource: Resource; amount: number }[];
+  ertragMal: { faktor: number; terrain?: Terrain; zahlen?: readonly number[]; gebaeude?: 'dorf' | 'stadt' }[];
+  grundErtrag: { dorf: number; stadt: number } | null;
+  siebenLiefert: boolean;
+  /** Fuer welche Anlaesse die Wenn-Karten doppelt ausloesen ('*': alle). */
+  nachhall: (Anlass['bei'] | '*')[];
+  ausloeserJahr: boolean;
+  beuteStattVerlust: boolean;
+  /** Fester Bankkurs: [Kurs, nur fuer diese Sorte]. */
+  kurs: { ratio: number; nur?: Resource }[];
+  sperren: Sperre[];
 };
+
+/**
+ * Woran `je` misst (ENGINE_KARTEN.md, Groesse). Ohne Kontext zaehlt jede
+ * Groesse als 0 - alte Aufrufer bleiben richtig, nur ohne Skalierung.
+ */
+export type KartenKontext = { groesse: (g: Groesse, karte: string) => number };
 
 const leer = (): Modifiers => ({
   terrainBonus: {},
@@ -59,10 +85,52 @@ const leer = (): Modifiers => ({
   stadtRuhm: 0,
   lagerBeute: 0,
   ruinenBeute: 0,
+  terrainSkaliert: {},
+  tradeSkaliert: 0,
+  punkte: 0,
+  ersatz: [],
+  rabatt: [],
+  ertragMal: [],
+  grundErtrag: null,
+  siebenLiefert: false,
+  nachhall: [],
+  ausloeserJahr: false,
+  beuteStattVerlust: false,
+  kurs: [],
+  sperren: [],
 });
 const LEER: Modifiers = leer();
 
-export function modifiersOf(cardIds: readonly string[]): Modifiers {
+/** Eine skalierte Wirkung n-mal anrechnen - an den Deckeln vorbei. */
+function skaliert(m: Modifiers, l: Lasting, n: number): number {
+  if (n <= 0) return 0;
+  switch (l.t) {
+    case 'terrainBonus':
+      m.terrainSkaliert[l.terrain] = (m.terrainSkaliert[l.terrain] ?? 0) + l.amount * n;
+      return 0;
+    case 'tradeDiscount':
+      m.tradeSkaliert += l.amount * n;
+      return 0;
+    case 'handLimit':
+      return l.amount * n;
+    case 'schutz':
+      m.schutz += l.amount * n;
+      return 0;
+    case 'siebenGabe':
+      m.siebenGabe += l.anzahl * n;
+      return 0;
+    case 'marktRabatt':
+      m.marktRabatt += l.amount * n;
+      return 0;
+    case 'punkte':
+      m.punkte += l.amount * n;
+      return 0;
+    default:
+      return 0;
+  }
+}
+
+export function modifiersOf(cardIds: readonly string[], kontext?: KartenKontext): Modifiers {
   if (cardIds.length === 0) return LEER;
 
   const m: Modifiers = leer();
@@ -72,6 +140,45 @@ export function modifiersOf(cardIds: readonly string[]): Modifiers {
     if (!karte) continue;
     for (const l of dauerwirkungen(karte)) {
       switch (l.t) {
+        case 'je': {
+          const g = kontext ? kontext.groesse(l.groesse, id) : 0;
+          const n = Math.max(0, Math.min(l.max, Math.floor(g / Math.max(1, l.pro))));
+          stapelnd += skaliert(m, l.dann, n);
+          break;
+        }
+        case 'punkte':
+          m.punkte += l.amount;
+          break;
+        case 'ersatz':
+          m.ersatz.push({ von: l.von, fuer: l.fuer, bei: l.bei });
+          break;
+        case 'rabatt':
+          m.rabatt.push({ bei: l.bei, resource: l.resource, amount: l.amount });
+          break;
+        case 'ertragMal':
+          m.ertragMal.push({ faktor: l.faktor, terrain: l.terrain, zahlen: l.zahlen, gebaeude: l.gebaeude });
+          break;
+        case 'grundErtrag':
+          m.grundErtrag = { dorf: l.dorf, stadt: l.stadt };
+          break;
+        case 'siebenLiefert':
+          m.siebenLiefert = true;
+          break;
+        case 'nachhall':
+          m.nachhall.push(l.bei ?? '*');
+          break;
+        case 'ausloeserJahr':
+          m.ausloeserJahr = true;
+          break;
+        case 'beuteStattVerlust':
+          m.beuteStattVerlust = true;
+          break;
+        case 'kurs':
+          m.kurs.push({ ratio: l.ratio, nur: l.nur });
+          break;
+        case 'sperre':
+          if (!m.sperren.includes(l.was)) m.sperren.push(l.was);
+          break;
         case 'terrainBonus':
           m.terrainBonus[l.terrain] = Math.max(
             -1,
@@ -137,40 +244,21 @@ export function modifiersOf(cardIds: readonly string[]): Modifiers {
  * dazu fuehren, dass man beim Wuerfeln Karten abgibt.
  */
 export function terrainBonusFor(m: Modifiers, terrain: Terrain, base: number): number {
-  return Math.max(0, base + (m.terrainBonus[terrain] ?? 0));
+  return Math.max(0, base + (m.terrainBonus[terrain] ?? 0) + (m.terrainSkaliert[terrain] ?? 0));
 }
 
-/** Was kartenPunkte vom Spielstand braucht - auch die redigierte Sicht hat es. */
-export type PunkteSicht = {
-  players: ReadonlyArray<{ id: string; activeCards: readonly string[]; sippe?: SippenZaehler; sippeSeit?: SippenZaehler }>;
-  buildings: Record<string, { owner: string; type: 'settlement' | 'city' }>;
-  roads: Record<string, string>;
-  chronik?: { stats: Record<string, { lager: number; ruinen: number; auftraege: number }> } | null;
-};
-
-/**
- * Siegpunkte aus aktiven Karten mit Punktewirkung - etwa "je 2 Staedte ein
- * Punkt". Eine Funktion fuer Server (state.ts, publicPoints) und Anzeige.
- */
-export function kartenPunkte(state: PunkteSicht, id: string): number {
-  const p = state.players.find((x) => x.id === id);
-  if (!p) return 0;
-  const m = modifiersOf(wirksameKarten(p));
-  if (m.siegpunkte.length === 0) return 0;
-  const stats = state.chronik?.stats[id];
-  const zahl = (je: KartenPunkteQuelle): number => {
-    switch (je) {
-      case 'stadt':
-        return Object.values(state.buildings).filter((b) => b.owner === id && b.type === 'city').length;
-      case 'strasse':
-        return Object.values(state.roads).filter((o) => o === id).length;
-      case 'lager':
-        return stats?.lager ?? 0;
-      case 'ruine':
-        return stats?.ruinen ?? 0;
-      case 'auftrag':
-        return stats?.auftraege ?? 0;
-    }
-  };
-  return m.siegpunkte.reduce((n, s) => n + Math.floor(zahl(s.je) / s.pro), 0);
+/** Der Ertragsfaktor fuer ein Feld, nach allen Plus-Werten - hoechstens x8 (ENGINE_KARTEN.md). */
+export const ERTRAG_MAL_MAX = 8;
+export function ertragsFaktor(m: Modifiers, terrain: Terrain, roll: number, gebaeude: 'dorf' | 'stadt'): number {
+  let f = 1;
+  for (const e of m.ertragMal) {
+    if (e.terrain && e.terrain !== terrain) continue;
+    if (e.zahlen && !e.zahlen.includes(roll)) continue;
+    if (e.gebaeude && e.gebaeude !== gebaeude) continue;
+    f *= e.faktor;
+  }
+  return Math.min(ERTRAG_MAL_MAX, f);
 }
+
+/** Ist das fuer diese Karten gesperrt? */
+export const gesperrt = (m: Modifiers, was: Sperre): boolean => m.sperren.includes(was);

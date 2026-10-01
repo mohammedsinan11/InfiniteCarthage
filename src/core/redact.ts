@@ -52,6 +52,10 @@ export type PublicPlayer = {
   loot: number;
   /** Offene Trophaeen besiegter Bosse - oeffentlich wie die Beute. */
   trophaeen: number;
+  /** Zaehler der Engine-Karten - oeffentlich wie die Karten (ENGINE_KARTEN.md). */
+  zaehler: Record<string, number>;
+  /** Die Schluesselkarte im Kronplatz. */
+  krone: string | null;
   /** Wann der gefallene Held zurueckkehrt, oder null - oeffentlich wie sein Fall. */
   heldZurueck: number | null;
   /** Frist bis zum Untergang (Zugnummer) oder null - oeffentlich: alle sehen, wer wankt. */
@@ -201,6 +205,8 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
       equipment: [...p.equipment],
       loot: p.loot,
       trophaeen: p.trophaeen ?? 0,
+      zaehler: { ...(p.zaehler ?? {}) },
+      krone: p.krone ?? null,
       heldZurueck: p.heldZurueck,
       untergang: p.untergang ?? null,
       besiegt: p.besiegt ?? false,

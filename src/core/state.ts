@@ -17,7 +17,7 @@ import type { ChunkCoord } from './chunks';
 import type { DraftSource } from './cards/types';
 import type { HeldLore } from './lore';
 import type { Chronik } from './chronik';
-import { kartenPunkte } from './cards/effects';
+import { kartenPunkte } from './cards/wirkung';
 import { wunderPunkte } from './wunder';
 import type { Wunder } from './wunder';
 import { aktPunkte } from './akte';
@@ -132,6 +132,15 @@ export type Player = {
   haus?: string | null;
   /** Offene Trophaeen besiegter Bosse (core/akte.ts) - je eine Kartenwahl mit seltenen Karten. */
   trophaeen?: number;
+  /**
+   * Zaehler der Engine-Karten (cards/ausloeser.ts): Kartenkennung oder ein
+   * benannter Topf mit '#' -> Stand. Oeffentlich wie die Karten.
+   */
+  zaehler?: Record<string, number>;
+  /** Wie oft jeder Ausloeser in diesem Zug schon kam (jeZug). Nur serverseitig. */
+  zaehlerZug?: { turn: number; n: Record<string, number> };
+  /** Die Schluesselkarte im Kronplatz - es wirkt immer nur eine. */
+  krone?: string | null;
 };
 
 /** Die drei Helden, die der Koenigssitz freischaltet - einer davon, fuer immer. */

@@ -5,7 +5,8 @@ import { applyAction, createGame, wuerfelFuer } from '../src/core/rules/reducer'
 import type { Game } from '../src/core/rules/reducer';
 import { productionSources } from '../src/core/rules/production';
 import { raidLoss } from '../src/core/rules/raid';
-import { kartenPunkte, modifiersOf } from '../src/core/cards/effects';
+import { modifiersOf } from '../src/core/cards/effects';
+import { kartenPunkte } from '../src/core/cards/wirkung';
 import { publicPoints } from '../src/core/state';
 import { hexKey, hexVertices, vertexKey } from '../src/core/coords';
 import { legalRoadEdges, legalSettlementVertices } from '../src/core/rules/placement';

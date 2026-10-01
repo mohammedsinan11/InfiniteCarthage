@@ -250,7 +250,11 @@ function vervollstaendige(msg: ServerMsg): void {
     msg.state.handelsstrasse ??= null;
     msg.state.akte ??= null;
     msg.state.systeme ??= null;
-    for (const p of msg.state.players) p.trophaeen ??= 0;
+    for (const p of msg.state.players) {
+      p.trophaeen ??= 0;
+      p.zaehler ??= {};
+      p.krone ??= null;
+    }
     msg.state.koop ??= false;
     msg.state.szenario ??= null;
     msg.state.szenarioErgebnis ??= null;

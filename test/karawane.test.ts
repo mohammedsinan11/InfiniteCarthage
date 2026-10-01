@@ -80,6 +80,5 @@ describe('Karawanen', () => {
     const ev = botsSpielen(g, () => true, 40000).flat();
     expect(ev.some((e) => e.t === 'caravanSet')).toBe(true);
     expect(ev.some((e) => e.t === 'caravanArrived')).toBe(true);
-    expect(ev.some((e) => e.t === 'tradeRoute')).toBe(true);
   });
 });

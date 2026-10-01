@@ -7,7 +7,8 @@ import { legalRoadEdges, legalSettlementVertices } from '../src/core/rules/place
 import { currentPlayerId } from '../src/core/state';
 import type { PlayerId } from '../src/core/state';
 import { CARDS } from '../src/core/cards/catalog';
-import { SIPPEN_BONI, SIPPE_VON, naechsteStufe, sippenBoni, wirksameKarten } from '../src/core/cards/sippen';
+import { SIPPEN_BONI, SIPPE_VON, naechsteStufe, sippenBoni } from '../src/core/cards/sippen';
+import { wirksameKarten } from '../src/core/cards/wirkung';
 import { modifiersOf } from '../src/core/cards/effects';
 import { draftOptions } from '../src/core/cards/draft';
 

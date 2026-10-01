@@ -104,7 +104,7 @@ export function akteFortschreiben(s: GameState, events: Ereignisse, beendet: num
         }
       }
       // Wer gepluendert hat, ist entkommen - dann ist der Akt nicht mehr zu gewinnen.
-      if (f.ids && s.units.some((u) => f.ids!.includes(u.id) && u.traegt > 0)) f.entkommen = true;
+      if (f.ids && s.units.some((u) => f.ids!.includes(u.id) && (u.traegt > 0 || u.auftrag === 'heimkehr'))) f.entkommen = true;
     }
 
     // Frueh geschafft: sofort belohnen.

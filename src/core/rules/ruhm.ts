@@ -9,7 +9,7 @@ export type RuhmEvent = {
   t: 'glory';
   player: PlayerId;
   amount: number;
-  reason: 'lager' | 'auftrag' | 'veteran' | 'morast' | 'ereignis' | 'wunder' | 'vorhaben' | 'sippe';
+  reason: 'lager' | 'auftrag' | 'veteran' | 'morast' | 'ereignis' | 'wunder' | 'vorhaben' | 'sippe' | 'karte';
 };
 
 type Ereignis = { t: string } & Record<string, unknown>;
@@ -28,7 +28,7 @@ function fuehrer(s: GameState): PlayerId | null {
   return best;
 }
 
-function geben(s: GameState, id: PlayerId, amount: number, reason: RuhmEvent['reason'], out: Ausgabe): void {
+export function geben(s: GameState, id: PlayerId, amount: number, reason: RuhmEvent['reason'], out: Ausgabe): void {
   const p = s.players.find((x) => x.id === id);
   if (!p || amount <= 0) return;
   p.ruhm += amount;

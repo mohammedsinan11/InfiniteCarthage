@@ -20,9 +20,9 @@
  * Nur in Partien mit Ereignissen zaehlt der Zaehler; alte Staende haben keinen.
  */
 
-import type { Card } from './types';
+import type { Card, SippeId } from './types';
 
-export type Sippe = 'ernte' | 'handel' | 'bau' | 'krieg' | 'wildnis';
+export type Sippe = SippeId;
 
 export const SIPPEN: readonly Sippe[] = ['ernte', 'handel', 'bau', 'krieg', 'wildnis'];
 
@@ -100,6 +100,63 @@ export const SIPPE_VON: Record<string, Sippe> = {
   proviant: 'wildnis',
   spaeherpfad: 'wildnis',
   schatzkarte: 'wildnis',
+  // Engine- und Schluesselkarten (ENGINE_KARTEN.md).
+  saatgut: 'ernte',
+  erntedank: 'ernte',
+  kornspeicher: 'ernte',
+  pflugschar: 'ernte',
+  fruchtwechsel: 'ernte',
+  gluecksklee: 'ernte',
+  dreschflegel: 'ernte',
+  doppeljoch: 'ernte',
+  dorfidyll: 'ernte',
+  fuellhorn: 'ernte',
+  siebenstern: 'ernte',
+  ahnenmutter: 'ernte',
+  zollstation: 'handel',
+  wechselstube: 'handel',
+  kontor: 'handel',
+  seidenstrasse: 'handel',
+  gildenbrief: 'handel',
+  pfandleiher: 'handel',
+  wucherzins: 'handel',
+  hafenmeister: 'handel',
+  monopol: 'handel',
+  zinseszins: 'handel',
+  karawanserei: 'handel',
+  wegezoll: 'bau',
+  richtfest: 'bau',
+  zunfthaus: 'bau',
+  steinmetz: 'bau',
+  bauboom: 'bau',
+  fachwerk: 'bau',
+  grundstein: 'bau',
+  meilenstein: 'bau',
+  metropole: 'bau',
+  koenigsweg: 'bau',
+  ziegelgold: 'bau',
+  kriegskasse: 'krieg',
+  veteranen: 'krieg',
+  blutzoll: 'krieg',
+  bollwerk: 'krieg',
+  beutezug: 'krieg',
+  kriegsschmiede: 'krieg',
+  trommler: 'krieg',
+  kopfgeld: 'krieg',
+  raubritter: 'krieg',
+  blutmond_krone: 'krieg',
+  eiserne_krone: 'krieg',
+  wegweiser: 'wildnis',
+  sammelbeutel: 'wildnis',
+  fernweh: 'wildnis',
+  sternkarte: 'wildnis',
+  kraeuterkunde: 'wildnis',
+  lagerfeuer: 'wildnis',
+  sagenschreiber: 'wildnis',
+  jagdglueck: 'wildnis',
+  weltenbaum: 'wildnis',
+  bund_der_sippen: 'wildnis',
+  nomadenherz: 'wildnis',
 };
 
 export const sippeVon = (card: string): Sippe | undefined => SIPPE_VON[card];
@@ -130,28 +187,53 @@ export const SIPPEN_BONI: readonly (Card & { sippe: Sippe; ab: number })[] = [
 export type SippenZaehler = Partial<Record<Sippe, number>>;
 
 /**
+ * Was Schluesselkarten an den Sippen beugen (ENGINE_KARTEN.md): Karten einer
+ * Familie zaehlen mehrfach, mehr oder weniger Familien wirken, Stufen ab einer
+ * Zahl wirken nicht. Gelesen nur aus aktiven Karten und Krone, nie aus den
+ * Stufen selbst (cards/wirkung.ts, sippenRegeln) - sonst ein Kreis.
+ */
+export type SippenRegeln = { mal: Partial<Record<Sippe | 'alle', number>>; platz: number; deckel: number | null };
+export const KEINE_REGELN: SippenRegeln = { mal: {}, platz: 0, deckel: null };
+
+/** Die Zaehler, wie sie unter den Regeln zaehlen. */
+export function effektiveSippe(sippe: SippenZaehler | undefined, r: SippenRegeln = KEINE_REGELN): SippenZaehler | undefined {
+  if (!sippe || (Object.keys(r.mal).length === 0)) return sippe;
+  const out: SippenZaehler = {};
+  for (const s of SIPPEN) {
+    const n = sippe[s] ?? 0;
+    if (n > 0) out[s] = n * (r.mal[s] ?? 1) * (r.mal.alle ?? 1);
+  }
+  return out;
+}
+
+/**
  * Die wirkenden Familien: die mit den meisten Karten (mindestens der ersten
  * Stufe). Bei Gleichstand bleibt, wer seine Zahl frueher erreichte (seit: die
  * wievielte Wahl das war) - eine neue Familie verdraengt eine alte erst, wenn
  * sie sie ueberholt.
  */
-export function wirkendeSippen(sippe: SippenZaehler | undefined, seit?: SippenZaehler): Sippe[] {
+export function wirkendeSippen(sippe: SippenZaehler | undefined, seit?: SippenZaehler, regeln: SippenRegeln = KEINE_REGELN): Sippe[] {
   if (!sippe) return [];
+  sippe = effektiveSippe(sippe, regeln)!;
+  const z = sippe;
   return SIPPEN.filter((s) => (sippe[s] ?? 0) >= SIPPEN_STUFEN[0])
     .sort(
       (a, b) =>
-        (sippe[b] ?? 0) - (sippe[a] ?? 0) ||
+        (z[b] ?? 0) - (z[a] ?? 0) ||
         (seit?.[a] ?? Infinity) - (seit?.[b] ?? Infinity) ||
         SIPPEN.indexOf(a) - SIPPEN.indexOf(b),
     )
-    .slice(0, WIRKENDE_SIPPEN);
+    .slice(0, Math.max(0, WIRKENDE_SIPPEN + regeln.platz));
 }
 
 /** Welche Stufen wirken - als Kennungen der unsichtbaren Karten. */
-export function sippenBoni(sippe: SippenZaehler | undefined, seit?: SippenZaehler): string[] {
+export function sippenBoni(sippe: SippenZaehler | undefined, seit?: SippenZaehler, regeln: SippenRegeln = KEINE_REGELN): string[] {
   if (!sippe) return [];
-  const wirken = new Set(wirkendeSippen(sippe, seit));
-  return SIPPEN_BONI.filter((b) => wirken.has(b.sippe) && (sippe[b.sippe] ?? 0) >= b.ab).map((b) => b.id);
+  const wirken = new Set(wirkendeSippen(sippe, seit, regeln));
+  const z = effektiveSippe(sippe, regeln)!;
+  return SIPPEN_BONI.filter(
+    (b) => wirken.has(b.sippe) && (z[b.sippe] ?? 0) >= b.ab && (regeln.deckel === null || b.ab < regeln.deckel),
+  ).map((b) => b.id);
 }
 
 /** Die naechste Stufe einer Familie: wie viele noch fehlen und was sie bringt. null, wenn alle erreicht sind. */
@@ -161,10 +243,17 @@ export function naechsteStufe(sippe: SippenZaehler | undefined, s: Sippe): { feh
   return b ? { fehlt: b.ab - n, bonus: b } : null;
 }
 
-/** Aktive Karten plus erreichte Sippenstufen - das, was modifiersOf rechnen soll. */
-export function wirksameKarten(p: { activeCards: readonly string[]; sippe?: SippenZaehler; sippeSeit?: SippenZaehler }): string[] {
-  const boni = sippenBoni(p.sippe, p.sippeSeit);
-  return boni.length === 0 ? [...p.activeCards] : [...p.activeCards, ...boni];
+/**
+ * Aktive Karten, Krone und erreichte Sippenstufen - ohne Schluesselregeln.
+ * Die vollstaendige Fassung steht in cards/wirkung.ts (wirksameKarten).
+ */
+export function wirksameKartenRoh(
+  p: { activeCards: readonly string[]; krone?: string | null; sippe?: SippenZaehler; sippeSeit?: SippenZaehler },
+  regeln: SippenRegeln = KEINE_REGELN,
+): string[] {
+  const eigene = p.krone ? [...p.activeCards, p.krone] : [...p.activeCards];
+  const boni = sippenBoni(p.sippe, p.sippeSeit, regeln);
+  return boni.length === 0 ? eigene : [...eigene, ...boni];
 }
 
 export const sippenBonusById = (id: string): (typeof SIPPEN_BONI)[number] | undefined => SIPPEN_BONI.find((b) => b.id === id);

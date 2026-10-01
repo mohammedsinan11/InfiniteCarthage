@@ -93,7 +93,99 @@ export type Lasting =
   /** Jedes zerstoerte Lager bringt so viele Kartenwahlen mehr. */
   | { t: 'lagerBeute'; amount: number }
   /** Jede erkundete Ruine bringt so viele Kartenwahlen mehr. */
-  | { t: 'ruinenBeute'; amount: number };
+  | { t: 'ruinenBeute'; amount: number }
+  /*
+   * ENGINE (ENGINE_KARTEN.md): Ausloeser, Zaehler und Regelbrueche. Karten
+   * bleiben Daten - ausgewertet wird in cards/effects.ts (je, punkte und die
+   * Regelbrueche) und cards/ausloeser.ts (wenn).
+   */
+  /** Wenn X geschieht, dann Y. jeZug deckelt je Zug, jedesNte zaehlt mit. */
+  | { t: 'wenn'; anlass: Anlass; dann: Lohn | readonly Lohn[]; jeZug?: number; jedesNte?: number }
+  /** Wirkt n = min(max, floor(groesse/pro)) mal - die Skalierung. */
+  | { t: 'je'; groesse: Groesse; pro: number; max: number; dann: Lasting }
+  /** Feste Siegpunkte (meist als dann von je). */
+  | { t: 'punkte'; amount: number }
+  /** `von` zaehlt beim Bezahlen von `bei` 1:1 als `fuer`. */
+  | { t: 'ersatz'; von: Resource; fuer: Resource | 'alle'; bei: Bauwerk | 'alle' }
+  /** Kosten senken, nie unter null je Sorte. */
+  | { t: 'rabatt'; bei: Bauwerk; resource: Resource; amount: number }
+  /** Ertrag mal faktor, nach allen Plus-Werten - optional nur ein Gelaende, Zahlen oder Gebaeude. */
+  | { t: 'ertragMal'; faktor: number; terrain?: Terrain; zahlen?: readonly number[]; gebaeude?: 'dorf' | 'stadt' }
+  /** Grundertrag statt 1 und 2. */
+  | { t: 'grundErtrag'; dorf: number; stadt: number }
+  /** Faellt deine 7, liefert deine beste Zahl. */
+  | { t: 'siebenLiefert' }
+  /** Karten einer Familie zaehlen mal faktor. */
+  | { t: 'sippeMal'; sippe: SippeId | 'alle'; faktor: number }
+  /** So viele Familien mehr (oder weniger) wirken. */
+  | { t: 'sippenPlatz'; amount: number }
+  /** Stufen ab dieser Kartenzahl wirken nicht. */
+  | { t: 'sippenDeckel'; ab: number }
+  /** Deine Wenn-Karten (optional nur fuer einen Anlass) loesen doppelt aus. */
+  | { t: 'nachhall'; bei?: Anlass['bei'] }
+  /** Zu jedem Jahreszeitwechsel loesen alle deine Wenn-Karten aus. */
+  | { t: 'ausloeserJahr' }
+  /** Pluenderer geben dir, was sie dir nehmen wuerden. */
+  | { t: 'beuteStattVerlust' }
+  /** Fester Bankkurs, optional nur fuer eine abgegebene Sorte. */
+  | { t: 'kurs'; ratio: number; nur?: Resource }
+  /** Etwas ist fuer dich gesperrt - der Preis der Schluesselkarten. */
+  | { t: 'sperre'; was: Sperre };
+
+export type SippeId = 'ernte' | 'handel' | 'bau' | 'krieg' | 'wildnis';
+export type Bauwerk = 'strasse' | 'dorf' | 'stadt' | 'truppe';
+export type Sperre = 'bank' | 'markt' | 'stadt' | 'truppe' | 'mauer' | 'fund' | 'gruendungswahl';
+
+/** Woran gemessen wird - jede Groesse ist oeffentlich. */
+export type Groesse =
+  /** Player.zaehler[key ?? eigene Kartenkennung]. */
+  | { aus: 'zaehler'; key?: string }
+  /** Genommene Karten einer Familie (oder der staerksten). */
+  | { aus: 'sippe'; sippe: SippeId | 'beste' }
+  /** Aktive Karten (mit Krone), optional nur einer Familie. */
+  | { aus: 'aktiv'; sippe?: SippeId }
+  | { aus: 'bau'; art: 'strasse' | 'dorf' | 'stadt' }
+  | { aus: 'chronik'; art: 'lager' | 'ruinen' | 'auftraege' }
+  | { aus: 'ruhm' }
+  | { aus: 'hand' };
+
+/** Ein Anlass - gelesen aus den Ereignissen einer Aktion (cards/ausloeser.ts). */
+export type Anlass =
+  | {
+      bei:
+        | 'strasse'
+        | 'dorf'
+        | 'stadt'
+        | 'karawane'
+        | 'kampfSieg'
+        | 'raubzugAbgewehrt'
+        | 'lager'
+        | 'ruine'
+        | 'auftrag'
+        | 'handel'
+        | 'markt'
+        | 'karte'
+        | 'jahreszeit'
+        | 'bossBesiegt'
+        | 'pluenderung';
+      /** Nur beim Handel: hoechstens zu diesem Kurs (2 = 2:1). */
+      kurs?: number;
+    }
+  | { bei: 'wurf'; zahlen?: readonly number[]; wer?: 'ich' | 'jeder' }
+  | { bei: 'ertrag'; resource?: Resource };
+
+/** Was ein Ausloeser gibt. */
+export type Lohn =
+  | { t: 'gain'; resources: Partial<Record<Resource, number>> }
+  | { t: 'gainAny'; count: number }
+  | { t: 'ruhm'; amount: number }
+  /** menge: so viel, wie das Ereignis brachte (Ertrag, Karawanengut). */
+  | { t: 'zaehler'; amount: number | 'menge'; key?: string }
+  /** Kartenwahlen als Beute. */
+  | { t: 'wahl'; anzahl: number }
+  | { t: 'heilen'; amount: number }
+  /** floor(groesse/pro) Stueck, hoechstens max; ohne resource zufaellig. */
+  | { t: 'gainJe'; je: Groesse; pro: number; max: number; resource?: Resource };
 
 export type KartenPunkteQuelle = 'stadt' | 'lager' | 'ruine' | 'auftrag' | 'strasse';
 
@@ -121,6 +213,16 @@ export type Card = {
   lasting?: Lasting | readonly Lasting[];
   /** Eine oder mehrere Wirkungen einer ausspielbaren Taktikkarte. */
   tactic?: TacticEffect | readonly TacticEffect[];
+  /**
+   * Schluesselkarte (ENGINE_KARTEN.md): liegt im Kronplatz, getrennt von den
+   * Reichskarten-Plaetzen. Es wirkt immer nur eine.
+   */
+  schluessel?: true;
+  /**
+   * Geschaetzter Wert ueber die Partie (cards/wert.ts) - fuer Engine-Karten,
+   * deren Wirkung vom Spielverlauf abhaengt. Fehlt: aus den Wirkungen gerechnet.
+   */
+  wert?: number;
   /**
    * Nur als Beute (Ruinen, Lager, Auftraege) - nie im Fund, auf dem Markt oder
    * bei einer Gruendung. Fuer die grossen Rohstoffkarten (Spieltest 6: die

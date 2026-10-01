@@ -4,9 +4,14 @@ import { cardById } from './catalog';
 import { cardKind, dauerwirkungen } from './types';
 import type { GameState, Player, PlayerId } from '../state';
 
-export const REICHSKARTEN_PLAETZE = 2;
-export const HAUPTSTADT_KARTEN_PLAETZE = 3;
-export const KOENIGSSITZ_KARTEN_PLAETZE = 4;
+/**
+ * Drei Plaetze von Beginn an (ENGINE_KARTEN.md: eine Engine braucht Raum),
+ * vier mit Hauptstadt, fuenf mit Koenigssitz - dazu der Kronplatz fuer eine
+ * Schluesselkarte.
+ */
+export const REICHSKARTEN_PLAETZE = 3;
+export const HAUPTSTADT_KARTEN_PLAETZE = 4;
+export const KOENIGSSITZ_KARTEN_PLAETZE = 5;
 
 export function reichskartenPlaetze(
   state: Pick<GameState, 'hauptstaedte'>,
@@ -22,7 +27,8 @@ export function reichskartenPlaetze(
 
 export function istDauerhafteReichskarte(id: string): boolean {
   const c = cardById(id);
-  return !!c && cardKind(c) === 'reich' && dauerwirkungen(c).length > 0;
+  // Schluesselkarten liegen im Kronplatz, nicht in den Plaetzen.
+  return !!c && cardKind(c) === 'reich' && dauerwirkungen(c).length > 0 && !c.schluessel;
 }
 
 /**

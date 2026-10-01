@@ -11,12 +11,11 @@
  * Haelfte statt einer Karte. Was genommen wird, tragen die Raeuber heim.
  */
 
-import { wirksameKarten } from '../cards/sippen';
+import { wirkungenVon } from '../cards/wirkung';
 import { RESOURCES } from '../types';
 import { emptyHand, handSize } from '../state';
 import { isHoarding } from './handlimit';
 import { hausPluenderung } from '../haus';
-import { modifiersOf } from '../cards/effects';
 import { hatWunder } from '../wunder';
 import type { Resource } from '../types';
 import type { GameState, Hand, PlayerId } from '../state';
@@ -34,7 +33,7 @@ export function raidLoss(state: GameState, id: PlayerId, raiders: number): numbe
   // Das Haus (core/haus.ts): Waldvolk und Ebene verlieren eine Karte mehr, die
   // Speicherherren eine weniger - aber nie weniger als keine.
   const koloss = hatWunder(state, id, 'koloss') ? 2 : 0;
-  const je = Math.max(0, raiders + hausPluenderung(p.haus) - modifiersOf(wirksameKarten(p)).schutz - koloss);
+  const je = Math.max(0, raiders + hausPluenderung(p.haus) - wirkungenVon(state, id).schutz - koloss);
   return Math.min(gehalten, Math.max(je, gehortet));
 }
 

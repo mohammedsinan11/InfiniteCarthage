@@ -10,10 +10,9 @@
  * weil sie jemanden anziehen - nicht, weil eine Zahl faellt.
  */
 
-import { wirksameKarten } from '../cards/sippen';
+import { wirkungenVon } from '../cards/wirkung';
 import type { SippenZaehler } from '../cards/sippen';
 import { handSize } from '../state';
-import { modifiersOf } from '../cards/effects';
 import { handGrenzeBonus } from '../omen';
 import { hausHandGrenze } from '../haus';
 import type { Hand, PlayerId } from '../state';
@@ -24,7 +23,9 @@ import type { Hand, PlayerId } from '../state';
  * eigene Hand, fremde nicht.
  */
 export type HandView = {
-  players: ReadonlyArray<{ id: PlayerId; activeCards: readonly string[]; sippe?: SippenZaehler; sippeSeit?: SippenZaehler; hand?: Hand; haus?: string | null }>;
+  players: ReadonlyArray<{ id: PlayerId; activeCards: readonly string[]; krone?: string | null; sippe?: SippenZaehler; sippeSeit?: SippenZaehler; zaehler?: Record<string, number>; ruhm?: number; hand?: Hand; handCount?: number; haus?: string | null }>;
+  buildings?: Record<string, { owner: string; type: 'settlement' | 'city' }>;
+  roads?: Record<string, string>;
   /** Volle Speicher, Leere Taschen (core/omen.ts). */
   omens?: readonly string[];
 };
@@ -37,7 +38,8 @@ export function limitFor(state: HandView, id: PlayerId): number {
   const p = state.players.find((x) => x.id === id);
   const omen = handGrenzeBonus(state.omens);
   if (!p) return HAND_LIMIT + omen;
-  return HAND_LIMIT + modifiersOf(wirksameKarten(p)).handLimitBonus + omen + hausHandGrenze(p.haus);
+  // Die Karten - auch skalierte und negative (Zinseszins) - nie unter 2.
+  return Math.max(2, HAND_LIMIT + wirkungenVon(state, id).handLimitBonus + omen + hausHandGrenze(p.haus));
 }
 
 /** Haelt dieser Spieler mehr, als ihm zusteht? */
