@@ -1438,6 +1438,9 @@ export function Game() {
           zaehler={me?.zaehler}
           krone={me?.krone ?? null}
           onKrone={(card) => act({ t: 'setKrone', card })}
+          plus={me?.plus ?? []}
+          schmiede={me?.schmiede ?? 0}
+          onSchmieden={(card, art) => act({ t: 'schmieden', card, art })}
           mitHeld={hatSystem(state, 'held')}
           mitReich={hatSystem(state, 'reich')}
           sippe={state.ereignisseAn ? (me?.sippe ?? {}) : undefined}

@@ -141,6 +141,10 @@ export type Player = {
   zaehlerZug?: { turn: number; n: Record<string, number> };
   /** Die Schluesselkarte im Kronplatz - es wirkt immer nur eine. */
   krone?: string | null;
+  /** Verbesserte Karten (cards/plus.ts) - Kennungen der Grundkarten. Oeffentlich. */
+  plus?: string[];
+  /** Offene Schmiedearbeiten: je eine Karte verbessern oder verbrennen (rules/schmiede.ts). */
+  schmiede?: number;
 };
 
 /** Die drei Helden, die der Koenigssitz freischaltet - einer davon, fuer immer. */

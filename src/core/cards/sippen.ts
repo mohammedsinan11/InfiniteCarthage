@@ -159,7 +159,8 @@ export const SIPPE_VON: Record<string, Sippe> = {
   nomadenherz: 'wildnis',
 };
 
-export const sippeVon = (card: string): Sippe | undefined => SIPPE_VON[card];
+// Verbesserte Karten (kennung+) gehoeren zur Familie ihrer Grundkarte.
+export const sippeVon = (card: string): Sippe | undefined => SIPPE_VON[card.endsWith('+') ? card.slice(0, -1) : card];
 
 /**
  * Die Stufen als unsichtbare Karten. Kennungen beginnen mit "sippe:" - sie

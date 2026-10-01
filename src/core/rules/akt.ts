@@ -35,7 +35,11 @@ function besiegt(s: GameState, st: BossStand, id: PlayerId, events: Ereignisse):
   const akte = s.akte!;
   akte.siege[id] = [...(akte.siege[id] ?? []), st.akt];
   const p = playerById(s, id);
-  if (p) p.trophaeen = (p.trophaeen ?? 0) + 1;
+  // Dazu eine Schmiedearbeit (rules/schmiede.ts): verbessern oder verbrennen.
+  if (p) {
+    p.trophaeen = (p.trophaeen ?? 0) + 1;
+    p.schmiede = (p.schmiede ?? 0) + 1;
+  }
   events.push({ t: 'bossBesiegt', player: id, akt: st.akt, boss: st.boss, punkte: st.akt });
 }
 

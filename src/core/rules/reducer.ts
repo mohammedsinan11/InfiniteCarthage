@@ -117,6 +117,8 @@ import { cardById } from '../cards/catalog';
 import { cardKind, dauerwirkungen, istEinzigartig, wiederholbar } from '../cards/types';
 import { gesperrt } from '../cards/effects';
 import { ausloeserAusEreignissen } from '../cards/ausloeser';
+import { schmieden } from './schmiede';
+import type { SchmiedeArt, SchmiedeEvent } from './schmiede';
 import type { AusloeserEvent } from '../cards/ausloeser';
 import { bezahle, kannBezahlen } from './kosten';
 import type { DraftSource } from '../cards/types';
@@ -218,6 +220,8 @@ export type Action =
   | { t: 'claimLoot' }
   /** Eine eigene Schluesselkarte in den Kronplatz legen (ENGINE_KARTEN.md). */
   | { t: 'setKrone'; card: string }
+  /** Eine Karte verbessern oder verbrennen (rules/schmiede.ts). */
+  | { t: 'schmieden'; card: string; art: SchmiedeArt }
   /** Tribut an den Boss des Aktes zahlen: so viel von dieser Sorte, wie fehlt (core/akte.ts). */
   | { t: 'bossZahlen'; resource: Resource }
   /** Ein eigenes Feuer mit einer Rohstoffkarte loeschen (rules/feuer.ts). */
@@ -286,6 +290,7 @@ export type GameEvent =
   | ArmyEvent
   | AktEvent
   | AusloeserEvent
+  | SchmiedeEvent
   | UntergangEvent
   | HilfeEvent
   | VorhabenEvent
@@ -674,6 +679,7 @@ function wendeFolgeAn(s: GameState, p: Player, folge: Folge, events: GameEvent[]
     }
   }
   p.loot += folge.beute ?? 0;
+  p.schmiede = (p.schmiede ?? 0) + (folge.schmiede ?? 0);
   for (let i = 0; i < (folge.ritter ?? 0); i++) spawnKnight(s, p.id, events);
   return verloren;
 }
@@ -1092,6 +1098,14 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       s.phase = s.ereignis ? { t: 'ereignis' } : { t: 'main' };
       events.push({ t: 'cardTaken', player: actor, card: karte.id });
       checkWin(s, events);
+      break;
+    }
+
+    case 'schmieden': {
+      if (phase.t !== 'main') return fail('Geschmiedet wird in der Bauphase.');
+      if (action.art !== 'verbessern' && action.art !== 'verbrennen') return fail('Unbekannte Schmiedearbeit.');
+      const why = schmieden(s, actor, action.card, action.art, events);
+      if (why) return fail(why);
       break;
     }
 

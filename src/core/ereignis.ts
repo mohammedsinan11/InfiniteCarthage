@@ -35,6 +35,8 @@ export type Folge = {
   ruhm?: number;
   /** Ritter, die an einer Siedlung antreten. */
   ritter?: number;
+  /** Schmiedearbeiten: eine Karte verbessern oder verbrennen (rules/schmiede.ts). */
+  schmiede?: number;
 };
 
 export type Wahl = {
@@ -72,6 +74,7 @@ export const EREIGNISSE: readonly Ereignis[] = [
     text: 'Er sucht einen Herrn, dem er dienen kann. Sein Hammer ist schwer, sein Lohn auch.',
     wahlen: [
       { text: 'Anwerben (2 Erz): ein Ritter tritt an', folge: { zahle: r({ ore: 2 }), ritter: 1 } },
+      { text: 'Eine Karte schmieden lassen (1 Erz, 1 Holz): verbessern oder verbrennen', folge: { zahle: r({ ore: 1, lumber: 1 }), schmiede: 1 } },
       { text: 'Ihm Holz zum Arbeiten geben (2 Holz): 2 Erz', folge: { zahle: r({ lumber: 2 }), gib: r({ ore: 2 }) } },
       { text: 'Weiterziehen lassen', folge: {} },
     ],

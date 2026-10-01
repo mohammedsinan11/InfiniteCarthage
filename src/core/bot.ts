@@ -220,6 +220,15 @@ export function botAktion(state: GameState, world: World, id: PlayerId, versucht
     if (a) return a;
   }
 
+  // Schmiedearbeit: die erste aktive Karte verbessern (rules/schmiede.ts).
+  if ((p.schmiede ?? 0) > 0) {
+    const karte = [...(p.krone ? [p.krone] : []), ...p.activeCards].find((c) => p.cards.includes(c) && !(p.plus ?? []).includes(c));
+    if (karte) {
+      const a = neu({ t: 'schmieden', card: karte, art: 'verbessern' });
+      if (a) return a;
+    }
+  }
+
   // Tribut an den Boss des Aktes (core/akte.ts): was gefordert ist und auf der Hand liegt.
   const boss = state.akte?.stand[id];
   if (boss && boss.ergebnis === 'offen' && boss.forderung.t === 'tribut') {

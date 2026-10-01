@@ -415,6 +415,8 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
       return `${who(state, e.player)} zieht das Angebot zurueck.`;
     case 'glory':
       return `${who(state, e.player)} gewinnt ${e.amount} Ruhm.`;
+    case 'geschmiedet':
+      return `${who(state, e.player)} ${e.art === 'verbessern' ? 'verbessert' : 'verbrennt'} ${cardById(e.card)?.name ?? 'eine Karte'}.`;
     case 'kartenLohn': {
       const teile = [
         bundleText(e.gained),

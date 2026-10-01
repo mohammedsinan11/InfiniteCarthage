@@ -244,7 +244,15 @@ export function SideMenu({
   zaehler,
   krone = null,
   onKrone,
+  plus = [],
+  schmiede = 0,
+  onSchmieden,
 }: {
+  /** Verbesserte Karten (cards/plus.ts). */
+  plus?: readonly string[];
+  /** Offene Schmiedearbeiten (rules/schmiede.ts). */
+  schmiede?: number;
+  onSchmieden?: (card: string, art: 'verbessern' | 'verbrennen') => void;
   /** Zaehler der Engine-Karten (ENGINE_KARTEN.md). */
   zaehler?: Record<string, number>;
   /** Die Schluesselkarte im Kronplatz. */
@@ -577,7 +585,7 @@ export function SideMenu({
                         title={karte.text}
                         onClick={() => setKarteOffen((k) => (k === karte.id ? null : karte.id))}
                       >
-                        <Spielkarte karte={karte} groesse="mini" zaehler={zaehler?.[karte.id]} />
+                        <Spielkarte karte={plus.includes(karte.id) ? (cardById(karte.id + '+') ?? karte) : karte} groesse="mini" zaehler={zaehler?.[karte.id]} />
                         {karte.schluessel
                           ? krone === karte.id && <span className="menu-karte-status">Krone</span>
                           : dauerwirkungen(karte).length > 0 && activeCards.includes(karte.id) && <span className="menu-karte-status">Aktiv</span>}
@@ -588,8 +596,9 @@ export function SideMenu({
                 </ul>
                 {karteOffen &&
                   (() => {
-                    const k = cardById(karteOffen);
+                    const k = cardById(plus.includes(karteOffen) ? karteOffen + '+' : karteOffen);
                     if (!k) return null;
+                    const basisId = karteOffen;
                     const dauer = dauerwirkungen(k).length > 0 && !k.schluessel;
                     const an = activeCards.includes(k.id);
                     const voll = activeCards.length >= kartenPlaetze;
@@ -635,13 +644,27 @@ export function SideMenu({
                             </button>
                           </span>
                         )}
-                        {zaehler?.[k.id] !== undefined && <p className="menu-leer">Zaehler: {zaehler[k.id]}</p>}
+                        {zaehler?.[basisId] !== undefined && <p className="menu-leer">Zaehler: {zaehler[basisId]}</p>}
+                        {/* Die Schmiede (rules/schmiede.ts): verbessern oder verbrennen. */}
+                        {schmiede > 0 && onSchmieden && (
+                          <span className="menu-ritter-knoepfe">
+                            {!plus.includes(basisId) && k.kind !== 'taktik' && (
+                              <button disabled={!kannUmstellen} title={cardById(basisId + '+')?.text} onClick={() => onSchmieden(basisId, 'verbessern')}>
+                                Verbessern
+                              </button>
+                            )}
+                            <button disabled={!kannUmstellen} title="Die Karte verschwindet ganz - ihre Sippe zaehlt eine weniger." onClick={() => onSchmieden(basisId, 'verbrennen')}>
+                              Verbrennen
+                            </button>
+                          </span>
+                        )}
                         {dauer && !kannUmstellen && <p className="menu-leer">Umstellen geht nur in deiner Bauphase.</p>}
                       </div>
                     );
                   })()}
                 <p className="menu-leer">
                   Plaetze: {activeCards.length} von {kartenPlaetze} belegt.
+                  {schmiede > 0 && ` · ${schmiede === 1 ? 'Eine Schmiedearbeit' : `${schmiede} Schmiedearbeiten`} offen - tippe eine Karte an.`}
                 </p>
                 {wirkungen(activeCards).length > 0 && (
                   <>

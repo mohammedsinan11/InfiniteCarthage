@@ -169,3 +169,37 @@ describe('Kronplatz', () => {
     expect(cardById('metropole')!.schluessel).toBe(true);
   });
 });
+
+describe('Schmiede', () => {
+  it('verbessert: die Plus-Fassung wirkt staerker, Schluesselkarten ohne Verbot', async () => {
+    const { verbessert } = await import('../src/core/cards/plus');
+    const plus = verbessert(cardById('richtfest')!);
+    expect(plus.id).toBe('richtfest+');
+    expect(cardById('richtfest+')?.name).toBe('Richtfest+');
+    const fh = modifiersOf(['fuellhorn+']);
+    expect(fh.sperren).not.toContain('bank');
+    const { s, p } = partie();
+    p.cards = ['richtfest'];
+    p.activeCards = ['richtfest'];
+    p.plus = ['richtfest'];
+    ausloeserAusEreignissen(s, [{ t: 'build', player: 'p0', kind: 'settlement', at: 'v' }], sammeln(), { jahreszeit: false });
+    expect(p.hand.brick).toBe(2);
+    expect(p.ruhm).toBe(2);
+  });
+
+  it('verbrennen nimmt Karte, Platz, Zaehler und einen Sippenpunkt', () => {
+    const { g, p } = partie();
+    p.cards = ['wegezoll'];
+    p.activeCards = ['wegezoll'];
+    p.zaehler = { wegezoll: 4 };
+    p.sippe = { bau: 3 };
+    p.schmiede = 1;
+    expect(applyAction(g, { t: 'schmieden', card: 'wegezoll', art: 'verbrennen' }, 'p0').ok).toBe(true);
+    const q = g.state.players[0]!;
+    expect(q.cards).toEqual([]);
+    expect(q.activeCards).toEqual([]);
+    expect(q.zaehler?.wegezoll).toBeUndefined();
+    expect(q.sippe?.bau).toBe(2);
+    expect(applyAction(g, { t: 'schmieden', card: 'wegezoll', art: 'verbrennen' }, 'p0').ok).toBe(false);
+  });
+});

@@ -11,6 +11,7 @@
  */
 
 import { cardById } from './catalog';
+import { basisKennung } from './plus';
 import { dauerwirkungen } from './types';
 import type { Anlass, Lasting, Lohn } from './types';
 import { kontextVon, wirksameKarten, wirkungenVon } from './wirkung';
@@ -217,7 +218,7 @@ export function ausloeserAusEreignissen(
                 break;
               case 'zaehler': {
                 const n = lohn.amount === 'menge' ? v.menge : lohn.amount;
-                const k = lohn.key ?? karte;
+                const k = lohn.key ?? basisKennung(karte);
                 p.zaehler = { ...(p.zaehler ?? {}), [k]: (p.zaehler?.[k] ?? 0) + n };
                 zaehlerPlus += n;
                 break;

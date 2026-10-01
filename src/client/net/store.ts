@@ -254,6 +254,8 @@ function vervollstaendige(msg: ServerMsg): void {
       p.trophaeen ??= 0;
       p.zaehler ??= {};
       p.krone ??= null;
+      p.plus ??= [];
+      p.schmiede ??= 0;
     }
     msg.state.koop ??= false;
     msg.state.szenario ??= null;

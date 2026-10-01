@@ -18,6 +18,7 @@ import { sippeVon } from './sippen';
 import { dauerwirkungen } from './types';
 import type { Groesse, KartenPunkteQuelle } from './types';
 import { modifiersOf } from './effects';
+import { PLUS, basisKennung } from './plus';
 import type { KartenKontext, Modifiers } from './effects';
 import type { Resource } from '../types';
 
@@ -29,6 +30,8 @@ export type KartenSpieler = {
   sippe?: SippenZaehler;
   sippeSeit?: SippenZaehler;
   zaehler?: Record<string, number>;
+  /** Verbesserte Karten - sie wirken als "kennung+" (cards/plus.ts). */
+  plus?: readonly string[];
   ruhm?: number;
   /** Server: die Hand. */
   hand?: Partial<Record<Resource, number>>;
@@ -45,8 +48,11 @@ export type PunkteSicht = {
 };
 
 /** Eigene Karten, die wirken koennen: aktive und die Krone. */
-export const eigeneWirkKarten = (p: Pick<KartenSpieler, 'activeCards' | 'krone'>): string[] =>
-  p.krone ? [...p.activeCards, p.krone] : [...p.activeCards];
+export const eigeneWirkKarten = (p: Pick<KartenSpieler, 'activeCards' | 'krone' | 'plus'>): string[] => {
+  const ids = p.krone ? [...p.activeCards, p.krone] : [...p.activeCards];
+  // Verbesserte Karten wirken in ihrer Plus-Fassung (cards/plus.ts).
+  return p.plus && p.plus.length > 0 ? ids.map((id) => (p.plus!.includes(id) ? id + PLUS : id)) : ids;
+};
 
 /** Wie die Schluesselkarten (und andere) die Sippen beugen. */
 export function sippenRegeln(ids: readonly string[]): SippenRegeln {
@@ -66,8 +72,9 @@ export function sippenRegeln(ids: readonly string[]): SippenRegeln {
 }
 
 /** Aktive Karten, Krone und erreichte Sippenstufen - das, was modifiersOf rechnen soll. */
-export function wirksameKarten(p: Pick<KartenSpieler, 'activeCards' | 'krone' | 'sippe' | 'sippeSeit'>): string[] {
-  return wirksameKartenRoh(p, sippenRegeln(eigeneWirkKarten(p)));
+export function wirksameKarten(p: Pick<KartenSpieler, 'activeCards' | 'krone' | 'sippe' | 'sippeSeit' | 'plus'>): string[] {
+  const eigene = eigeneWirkKarten(p);
+  return wirksameKartenRoh({ ...p, activeCards: eigene, krone: null }, sippenRegeln(eigene));
 }
 
 const handZahl = (p: KartenSpieler): number =>
@@ -81,7 +88,7 @@ export function kontextVon(s: PunkteSicht, id: string): KartenKontext {
       if (!p) return 0;
       switch (g.aus) {
         case 'zaehler':
-          return p.zaehler?.[g.key ?? karte] ?? 0;
+          return p.zaehler?.[g.key ?? basisKennung(karte)] ?? 0;
         case 'sippe': {
           const z = effektiveSippe(p.sippe, sippenRegeln(eigeneWirkKarten(p))) ?? {};
           return g.sippe === 'beste' ? Math.max(0, ...SIPPEN.map((x) => z[x] ?? 0)) : (z[g.sippe] ?? 0);

@@ -56,6 +56,10 @@ export type PublicPlayer = {
   zaehler: Record<string, number>;
   /** Die Schluesselkarte im Kronplatz. */
   krone: string | null;
+  /** Verbesserte Karten (cards/plus.ts). */
+  plus: string[];
+  /** Offene Schmiedearbeiten. */
+  schmiede: number;
   /** Wann der gefallene Held zurueckkehrt, oder null - oeffentlich wie sein Fall. */
   heldZurueck: number | null;
   /** Frist bis zum Untergang (Zugnummer) oder null - oeffentlich: alle sehen, wer wankt. */
@@ -207,6 +211,8 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
       trophaeen: p.trophaeen ?? 0,
       zaehler: { ...(p.zaehler ?? {}) },
       krone: p.krone ?? null,
+      plus: [...(p.plus ?? [])],
+      schmiede: p.schmiede ?? 0,
       heldZurueck: p.heldZurueck,
       untergang: p.untergang ?? null,
       besiegt: p.besiegt ?? false,
