@@ -40,12 +40,22 @@ type Sicht = Pick<GameState, 'targetPoints'> & {
   koop?: boolean;
   szenario?: string | null;
   ereignisseAn?: boolean;
+  akte?: unknown;
+  /** Die Systeme der Partie (core/systeme.ts) - Siegwege gehoeren zum Reich. */
+  systeme?: readonly string[] | null;
   chronik?: GameState['chronik'] | null;
   wunder?: GameState['wunder'];
 };
 
 /** Gelten Siegwege in dieser Partie? */
-export const siegwegeAn = (s: Sicht): boolean => s.targetPoints > 0 && !s.koop && !s.szenario && s.ereignisseAn === true;
+export const siegwegeAn = (s: Sicht): boolean =>
+  s.targetPoints > 0 &&
+  !s.koop &&
+  !s.szenario &&
+  s.ereignisseAn === true &&
+  // Mit Akten (core/akte.ts) entscheidet das Ende des dritten Aktes, kein frueher Sieg.
+  !s.akte &&
+  (!s.systeme || s.systeme.includes('reich'));
 
 /** Die Schwelle dieses Weges bei diesem Ziel. */
 export const schwelle = (w: Siegweg, ziel: number): number =>

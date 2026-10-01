@@ -4,6 +4,7 @@ import { botNatur } from '../../core/bot';
 import { WELTARTEN, weltArtInfo } from '../../core/weltart';
 import { useStore } from '../net/store';
 import {
+  AKTE_ZUEGE,
   MIN_PLAYERS,
   MAX_PLAYERS,
   RUNDEN_LIMIT_CHOICES,
@@ -18,6 +19,7 @@ import { omenById } from '../../core/omen';
 import { leseProfil } from '../profil';
 import { KOOP_ZIEL_JE } from '../../core/rules/reducer';
 import { szenarioById } from '../../core/szenario';
+import { SYSTEME, neuesSystem } from '../../core/systeme';
 
 
 /** Wie ein Bot spielt - in der Lobby, damit man weiss, gegen wen. */
@@ -233,9 +235,42 @@ export function Lobby() {
             )}
             {room.rundenLimit !== null && (
               <p className="note">
-                Nach {room.rundenLimit} Runden ist Schluss, dann gewinnt die hoechste Wertung
-                (Siegpunkte mal 10 plus Ruhm) - wenn nicht vorher jemand das Ziel erreicht.
+                {room.rundenLimit === AKTE_ZUEGE
+                  ? `Drei Akte zu je ${AKTE_ZUEGE / 3} eigenen Zuegen (${AKTE_ZUEGE * room.members.length} Runden). Danach`
+                  : `Nach ${room.rundenLimit} Runden`}{' '}
+                ist Schluss, dann gewinnt die hoechste Wertung
+                (Siegpunkte mal 10 plus Ruhm) - wenn nicht vorher jemand das Ziel erreicht. Jeder Akt endet
+                mit einem Boss: wer ihn besteht, bekommt Siegpunkte und eine seltene Karte.
               </p>
+            )}
+
+            {/* Was diese Partie zeigt (core/systeme.ts): mit jeder Partie kommt etwas dazu. */}
+            {room.systeme !== undefined && (room.systeme !== null || room.alleSysteme) && (
+              <div className="lobby-systeme">
+                <b>Diese Partie</b>
+                <ul>
+                  <li className="an">Doerfer, Strassen, Staedte, Kartenwahl, drei Akte</li>
+                  {SYSTEME.map((x) => {
+                    const an = room.systeme === null || room.systeme!.includes(x.id);
+                    const neu = an && room.systeme !== null && neuesSystem(leseProfil().partien)?.id === x.id;
+                    return (
+                      <li key={x.id} className={an ? 'an' : 'aus'} title={x.text}>
+                        {x.name}
+                        {neu ? ' - neu!' : an ? '' : ` - ab der ${x.ab + 1}. Partie`}
+                      </li>
+                    );
+                  })}
+                </ul>
+                <label className="home-schalter">
+                  <input
+                    type="checkbox"
+                    checked={room.alleSysteme ?? false}
+                    disabled={!isHost}
+                    onChange={(e) => send({ t: 'setOptions', alleSysteme: e.target.checked })}
+                  />
+                  Alles von Anfang an (fuer alle, die das Spiel kennen)
+                </label>
+              </div>
             )}
 
             <label className="home-schalter">

@@ -3,6 +3,7 @@
  * der Server schickt Ereignisse, keine Saetze.
  */
 
+import { bossById } from '../core/akte';
 import { genitiv } from '../core/factions';
 import { sippenBonusById } from '../core/cards/sippen';
 import { vorhabenById } from '../core/vorhaben';
@@ -211,6 +212,18 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
       return e.player
         ? `${who(state, e.player)} traegt jetzt die Handelsstrasse: ${e.laenge} Strassen zwischen zwei Siedlungen (+2 Punkte).`
         : `Die Handelsstrasse hat niemand mehr.`;
+    case 'aktBeginn': {
+      const b = bossById(e.boss);
+      return `Akt ${e.akt}: ${b?.name ?? 'Ein Boss'} - ${who(state, e.player)} hat bis Runde ${e.bis} Zeit.`;
+    }
+    case 'bossNaht':
+      return `${bossById(e.boss)?.name ?? 'Der Boss'}: ein Heer von ${e.anzahl} Kaempfern zieht gegen ${who(state, e.player)}.`;
+    case 'bossBesiegt':
+      return `${who(state, e.player)} besteht ${bossById(e.boss)?.name ?? 'den Boss'} - Akt ${e.akt}: +${e.punkte} ${e.punkte === 1 ? 'Siegpunkt' : 'Siegpunkte'} und eine Trophaee.`;
+    case 'bossVerfehlt':
+      return `${who(state, e.player)} verfehlt ${bossById(e.boss)?.name ?? 'den Boss'} - ${e.verloren} Karten und ein Punkt Ruhm sind verloren.`;
+    case 'bossGezahlt':
+      return `${who(state, e.player)} zahlt Tribut: ${e.anzahl} ${resourceName(e.resource)}.`;
     case 'sippenRuhm':
       return `${sippenBonusById(e.bonus)?.name ?? 'Die Sippe'}: ${who(state, e.player)} gewinnt ${e.amount} Ruhm fuer die neue Stadt.`;
     case 'sippenBeute':

@@ -25,7 +25,7 @@ import { fnv1a } from './hash';
 import { wuerfleOmen } from './omen';
 
 /** Ein Jahr: vier Jahreszeiten zu 15 Runden (core/season.ts). */
-export const TAGES_RUNDEN = 60;
+export const TAGES_RUNDEN = 30;
 
 /** So viele Plaetze zeigt die Bestenliste. */
 export const BESTENLISTE_PLAETZE = 20;

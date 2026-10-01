@@ -7,11 +7,12 @@
  * der Server, ohne dass ein einziges Gelaendefeld uebertragen wird.
  */
 
+import { bossById } from '../../core/akte';
 import { sippenBonusById } from '../../core/cards/sippen';
 import { genitiv } from '../../core/factions';
 import type { Bericht } from '../../core/kunde';
 import { vorhabenById } from '../../core/vorhaben';
-import { aktuellesErbstueck, letzterAhn } from '../profil';
+import { aktuellesErbstueck, leseProfil, letzterAhn } from '../profil';
 import { create } from 'zustand';
 import { openSocket, sendMsg } from './socket';
 import type { RaumWunsch } from './socket';
@@ -137,6 +138,8 @@ export type Treffer = {
 
 /** Unter welchem Namen zuletzt beigetreten wurde - fuer die Platzwahl auf derselben Verbindung. */
 let beitrittsName = '';
+/** Sofort spielen (D13): sobald der Raum steht, ein Bot dazu und starten. */
+let schnellStart = false;
 
 export type Store = {
   status: Status;
@@ -245,6 +248,9 @@ function vervollstaendige(msg: ServerMsg): void {
     msg.state.marktZug ??= {};
     msg.state.wahlen ??= null;
     msg.state.handelsstrasse ??= null;
+    msg.state.akte ??= null;
+    msg.state.systeme ??= null;
+    for (const p of msg.state.players) p.trophaeen ??= 0;
     msg.state.koop ??= false;
     msg.state.szenario ??= null;
     msg.state.szenarioErgebnis ??= null;
@@ -419,6 +425,23 @@ function meldungenAus(
   const sichtbar = (q: number, r: number) => sicht === null || sicht.has(hexKey(q, r));
   const meldung = (text: string, kind: Announcement['kind']) => out.push({ id: naechsteId++, text, kind });
   for (const e of events) {
+    // Akte und Bosse (core/akte.ts): die eigenen laut, fremde nur, wenn sie bestehen.
+    if (e.t === 'aktBeginn' && e.player === you) {
+      meldung(`Akt ${e.akt}: ${bossById(e.boss)?.name ?? 'Ein Boss'} - bis Runde ${e.bis}`, 'raid');
+      continue;
+    }
+    if (e.t === 'bossNaht' && e.player === you) {
+      meldung(`${bossById(e.boss)?.name ?? 'Der Boss'}: sein Heer bricht auf (${e.anzahl} Kaempfer)`, 'raid');
+      continue;
+    }
+    if (e.t === 'bossBesiegt') {
+      meldung(e.player === you ? `${bossById(e.boss)?.name ?? 'Der Boss'} bezwungen: +${e.punkte} Siegpunkte und eine Trophaee` : `${wer(e.player)} bezwingt ${bossById(e.boss)?.name ?? 'den Boss'}`, e.player === you ? 'gain' : 'info');
+      continue;
+    }
+    if (e.t === 'bossVerfehlt' && e.player === you) {
+      meldung(`${bossById(e.boss)?.name ?? 'Der Boss'} hat gesiegt: ${e.verloren} Karten verloren`, 'raid');
+      continue;
+    }
     if (e.t === 'capital') {
       meldung(e.player === you ? 'Deine Hauptstadt ist gegruendet' : `${wer(e.player)} gruendet eine Hauptstadt`, e.player === you ? 'gain' : 'info');
       continue;
@@ -805,6 +828,7 @@ export const useStore = create<Store>((set, get) => ({
       alt.onmessage = null;
       alt.close();
     }
+    schnellStart = neu.schnell === true;
     if (neu.wieder) {
       // Die Partie bleibt sichtbar, bis die neue Verbindung steht.
       set({ status: 'reconnecting', error: null });
@@ -818,7 +842,8 @@ export const useStore = create<Store>((set, get) => ({
       onOpen: () => {
         const ahn = letzterAhn();
         const erbstueck = aktuellesErbstueck();
-        sendMsg(ws, { t: 'join', name, token: token ?? loadToken(code), ...(ahn ? { ahn } : {}), ...(erbstueck ? { erbstueck } : {}) });
+        // Gespielte Partien: welche Systeme sich zeigen (core/systeme.ts).
+        sendMsg(ws, { t: 'join', name, token: token ?? loadToken(code), partien: leseProfil().partien, ...(ahn ? { ahn } : {}), ...(erbstueck ? { erbstueck } : {}) });
       },
       onClose: () => {
         // Nur die AKTUELLE Verbindung darf den Zustand aendern.
@@ -903,6 +928,14 @@ export const useStore = create<Store>((set, get) => ({
               room: msg.room,
               status: msg.room.started || s.state !== null ? s.status : 'lobby',
             }));
+            // Sofort spielen: der Warteraum ist nur ein Durchgang.
+            if (schnellStart && !msg.room.started && msg.room.hostId !== null && msg.room.hostId === get().you) {
+              if (msg.room.members.length < 2) sendMsg(ws, { t: 'addBot' });
+              else {
+                schnellStart = false;
+                sendMsg(ws, { t: 'start' });
+              }
+            }
             break;
           case 'state':
             set((s) => {

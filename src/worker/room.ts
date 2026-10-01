@@ -29,6 +29,8 @@ import { redactEventsFor, redactStateFor } from '../core/redact';
 import { migriereStand } from '../core/rules/migration';
 import type { GameState, PlayerId } from '../core/state';
 import {
+  AKTE_ZUEGE,
+  DEFAULT_RUNDEN,
   DEFAULT_TARGET_POINTS,
   MAX_PLAYERS,
   MIN_PLAYERS,
@@ -53,6 +55,8 @@ import { istStufe } from '../core/stufe';
 import { botsSpielen } from '../core/bot';
 import { szenarioById } from '../core/szenario';
 import { totalPoints } from '../core/state';
+import { systemeFuer } from '../core/systeme';
+import type { SystemId } from '../core/systeme';
 
 export type Env = {
   GAME_ROOM: DurableObjectNamespace;
@@ -105,6 +109,10 @@ type RoomData = {
   koop?: boolean;
   /** Ein Szenario (core/szenario.ts) - allein. */
   szenario?: string | null;
+  /** Wie viele Partien jeder Browser schon gespielt hat (core/systeme.ts). */
+  partien?: Record<PlayerId, number>;
+  /** Alles von Anfang an - der Gastgeber kennt das Spiel. */
+  alleSysteme?: boolean;
 };
 
 type Attachment = { playerId: PlayerId | null };
@@ -278,7 +286,7 @@ export class GameRoom implements DurableObject {
         // Voreingestellt: 15 Punkte oder ein Jahr, was zuerst kommt - so hat
         // jede Partie ein absehbares Ende und eine Chronik (Spieltest: allein
         // zog sich das offene Spiel zu 30 Punkten zu lange).
-        room.rundenLimit = 60;
+        room.rundenLimit = DEFAULT_RUNDEN;
         // Der Weltseed ist oeffentlich (er steht in jedem Spielstand) - ihn
         // wiederzuverwenden verraet nichts. Wuerfel und Karten kommen neu.
         const welt = Number(url.searchParams.get('welt'));
@@ -402,6 +410,7 @@ export class GameRoom implements DurableObject {
           room.targetPoints = msg.targetPoints;
         }
         if (typeof msg.oeffentlich === 'boolean') room.oeffentlich = msg.oeffentlich;
+        if (typeof msg.alleSysteme === 'boolean') room.alleSysteme = msg.alleSysteme;
         await this.save();
         this.broadcastRoom();
         await this.melden();
@@ -438,7 +447,7 @@ export class GameRoom implements DurableObject {
           room.koop && !tages ? 0 : room.targetPoints,
           {
             omens: gueltigeOmen(room.omens ?? []),
-            rundenLimit: room.koop && !tages ? (room.rundenLimit ?? 60) : (room.rundenLimit ?? null),
+            rundenLimit: room.koop && !tages ? (room.rundenLimit ?? 60) : this.rundenFuer(room),
             tagesDatum: tages,
             haeuser: true,
             ereignisse: true,
@@ -449,6 +458,8 @@ export class GameRoom implements DurableObject {
             stufe: tages ? 0 : (room.stufe ?? 0),
             koop: !tages && !room.szenario && (room.koop ?? false),
             szenario: room.szenario ?? null,
+            ...(this.systemeFuer(room) ? { systeme: this.systemeFuer(room)! } : {}),
+            akte: true,
           },
         );
         room.started = true;
@@ -565,6 +576,9 @@ export class GameRoom implements DurableObject {
     // Der Ahn gilt, solange die Partie noch nicht begonnen hat.
     if (playerId !== undefined && !room.started && istAhn(msg.ahn)) {
       room.ahnen = { ...(room.ahnen ?? {}), [playerId]: msg.ahn };
+    }
+    if (playerId !== undefined && !room.started && typeof msg.partien === 'number' && Number.isInteger(msg.partien) && msg.partien >= 0) {
+      room.partien = { ...(room.partien ?? {}), [playerId]: Math.min(msg.partien, 1000) };
     }
     if (playerId !== undefined && !room.started && istErbstueck(msg.erbstueck)) {
       room.erbstuecke = { ...(room.erbstuecke ?? {}), [playerId]: msg.erbstueck };
@@ -752,7 +766,36 @@ export class GameRoom implements DurableObject {
       stufe: room.stufe ?? 0,
       koop: room.koop ?? false,
       szenario: room.szenario ?? null,
+      systeme: this.systemeFuer(room),
+      alleSysteme: room.alleSysteme ?? false,
     };
+  }
+
+  /**
+   * Welche Systeme die Partie hat (core/systeme.ts): nur fuer EINEN Menschen
+   * (Bots zaehlen nicht) in einer gewoehnlichen Partie richtet es sich nach
+   * seinen gespielten Partien. Mehrere Menschen, Szenarien, die
+   * Tagesexpedition oder "alles" - dann gilt alles (null).
+   */
+  /**
+   * Die Rundengrenze beim Start: "drei Akte" zaehlt Zuege je Spieler und wird
+   * auf alle umgerechnet - sonst bekaeme bei drei Spielern jeder nur fuenf
+   * eigene Zuege je Akt (Simulation).
+   */
+  private rundenFuer(room: RoomData): number | null {
+    const n = room.rundenLimit ?? null;
+    if (n === AKTE_ZUEGE && !room.tagesDatum && !room.szenario) return n * Math.max(1, room.members.length);
+    return n;
+  }
+
+  private systemeFuer(room: RoomData): SystemId[] | null {
+    if (room.alleSysteme || room.tagesDatum || room.szenario || room.koop) return null;
+    const menschen = room.members.filter((m) => !m.bot);
+    if (menschen.length !== 1) return null;
+    const n = room.partien?.[menschen[0]!.id];
+    if (n === undefined) return null;
+    const liste = systemeFuer(n);
+    return liste.length >= 4 ? null : liste;
   }
 
   private broadcastRoom(): void {

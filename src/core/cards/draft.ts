@@ -34,6 +34,7 @@ const QUELLE_ZU_ZAHL: Record<DraftSource, number> = {
   belohnung: 2,
   markt: 3,
   gruendung: 4,
+  trophaee: 5,
 };
 
 /** Eine Seltenheitsstufe nach den Gewichten der Quelle ziehen. */
@@ -77,7 +78,7 @@ export function draftOptions(
    * Bots: Runde 40 statt 60 bis 15 Punkte).
    */
   const gruendung = source === 'gruendung';
-  const erlaubt = (c: Card) => !c.nurBeute || source === 'belohnung';
+  const erlaubt = (c: Card) => !c.nurBeute || source === 'belohnung' || source === 'trophaee';
   const bleibt = (c: Card) => dauerwirkungen(c).length > 0 || cardKind(c) === 'taktik';
   const alle = CARDS.filter(erlaubt).filter((c) =>
     gruendung ? bleibt(c) && !(istEinzigartig(c) && besitzt.has(c.id)) : !istEinzigartig(c) || !besitzt.has(c.id) || wiederholbar(c),

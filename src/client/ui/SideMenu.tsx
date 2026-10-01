@@ -239,7 +239,13 @@ export function SideMenu({
   onKarten,
   onRat,
   onVerlassen,
+  mitHeld = true,
+  mitReich = true,
 }: {
+  /** Held, Auftraege und Geruechte dabei (core/systeme.ts)? */
+  mitHeld?: boolean;
+  /** Wunder und Vorhaben dabei? */
+  mitReich?: boolean;
   /** Die Partie verlassen - steht in der Chronik, weit weg vom Spiel. */
   onVerlassen?: () => void;
   /** Den Rat fragen (client/rat.ts) - nur im eigenen Zug. */
@@ -668,7 +674,7 @@ export function SideMenu({
           </>
         )}
 
-        {reiter === 'reich' && (
+        {reiter === 'reich' && mitHeld && (
           <>
             {/* Auftraege der Wanderer (rules/auftraege.ts). */}
             <Kopf titel="Auftraege" hilfe="Wanderer bieten Auftraege an, wenn sie an deinen Siedlungen vorbeikommen. Lohn: eine Kartenwahl." />
@@ -725,7 +731,7 @@ export function SideMenu({
 
         {reiter === 'reich' && (
           <>
-            {wunderListe.length > 0 && (
+            {mitReich && wunderListe.length > 0 && (
               <>
                 <Kopf
                   titel="Weltwunder"
@@ -762,7 +768,7 @@ export function SideMenu({
 
         {reiter === 'reich' && (
           <>
-            {geruechte.length > 0 && (
+            {mitHeld && geruechte.length > 0 && (
               <>
                 <Kopf
                   titel="Geruechte"

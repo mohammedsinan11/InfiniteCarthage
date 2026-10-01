@@ -58,6 +58,7 @@ import { karawaneAngekommen, karawanenRunde } from '../karawane';
 import { strassenFelder } from '../handelswege';
 import type { KarawanenEvent } from '../karawane';
 import { szenarioById } from '../szenario';
+import { hatSystem } from '../systeme';
 import { Rng } from '../rng';
 import { hexDistance, hexKey, hexVertices, hexesInRange, neighbors, parseVertexKey, vertexAdjacentHexes, vertexKey } from '../coords';
 import { canPlaceSettlement } from './placement';
@@ -811,12 +812,15 @@ export function beginBigRound(s: GameState, events: Ereignisse): void {
   // Ruhige Grenzen (core/omen.ts): nur jede zweite grosse Runde ein Aufbruch.
   // Schonfrist im Szenario (core/szenario.ts): die ersten Runden bleibt es ruhig.
   const frist = szenarioById(s.szenario)?.schonfrist ?? 0;
-  if (raubzugRunde(s.omens, bigRoundOf(s.turn)) && roundOf(s.turn) > frist) sendRaiders(s, events);
+  // Was noch nicht dabei ist (core/systeme.ts), bleibt still: Raubzuege und
+  // Fehden ohne 'raub', Wanderer ohne 'held', Karawanen ohne 'ereignisse'.
+  const raub = hatSystem(s, 'raub');
+  if (raub && raubzugRunde(s.omens, bigRoundOf(s.turn)) && roundOf(s.turn) > frist) sendRaiders(s, events);
   // Karawanen fuer alle, die zwei Siedlungen weit genug auseinander haben (core/karawane.ts).
-  karawanenRunde(s, events, (vorlage) => aufstellen(s, vorlage));
+  if (hatSystem(s, 'ereignisse')) karawanenRunde(s, events, (vorlage) => aufstellen(s, vorlage));
   const rng = new Rng(s.rngState);
-  sendFeud(s, rng, events);
-  sendWanderer(s, rng, events);
+  if (raub) sendFeud(s, rng, events);
+  if (hatSystem(s, 'held')) sendWanderer(s, rng, events);
   s.rngState = rng.getState();
 }
 
@@ -890,6 +894,8 @@ const HORDE_REICHWEITE = SPAWN_RANGE + 4;
 
 /** Zu Beginn jeder Nacht (core/zeit.ts). */
 export function beginNight(s: GameState, events: Ereignisse): void {
+  // Ohne Raubzuege (core/systeme.ts) bleibt auch die Nacht ruhig.
+  if (!hatSystem(s, 'raub')) return;
   const rng = new Rng(s.rngState);
   sendHorde(s, rng, events);
   // Was vom letzten Mal noch herumliegt, wacht mit auf - der Morast auch.
@@ -1049,6 +1055,62 @@ export function sendHorde(s: GameState, rng: Rng, events: Ereignisse): void {
     events.push({ t: 'horde', round: roundOf(s.turn), q: nest.q, r: nest.r, fraktion, anzahl });
     return;
   }
+}
+
+/** So weit sucht das Heer eines Bosses sein Lager um die Siedlungen. */
+const BOSS_LAGER_SUCHE = 14;
+
+/**
+ * Das Heer eines Bosses (core/akte.ts): ein starker Trupp gegen EINEN
+ * Spieler. Er bricht aus dem naechsten Lager auf - oder, wenn keines nah
+ * genug ist, aus der Wildnis einige Felder vor dem Reich. Die Nummern der
+ * Einheiten gehen an den Akt zurueck: er erkennt daran, ob das Heer
+ * geschlagen ist. null, wenn es keinen Weg zum Spieler gibt.
+ */
+export function bossHeerAufstellen(
+  s: GameState,
+  id: PlayerId,
+  anzahl: number,
+  rang: number,
+): { ids: number[]; q: number; r: number; fraktion: string } | null {
+  const ziele = new Set(settlementApproaches(s, id).keys());
+  if (ziele.size === 0) return null;
+  const an = [...ziele].sort().map(feld);
+  let start: { q: number; r: number; d: number; lager: boolean } | null = null;
+  for (const a of an) {
+    for (const c of hexesInRange(a, BOSS_LAGER_SUCHE)) {
+      if (!isNestActive(s, c.q, c.r)) continue;
+      const d = hexDistance(a, c);
+      if (!start || d < start.d) start = { q: c.q, r: c.r, d, lager: true };
+    }
+  }
+  if (!start) {
+    // Keine Lager in der Naehe: das Heer kommt aus der Wildnis, acht Felder vor dem Reich.
+    const a = an[0]!;
+    for (const c of hexesInRange(a, 8)) {
+      if (hexDistance(a, c) !== 8 || !isLandAt(s.worldSeed, c.q, c.r)) continue;
+      if (an.some((x) => hexDistance(x, c) < 6)) continue;
+      start = { q: c.q, r: c.r, d: 8, lager: false };
+      break;
+    }
+  }
+  if (!start) return null;
+  const weg = nextStep(s.worldSeed, start, ziele, SUCHE_RAEUBER * 2);
+  if (!weg) return null;
+  const fraktion = nestFraktionOf(s, start.q, start.r);
+  const kind = lagerArt(fraktionById(s.worldSeed, fraktion).art);
+  const ids: number[] = [];
+  for (let i = 0; i < anzahl; i++) {
+    const vorlage = einheitVorlage(kind, start.q, start.r, {
+      fraktion,
+      heimat: start.lager ? hexKey(start.q, start.r) : null,
+      auftrag: 'raub',
+      ziel: weg.ziel,
+      stufe: rang,
+    });
+    ids.push(aufstellen(s, { ...vorlage, leben: maxLeben({ kind: vorlage.kind, stufe: rang }) }).id);
+  }
+  return { ids, q: start.q, r: start.r, fraktion };
 }
 
 // --- Brandschatzen --------------------------------------------------------------

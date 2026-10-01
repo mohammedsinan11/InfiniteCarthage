@@ -6133,3 +6133,222 @@ em.off {
 .hud-wetter-text {
   display: none;
 }
+
+/* --- Akte und Bosse (ui/BossTafel.tsx, core/akte.ts). PLATZHALTER (ASSETS.md) --- */
+.hud-akt {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--pixel);
+  font-size: 10px;
+  white-space: nowrap;
+  padding: 6px 9px;
+  background: rgba(60, 14, 12, 0.9);
+  border: 2px solid var(--danger);
+  color: var(--text);
+  box-shadow: none;
+}
+.hud-akt b {
+  color: var(--danger);
+}
+.hud-akt.knapp {
+  animation: untaetig-puls 1.2s ease-in-out infinite;
+}
+.hud-akt.besiegt {
+  border-color: var(--accent);
+  background: rgba(23, 18, 12, 0.86);
+}
+.hud-akt.besiegt b {
+  color: var(--accent);
+}
+.hud-akt.verfehlt {
+  border-color: var(--line);
+  background: rgba(23, 18, 12, 0.86);
+  color: var(--muted);
+}
+.boss-tafel {
+  position: absolute;
+  top: var(--heerleiste-oben, 52px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 11;
+  width: min(380px, calc(100% - 24px));
+  max-height: calc(100% - 200px);
+  overflow-y: auto;
+  padding: 10px 12px 12px;
+  background: rgba(23, 18, 12, 0.97);
+  border: 2px solid var(--danger);
+  box-shadow: 0 0 0 2px var(--bg), 0 8px 24px rgba(0, 0, 0, 0.5);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.boss-kopf {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.boss-akt {
+  font-family: var(--pixel);
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.boss-name {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 6px 0 4px;
+  color: var(--danger);
+}
+.boss-name > div {
+  display: flex;
+  flex-direction: column;
+}
+.boss-name b {
+  font-family: var(--pixel);
+  font-size: 14px;
+  color: var(--text);
+}
+.boss-name span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.boss-wappen {
+  width: 34px;
+  height: 38px;
+  flex: none;
+}
+.boss-text {
+  margin: 0 0 8px;
+  font-style: italic;
+  color: var(--muted);
+}
+.boss-forderung {
+  margin: 0 0 6px;
+}
+.boss-balken {
+  height: 8px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  margin-bottom: 8px;
+}
+.boss-balken i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.boss-tribut {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.boss-tribut li {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+.boss-tribut li svg {
+  width: 18px;
+  height: 18px;
+}
+.boss-tribut li.fertig span {
+  color: var(--accent);
+}
+.boss-klein,
+.boss-frist {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.boss-frist {
+  color: var(--text);
+}
+.boss-lohn {
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.boss-ergebnis {
+  font-family: var(--pixel);
+  font-size: 11px;
+  margin: 4px 0 10px;
+}
+.boss-ergebnis.gut {
+  color: var(--accent);
+}
+.boss-ergebnis.schlecht {
+  color: var(--danger);
+}
+.boss-leiste {
+  list-style: none;
+  margin: 0;
+  padding: 8px 0 0;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 3px;
+  font-size: 12px;
+}
+.boss-leiste li {
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  gap: 6px;
+  color: var(--muted);
+}
+.boss-leiste li span {
+  font-family: var(--pixel);
+  font-size: 9px;
+}
+.boss-leiste li.jetzt {
+  color: var(--text);
+}
+.boss-leiste li.gesiegt i {
+  color: var(--accent);
+}
+.boss-leiste li.verfehlt i {
+  color: var(--danger);
+}
+@media (max-width: 700px) {
+  .hud > .hud-akt {
+    padding: 4px 6px;
+    font-size: 9px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hud-akt.knapp {
+    animation: none;
+  }
+}
+
+/* Was die Partie zeigt (scenes/Lobby.tsx, core/systeme.ts). */
+.lobby-systeme {
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  padding: 8px 10px;
+  font-size: 12px;
+}
+.lobby-systeme b {
+  font-family: var(--pixel);
+  font-size: 10px;
+}
+.lobby-systeme ul {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.lobby-systeme li.an::before {
+  content: '✓ ';
+  color: var(--accent);
+}
+.lobby-systeme li.aus {
+  color: var(--muted);
+}
+.lobby-systeme li.aus::before {
+  content: '· ';
+}

@@ -20,6 +20,9 @@ import type { Chronik } from './chronik';
 import { kartenPunkte } from './cards/effects';
 import { wunderPunkte } from './wunder';
 import type { Wunder } from './wunder';
+import { aktPunkte } from './akte';
+import type { AkteStand } from './akte';
+import type { SystemId } from './systeme';
 
 export type PlayerId = string;
 
@@ -127,6 +130,8 @@ export type Player = {
    * null, solange noch gewaehlt wird; fehlt bei alten Staenden - dann gilt keines.
    */
   haus?: string | null;
+  /** Offene Trophaeen besiegter Bosse (core/akte.ts) - je eine Kartenwahl mit seltenen Karten. */
+  trophaeen?: number;
 };
 
 /** Die drei Helden, die der Koenigssitz freischaltet - einer davon, fuer immer. */
@@ -492,6 +497,10 @@ export type GameState = {
   ruhmreichster: PlayerId | null;
   /** Wer die Handelsstrasse traegt - den laengsten Weg zwischen zwei eigenen Siedlungen (core/handelswege.ts). */
   handelsstrasse?: PlayerId | null;
+  /** Drei Akte mit je einem Boss (core/akte.ts). Fehlt: keine Akte. Oeffentlich. */
+  akte?: AkteStand | null;
+  /** Welche Systeme in dieser Partie dabei sind (core/systeme.ts). Fehlt: alle. */
+  systeme?: SystemId[];
   /** VERALTET: nur fuer die Migration alter Staende. */
   largestArmy?: PlayerId | null;
   chunks: ChunkCoord[];
@@ -650,7 +659,7 @@ export function setupPlayerId(state: GameState, step: number): PlayerId {
 /** Sichtbare Siegpunkte (ohne verdeckte Siegpunktkarten). */
 export function publicPoints(
   state: Pick<GameState, 'buildings' | 'ruhmreichster' | 'hauptstaedte'> &
-    Partial<Pick<GameState, 'roads' | 'players' | 'chronik' | 'wunder' | 'handelsstrasse'>>,
+    Partial<Pick<GameState, 'roads' | 'players' | 'chronik' | 'wunder' | 'handelsstrasse' | 'akte'>>,
   id: PlayerId,
 ): number {
   let pts = 0;
@@ -660,6 +669,8 @@ export function publicPoints(
   if (state.ruhmreichster === id) pts += 2;
   // Die Handelsstrasse (core/handelswege.ts, HANDELSSTRASSE_PUNKTE).
   if (state.handelsstrasse === id) pts += 2;
+  // Bestandene Akte (core/akte.ts): je Akt so viele Punkte wie seine Zahl.
+  pts += aktPunkte(state.akte, id);
   for (const h of Object.values(state.hauptstaedte ?? {})) {
     if (h.owner === id) pts += HAUPTSTADT_PUNKTE + (h.stufe - 1) * STUFE_PUNKTE;
   }

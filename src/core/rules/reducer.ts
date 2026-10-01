@@ -104,6 +104,11 @@ import { auftraegePruefen, aufAuftragAntworten, auftragLiefern, wandererBieten }
 import type { AuftragEvent } from './auftraege';
 import { nachtBeginntAt, tagBeginntAt } from '../zeit';
 import type { ArmyEvent } from './army';
+import { akteFortschreiben, bossZahlen } from './akt';
+import type { AktEvent } from './akt';
+import { waehleBosse } from '../akte';
+import { hatSystem, istSystem } from '../systeme';
+import type { SystemId } from '../systeme';
 import { nextStep } from '../units';
 import { bigRoundChangedAt, seasonChangedAt } from '../season';
 import { draftOptions } from '../cards/draft';
@@ -208,6 +213,8 @@ export type Action =
   | { t: 'disbandGroup'; verband: number }
   /** Eine Beute einloesen: eine Kartenwahl. */
   | { t: 'claimLoot' }
+  /** Tribut an den Boss des Aktes zahlen: so viel von dieser Sorte, wie fehlt (core/akte.ts). */
+  | { t: 'bossZahlen'; resource: Resource }
   /** Ein eigenes Feuer mit einer Rohstoffkarte loeschen (rules/feuer.ts). */
   | { t: 'putOut'; key: string; mit: Resource }
   /** Einen Wachturm setzen - an einer eigenen Strasse oder im eigenen Einflussbereich. */
@@ -272,6 +279,7 @@ export type GameEvent =
   | { t: 'win'; player: PlayerId }
   /** Heer, Raubzuege, Gefechte, Lager, Ruinen, Held und Feuer - siehe rules/army.ts. */
   | ArmyEvent
+  | AktEvent
   | UntergangEvent
   | HilfeEvent
   | VorhabenEvent
@@ -358,6 +366,10 @@ export type PartieOptionen = {
   erbeAn?: boolean;
   /** Welche Plaetze Bots sind - sie zaehlen beim Erbe nicht als Mitspieler. */
   bots?: readonly PlayerId[];
+  /** Welche Systeme dabei sind (core/systeme.ts). Fehlt: alle. */
+  systeme?: readonly SystemId[];
+  /** Drei Akte mit Bossen (core/akte.ts) - nur mit Rundengrenze und ohne Szenario. */
+  akte?: boolean;
 };
 
 /** Im gemeinsamen Spiel: so viele Siegpunkte je Spieler soll die Summe erreichen. */
@@ -478,6 +490,11 @@ export function createGame(
     state.koop = true;
     state.koopErgebnis = null;
   }
+  if (optionen.systeme) state.systeme = optionen.systeme.filter(istSystem);
+  // Drei Akte, so lang wie die Rundengrenze erlaubt (core/akte.ts).
+  if (optionen.akte && state.ereignisseAn && state.rundenLimit && !state.szenario) {
+    state.akte = { laenge: Math.max(5, Math.floor(state.rundenLimit / 3)), bosse: waehleBosse(state.worldSeed, state), stand: {}, siege: {} };
+  }
   if (optionen.haeuser) {
     state.phase = { t: 'hauswahl' };
     state.hausAngebot = {};
@@ -591,6 +608,9 @@ function zeitAbgelaufen(state: GameState, events: GameEvent[]): void {
 function checkWin(state: GameState, events: GameEvent[]): void {
   // Gemeinsam gibt es kein Einzelziel - nur die Rundengrenze entscheidet.
   if (state.targetPoints <= 0 || state.koop) return;
+  // Mit Akten (core/akte.ts) gibt es keinen fruehen Sieg: jede Partie
+  // erreicht ihren letzten Boss, danach entscheidet die Wertung (zeitAbgelaufen).
+  if (state.akte) return;
   const id = state.order[state.current]!;
   if (totalPoints(state, id) >= state.targetPoints) {
     state.phase = { t: 'finished', winner: id, durch: 'ziel' };
@@ -801,6 +821,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
     // --- Weltwunder ---
     case 'buildWonder': {
       if (phase.t !== 'main') return fail('Jetzt kann nicht gebaut werden.');
+      if (!hatSystem(s, 'reich')) return fail('Weltwunder gibt es in dieser Partie noch nicht.');
       const why = wunderHindernis(s, world, actor, action.q, action.r);
       if (why) return fail(why);
       if (!canAfford(actorPlayer.hand, COST_WUNDER)) return fail('Zu wenig Rohstoffe fuer ein Weltwunder.');
@@ -900,7 +921,8 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         s.current = 0;
         s.turn = 1;
         s.phase = { t: 'roll' };
-        for (const id of s.order) spawnHeld(s, id, events);
+        // Der Held erst, wenn er dabei ist (core/systeme.ts).
+        if (hatSystem(s, 'held')) for (const id of s.order) spawnHeld(s, id, events);
         // Gruenderzeit: jeder beginnt mit einer Kartenwahl (core/omen.ts).
         for (const p of s.players) p.loot += startBeute(s.omens);
         // Die Startausstattung der Haeuser (core/haus.ts).
@@ -963,7 +985,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       botAufholen(s, actor, events);
       // Alle paar eigenen Zuege ein Ereignis mit einer Wahl (core/ereignis.ts) -
       // bei einer 7 erst nach der Kartenwahl.
-      if (s.ereignisseAn && ereignisFaellig(s.turn, s.order.length)) {
+      if (s.ereignisseAn && hatSystem(s, 'ereignisse') && ereignisFaellig(s.turn, s.order.length)) {
         const id = waehleEreignis(s.secretSeed, s.turn, seasonOf(s.turn), s.ereignisseGesehen ?? []);
         s.ereignis = { id, player: actor };
         events.push({ t: 'eventOffered', player: actor, id });
@@ -1437,11 +1459,25 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
 
     case 'claimLoot': {
       if (phase.t !== 'main') return fail('Beute wird in der Bauphase eingeloest.');
+      // Trophaeen besiegter Bosse zuerst - sie zaehlen nicht gegen die Wahlen je Zug.
+      if ((actorPlayer.trophaeen ?? 0) > 0) {
+        actorPlayer.trophaeen = actorPlayer.trophaeen! - 1;
+        enterDraft(s, 'trophaee', events, 7 + actorPlayer.cards.length);
+        break;
+      }
       if (actorPlayer.loot <= 0) return fail('Keine Beute vorhanden.');
       if (!wahlFrei(s)) return fail(`Mehr als ${WAHLEN_JE_ZUG} Kartenwahlen gibt es nicht je Zug - die Beute wartet bis zum naechsten.`);
       wahlZaehlen(s);
       actorPlayer.loot -= 1;
       enterDraft(s, 'belohnung', events, 1 + actorPlayer.cards.length);
+      break;
+    }
+
+    case 'bossZahlen': {
+      if (phase.t !== 'main') return fail('Tribut wird in der Bauphase gezahlt.');
+      if (!RESOURCES.includes(action.resource)) return fail('Unbekannter Rohstoff.');
+      const why = bossZahlen(s, actor, action.resource, events);
+      if (why) return fail(why);
       break;
     }
 
@@ -1619,6 +1655,9 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (phase.t !== 'main') return fail('Der Zug laesst sich jetzt nicht beenden.');
       const ender = actor;
       const beendet = s.turn;
+      // Akte (core/akte.ts): wessen letzte Runde gespielt ist, ueber den wird
+      // entschieden - vor der Rundengrenze, damit der dritte Boss noch zaehlt.
+      akteFortschreiben(s, events, beendet);
       // Rundengrenze: der letzte Zug ist gespielt (core/chronik.ts, wertung).
       if (s.rundenLimit && beendet >= s.rundenLimit) {
         zeitAbgelaufen(s, events);
@@ -1649,7 +1688,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         lagerNeuBesetzen(s, events);
         tributRunde(s, events);
         // Vorhaben (core/vorhaben.ts): verfallen lassen, neue anbieten.
-        vorhabenRunde(s, events);
+        if (hatSystem(s, 'reich')) vorhabenRunde(s, events);
         // Die Siedlungen wachsen (core/bevoelkerung.ts).
         bevoelkerungRunde(s, world, events);
         // Wer eine Sorte gar nicht erzeugt, bekommt sie ab und zu (rules/hilfe.ts).
@@ -1766,6 +1805,16 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       events.push(...schluss);
       chronikFortschreiben(s, schluss);
       break;
+    }
+  }
+
+  // Akte: neuer Akt, das Heer des Bosses, frueh bestandene Forderungen (core/akte.ts).
+  {
+    const akt: GameEvent[] = [];
+    akteFortschreiben(s, akt, null);
+    if (akt.length > 0) {
+      events.push(...akt);
+      chronikFortschreiben(s, akt);
     }
   }
 

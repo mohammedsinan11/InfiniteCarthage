@@ -214,6 +214,23 @@ export function botAktion(state: GameState, world: World, id: PlayerId, versucht
     }
   }
 
+  // Trophaeen besiegter Bosse - sie zaehlen nicht gegen die Wahlen je Zug.
+  if ((p.trophaeen ?? 0) > 0) {
+    const a = neu({ t: 'claimLoot' });
+    if (a) return a;
+  }
+
+  // Tribut an den Boss des Aktes (core/akte.ts): was gefordert ist und auf der Hand liegt.
+  const boss = state.akte?.stand[id];
+  if (boss && boss.ergebnis === 'offen' && boss.forderung.t === 'tribut') {
+    const f = boss.forderung;
+    const r = RESOURCES.find((x) => (f.soll[x] ?? 0) > (f.gezahlt[x] ?? 0) && p.hand[x] > 0);
+    if (r) {
+      const a = neu({ t: 'bossZahlen', resource: r });
+      if (a) return a;
+    }
+  }
+
   // Beute einloesen.
   if (p.loot > 0 && wahlFrei(state)) {
     const a = neu({ t: 'claimLoot' });

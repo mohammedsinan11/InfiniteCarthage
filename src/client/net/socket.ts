@@ -73,6 +73,8 @@ export type RaumWunsch = {
   szenario?: string;
   /** Wiederverbinden nach einer Trennung: Spielstand und Protokoll bleiben stehen. */
   wieder?: boolean;
+  /** Sofort spielen: ein Bot dazu und los, ohne Warteraum (store.ts). */
+  schnell?: boolean;
 };
 
 export function openSocket(

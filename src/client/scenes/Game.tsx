@@ -136,6 +136,10 @@ import {
 import { productionSources } from '../../core/rules/production';
 import { tradeRatio, tradeRatioErklaert } from '../../core/rules/trade';
 import { Aktionsleiste, SymHandel } from '../ui/Aktionsleiste';
+import { aktPunkte, bossById } from '../../core/akte';
+import { hatSystem, neuesSystem } from '../../core/systeme';
+import { leseProfil } from '../profil';
+import { BossTafel, aktZahl } from '../ui/BossTafel';
 import type { BuildMode } from '../ui/Aktionsleiste';
 import { reichArtVon } from '../ui/Aktionsleiste';
 import { REICHSBAU_NAME, REICHSBAU_ZWECK, reichsbauHindernis, reichsgebiet } from '../../core/rules/reich';
@@ -377,6 +381,17 @@ export function Game() {
   const [lagerTafel, setLagerTafel] = useState<string | null>(null);
   /** Der Rat (client/rat.ts): ein Vorschlag, bis man ihn wegklickt oder der Zug wechselt. */
   const [rat, setRat] = useState<Rat | null>(null);
+  /*
+   * Neu in dieser Partie (core/systeme.ts): ein System, das zum ersten Mal
+   * dabei ist, stellt sich einmal vor - beim ersten eigenen Zug.
+   */
+  const neuGezeigt = useRef(false);
+  useEffect(() => {
+    if (neuGezeigt.current || !state.systeme || state.turn > 2 || state.phase.t === 'setup' || state.phase.t === 'hauswahl') return;
+    neuGezeigt.current = true;
+    const neu = neuesSystem(leseProfil().partien);
+    if (neu && state.systeme.includes(neu.id)) setRat({ text: `Neu in dieser Partie - ${neu.name}: ${neu.text}` });
+  }, [state.systeme, state.turn, state.phase.t]);
   useEffect(() => setRat(null), [state.turn, state.current]);
   /** Vorhaben fuers Menue (core/vorhaben.ts). */
   const vorhabenSicht = useMemo(() => {
@@ -424,6 +439,18 @@ export function Game() {
    */
   /** Ausgeblendete Warnungen: Fraktion -> bis zu welcher Runde (Spieltest: kam jede Runde wieder). */
   const [weggeklickt, setWeggeklickt] = useState<Record<string, number>>({});
+  /** Die Tafel des Aktes (core/akte.ts) - oeffnet sich, wenn ein neuer Akt beginnt. */
+  const [bossOffen, setBossOffen] = useState(false);
+  const meinAkt = you ? state.akte?.stand[you] : undefined;
+  const gesehenerAkt = useRef<number | null>(null);
+  useEffect(() => {
+    if (!meinAkt || state.phase.t === 'finished') return;
+    if (gesehenerAkt.current !== meinAkt.akt) {
+      // Beim Wiedereinstieg mitten im Akt nicht noch einmal aufdraengen.
+      if (gesehenerAkt.current !== null || state.turn - (meinAkt.bis - (state.akte?.laenge ?? 0)) <= 2) setBossOffen(true);
+      gesehenerAkt.current = meinAkt.akt;
+    }
+  }, [meinAkt, state.turn, state.akte?.laenge, state.phase.t]);
   const raubWarnung = useMemo(() => {
     // Nach dem Ende warnt nichts mehr (Spieltest 4: die Warnung zaehlte weiter).
     if (!you || meineFelder.length === 0 || state.phase.t === 'finished') return null;
@@ -456,15 +483,17 @@ export function Game() {
    * und Beutestand nur ein Versuch - scheitert er, bleibt die Beute liegen.
    */
   const beuteVersucht = useRef(new Set<string>());
-  const meineBeute = me?.loot ?? 0;
+  const meineTrophaeen = me?.trophaeen ?? 0;
+  const meineBeute = (me?.loot ?? 0) + meineTrophaeen;
   useEffect(() => {
     if (!isMine || phase.t !== 'main' || meineBeute <= 0 || state.draft !== null) return;
-    if (!wahlFrei({ ...state, wahlen: state.wahlen ?? undefined })) return;
+    // Trophaeen besiegter Bosse kommen immer - Beute nur, solange eine Wahl frei ist.
+    if (meineTrophaeen === 0 && !wahlFrei({ ...state, wahlen: state.wahlen ?? undefined })) return;
     const schluessel = `${state.turn}:${meineBeute}`;
     if (beuteVersucht.current.has(schluessel)) return;
     beuteVersucht.current.add(schluessel);
     act({ t: 'claimLoot' });
-  }, [isMine, phase.t, meineBeute, state, act]);
+  }, [isMine, phase.t, meineBeute, meineTrophaeen, state, act]);
 
   /**
    * Die besten Bauplaetze hervorheben: viele Wurfpunkte, dazu Sorten, die man
@@ -650,7 +679,8 @@ export function Game() {
     const karten = (state.players.find((p) => p.id === you)?.dev ?? []).filter((d) => d.type === 'victoryPoint').length;
     return {
       gesamt: state.myPoints,
-      ziel: state.targetPoints,
+      // Mit Akten gibt es kein Punkteziel - am Ende zaehlt die Wertung.
+      ziel: state.akte ? 0 : state.targetPoints,
       rundenLimit: state.rundenLimit,
       wertung: state.myPoints * 10 + (state.players.find((p) => p.id === you)?.ruhm ?? 0),
       zeilen: [
@@ -665,6 +695,8 @@ export function Game() {
           text: `Handelsstrasse${you ? ` (dein Weg: ${laengsteRoute(state, you)?.laenge ?? 0}, ab ${HANDELSSTRASSE_AB})` : ''}`,
           wert: state.handelsstrasse === you ? 2 : null,
         },
+        // Bestandene Akte (core/akte.ts): je Akt so viele Punkte wie seine Zahl.
+        ...(state.akte ? [{ text: `Bosse bezwungen (Akt ${(state.akte.siege[you ?? ''] ?? []).join(', ') || '-'})`, wert: you && aktPunkte(state.akte, you) > 0 ? aktPunkte(state.akte, you) : null }] : []),
       ],
     };
   }, [state, you]);
@@ -1000,13 +1032,16 @@ export function Game() {
       hinweis: warum ?? armut(kosten),
       wahl: dann(() => act(a)),
     });
-    optionen.push(
-      bauWahl('Turm', COST_TOWER, 'tower'),
-      bauWahl('Palisade', COST_MAUER, 'mauer'),
-      bauWahl('Tor', COST_TOR, 'tor'),
-      truppe('Ritter', COST_KNIGHT, { t: 'recruitKnight' }),
-      truppe('Bogen', COST_ARCHER, { t: 'recruitArcher' }),
-    );
+    // Wehr und Truppen erst, wenn Raubzuege dabei sind (core/systeme.ts).
+    if (hatSystem(state, 'raub')) {
+      optionen.push(
+        bauWahl('Turm', COST_TOWER, 'tower'),
+        bauWahl('Palisade', COST_MAUER, 'mauer'),
+        bauWahl('Tor', COST_TOR, 'tor'),
+        truppe('Ritter', COST_KNIGHT, { t: 'recruitKnight' }),
+        truppe('Bogen', COST_ARCHER, { t: 'recruitArcher' }),
+      );
+    }
     // Jedes fast geschlossene Feld an dieser Ecke - eine Stadt kann an mehreren Ringen liegen.
     for (const u of umland) {
       if (u.fehlt > FAST_GESCHLOSSEN || !hexVertices(u.q, u.r).some((v) => vertexKey(v) === ausbauOrt.key)) continue;
@@ -1305,12 +1340,12 @@ export function Game() {
           <span
             className="hud-punkte"
             title={[
-              state.targetPoints > 0 ? `Ziel: ${state.targetPoints} Siegpunkte` : 'Endlosspiel - kein Siegpunktziel',
+              state.akte ? 'Drei Akte: am Ende gewinnt die hoechste Wertung' : state.targetPoints > 0 ? `Ziel: ${state.targetPoints} Siegpunkte` : 'Endlosspiel - kein Siegpunktziel',
               ...state.players.filter((p) => p.id !== you).map((p) => `${p.name}: ${p.points}`),
             ].join(' · ')}
           >
             ★ {state.myPoints}
-            {state.targetPoints > 0 ? ` / ${state.targetPoints}` : ''}
+            {state.targetPoints > 0 && !state.akte ? ` / ${state.targetPoints}` : ''}
           </span>
           {/* Szenario: wie weit das Ziel ist (core/szenario.ts). */}
           {szenarioById(state.szenario) && you && (
@@ -1340,6 +1375,18 @@ export function Game() {
             >
               {state.tagesDatum ? <span className="hud-lang">Tagesexpedition · </span> : ''}<span className="hud-lang">Runde </span>{Math.min(roundOf(state.turn), state.rundenLimit)} / {state.rundenLimit}
             </span>
+          )}
+          {/* Der Akt und sein Boss (core/akte.ts): Name, Fortschritt, wie lange noch. */}
+          {meinAkt && phase.t !== 'finished' && (
+            <button
+              className={['hud-akt', meinAkt.ergebnis !== 'offen' ? meinAkt.ergebnis : meinAkt.bis - state.turn < 3 ? 'knapp' : ''].filter(Boolean).join(' ')}
+              title={`Akt ${meinAkt.akt}: ${bossById(meinAkt.boss)?.name ?? 'Boss'} - bis Runde ${meinAkt.bis}. Antippen fuer Einzelheiten.`}
+              onClick={() => setBossOffen((v) => !v)}
+            >
+              <b>{aktZahl(meinAkt.akt)}</b>
+              <span className="hud-lang">{bossById(meinAkt.boss)?.name ?? 'Boss'}</span>
+              <span>{meinAkt.ergebnis === 'besiegt' ? '✓' : meinAkt.ergebnis === 'verfehlt' ? '✗' : `${Math.max(0, meinAkt.bis - state.turn + 1)}`}</span>
+            </button>
           )}
           {state.order.length > 1 && !state.koop && (
             <span
@@ -1383,6 +1430,8 @@ export function Game() {
 
         <SideMenu
           onVerlassen={disconnect}
+          mitHeld={hatSystem(state, 'held')}
+          mitReich={hatSystem(state, 'reich')}
           sippe={state.ereignisseAn ? (me?.sippe ?? {}) : undefined}
           sippeSeit={me?.sippeSeit}
           onKarten={() => setTafel('karten')}
@@ -1758,6 +1807,17 @@ export function Game() {
                 </div>
               );
             })()}
+
+          {bossOffen && you && state.akte && state.draft === null && phase.t !== 'finished' && (
+            <BossTafel
+              state={state}
+              you={you}
+              darfZahlen={isMine && phase.t === 'main'}
+              onZahlen={(r) => act({ t: 'bossZahlen', resource: r })}
+              onZeigen={(q, r) => zeigeFeld(q, r)}
+              onZu={() => setBossOffen(false)}
+            />
+          )}
 
           {rat && (
             <div className="rat-tafel" role="status">

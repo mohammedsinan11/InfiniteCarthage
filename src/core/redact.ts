@@ -12,6 +12,8 @@
  *   fremde Haende und Karten - nur die Anzahl geht raus
  */
 
+import type { AkteStand } from './akte';
+import type { SystemId } from './systeme';
 import { emptyHand, handSize, publicPoints } from './state';
 import type { DevCard, GameState, Hand, Phase, PlayerId, TradeOffer } from './state';
 import type { ChunkCoord } from './chunks';
@@ -48,6 +50,8 @@ export type PublicPlayer = {
   equipment: string[];
   /** Uneingeloeste Beute - oeffentlich: wer ein Lager zerstoert, tut das vor aller Augen. */
   loot: number;
+  /** Offene Trophaeen besiegter Bosse - oeffentlich wie die Beute. */
+  trophaeen: number;
   /** Wann der gefallene Held zurueckkehrt, oder null - oeffentlich wie sein Fall. */
   heldZurueck: number | null;
   /** Frist bis zum Untergang (Zugnummer) oder null - oeffentlich: alle sehen, wer wankt. */
@@ -101,6 +105,10 @@ export type PublicState = {
   targetPoints: number;
   ruhmreichster: PlayerId | null;
   handelsstrasse: PlayerId | null;
+  /** Akte und Bosse (core/akte.ts) - oeffentlich wie die Bosse selbst. */
+  akte: AkteStand | null;
+  /** Die Systeme dieser Partie (core/systeme.ts); null: alle. */
+  systeme: SystemId[] | null;
   /** Offene, bis zur naechsten Heeresrunde vorbereitete Taktiken. */
   tacticBuffs: GameState['tacticBuffs'];
   /** Die offene Kartenwahl - fuer alle sichtbar, gewaehlt wird vom Spieler am Zug. */
@@ -192,6 +200,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
       tacticCount: p.tactics.length,
       equipment: [...p.equipment],
       loot: p.loot,
+      trophaeen: p.trophaeen ?? 0,
       heldZurueck: p.heldZurueck,
       untergang: p.untergang ?? null,
       besiegt: p.besiegt ?? false,
@@ -241,6 +250,8 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     targetPoints: state.targetPoints,
     ruhmreichster: state.ruhmreichster,
     handelsstrasse: state.handelsstrasse ?? null,
+    akte: state.akte ?? null,
+    systeme: state.systeme ?? null,
     tacticBuffs: state.tacticBuffs,
     draft: state.draft,
     trade: state.trade,

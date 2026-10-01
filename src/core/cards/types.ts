@@ -27,7 +27,8 @@ export const RARITY_ORDER: readonly Rarity[] = [
  * Woher eine Auswahl stammt. Bestimmt, wie selten die Karten ausfallen und
  * ob sie etwas kosten.
  */
-export type DraftSource = 'fund' | 'belohnung' | 'markt' | 'gruendung';
+/** trophaee: die Belohnung fuer einen besiegten Boss (core/akte.ts) - selten bis legendaer. */
+export type DraftSource = 'fund' | 'belohnung' | 'markt' | 'gruendung' | 'trophaee';
 
 /**
  * Drei getrennte Kartenbereiche.
@@ -169,4 +170,6 @@ export const RARITY_WEIGHTS: Record<DraftSource, Record<Rarity, number>> = {
   // Jede Gruendung - ein neues Dorf, eine neue Stadt - bringt eine Wahl
   // (Spieltest 5: die Wahl zum Kern machen). Meist kleine Karten, selten mehr.
   gruendung: { gewoehnlich: 5, ungewoehnlich: 5, selten: 2, episch: 1, legendaer: 0 },
+  // Ein besiegter Boss: hier fallen die grossen Karten (core/akte.ts).
+  trophaee: { gewoehnlich: 0, ungewoehnlich: 0, selten: 3, episch: 4, legendaer: 3 },
 };

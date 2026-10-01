@@ -33,7 +33,7 @@ const RARITY_NAME: Record<Rarity, string> = {
 };
 
 /** Ueberschrift je Herkunft - ein Fund faellt vom Himmel, Beute ist verdient. */
-const TITEL: Record<DraftSource, string> = { fund: 'Ein Fund', belohnung: 'Beute', markt: 'Markt', gruendung: 'Eine Gruendung' };
+const TITEL: Record<DraftSource, string> = { fund: 'Ein Fund', belohnung: 'Beute', markt: 'Markt', gruendung: 'Eine Gruendung', trophaee: 'Trophaee' };
 
 const STUFEN: readonly Rarity[] = ['gewoehnlich', 'ungewoehnlich', 'selten', 'episch', 'legendaer'];
 

@@ -331,7 +331,7 @@ describe('Tagesexpedition', () => {
     const o = tagesOmen('2026-09-26');
     expect(o.map((id) => omenById(id)!.art).sort()).toEqual(['fluch', 'fluch', 'segen']);
     expect(gueltigeOmen(o)).toEqual(o);
-    expect(TAGES_RUNDEN).toBe(60);
+    expect(TAGES_RUNDEN).toBe(30);
   });
 
   it('zwei Spieler am selben Tag bekommen dieselbe Welt und dieselben Wuerfe', () => {

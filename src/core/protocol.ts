@@ -7,6 +7,7 @@
  * aus (siehe worldgen.ts). Uebertragen werden nur Koordinatenpaare.
  */
 
+import type { SystemId } from './systeme';
 import type { WeltArt } from './weltart';
 import type { HeldLore } from './lore';
 import type { Action, GameEvent } from './rules/reducer';
@@ -48,6 +49,10 @@ export type RoomInfo = {
   szenario: string | null;
   /** Die Weltart der kommenden Partie (core/weltart.ts). Fehlt bei alten Servern. */
   weltArt?: WeltArt;
+  /** Welche Systeme die Partie haben wird (core/systeme.ts); null: alle. Fehlt bei alten Servern. */
+  systeme?: SystemId[] | null;
+  /** Hat der Gastgeber alles freigeschaltet? */
+  alleSysteme?: boolean;
 };
 
 /**
@@ -80,10 +85,18 @@ export const targetPointsLabel = (n: number): string =>
  * zu 60 Runden, nach dem die hoechste Wertung gewinnt. Das Jahr macht eine
  * Partie planbar - und Ergebnisse vergleichbar.
  */
-export const RUNDEN_LIMIT_CHOICES = [null, 60] as const;
+export const RUNDEN_LIMIT_CHOICES = [null, 30, 60] as const;
+/**
+ * Voreingestellt: drei Akte (core/akte.ts) zu je zehn eigenen Zuegen. Der Wert
+ * zaehlt hier ZUEGE JE SPIELER - beim Start rechnet der Raum ihn auf alle um
+ * (AKTE_ZUEGE x Spieler), denn eine Runde ist ein Zug irgendeines Spielers.
+ * Allein mit einem Bot: 60 Runden, etwa eine halbe Stunde.
+ */
+export const AKTE_ZUEGE = 30;
+export const DEFAULT_RUNDEN = AKTE_ZUEGE;
 
 export const rundenLimitLabel = (n: number | null): string =>
-  n === null ? 'offen' : n === 60 ? 'ein Jahr' : `${n} Runden`;
+  n === null ? 'offen' : n === 60 ? 'ein Jahr' : n === AKTE_ZUEGE ? 'drei Akte' : `${n} Runden`;
 
 export type ClientMsg =
   /**
@@ -100,6 +113,8 @@ export type ClientMsg =
       ahn?: HeldLore;
       /** Das Erbstueck der Familie (core/erbe.ts, istErbstueck). */
       erbstueck?: string;
+      /** Wie viele Partien dieser Browser gespielt hat - welche Systeme sich zeigen (core/systeme.ts). */
+      partien?: number;
     }
   /** Nur der Gastgeber, nur vor dem Start. Was fehlt, bleibt, wie es ist. */
   | {
@@ -115,6 +130,8 @@ export type ClientMsg =
       koop?: boolean;
       /** Weltart waehlen oder neu wuerfeln (core/weltart.ts). */
       weltArt?: WeltArt | 'neu';
+      /** Alle Systeme von Anfang an - fuer alle, die das Spiel schon kennen (core/systeme.ts). */
+      alleSysteme?: boolean;
     }
   | { t: 'start' }
   /** Nur der Gastgeber, nur vor dem Start: einen Bot dazusetzen oder entfernen. */

@@ -326,6 +326,18 @@ export function Home() {
         </label>
         {nameFehlt && <p className="note warn-name">Wie heisst du? Erst einen Namen eingeben, dann geht es los.</p>}
 
+        {/* Sofort spielen (D13): ein Klick, ein Rivale, los - ohne Warteraum. */}
+        <button
+          className="primary home-sofort"
+          disabled={SERVER_MISSING || verbindet}
+          onClick={() => {
+            const n = name.trim() || 'Herrscher';
+            connect(freshCode(), n, true, false, undefined, { schnell: true });
+          }}
+        >
+          Sofort spielen
+        </button>
+
         {neuHier && !SERVER_MISSING && (
           <section className="neu-hier">
             <h2>Neu hier?</h2>
