@@ -1272,36 +1272,18 @@ em.off {
 
 /* --- Seitenmenue --- */
 
-/* Im Stil der Schilder oben links (Raumcode, Wetter): fester dunkler Grund,
-   gleicher Rahmen - frueher durchsichtig und blass, auf hellen Kacheln kaum
-   zu lesen. Rot erst unter dem Zeiger, damit er nicht staendig warnt. */
-.verlassen {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 13;
-  font-size: 10px;
-  padding: 6px 9px;
+/* Verlassen steht in der Chronik, ganz unten - weit weg von allem, was man oft klickt. */
+.menu-verlassen {
+  display: block;
+  margin: 8px 0 4px auto;
   color: var(--muted);
-  background: rgba(23, 18, 12, 0.86);
-  border: 2px solid var(--line);
-  box-shadow: none;
-  /* So hoch wie das Wetterschild daneben. */
-  min-height: 34px;
-  display: inline-flex;
-  align-items: center;
 }
-.verlassen:hover:not(:disabled) {
+.menu-verlassen:hover:not(:disabled) {
   color: var(--text);
-  background: rgba(23, 18, 12, 0.94);
   border-color: var(--danger);
 }
 
-/*
- * Das Menue beginnt unter dem Verlassen-Knopf (10px Abstand + 34px hoch) und
- * laesst eine Luecke - frueher begann es bei 34px und schob sich ueber den
- * Knopf. Der Aufklapper steht auf Hoehe der Menuekante.
- */
+/* Das Menue beginnt unter der Kopfleiste. Der Aufklapper steht auf Hoehe der Menuekante. */
 .main {
   --menu-oben: 52px;
 }
@@ -1318,6 +1300,23 @@ em.off {
 .menu-auf {
   top: var(--menu-oben);
   right: 0;
+  width: 26px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0;
+}
+/* Zugeklappt: senkrecht beschriftet, damit man es findet (weniger Knoepfe, Schritt 2). */
+.menu-auf > span {
+  writing-mode: vertical-rl;
+  font-family: var(--pixel);
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+.menu-auf > .menu-reiter-punkt {
+  top: -3px;
+  right: -3px;
 }
 .menu-zu {
   top: 34px;
@@ -1424,6 +1423,19 @@ em.off {
 .menu-reiter-knopf.aktiv {
   background: var(--accent-dark);
   color: #21170a;
+}
+/* Zwei Reiter (Reich, Chronik): Symbol und Wort nebeneinander, gut lesbar. */
+.menu-reiter-knopf {
+  flex-direction: row;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--pixel);
+  font-size: 9px;
+  padding: 8px 4px;
+  color: var(--muted);
+}
+.menu-reiter-knopf.aktiv {
+  background: var(--accent);
 }
 
 .menu-inhalt {
@@ -5312,39 +5324,71 @@ em.off {
   margin: 0;
 }
 
-/* Warnung vor einem nahen Raubzug (scenes/Game.tsx, raubWarnung). */
-.raub-warnung {
+/*
+ * Warnung vor einem nahen Raubzug (scenes/Game.tsx, raubWarnung): nur eine
+ * Zeile - die Gegenmittel stehen am roten Banner auf der Karte.
+ */
+.raub-zeile {
   position: absolute;
-  /* Ueber Bauleiste und Zeitleiste, nicht oben: dort stehen Heerleiste und Meldungen. */
   bottom: calc(var(--unten-oben, 118px) + 46px);
   left: 50%;
   transform: translateX(-50%);
   z-index: 7;
-  width: min(460px, calc(100% - 32px));
-  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 32px);
   background: rgba(23, 18, 12, 0.95);
   border: 2px solid var(--danger);
   box-shadow: 0 0 0 2px var(--bg);
+}
+.raub-zeile:active {
+  transform: translate(calc(-50% + 1px), 1px);
+}
+.raub-zeile > button {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  color: var(--text);
   font-size: 13px;
+  padding: 6px 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.raub-warnung p {
-  margin: 0 0 4px;
+.raub-zeile > button.raub-zu {
+  color: var(--muted);
+  padding: 6px 8px;
 }
-.raub-warnung b {
+.raub-zeile b {
   color: var(--danger);
   font-family: var(--pixel);
   font-size: 10px;
   letter-spacing: 1px;
+  margin-right: 6px;
 }
-.raub-warnung-klein {
+.hex-raub {
+  fill: rgba(216, 50, 42, 0.18);
+  stroke: #d8322a;
+  stroke-width: 2;
+  pointer-events: none;
+  animation: krone-leuchten 1.2s ease-in-out infinite;
+}
+.raub-zeichen {
+  cursor: pointer;
+  animation: krone-wippen 1.2s ease-in-out infinite;
+}
+.ausbau-text {
+  font-size: 11px;
   color: var(--muted);
-  font-size: 11.5px;
+  margin: 0 0 6px;
+  line-height: 1.35;
 }
-.raub-warnung-knoepfe {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 6px;
+@media (prefers-reduced-motion: reduce) {
+  .hex-raub,
+  .raub-zeichen {
+    animation: none;
+  }
 }
 
 /* Weltart in der Lobby (core/weltart.ts). */
@@ -5445,7 +5489,7 @@ em.off {
   color: var(--accent);
 }
 @media (max-width: 700px) {
-  .raub-warnung {
+  .raub-zeile > button {
     font-size: 12px;
   }
 }
@@ -5995,7 +6039,6 @@ em.off {
   .hud > span.hud-room,
   .hud > span.hud-haus,
   .hud > span.hud-turn,
-  .hud > .hud-ton,
   .hud-wetter-text {
     display: none;
   }

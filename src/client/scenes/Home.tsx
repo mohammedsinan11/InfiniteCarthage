@@ -205,7 +205,7 @@ export function Home() {
           <section className="platzwahl">
             <h2>Raum {platzWahl.code} laeuft</h2>
             <p className="note">
-              Welcher Platz bist du? Die PIN steht in der Partie im Menue beim Chronisten - auf dem Geraet, auf dem du
+              Welcher Platz bist du? Die PIN steht in der Partie im Menue unter Chronik - auf dem Geraet, auf dem du
               bisher gespielt hast.
             </p>
             <ul>

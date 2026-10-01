@@ -68,7 +68,7 @@ import {
 // maxLeben kennt Art, Zweig des Ernannten und Rang (core/combat.ts).
 import { maxLeben } from '../../core/combat';
 import { Schwerter } from './Schwerter';
-import { AuftragsZeichen, Flammen, KronenZeichen } from './Marken';
+import { AuftragsZeichen, Flammen, KronenZeichen, RaubZeichen } from './Marken';
 import { Kosten } from '../ui/Aktionsleiste';
 import type { Cost } from '../../core/rules/costs';
 import { loeschFelder } from '../../core/rules/feuer';
@@ -236,8 +236,10 @@ export type Targets = {
 
 /** Eine kleine Tafel am Gebaeude oder an der Krone: was sich dort ausbauen laesst. */
 export type AusbauTafel = {
-  ort: { art: 'ecke' | 'feld'; key: string };
+  ort: { art: 'ecke' | 'feld' | 'raub'; key: string };
   titel: string;
+  /** Eine Zeile Erklaerung unter dem Titel. */
+  text?: string;
   optionen: { name: string; kosten?: Cost; darf: boolean; hinweis?: string; wahl: () => void }[];
   /** Text, wenn es keine Optionen gibt. */
   leer?: string;
@@ -293,6 +295,10 @@ type Props = {
   kronen?: Krone[];
   /** Klick auf eine Krone. */
   onKrone?: (q: number, r: number) => void;
+  /** Ein Raubzug zieht auf dieses Feld: rotes Banner darueber (statt eines Kastens). */
+  raubMarke?: { q: number; r: number; titel: string } | null;
+  /** Klick auf das Banner - oeffnet die Gegenmittel. */
+  onRaubMarke?: () => void;
   /** Klick auf ein eigenes Gebaeude - zeigt, was sich dort ausbauen laesst. */
   onGebaeude?: (vertex: string) => void;
   /** Klick auf die eigene Hauptstadt - zeigt ihre Ausbaustufen. */
@@ -443,6 +449,8 @@ export function Board({
   onFeuer,
   kronen = KEINE_KRONEN,
   onKrone,
+  raubMarke = null,
+  onRaubMarke,
   onGebaeude,
   onHauptstadtKlick,
   onLeer,
@@ -1010,7 +1018,7 @@ export function Board({
       zeilen.push({
         text: w
           ? `${typ.name} - errichtet von ${state.players.find((p) => p.id === w.owner)?.name ?? 'jemandem'}`
-          : `Wunderstaette: ${typ.name} (${typ.punkte} Siegpunkte). ${typ.text} Baue ein Dorf daneben, dann errichte es bei der Seherin im Menue.`,
+          : `Wunderstaette: ${typ.name} (${typ.punkte} Siegpunkte). ${typ.text} Baue ein Dorf daneben, dann errichte es im Menue unter Reich.`,
       });
     }
     if (!nebel) {
@@ -2495,6 +2503,13 @@ export function Board({
    */
   const ausbauTreffer = (wx: number, wy: number): boolean => {
     const reichweite = 18 / scale;
+    if (raubMarke && onRaubMarke) {
+      const p = kronenFuss(raubMarke.q, raubMarke.r);
+      if (Math.hypot(p.x - wx, p.y - 5 * SCALE - wy) <= reichweite + 5 * SCALE) {
+        onRaubMarke();
+        return true;
+      }
+    }
     if (onKrone) {
       for (const kr of kronen) {
         const p = kronenFuss(kr.q, kr.r);
@@ -3141,6 +3156,25 @@ export function Board({
           );
         })}
 
+        {/* Raubzug: das Zielfeld rot umrandet, darueber ein Banner zum Anklicken. */}
+        {raubMarke &&
+          (() => {
+            const hoch = liftHex(raubMarke.q, raubMarke.r);
+            const fuss = kronenFuss(raubMarke.q, raubMarke.r);
+            const punkte = [0, 1, 2, 3, 4, 5]
+              .map((i) => {
+                const p = hexCornerPixel(raubMarke.q, raubMarke.r, i, LAYOUT);
+                return `${p.x.toFixed(1)},${(p.y - hoch).toFixed(1)}`;
+              })
+              .join(' ');
+            return (
+              <g key="raub">
+                <polygon className="hex-raub" points={punkte} />
+                <RaubZeichen x={fuss.x} y={fuss.y} k={SCALE} titel={raubMarke.titel} />
+              </g>
+            );
+          })()}
+
         {/* Die Felder der ausgewaehlten Einheiten bekommen einen Ring. */}
         {[
           ...new Map(
@@ -3280,6 +3314,7 @@ export function Board({
                   x
                 </button>
               </div>
+              {ausbau.text && <div className="ausbau-text">{ausbau.text}</div>}
               {ausbau.optionen.length === 0 && (
                 <div className="ausbau-hinweis">{ausbau.leer ?? 'Hier gibt es nichts mehr auszubauen.'}</div>
               )}

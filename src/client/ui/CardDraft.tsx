@@ -124,7 +124,7 @@ export function CardDraft({
           : 'Der Spieler am Zug waehlt.'}
       </p>
       {darfWaehlen && (
-        <p className="draft-sub draft-slots" title="Dauerwirkungen gelten nur, solange die Karte einen Platz hat. Tauschen kannst du beim Kanzler im Menue.">
+        <p className="draft-sub draft-slots" title="Dauerwirkungen gelten nur, solange die Karte einen Platz hat. Tauschen kannst du im Menue unter Reich.">
           Dauerwirkungen: {aktiv.length} von {plaetze} Plaetzen belegt
           {aktiv.length > 0 ? ` (${aktiv.map((id) => cardById(id)?.name ?? id).join(', ')})` : ''}
         </p>
@@ -210,7 +210,7 @@ export function CardDraft({
           <button
             className={ersetze === null ? 'aktiv' : ''}
             onClick={() => setWahlErsetze(null)}
-            title="Die neue Karte bleibt in deinem Besitz, nimmt aber keinen Platz ein - beim Kanzler im Menue tauschbar."
+            title="Die neue Karte bleibt in deinem Besitz, nimmt aber keinen Platz ein - im Menue unter Reich tauschbar."
           >
             keine (nur behalten)
           </button>

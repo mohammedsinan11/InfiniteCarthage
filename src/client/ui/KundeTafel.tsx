@@ -2,7 +2,7 @@
  * Die Kunde aus dem Land (core/kunde.ts) als Brief ueber der Karte - im Stil
  * der Ereignisse, aber ohne Wahl: zum Wechsel der Jahreszeit erzaehlt der
  * Chronist, was geschah. Ein Klick schliesst ihn; nachlesen laesst er sich
- * beim Chronisten im Menue.
+ * im Menue unter Chronik.
  */
 
 import type { Bericht } from '../../core/kunde';
@@ -29,7 +29,7 @@ export function KundeTafel({ bericht, onZu }: { bericht: Bericht; onZu: () => vo
         </ul>
         {bericht.zeilen.length > KURZ && (
           <p className="kunde-mehr">
-            Und {bericht.zeilen.length - KURZ} weitere Nachrichten - beim Chronisten im Menue.
+            Und {bericht.zeilen.length - KURZ} weitere Nachrichten - im Menue unter Chronik.
           </p>
         )}
         <div className="ereignis-wahlen">

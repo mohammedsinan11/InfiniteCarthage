@@ -20,7 +20,23 @@ const FARBEN: Record<string, string> = {
   s: '#c9ccd6', // Silber
   S: '#8a8e9a', // Silber im Schatten
   b: '#3a7ac2', // Saphir
+  R: '#d8322a', // Warnrot
 };
+
+/** Ein rotes Banner mit Ausrufezeichen: hierher zieht ein Raubzug. */
+const RAUB: Karte = [
+  '.kkkkkkk.',
+  'kRRRRRRRk',
+  'kRRRwRRRk',
+  'kRRRwRRRk',
+  'kRRRwRRRk',
+  'kRRRRRRRk',
+  'kRRRwRRRk',
+  '.kRRRRRk.',
+  '..kRRRk..',
+  '...kRk...',
+  '....k....',
+];
 
 /** Die Krone ueber einem Feld, das fuer eine Hauptstadt (fast) geschlossen ist. */
 const KRONE: Karte = [
@@ -186,6 +202,20 @@ export function AuftragsZeichen({
     <g className={`auftrag-zeichen ${art}`} pointerEvents="none" shapeRendering="crispEdges">
       <title>{titel}</title>
       <Pixel karte={karte} x0={x - (breite / 2) * k} y0={y - karte.length * k} k={k} />
+    </g>
+  );
+}
+
+/**
+ * Ueber dem Feld, auf das ein Raubzug zieht: ein rotes Banner, das pocht.
+ * Geklickt wird ueber das Brett (Naehe) - es oeffnet die Gegenmittel.
+ */
+export function RaubZeichen({ x, y, k, titel }: { x: number; y: number; k: number; titel: string }) {
+  const breite = RAUB[0]!.length;
+  return (
+    <g className="raub-zeichen" shapeRendering="crispEdges">
+      <title>{titel}</title>
+      <Pixel karte={RAUB} x0={x - (breite / 2) * k} y0={y - RAUB.length * k} k={k} />
     </g>
   );
 }

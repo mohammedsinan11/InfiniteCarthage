@@ -20,6 +20,15 @@ npm run dev          # Oberflaeche auf :5173
 Dann einen Raum eroeffnen und **Allein starten** - oder den angezeigten Code
 weitergeben und zu mehreren spielen.
 
+Bedienung in Kuerze: unten nur Strasse, Dorf, Stadt und der Wuerfel. Alles
+andere steht dort, wo es hingehoert - ein Klick auf das eigene Dorf zeigt
+Ausbau, Turm, Palisade, Tor und Truppen; ein rotes Banner ueber einem Feld
+warnt vor einem Raubzug und bietet die Gegenmittel (Heer entgegen, Tribut,
+Frieden); ein Klick auf ein Lager zeigt die Fraktion. Beute oeffnet die
+Kartenwahl von selbst. Das Menue rechts ist zugeklappt und hat zwei Reiter:
+**Reich** (Vorhaben, Sippen, Karten, Auftraege, Omen) und **Chronik**
+(Punkte, Kunde, Einstellungen, Raumcode und PIN, Protokoll, Verlassen).
+
 | Befehl | Wirkung |
 | --- | --- |
 | `npm run dev` | Vite-Entwicklungsserver |

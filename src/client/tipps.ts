@@ -48,7 +48,7 @@ export const TIPPS: Record<string, Omit<Tipp, 'id'>> = {
   },
   auftrag: {
     titel: 'Ein Wanderer bittet um Hilfe',
-    text: 'Ein Wanderer bietet einen Auftrag an - bei der Seherin im Menue.',
+    text: 'Ein Wanderer bietet einen Auftrag an - im Menue unter Reich.',
   },
   hilfe: {
     titel: 'Wanderhaendler',
