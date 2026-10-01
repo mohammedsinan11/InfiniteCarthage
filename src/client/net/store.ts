@@ -378,7 +378,7 @@ function ruinenMeldung(e: Extract<GameEvent, { t: 'ruin' }>): string {
     case 'schatz':
       return `Schatz in der Ruine: ${bundleText(e.gained)}`;
     case 'beute':
-      return 'Beute in der Ruine - einloesen mit dem Knopf Beute unten';
+      return 'Beute in der Ruine - eine Kartenwahl in deinem Zug';
     case 'karte':
       return 'Eine alte Karte - die Umgebung ist aufgedeckt';
     case 'hinterhalt':

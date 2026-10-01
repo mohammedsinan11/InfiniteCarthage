@@ -47,9 +47,8 @@ import { hausById } from '../../core/haus';
 import { kartenPunkte } from '../../core/cards/effects';
 import { COST_WUNDER, WUNDER, wunderAt } from '../../core/wunder';
 import { szenarioById, szenarioStand } from '../../core/szenario';
-import { KOOP_ZIEL_JE, wunderHindernis } from '../../core/rules/reducer';
-import { OmenListe } from '../ui/OmenListe';
-import { omenById } from '../../core/omen';
+import { KOOP_ZIEL_JE, wahlFrei, wunderHindernis } from '../../core/rules/reducer';
+import type { Action } from '../../core/rules/reducer';
 import { neuerRaumCode } from '../net/socket';
 import type { FraktionsZeile } from '../ui/SideMenu';
 import { garrisonOf, isNestActive, nestFraktionOf, sightOf } from '../../core/units';
@@ -62,7 +61,7 @@ import { setAmbiente } from '../ambiente';
 import { roundOf, seasonOf } from '../../core/season';
 import { RESOURCES } from '../../core/types';
 import type { Resource } from '../../core/types';
-import { COST_CAPITAL, COST_CITY, COST_STUFE, COST_ROAD, COST_TURM_STUFE, canAfford } from '../../core/rules/costs';
+import { COST_ARCHER, COST_CAPITAL, COST_CITY, COST_KNIGHT, COST_MAUER, COST_STUFE, COST_ROAD, COST_TOR, COST_TOWER, COST_TURM_STUFE, canAfford } from '../../core/rules/costs';
 import { FRIEDEN_PREIS, nimmtFrieden, tributKarten } from '../../core/rules/diplomatie';
 import { brennt } from '../../core/rules/feuer';
 // maxLeben kennt Art, Zweig des Ernannten und Rang (core/combat.ts).
@@ -72,10 +71,9 @@ import type { UnitState as HeerEinheit } from '../../core/state';
 import { bundleText } from '../log';
 import { eckenWert, istBotId } from '../../core/bot';
 import { weltArtVon } from '../../core/weltart';
-import { stadtReif } from '../../core/bevoelkerung';
+import { einwohnerVon, platzFuer, stadtReif } from '../../core/bevoelkerung';
 import { erstarkt, fraktionIn, stimmungText, stimmungVon } from '../../core/fraktionsleben';
 import { geruechte } from '../geruechte';
-import { Zeitleiste } from '../ui/Zeitleiste';
 import { holeTagesInfo } from '../net/socket';
 import { KundeTafel } from '../ui/KundeTafel';
 import { ratschlag } from '../rat';
@@ -169,7 +167,6 @@ export function Game() {
     setTippRuhe(state?.turn ?? 0);
     tippGelesen();
   };
-  const [omenOffen, setOmenOffen] = useState(false);
   const pendingRoll = useStore((s) => s.pendingRoll);
   const kunde = useStore((s) => s.kunde);
   const schliesseKunde = useStore((s) => s.schliesseKunde);
@@ -515,6 +512,22 @@ export function Game() {
   useEffect(() => {
     if (!isMine) setAngebotOffen(false);
   }, [isMine]);
+  /*
+   * Beute loest sich selbst ein (Spieltest 7: der Beuteknopf war einer von zu
+   * vielen): in der Bauphase oeffnet sich die Kartenwahl von allein, solange
+   * in diesem Zug noch eine Wahl frei ist (rules/reducer.ts, wahlFrei). Je Zug
+   * und Beutestand nur ein Versuch - scheitert er, bleibt die Beute liegen.
+   */
+  const beuteVersucht = useRef(new Set<string>());
+  const meineBeute = me?.loot ?? 0;
+  useEffect(() => {
+    if (!isMine || phase.t !== 'main' || meineBeute <= 0 || state.draft !== null) return;
+    if (!wahlFrei({ ...state, wahlen: state.wahlen ?? undefined })) return;
+    const schluessel = `${state.turn}:${meineBeute}`;
+    if (beuteVersucht.current.has(schluessel)) return;
+    beuteVersucht.current.add(schluessel);
+    act({ t: 'claimLoot' });
+  }, [isMine, phase.t, meineBeute, state, act]);
 
   /**
    * Die besten Bauplaetze hervorheben: viele Wurfpunkte, dazu Sorten, die man
@@ -989,8 +1002,33 @@ export function Game() {
         }),
       });
     }
-    // Der Wachturm gehoert nicht mehr hierher: er steht fuer sich auf einer
-    // freien Ecke und wird ueber die Leiste gesetzt (rules/placement.ts).
+    /*
+     * Was frueher in der Leiste unter Befestigen und Truppe lag, steht hier am
+     * eigenen Haus (Spieltest 7: "zu viele Knoepfe, die ich nie benutze").
+     * Turm, Palisade und Tor waehlen den Bau - die Plaetze zeigt dann die
+     * Karte; Ritter und Bogen treten sofort an.
+     */
+    const bauWahl = (name: string, kosten: Cost, m: BuildMode) => ({
+      name,
+      kosten,
+      darf: jetzt && bezahlbar(kosten),
+      hinweis: warum ?? armut(kosten),
+      wahl: dann(() => setMode(m)),
+    });
+    const truppe = (name: string, kosten: Cost, a: Action) => ({
+      name,
+      kosten,
+      darf: jetzt && bezahlbar(kosten),
+      hinweis: warum ?? armut(kosten),
+      wahl: dann(() => act(a)),
+    });
+    optionen.push(
+      bauWahl('Turm', COST_TOWER, 'tower'),
+      bauWahl('Palisade', COST_MAUER, 'mauer'),
+      bauWahl('Tor', COST_TOR, 'tor'),
+      truppe('Ritter', COST_KNIGHT, { t: 'recruitKnight' }),
+      truppe('Bogen', COST_ARCHER, { t: 'recruitArcher' }),
+    );
     // Jedes fast geschlossene Feld an dieser Ecke - eine Stadt kann an mehreren Ringen liegen.
     for (const u of umland) {
       if (u.fehlt > FAST_GESCHLOSSEN || !hexVertices(u.q, u.r).some((v) => vertexKey(v) === ausbauOrt.key)) continue;
@@ -1002,7 +1040,8 @@ export function Game() {
       const [q, r] = hk.split(':').map(Number) as [number, number];
       if (hexVertices(q, r).some((v) => vertexKey(v) === ausbauOrt.key)) optionen.push(ausbauOption(q, r, h.stufe + 1));
     }
-    return { ort: ausbauOrt, titel: b.type === 'city' ? 'Stadt' : 'Dorf', optionen };
+    const ew = state.ereignisseAn ? ` · ${einwohnerVon(state, ausbauOrt.key)}/${platzFuer(state, ausbauOrt.key)} Einwohner` : '';
+    return { ort: ausbauOrt, titel: `${b.type === 'city' ? 'Stadt' : 'Dorf'}${ew}`, optionen };
   }, [ausbauOrt, you, isMine, phase.t, hand, state, umland, act]);
 
   /** Was auf freien Bauplaetzen als Vorschau steht (Board). */
@@ -1262,7 +1301,6 @@ export function Game() {
           Ohne das waere eine Partie zu mehreren nicht spielbar.
         */}
         <div className="hud" ref={hudRef}>
-          <span className="hud-room">{useStore.getState().code}</span>
           <span
             className={`hud-wetter zeit-${tageszeit}`}
             title={[
@@ -1279,20 +1317,10 @@ export function Game() {
             </span>
             {WETTER_WIRKUNG[echtesWetter] && <span className="hud-wirkung">!</span>}
           </span>
-          <button
-            className={stumm ? 'hud-ton aus' : 'hud-ton'}
-            title={stumm ? 'Ton einschalten' : 'Ton ausschalten - Umgebung, Musik und Klaenge'}
-            onClick={tonUmschalten}
-          >
-            <TonSymbol aus={stumm} />
-          </button>
-          {state.order.length > 1 && (
+          {/* Nur, wenn ein anderer dran ist - den eigenen Zug zeigt der Wuerfel (Spieltest 7). */}
+          {state.order.length > 1 && (phase.t === 'finished' || !isMine) && (
             <span className="hud-turn">
-              {phase.t === 'finished'
-                ? 'Partie beendet'
-                : isMine
-                  ? 'du bist dran'
-                  : `${state.players.find((p) => p.id === state.currentPlayer)?.name} ist dran`}
+              {phase.t === 'finished' ? 'Partie beendet' : `${state.players.find((p) => p.id === state.currentPlayer)?.name} ist dran`}
             </span>
           )}
           {/* Siegpunkte: eigene, bei mehreren auch die der anderen im Tooltip. */}
@@ -1364,34 +1392,14 @@ export function Game() {
               {hausById(me.haus)!.name}
             </span>
           )}
-          {you && phase.t !== 'hauswahl' && (
-            <button
-              className="hud-omen hud-rat"
-              disabled={!isMine}
-              title={isMine ? 'Was waere jetzt sinnvoll? Ein Vorschlag - gespielt wird nichts.' : 'Rat gibt es in deinem Zug'}
-              onClick={() => {
-                const r = world ? ratschlag(state, world, you) : null;
-                setRat(r ?? { text: 'Gerade faellt dem Rat nichts ein.' });
-                if (r?.ort) zeigeFeld(r.ort.q, r.ort.r);
-              }}
-            >
-              Rat?
-            </button>
-          )}
-          {state.omens.length > 0 && (
-            <button
-              className={omenOffen ? 'hud-omen offen' : 'hud-omen'}
-              title={state.omens.map((id) => `${omenById(id)?.name}: ${omenById(id)?.text}`).join('\n')}
-              onClick={() => setOmenOffen((v) => !v)}
-            >
-              Omen {state.omens.length}
-            </button>
-          )}
-          {state.lastRoll && (
-            <span className="hud-roll">
-              {state.lastRoll[0]} + {state.lastRoll[1]} = {state.lastRoll[0] + state.lastRoll[1]}
-            </span>
-          )}
+          {/* Der Ton bleibt oben, neben Welt und Haus (Wunsch aus dem Spieltest). */}
+          <button
+            className={stumm ? 'hud-ton aus' : 'hud-ton'}
+            title={stumm ? 'Ton einschalten' : 'Ton ausschalten - Umgebung, Musik und Klaenge'}
+            onClick={tonUmschalten}
+          >
+            <TonSymbol aus={stumm} />
+          </button>
         </div>
 
         {/* Verlassen steht fuer sich, weit weg von allem, was man oft klickt. */}
@@ -1402,6 +1410,16 @@ export function Game() {
         <SideMenu
           sippe={state.ereignisseAn ? (me?.sippe ?? {}) : undefined}
           sippeSeit={me?.sippeSeit}
+          onKarten={() => setTafel('karten')}
+          onRat={
+            you && isMine && world
+              ? () => {
+                  const r = ratschlag(state, world, you);
+                  setRat(r ?? { text: 'Gerade faellt dem Rat nichts ein.' });
+                  if (r?.ort) zeigeFeld(r.ort.q, r.ort.r);
+                }
+              : undefined
+          }
           turn={state.turn}
           cards={me?.cards ?? []}
           activeCards={me?.activeCards ?? []}
@@ -1527,12 +1545,6 @@ export function Game() {
 
         <Announcements items={announcements} onDone={dropAnnouncement} />
 
-        {omenOffen && state.omens.length > 0 && (
-          <div className="hud-omen-tafel">
-            <OmenListe omens={state.omens} />
-          </div>
-        )}
-
         {phase.t !== 'finished' && me?.untergang != null && !me.besiegt && (
           <div className="hud-untergang" role="alert">
             {notbau
@@ -1541,7 +1553,8 @@ export function Game() {
           </div>
         )}
 
-        {phase.t !== 'hauswahl' && phase.t !== 'setup' && phase.t !== 'finished' && you && (
+        {/* Die Erste-Schritte-Liste nur im Einstiegsszenario (Spieltest 7). */}
+        {state.szenario === 'gruendung' && phase.t !== 'hauswahl' && phase.t !== 'setup' && phase.t !== 'finished' && you && (
           <ErsteSchritte state={state} you={you} />
         )}
         {sichtbareTipps.length > 0 && phase.t !== 'finished' && phase.t !== 'hauswahl' && state.draft === null && (
@@ -1721,20 +1734,7 @@ export function Game() {
               </div>
             )}
 
-          {/*
-            Die Zeitleiste weicht allem, was sich unten oeffnet - Tafeln,
-            Klappen, Befehle, Handel (Spieltest 4: sie lag ueber dem Markt,
-            der Kartentafel und der Befehlstafel). Die Klappen der Leiste
-            blendet styles.css aus, sie leben in der Aktionsleiste.
-          */}
-          {you && phase.t !== 'setup' && phase.t !== 'hauswahl' && phase.t !== 'finished' && tafel === null && kandidaten.length === 0 && state.trade === null && !angebotOffen && lagerTafel === null && (
-            <Zeitleiste
-              turn={state.turn}
-              rundenLimit={state.rundenLimit ?? null}
-              vorhabenBis={state.vorhaben?.[you]?.aktiv?.bis ?? null}
-              raubIn={raubWarnung ? raubWarnung.weg : null}
-            />
-          )}
+          {/* Die Zeitleiste ist weg (Spieltest 7) - ein Raubzug zeigt sich als Marke auf der Karte. */}
 
           {lagerTafel &&
             isNestActive(state, ...(lagerTafel.split(':').map(Number) as [number, number])) &&
@@ -1882,6 +1882,7 @@ export function Game() {
 
           {/* Heerleiste: je Schar oder Feld ein Kaertchen, dazu "untaetig" (ui/Heerleiste.tsx). */}
           <Heerleiste
+            kompakt
             gruppen={heer}
             heldName={heldName}
             status={(g) => gruppenStatus(g, kampfOrte)}

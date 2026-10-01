@@ -41,6 +41,7 @@ export function Heerleiste({
   untaetig,
   onUntaetig,
   heldName,
+  kompakt = false,
 }: {
   gruppen: readonly HeerGruppe[];
   status: (g: HeerGruppe) => HeerStatus;
@@ -52,8 +53,14 @@ export function Heerleiste({
   /** Wie viele Einheiten ohne Auftrag herumstehen. */
   untaetig: number;
   onUntaetig: () => void;
+  /**
+   * Nur das Schild "untaetig" - die Scharen selbst waehlt man auf der Karte
+   * (Spieltest 7: zu viele Schilder, die keiner anklickte).
+   */
+  kompakt?: boolean;
 }) {
   if (gruppen.length === 0) return null;
+  if (kompakt && untaetig === 0) return null;
   return (
     <div className="heerleiste">
       {untaetig > 0 && (
@@ -61,7 +68,7 @@ export function Heerleiste({
           {untaetig} untaetig
         </button>
       )}
-      {gruppen.map((g) => {
+      {!kompakt && gruppen.map((g) => {
         const s = status(g);
         const leben = g.einheiten.reduce((n, u) => n + u.leben, 0);
         const max = g.einheiten.reduce((n, u) => n + maxLeben(u), 0);

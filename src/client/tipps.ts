@@ -44,7 +44,7 @@ export const TIPPS: Record<string, Omit<Tipp, 'id'>> = {
   },
   beute: {
     titel: 'Beute',
-    text: 'Du hast Beute: der Knopf "Beute" unten gibt dir eine Kartenwahl.',
+    text: 'Beute ist eine Kartenwahl - sie oeffnet sich in deinem Zug von selbst, hoechstens zwei je Zug.',
   },
   auftrag: {
     titel: 'Ein Wanderer bittet um Hilfe',

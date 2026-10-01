@@ -336,7 +336,13 @@ export function SideMenu({
   onLiefern,
   sippe,
   sippeSeit,
+  onKarten,
+  onRat,
 }: {
+  /** Den Rat fragen (client/rat.ts) - nur im eigenen Zug. */
+  onRat?: () => void;
+  /** Die Kartentafel oeffnen: Entwicklungskarte kaufen, Karten und Taktiken spielen. */
+  onKarten?: () => void;
   /** Karten je Familie (core/cards/sippen.ts) - fehlt ohne Ereignisse. */
   sippe?: SippenZaehler;
   sippeSeit?: SippenZaehler;
@@ -662,6 +668,12 @@ export function SideMenu({
             <b>{REITER.find((r) => r.id === reiter)!.name}</b>
             <span>{berater[reiter].satz}</span>
           </span>
+          {/* "Was jetzt?" - frueher ein Schild oben, jetzt beim Berater (Spieltest 7). */}
+          {onRat && (
+            <button className="klein berater-rat" title="Was waere jetzt sinnvoll? Ein Vorschlag - gespielt wird nichts." onClick={onRat}>
+              Rat?
+            </button>
+          )}
         </div>
         {reiter === 'kanzler' && (
           <>
@@ -1264,7 +1276,13 @@ export function SideMenu({
               </>
             )}
 
-            <Kopf titel={`Taktiken${tactics.length > 0 ? ` · ${tactics.length}` : ''}`} hilfe="Taktiken liegen auf deiner Hand. Spiele sie im Kartenknopf der Aktionsleiste auf eine Einheit oder ein Feld; danach sind sie verbraucht." />
+            <Kopf titel={`Taktiken${tactics.length > 0 ? ` · ${tactics.length}` : ''}`} hilfe="Taktiken liegen auf deiner Hand. Spiele sie ueber 'Karten kaufen und spielen' auf eine Einheit; danach sind sie verbraucht." />
+            {/* Der Kartenknopf der Leiste ist weg (Spieltest 7) - hier oeffnet sich dieselbe Tafel. */}
+            {onKarten && (
+              <button className="klein menu-karten-knopf" onClick={onKarten}>
+                Karten kaufen und spielen
+              </button>
+            )}
             {tactics.length === 0 ? (
               <p className="menu-leer">Keine spielbereit.</p>
             ) : (

@@ -6076,3 +6076,8 @@ em.off {
     letter-spacing: 0;
   }
 }
+
+/* Das Wetter oben nur als Zeichen - Tageszeit und Wetter stehen im Tooltip (Spieltest 7). */
+.hud-wetter-text {
+  display: none;
+}
