@@ -1338,7 +1338,7 @@ export function Game() {
               className="hud-runden"
               title={`Nach Runde ${state.rundenLimit} ist Schluss - dann gewinnt die hoechste Wertung (Siegpunkte x 10 + Ruhm).`}
             >
-              {state.tagesDatum ? 'Tagesexpedition · ' : ''}Runde {Math.min(roundOf(state.turn), state.rundenLimit)} / {state.rundenLimit}
+              {state.tagesDatum ? <span className="hud-lang">Tagesexpedition · </span> : ''}<span className="hud-lang">Runde </span>{Math.min(roundOf(state.turn), state.rundenLimit)} / {state.rundenLimit}
             </span>
           )}
           {state.order.length > 1 && !state.koop && (
@@ -1351,7 +1351,7 @@ export function Game() {
                 .map((p) => (
                   <span key={p.id} className={p.besiegt ? 'besiegt' : undefined}>
                     <i className="dot" style={{ background: p.color }} />
-                    {p.name} ★{p.points}
+                    <span className="hud-lang">{p.name} </span>★{p.points}
                     {p.devCount > 0 ? '+?' : ''}
                   </span>
                 ))}

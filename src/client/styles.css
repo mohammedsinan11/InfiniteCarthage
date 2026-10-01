@@ -6019,16 +6019,25 @@ em.off {
     width: 72px;
   }
   /*
-   * Die Schilder oben: hoechstens zwei kurze Reihen, nichts ausserhalb des
-   * Bildes (Spieltest 5: in einer schiebbaren Zeile lagen Runde, Rivalen,
-   * Rat und Omen hinter dem Rand). Was im Menue oder am Wuerfel ohnehin
-   * steht, faellt weg: Raumcode, Hausname, Welt, Ton, "du bist dran" und
-   * der Wettername (das Symbol bleibt, der Text steht im Tooltip).
+   * Die Schilder oben in einer Reihe, Ton eingeschlossen (Wunsch: kompakt).
+   * Was im Menue ohnehin steht, faellt weg: Raumcode, Hausname, Welt, "du
+   * bist dran", der Wettername, das Wort "Runde" und die Namen der Rivalen -
+   * Zahl, Farbpunkt und Tooltip reichen. Nur wenn es dann noch nicht passt
+   * (Szenario, viele Rivalen), bricht es in eine zweite Reihe um.
    */
   .hud {
     flex-wrap: wrap;
     gap: 4px;
-    max-width: calc(100% - 96px);
+    max-width: calc(100% - 20px);
+  }
+  .hud .hud-lang {
+    display: none;
+  }
+  .hud > span.hud-rivalen {
+    gap: 6px;
+  }
+  .hud > .hud-ton {
+    padding: 4px 5px;
   }
   .hud > span,
   .hud > button {
