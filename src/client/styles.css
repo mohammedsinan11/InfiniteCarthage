@@ -4202,71 +4202,6 @@ em.off {
   color: var(--muted);
 }
 
-/* --- Kartenbilder (ui/KartenBild.tsx). PLATZHALTER (ASSETS.md) ------------ */
-
-.karten-bild {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  width: 100%;
-  min-height: 78px;
-  padding: 6px 4px;
-  background: linear-gradient(180deg, #33404c 0%, #27301f 100%);
-  border: 2px solid rgba(0, 0, 0, 0.45);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
-}
-.karten-bild.bild-selten { background: linear-gradient(180deg, #24405e 0%, #1f2b36 100%); }
-.karten-bild.bild-episch { background: linear-gradient(180deg, #43305a 0%, #261d33 100%); }
-.karten-bild.bild-legendaer { background: linear-gradient(180deg, #5a4520 0%, #2e2410 100%); }
-.karten-bild.klein {
-  min-height: 0;
-  padding: 3px;
-  gap: 3px;
-  justify-content: flex-start;
-  border-width: 1px;
-}
-.karten-bild img {
-  display: block;
-  image-rendering: pixelated;
-}
-.karten-bild svg {
-  display: block;
-}
-.karten-teil {
-  position: relative;
-  display: inline-flex;
-}
-.karten-teil b {
-  position: absolute;
-  right: -5px;
-  bottom: -3px;
-  padding: 0 3px;
-  font-family: var(--pixel);
-  font-size: 8px;
-  font-weight: 400;
-  line-height: 1.4;
-  color: #21170a;
-  background: #f2c94c;
-  border: 1px solid #2a1f16;
-}
-.karten-teil.karg b {
-  color: #fff;
-  background: #c8402f;
-}
-.karten-rohstoffe {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px 7px;
-  max-width: 110px;
-  justify-content: center;
-}
-.karten-bild.klein .karten-teil b {
-  font-size: 7px;
-  right: -3px;
-  bottom: -2px;
-}
 
 /* --- Handy hochkant, zweiter Anlauf --------------------------------------
    Nach dem Geraetetest: Wuerfelknopf ueber die ganze Breite und zwei Reihen
@@ -5046,30 +4981,6 @@ em.off {
   }
 }
 
-/* Marken fuer Punkte-, Regel-, Sieben- und Schildkarten (ui/KartenBild.tsx).
-   Im Bild, nicht daran gehaengt: die allgemeine Regel .karten-teil b setzt
-   Zahlen absolut an die Ecke - eine lange Marke ragte so aus der Karte und
-   im Menue ueber die Nachbarkacheln (Spieltest 6). */
-.karten-marke b {
-  position: static;
-  display: block;
-  max-width: 100%;
-  text-align: center;
-  font-family: var(--pixel);
-  font-size: 10px;
-  color: var(--accent);
-  white-space: normal;
-  background: rgba(0, 0, 0, 0.35);
-  padding: 3px 6px;
-  border: 1px solid var(--line);
-}
-.karten-bild.klein .karten-marke b {
-  font-size: 7px;
-  padding: 1px 2px;
-}
-.karten-marke {
-  max-width: 100%;
-}
 
 /* --- Ereignisse (ui/EreignisTafel.tsx, core/ereignis.ts) ------------------- */
 
@@ -6351,4 +6262,607 @@ em.off {
 }
 .lobby-systeme li.aus::before {
   content: '· ';
+/* --- Spielkarten (ui/Spielkarte.tsx, ui/KartenBild.tsx) ---------------------
+   Eine Karte als Sammelkarte: Rahmen nach Seltenheit, Wappen und Fensterkante
+   nach Sippe, die Form des Bildfensters nach Kartenart. Rahmen und Folie sind
+   CSS - PLATZHALTER (ASSETS.md, "Kartenrahmen je Seltenheit"). */
+
+@property --sk-winkel {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.sk {
+  /* Seltenheit: Rahmen, Licht, Schatten. */
+  --rahmen: #7d6141;
+  --rahmen-hell: #b08c5c;
+  --rahmen-dunkel: #3a2a1a;
+  --koerper: #241a11;
+  --pergament: #e9dbb8;
+  --tinte: #2a1f16;
+  position: relative;
+  box-sizing: border-box;
+  width: var(--sk-breite, 164px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 5px;
+  border: 3px solid var(--rahmen);
+  /* Nieten in den Ecken, darunter gewebtes Leder. */
+  background:
+    linear-gradient(var(--rahmen-hell), var(--rahmen-hell)) left 1px top 1px / 2px 2px no-repeat,
+    linear-gradient(var(--rahmen-hell), var(--rahmen-hell)) right 1px top 1px / 2px 2px no-repeat,
+    linear-gradient(var(--rahmen-hell), var(--rahmen-hell)) left 1px bottom 1px / 2px 2px no-repeat,
+    linear-gradient(var(--rahmen-hell), var(--rahmen-hell)) right 1px bottom 1px / 2px 2px no-repeat,
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #2e2217 0%, var(--koerper) 100%);
+  box-shadow:
+    0 0 0 2px #0c0805,
+    inset 0 0 0 1px var(--rahmen-dunkel),
+    inset 1px 1px 0 2px rgba(255, 255, 255, 0.05),
+    0 8px 16px rgba(0, 0, 0, 0.45);
+  color: var(--text);
+  text-align: left;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  letter-spacing: 0;
+}
+
+.sk-selt-ungewoehnlich { --rahmen: #4f8f58; --rahmen-hell: #8cc490; --rahmen-dunkel: #1f3f24; }
+.sk-selt-selten { --rahmen: #3a74b8; --rahmen-hell: #86b6ea; --rahmen-dunkel: #18324f; }
+.sk-selt-episch { --rahmen: #8a58ad; --rahmen-hell: #cba2ea; --rahmen-dunkel: #3c2350; }
+.sk-selt-legendaer { --rahmen: #d9a441; --rahmen-hell: #fff0b0; --rahmen-dunkel: #5e4010; }
+
+/* Episch: ein zweiter, heller Rand innen - Amethyst gefasst. */
+.sk-selt-episch {
+  box-shadow:
+    0 0 0 2px #0c0805,
+    inset 0 0 0 1px var(--rahmen-hell),
+    inset 0 0 0 2px var(--rahmen-dunkel),
+    0 8px 16px rgba(0, 0, 0, 0.45);
+}
+
+/* Legendaer: eine Goldfolie laeuft um den Rahmen. */
+.sk-selt-legendaer {
+  border-color: transparent;
+  background:
+    linear-gradient(var(--rahmen-hell), var(--rahmen-hell)) left 1px top 1px / 2px 2px no-repeat padding-box,
+    linear-gradient(var(--rahmen-hell), var(--rahmen-hell)) right 1px top 1px / 2px 2px no-repeat padding-box,
+    linear-gradient(var(--rahmen-hell), var(--rahmen-hell)) left 1px bottom 1px / 2px 2px no-repeat padding-box,
+    linear-gradient(var(--rahmen-hell), var(--rahmen-hell)) right 1px bottom 1px / 2px 2px no-repeat padding-box,
+    linear-gradient(180deg, #33250f 0%, #21170c 100%) padding-box,
+    conic-gradient(from var(--sk-winkel), #8a5a1b, #d9a441, #fff1b8, #d9a441, #8a5a1b, #d9a441, #fff1b8, #8a5a1b) border-box;
+  animation: sk-folie 6s linear infinite;
+}
+@keyframes sk-folie {
+  to {
+    --sk-winkel: 360deg;
+  }
+}
+
+/* Schluesselkarten: schillernder Rahmen statt Gold - die Krone des Decks. */
+.sk-schluessel {
+  --rahmen-hell: #ffe9a8;
+  background:
+    linear-gradient(180deg, #2b1f2e 0%, #17101a 100%) padding-box,
+    conic-gradient(from var(--sk-winkel), #d9a441, #e88a6a, #b58ae0, #6aaee0, #6ab46a, #f2c94c, #d9a441) border-box;
+  box-shadow:
+    0 0 0 2px #0c0805,
+    inset 0 0 0 1px rgba(255, 233, 168, 0.5),
+    0 0 18px rgba(217, 164, 65, 0.35),
+    0 8px 16px rgba(0, 0, 0, 0.45);
+  animation-duration: 4s;
+}
+
+/* Kopf: Wappen und Name auf dunklem Brett. */
+.sk-kopf {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 2px 5px 2px 2px;
+  background: linear-gradient(180deg, #3a2c1d 0%, #261c12 100%);
+  border: 1px solid #0c0805;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.sk-wappen {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  background: #140e09;
+  border: 1px solid var(--sippe);
+  box-shadow: inset 0 0 0 1px #0c0805;
+}
+.sk-wappen svg {
+  display: block;
+}
+.sk-name {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--pixel);
+  font-size: 10px;
+  line-height: 1.15;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  text-shadow: 1px 1px 0 #0c0805;
+}
+.sk-selt-legendaer .sk-name,
+.sk-schluessel .sk-name {
+  color: #ffe08a;
+}
+.sk-krone {
+  flex: none;
+  display: block;
+}
+.sk-krone svg {
+  display: block;
+}
+
+/* Das Bildfenster. Die Form traegt die Kartenart: eckig fuer Reichskarten,
+   abgeschraegt fuer Taktiken, ein gestufter Bogen fuer Ausruestung und Krone.
+   Aussen die Sippenfarbe als Kante, innen das Bild - beide mit derselben
+   Form, damit die Kante ueberall gleich breit ist. */
+.sk-fenster {
+  --form-aussen: none;
+  --form-innen: none;
+  position: relative;
+  padding: 2px;
+  background: linear-gradient(180deg, var(--sippe) 0%, var(--sippe-dunkel) 100%);
+  clip-path: var(--form-aussen);
+  box-shadow: 0 0 0 1px #0c0805;
+}
+.sk-bild {
+  position: relative;
+  overflow: hidden;
+  clip-path: var(--form-innen);
+  background: #0c0805;
+}
+.sk-art-taktik .sk-fenster {
+  --form-aussen: polygon(7px 0, calc(100% - 7px) 0, 100% 7px, 100% calc(100% - 7px), calc(100% - 7px) 100%, 7px 100%, 0 calc(100% - 7px), 0 7px);
+  --form-innen: polygon(6px 0, calc(100% - 6px) 0, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0 calc(100% - 6px), 0 6px);
+}
+.sk-art-ausruestung .sk-fenster,
+.sk-art-krone .sk-fenster {
+  --form-aussen: polygon(0 12px, 3px 12px, 3px 7px, 6px 7px, 6px 4px, 10px 4px, 10px 2px, 16px 2px, 16px 0, calc(100% - 16px) 0, calc(100% - 16px) 2px, calc(100% - 10px) 2px, calc(100% - 10px) 4px, calc(100% - 6px) 4px, calc(100% - 6px) 7px, calc(100% - 3px) 7px, calc(100% - 3px) 12px, 100% 12px, 100% 100%, 0 100%);
+  --form-innen: polygon(0 10px, 3px 10px, 3px 5px, 6px 5px, 6px 2px, 10px 2px, 10px 0, calc(100% - 10px) 0, calc(100% - 10px) 2px, calc(100% - 6px) 2px, calc(100% - 6px) 5px, calc(100% - 3px) 5px, calc(100% - 3px) 10px, 100% 10px, 100% 100%, 0 100%);
+}
+
+.karten-bild {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+}
+.karten-bild svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.karten-bild.klein {
+  width: 72px;
+  flex: none;
+  border: 1px solid #0c0805;
+}
+
+/* Folie ueber legendaeren Bildern: ein schraeger, weicher Schimmer. */
+.sk-folie {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 20%,
+    rgba(255, 240, 190, 0.28) 34%,
+    rgba(200, 160, 255, 0.18) 42%,
+    rgba(120, 220, 255, 0.16) 50%,
+    transparent 64%
+  );
+  background-size: 300% 100%;
+  mix-blend-mode: screen;
+  animation: sk-schimmer 4.5s ease-in-out infinite;
+}
+@keyframes sk-schimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  60%,
+  100% {
+    background-position: 0% 0;
+  }
+}
+
+/* Zaehlerfeld oben rechts: die Striche, dazu der Stand - wenn ihn der Kern liefert. */
+.sk-zaehler {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 20px;
+  height: 16px;
+  padding: 0 4px;
+  background: rgba(12, 8, 5, 0.85);
+  border: 1px solid var(--rahmen-hell);
+  box-shadow: 0 0 0 1px #0c0805;
+}
+.sk-zaehler svg {
+  display: block;
+}
+.sk-zaehler b {
+  font-family: var(--pixel);
+  font-size: 9px;
+  line-height: 1;
+  color: #ffe08a;
+}
+
+/* Seltenheitssteine oben links im Fenster: einer je Stufe. */
+.sk-steine {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  display: flex;
+  gap: 2px;
+  padding: 2px 3px;
+  background: rgba(12, 8, 5, 0.7);
+}
+.sk-steine i {
+  display: block;
+  width: 4px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.12);
+}
+.sk-steine i.an {
+  background: var(--rahmen-hell);
+  box-shadow: inset -1px -1px 0 var(--rahmen);
+}
+
+/* Das Band: wie die Karte wirkt. Schwalbenschwanz an beiden Enden. */
+.sk-band {
+  align-self: center;
+  margin: -9px 0 -6px;
+  position: relative;
+  z-index: 1;
+  padding: 2px 10px;
+  font-family: var(--pixel);
+  font-size: 7px;
+  line-height: 1.3;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #21170a;
+  background: linear-gradient(180deg, #e8c97a 0%, #c99a42 100%);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 4px) 50%, 100% 100%, 0 100%, 4px 50%);
+  filter: drop-shadow(0 1px 0 #0c0805);
+}
+.sk-art-taktik .sk-band { background: linear-gradient(180deg, #e0735a 0%, #a8382a 100%); color: #fff2e0; }
+.sk-art-ausruestung .sk-band { background: linear-gradient(180deg, #c9ccd6 0%, #8a8e9a 100%); }
+.sk-art-ausloeser .sk-band { background: linear-gradient(180deg, #9fd0f0 0%, #5a96c8 100%); }
+.sk-art-wachsend .sk-band { background: linear-gradient(180deg, #a8dc90 0%, #5aa05a 100%); }
+.sk-art-regel .sk-band { background: linear-gradient(180deg, #d8b8f0 0%, #9a6ac8 100%); }
+.sk-art-sofort .sk-band { background: linear-gradient(180deg, #e9dbb8 0%, #b8a27a 100%); }
+.sk-art-krone .sk-band { background: linear-gradient(90deg, #f2c94c, #fff1b8, #f2c94c); }
+
+/* Der Text auf hellem Pergament - auf dem dunklen Brett das Lesbarste. */
+.sk-text {
+  flex: 1;
+  margin: 0;
+  padding: 9px 7px 6px;
+  font-size: 11.5px;
+  line-height: 1.38;
+  color: var(--tinte);
+  background:
+    radial-gradient(circle at 20% 15%, rgba(255, 255, 255, 0.35), transparent 60%),
+    linear-gradient(180deg, var(--pergament) 0%, #d6c39a 100%);
+  border: 1px solid #0c0805;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25), inset 0 -2px 0 rgba(90, 60, 30, 0.18);
+  white-space: normal;
+  hyphens: auto;
+  overflow-wrap: break-word;
+}
+.sk-text b {
+  font-family: inherit;
+  font-weight: 800;
+  letter-spacing: 0;
+  color: #8a2a20;
+}
+.sk-schluessel .sk-text {
+  background:
+    radial-gradient(circle at 20% 15%, rgba(255, 255, 255, 0.4), transparent 60%),
+    linear-gradient(180deg, #f2e2b4 0%, #dcc184 100%);
+}
+
+/* Fuss: Sippe links, Seltenheit rechts. */
+.sk-fuss {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--pixel);
+  font-size: 7px;
+  line-height: 1.2;
+  color: var(--muted);
+}
+.sk-sippe {
+  flex: 1;
+  color: var(--sippe);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+.sk-beute {
+  padding: 0 3px;
+  color: #21170a;
+  background: #c99a42;
+}
+.sk-selt {
+  color: var(--rahmen-hell);
+}
+
+/* Mini: nur Fenster und Name - fuer das Raster im Menue. */
+.sk-mini {
+  width: 100%;
+  gap: 2px;
+  padding: 2px;
+  border-width: 2px;
+  box-shadow: 0 0 0 1px #0c0805, inset 0 0 0 1px var(--rahmen-dunkel);
+  animation: none;
+}
+.sk-mini .sk-fenster {
+  padding: 1px;
+}
+.sk-mini.sk-art-taktik .sk-fenster {
+  --form-aussen: polygon(4px 0, calc(100% - 4px) 0, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 0 calc(100% - 4px), 0 4px);
+  --form-innen: polygon(3px 0, calc(100% - 3px) 0, 100% 3px, 100% calc(100% - 3px), calc(100% - 3px) 100%, 3px 100%, 0 calc(100% - 3px), 0 3px);
+}
+.sk-mini.sk-art-ausruestung .sk-fenster,
+.sk-mini.sk-art-krone .sk-fenster {
+  --form-aussen: polygon(0 6px, 2px 6px, 2px 3px, 4px 3px, 4px 1px, 7px 1px, 7px 0, calc(100% - 7px) 0, calc(100% - 7px) 1px, calc(100% - 4px) 1px, calc(100% - 4px) 3px, calc(100% - 2px) 3px, calc(100% - 2px) 6px, 100% 6px, 100% 100%, 0 100%);
+  --form-innen: polygon(0 5px, 2px 5px, 2px 2px, 4px 2px, 4px 0, calc(100% - 4px) 0, calc(100% - 4px) 2px, calc(100% - 2px) 2px, calc(100% - 2px) 5px, 100% 5px, 100% 100%, 0 100%);
+}
+.sk-mini .sk-folie {
+  animation: none;
+  background-position: 40% 0;
+}
+.sk-wappen-klein {
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 13px;
+  height: 13px;
+}
+.sk-mini .sk-zaehler {
+  top: auto;
+  bottom: 2px;
+  right: 2px;
+  height: 11px;
+  min-width: 0;
+  padding: 0 2px;
+}
+.sk-mini .sk-zaehler svg {
+  width: 8px;
+  height: 7px;
+}
+.sk-mini .sk-zaehler b {
+  font-size: 6px;
+}
+/* Der Name in Systemschrift: die Pixelschrift ist zu breit fuer eine Kachel
+   von 50 Pixeln und braeche mitten im Wort. */
+.sk-mini-name {
+  display: block;
+  padding: 1px 1px 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 8.5px;
+  font-weight: 600;
+  line-height: 1.1;
+  text-align: center;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+/* Die Kartenwahl traegt die Karte in einer Huelle: Neigen, Hub und Glut
+   bleiben an der Huelle (siehe Karteneffekte), die Karte selbst ist die
+   Sammelkarte. */
+.draft-karte.sk-huelle {
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  display: block;
+  overflow: hidden;
+}
+.draft-karte.sk-huelle:hover:not(:disabled) {
+  border-color: transparent;
+  background: none;
+}
+.draft-karte.sk-huelle:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.draft-karte.sk-huelle .draft-glanz {
+  z-index: 2;
+}
+.draft-karte.sk-huelle .sk {
+  min-height: 268px;
+}
+.draft-platz .sippe-schild {
+  display: flex;
+  justify-content: center;
+  margin: 6px auto 0;
+  max-width: 164px;
+  text-align: center;
+}
+.draft-platz .draft-nochmal {
+  max-width: 164px;
+  margin: 4px auto 0;
+  text-align: center;
+}
+/* Wer nur zusieht, sieht die Karten etwas gedaempft. */
+.draft-karten.zuschauen .sk {
+  filter: saturate(0.75) brightness(0.85);
+}
+
+/* Handy: drei Karten nebeneinander, schmaler und mit kleinerer Schrift. */
+@media (max-width: 560px) {
+  .draft-overlay {
+    justify-content: flex-start;
+    overflow-y: auto;
+    padding: 14px 0 24px;
+  }
+  .draft-titel {
+    font-size: 16px;
+  }
+  .draft-karten {
+    flex-wrap: nowrap;
+    gap: 6px;
+    padding: 0 8px;
+  }
+  .draft-platz {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .draft-karte.sk-huelle {
+    width: 100%;
+  }
+  .draft-karte.sk-huelle .sk {
+    --sk-breite: 100%;
+    min-height: 236px;
+    padding: 3px;
+    gap: 3px;
+    border-width: 2px;
+  }
+  .draft-karte.sk-huelle:hover:not(:disabled) {
+    --hub: -4px;
+  }
+  .draft-platz .sk-kopf {
+    min-height: 22px;
+    gap: 3px;
+    padding: 1px 3px 1px 1px;
+  }
+  .draft-platz .sk-wappen {
+    width: 16px;
+    height: 16px;
+  }
+  .draft-platz .sk-wappen svg {
+    width: 12px;
+    height: 12px;
+  }
+  .draft-platz .sk-krone svg {
+    width: 14px;
+    height: 8px;
+  }
+  .draft-platz .sk-name {
+    font-size: 7.5px;
+  }
+  .draft-platz .sk-band {
+    font-size: 5.5px;
+    padding: 1px 7px;
+    letter-spacing: 0.4px;
+  }
+  .draft-platz .sk-text {
+    padding: 7px 4px 4px;
+    font-size: 10px;
+    line-height: 1.3;
+  }
+  .draft-platz .sk-fuss {
+    font-size: 5.5px;
+  }
+  .draft-platz .sk-selt {
+    display: none;
+  }
+  .draft-platz .sk-zaehler {
+    top: 3px;
+    right: 3px;
+    height: 13px;
+    padding: 0 2px;
+  }
+  .draft-platz .sk-steine {
+    left: 3px;
+    top: 3px;
+    padding: 1px 2px;
+    gap: 1px;
+  }
+  .draft-platz .sk-steine i {
+    width: 3px;
+    height: 3px;
+  }
+  .draft-platz .sippe-schild,
+  .draft-platz .draft-nochmal {
+    font-size: 7px;
+    max-width: 100%;
+  }
+  .draft-platz .draft-strahlen {
+    inset: -24px;
+  }
+}
+
+/* Im schmalen Menue (168 Pixel) ist jede Kachel knapp 50 Pixel breit. */
+@media (max-width: 860px) {
+  .menu .sk-mini-name {
+    font-size: 7.5px;
+  }
+}
+
+/* Das Raster im Menue: die Kachel ist nur noch die Huelle der Mini-Karte. */
+.menu-karte-kachel.sk-kachel {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  display: block;
+}
+.menu-karte-kachel.sk-kachel:hover:not(:disabled) {
+  background: none;
+}
+.menu-karte-kachel.sk-kachel:hover:not(:disabled) .sk {
+  border-color: var(--rahmen-hell);
+}
+.menu-karte-kachel.sk-kachel.aktiv {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.menu-karte-kachel.sk-kachel .menu-karte-status {
+  left: auto;
+  right: 4px;
+  top: 4px;
+  z-index: 1;
+}
+
+/* Taktiken in der Kartentafel: ein kleines Bild vor dem Namen. */
+.dock-karte-name.mit-bild {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Bewegung nur fuer die, die sie wollen. */
+@media (prefers-reduced-motion: reduce) {
+  .sk,
+  .sk-folie {
+    animation: none !important;
+  }
+}
+
+/* Der Kronplatz im Menue (ui/SideMenu.tsx, ENGINE_KARTEN.md). */
+.menu-krone {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 9px;
+  margin-bottom: 6px;
+  border: 2px solid #c9a227;
+  background: linear-gradient(135deg, rgba(201, 162, 39, 0.18), rgba(23, 18, 12, 0.9));
+  font-size: 12px;
+}
+.menu-krone-titel {
+  font-family: var(--pixel);
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: #ffd76a;
+  text-transform: uppercase;
+}
+.menu-krone b {
+  font-family: var(--pixel);
+  font-size: 11px;
 }

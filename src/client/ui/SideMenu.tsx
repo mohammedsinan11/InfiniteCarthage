@@ -28,7 +28,7 @@ import { TAGESZEIT_NAME, WETTER_NAME } from '../../core/zeit';
 import type { Tageszeit, Wetter } from '../../core/zeit';
 import { getVolume, initAudio, setVolume } from '../audio';
 import { LogPanel } from './LogPanel';
-import { KartenBild } from './KartenBild';
+import { Spielkarte } from './Spielkarte';
 import { OmenListe } from './OmenListe';
 import type { Bericht } from '../../core/kunde';
 import type { WeltEintrag } from '../net/store';
@@ -241,7 +241,16 @@ export function SideMenu({
   onVerlassen,
   mitHeld = true,
   mitReich = true,
+  zaehler,
+  krone = null,
+  onKrone,
 }: {
+  /** Zaehler der Engine-Karten (ENGINE_KARTEN.md). */
+  zaehler?: Record<string, number>;
+  /** Die Schluesselkarte im Kronplatz. */
+  krone?: string | null;
+  /** Eine andere eigene Schluesselkarte in den Kronplatz legen. */
+  onKrone?: (card: string) => void;
   /** Held, Auftraege und Geruechte dabei (core/systeme.ts)? */
   mitHeld?: boolean;
   /** Wunder und Vorhaben dabei? */
@@ -544,8 +553,16 @@ export function SideMenu({
             )}
             <Kopf
               titel={`Reichskarten${cards.length > 0 ? ` · ${cards.length}` : ''}`}
-              hilfe="Nur Karten mit dem Siegel Aktiv liefern eine Dauerwirkung. Anfangs hast du zwei Plaetze; eine Hauptstadt erweitert sie. Tippe eine Dauerkarte an, um sie ein- oder auszuschalten - in deiner Bauphase. Bei vollen Plaetzen waehlst du, welche weicht."
+              hilfe="Nur Karten mit dem Siegel Aktiv liefern eine Dauerwirkung. Anfangs hast du drei Plaetze; eine Hauptstadt erweitert sie. Dazu kommt der Kronplatz fuer eine Schluesselkarte. Tippe eine Dauerkarte an, um sie ein- oder auszuschalten - in deiner Bauphase. Bei vollen Plaetzen waehlst du, welche weicht."
             />
+            {/* Der Kronplatz (ENGINE_KARTEN.md): eine Schluesselkarte, die die Regeln beugt. */}
+            {krone && cardById(krone) && (
+              <div className="menu-krone" title={cardById(krone)!.text}>
+                <span className="menu-krone-titel">Krone</span>
+                <b>{cardById(krone)!.name}</b>
+                <span>{cardById(krone)!.text}</span>
+              </div>
+            )}
             {cards.length === 0 ? (
               <p className="menu-leer">Noch keine.</p>
             ) : (
@@ -554,15 +571,16 @@ export function SideMenu({
                   {kartenStapel(cards).map(({ karte, anzahl }) => (
                     <li key={karte.id}>
                       <button
-                        className={[`menu-karte-kachel selt-${karte.rarity}`, karteOffen === karte.id ? 'aktiv' : '', dauerwirkungen(karte).length > 0 && !activeCards.includes(karte.id) ? 'inaktiv' : '']
+                        className={[`menu-karte-kachel sk-kachel selt-${karte.rarity}`, karteOffen === karte.id ? 'aktiv' : '', dauerwirkungen(karte).length > 0 && !activeCards.includes(karte.id) ? 'inaktiv' : '']
                           .filter(Boolean)
                           .join(' ')}
                         title={karte.text}
                         onClick={() => setKarteOffen((k) => (k === karte.id ? null : karte.id))}
                       >
-                        <KartenBild karte={karte} klein />
-                        <span className="menu-karte-kachel-name">{karte.name}</span>
-                        {dauerwirkungen(karte).length > 0 && activeCards.includes(karte.id) && <span className="menu-karte-status">Aktiv</span>}
+                        <Spielkarte karte={karte} groesse="mini" zaehler={zaehler?.[karte.id]} />
+                        {karte.schluessel
+                          ? krone === karte.id && <span className="menu-karte-status">Krone</span>
+                          : dauerwirkungen(karte).length > 0 && activeCards.includes(karte.id) && <span className="menu-karte-status">Aktiv</span>}
                         {anzahl > 1 && <span className="menu-karte-anzahl">×{anzahl}</span>}
                       </button>
                     </li>
@@ -572,7 +590,7 @@ export function SideMenu({
                   (() => {
                     const k = cardById(karteOffen);
                     if (!k) return null;
-                    const dauer = dauerwirkungen(k).length > 0;
+                    const dauer = dauerwirkungen(k).length > 0 && !k.schluessel;
                     const an = activeCards.includes(k.id);
                     const voll = activeCards.length >= kartenPlaetze;
                     return (
@@ -610,6 +628,14 @@ export function SideMenu({
                             )}
                           </span>
                         )}
+                        {k.schluessel && krone !== k.id && onKrone && (
+                          <span className="menu-ritter-knoepfe">
+                            <button disabled={!kannUmstellen} onClick={() => onKrone(k.id)}>
+                              In die Krone
+                            </button>
+                          </span>
+                        )}
+                        {zaehler?.[k.id] !== undefined && <p className="menu-leer">Zaehler: {zaehler[k.id]}</p>}
                         {dauer && !kannUmstellen && <p className="menu-leer">Umstellen geht nur in deiner Bauphase.</p>}
                       </div>
                     );
@@ -643,9 +669,8 @@ export function SideMenu({
               <ul className="menu-kartenraster">
                 {kartenStapel(tactics).map(({ karte, anzahl }) => (
                   <li key={karte.id}>
-                    <button className={`menu-karte-kachel selt-${karte.rarity}`} title={karte.text}>
-                      <KartenBild karte={karte} klein />
-                      <span className="menu-karte-kachel-name">{karte.name}</span>
+                    <button className={`menu-karte-kachel sk-kachel selt-${karte.rarity}`} title={karte.text}>
+                      <Spielkarte karte={karte} groesse="mini" />
                       {anzahl > 1 && <span className="menu-karte-anzahl">×{anzahl}</span>}
                     </button>
                   </li>
@@ -660,9 +685,8 @@ export function SideMenu({
                 <ul className="menu-kartenraster">
                   {kartenStapel(equipment).map(({ karte, anzahl }) => (
                     <li key={karte.id}>
-                      <button className={`menu-karte-kachel selt-${karte.rarity}`} title={karte.text}>
-                        <KartenBild karte={karte} klein />
-                        <span className="menu-karte-kachel-name">{karte.name}</span>
+                      <button className={`menu-karte-kachel sk-kachel selt-${karte.rarity}`} title={karte.text}>
+                        <Spielkarte karte={karte} groesse="mini" />
                         {anzahl > 1 && <span className="menu-karte-anzahl">×{anzahl}</span>}
                       </button>
                     </li>

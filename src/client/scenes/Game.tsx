@@ -1435,6 +1435,9 @@ export function Game() {
 
         <SideMenu
           onVerlassen={disconnect}
+          zaehler={me?.zaehler}
+          krone={me?.krone ?? null}
+          onKrone={(card) => act({ t: 'setKrone', card })}
           mitHeld={hatSystem(state, 'held')}
           mitReich={hatSystem(state, 'reich')}
           sippe={state.ereignisseAn ? (me?.sippe ?? {}) : undefined}

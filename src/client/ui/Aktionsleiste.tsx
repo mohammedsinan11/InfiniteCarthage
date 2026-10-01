@@ -45,6 +45,7 @@ import type { DevCardType, Hand, HeldZweig } from '../../core/state';
 import { ZWEIGE, ZWEIG_NAME, ZWEIG_ZWECK } from '../../core/rules/zweig';
 import { devName, resourceName } from '../log';
 import { ResourceGlyph } from './ResourceIcon';
+import { KartenBild } from './KartenBild';
 import { cardById } from '../../core/cards/catalog';
 import { taktikwirkungen } from '../../core/cards/types';
 
@@ -435,7 +436,10 @@ function KartenTafel({
         const gewaehlt = ziel[`${id}-${index}`] ?? kandidaten[0]?.id;
         return (
           <div key={`${id}-${index}`} className="dock-karte dock-taktik">
-            <span className="dock-karte-name">{karte.name}</span>
+            <span className="dock-karte-name mit-bild">
+              <KartenBild karte={karte} klein />
+              {karte.name}
+            </span>
             <span className="dock-karte-beschreibung">{karte.text}</span>
             <select
               aria-label={`Ziel fuer ${karte.name}`}
