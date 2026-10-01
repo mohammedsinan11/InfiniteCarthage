@@ -21,6 +21,8 @@ import type { HeldLore } from '../core/lore';
 import { familienart, freieErbstuecke, istErbstueck } from '../core/erbe';
 import type { ErbstueckId, Familienart } from '../core/erbe';
 import { weltArtVon } from '../core/weltart';
+import { wertungTeile } from '../core/wertung';
+import { neuFrei } from '../core/freischalt';
 
 const SPEICHER = 'infinitecarthage.profil';
 
@@ -44,7 +46,37 @@ export type Profil = {
   dynastie?: boolean;
   /** Das Erbstueck fuer die naechste Partie (core/erbe.ts). */
   erbstueck?: ErbstueckId;
+  /** Bezwungene Bosse ueber alle Partien - sie geben Schluesselkarten frei (core/freischalt.ts). */
+  bosse?: number;
+  /** Die letzten Laeufe mit ihrem Bau (E16), neueste zuerst. */
+  laeufe?: Lauf[];
 };
+
+/**
+ * Ein Lauf im Rueckblick: was man gebaut hat, nicht nur wie es ausging - so
+ * sieht man, welcher Bau trug (nach Balatro und Isaac).
+ */
+export type Lauf = {
+  zeit: number;
+  welt: string;
+  haus: string | null;
+  sieg: boolean;
+  punkte: number;
+  wertung: number;
+  /** Basis x Mult, wenn es Akte gab. */
+  basis?: number;
+  mult?: number;
+  /** Die Karten am Ende - verbesserte mit "+". */
+  karten: string[];
+  krone: string | null;
+  /** Die zwei staerksten Sippen mit Zahl. */
+  sippen: { sippe: string; n: number }[];
+  /** Je Akt: bezwungen (true), verfehlt (false). */
+  bosse: boolean[];
+  stufe: number;
+};
+
+const LAEUFE_MAX = 30;
 
 /**
  * Ein Eintrag der Ahnenhalle: der Held einer beendeten Partie und was aus
@@ -236,7 +268,14 @@ function ahneAus(state: PublicState, you: string, wertung: number, sieg: boolean
   };
 }
 
-export type Wertung = { neueTaten: Tat[]; neueStufe: number | null; sieg: boolean; schonGewertet: boolean };
+export type Wertung = {
+  neueTaten: Tat[];
+  neueStufe: number | null;
+  sieg: boolean;
+  schonGewertet: boolean;
+  /** Karten, die diese Partie freigeschaltet hat (core/freischalt.ts). */
+  neueKarten?: string[];
+};
 
 /**
  * Eine beendete Partie ins Profil eintragen. Sieg heisst: man ist Sieger und
@@ -251,7 +290,9 @@ export function werteAus(state: PublicState, you: string, code: string): Wertung
   const letzte = state.chronik?.verlauf[state.chronik.verlauf.length - 1];
   const punkte = letzte?.punkte[i] ?? state.myPoints;
   const me = state.players.find((p) => p.id === you);
-  const wertung = punkte * 10 + (me?.ruhm ?? 0);
+  // Mit Akten Basis x Mult (core/wertung.ts).
+  const teile = wertungTeile(state, you, punkte);
+  const wertung = teile.gesamt;
   // Gemeinsam gewinnen alle oder keiner; sonst wie oben beschrieben.
   const sieg = state.szenario
     ? state.szenarioErgebnis?.erreicht === true
@@ -260,8 +301,34 @@ export function werteAus(state: PublicState, you: string, code: string): Wertung
     : phase.winner === you && (phase.durch === 'ziel' || state.order.length > 1 || punkte >= 10);
   if (profil.gewertet.includes(code)) return { neueTaten: [], neueStufe: null, sieg, schonGewertet: true };
 
+  const vorher = { partien: profil.partien, bosse: profil.bosse ?? 0 };
   profil.partien += 1;
   if (sieg) profil.siege += 1;
+  profil.bosse = (profil.bosse ?? 0) + (state.akte?.siege[you]?.length ?? 0);
+  const neueKarten = state.szenario || state.tagesDatum ? [] : neuFrei(vorher, { partien: profil.partien, bosse: profil.bosse });
+  // Der Lauf im Rueckblick (E16).
+  if (me) {
+    const sippen = Object.entries(me.sippe ?? {})
+      .map(([sippe, n]) => ({ sippe, n: n ?? 0 }))
+      .sort((a, b) => b.n - a.n)
+      .slice(0, 2)
+      .filter((x) => x.n > 0);
+    const lauf: Lauf = {
+      zeit: Date.now(),
+      welt: weltArtVon(state.worldSeed).name,
+      haus: me.haus ?? null,
+      sieg,
+      punkte,
+      wertung,
+      ...(state.akte ? { basis: teile.basis, mult: teile.mult } : {}),
+      karten: [...new Set(me.cards)].map((c) => ((me.plus ?? []).includes(c) ? c + '+' : c)),
+      krone: me.krone ?? null,
+      sippen,
+      bosse: state.akte ? [1, 2, 3].filter((a) => a <= (state.akte!.stand[you]?.akt ?? 0)).map((a) => (state.akte!.siege[you] ?? []).includes(a)) : [],
+      stufe: state.stufe ?? 0,
+    };
+    profil.laeufe = [lauf, ...(profil.laeufe ?? [])].slice(0, LAEUFE_MAX);
+  }
   profil.besteWertung = Math.max(profil.besteWertung, wertung);
   if (me?.haus && !profil.haeuser.includes(me.haus)) profil.haeuser.push(me.haus);
   let neueStufe: number | null = null;
@@ -279,5 +346,5 @@ export function werteAus(state: PublicState, you: string, code: string): Wertung
   for (const t of neueTaten) profil.taten[t.id] = Date.now();
   profil.gewertet = [...profil.gewertet, code].slice(-50);
   schreibe(profil);
-  return { neueTaten, neueStufe, sieg, schonGewertet: false };
+  return { neueTaten, neueStufe, sieg, schonGewertet: false, neueKarten };
 }

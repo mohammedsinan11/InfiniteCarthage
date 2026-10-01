@@ -14,6 +14,7 @@ import type { GameState, PlayerId } from '../state';
 import { RESOURCES } from '../types';
 import type { Resource } from '../types';
 import { bossHeerAufstellen } from './army';
+import { stufeRegel } from '../stufe';
 
 export type AktEvent =
   /** Ein neuer Akt beginnt - mit diesem Boss gegen diesen Spieler. */
@@ -59,6 +60,8 @@ function verfehlt(s: GameState, st: BossStand, id: PlayerId, events: Ereignisse)
     }
     p.ruhm = Math.max(0, p.ruhm - 1);
   }
+  // Chronikstufe 10: ein verfehlter Boss kostet einen Siegpunkt.
+  if (stufeRegel(s.stufe, 10) && s.akte) s.akte.strafe = { ...(s.akte.strafe ?? {}), [id]: (s.akte.strafe?.[id] ?? 0) + 1 };
   events.push({ t: 'bossVerfehlt', player: id, akt: st.akt, boss: st.boss, verloren });
 }
 

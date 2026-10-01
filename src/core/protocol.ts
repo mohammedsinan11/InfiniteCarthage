@@ -115,6 +115,8 @@ export type ClientMsg =
       erbstueck?: string;
       /** Wie viele Partien dieser Browser gespielt hat - welche Systeme sich zeigen (core/systeme.ts). */
       partien?: number;
+      /** Wie viele Bosse dieser Browser bezwungen hat - welche Schluesselkarten frei sind (core/freischalt.ts). */
+      bosse?: number;
     }
   /** Nur der Gastgeber, nur vor dem Start. Was fehlt, bleibt, wie es ist. */
   | {

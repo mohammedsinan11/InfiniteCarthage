@@ -15,8 +15,12 @@ describe('Chronikstufen', () => {
       const o = omenMitStufe(['handelswinde', 'blutmond'], n);
       expect(gueltigeOmen(o)).toEqual(o);
       expect(new Set(o).size).toBe(o.length);
-      expect(o.filter((id) => omenById(id)!.art === 'fluch').length).toBeGreaterThanOrEqual(n);
+      // Ab Stufe 7 kommen Regeln statt Flueche (core/stufe.ts, STUFE_REGELN).
+      expect(o.filter((id) => omenById(id)!.art === 'fluch').length).toBeGreaterThanOrEqual(Math.min(n, 6));
     }
+    // Ein gewuerfelter Fluch der Leiter: die Stufe legt trotzdem einen mehr auf.
+    const mager = omenMitStufe(['magere_weiden'], 1);
+    expect(mager.filter((id) => omenById(id)!.art === 'fluch').length).toBe(2);
     // Zoellner (Stufe 3) verdraengt Handelswinde.
     expect(omenMitStufe(['handelswinde'], 3)).not.toContain('handelswinde');
   });

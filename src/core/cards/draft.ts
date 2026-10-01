@@ -67,6 +67,8 @@ export function draftOptions(
   source: DraftSource,
   /** Bereits besessene einzigartige Karten werden nicht erneut angeboten. */
   owned: readonly string[] = [],
+  /** Noch nicht freigeschaltete Karten (core/freischalt.ts) - kommen nie ins Angebot. */
+  gesperrt: readonly string[] = [],
 ): string[] {
   const rng = new Rng(hash3i(secretSeed, turn, QUELLE_ZU_ZAHL[source], SALT_DRAFT));
   const besitzt = new Set(owned);
@@ -78,7 +80,8 @@ export function draftOptions(
    * Bots: Runde 40 statt 60 bis 15 Punkte).
    */
   const gruendung = source === 'gruendung';
-  const erlaubt = (c: Card) => !c.nurBeute || source === 'belohnung' || source === 'trophaee';
+  const zu = new Set(gesperrt);
+  const erlaubt = (c: Card) => !zu.has(c.id) && (!c.nurBeute || source === 'belohnung' || source === 'trophaee');
   const bleibt = (c: Card) => dauerwirkungen(c).length > 0 || cardKind(c) === 'taktik';
   const alle = CARDS.filter(erlaubt).filter((c) =>
     gruendung ? bleibt(c) && !(istEinzigartig(c) && besitzt.has(c.id)) : !istEinzigartig(c) || !besitzt.has(c.id) || wiederholbar(c),

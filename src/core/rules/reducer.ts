@@ -381,6 +381,8 @@ export type PartieOptionen = {
   systeme?: readonly SystemId[];
   /** Drei Akte mit Bossen (core/akte.ts) - nur mit Rundengrenze und ohne Szenario. */
   akte?: boolean;
+  /** Noch nicht freigeschaltete Karten (core/freischalt.ts). */
+  gesperrt?: readonly string[];
 };
 
 /** Im gemeinsamen Spiel: so viele Siegpunkte je Spieler soll die Summe erreichen. */
@@ -502,6 +504,17 @@ export function createGame(
     state.koopErgebnis = null;
   }
   if (optionen.systeme) state.systeme = optionen.systeme.filter(istSystem);
+  // Chronikstufe 9: die Rivalen beginnen mit mehr (core/stufe.ts).
+  if ((optionen.stufe ?? 0) >= 9) {
+    for (const p of state.players) {
+      if (!(optionen.bots ?? []).includes(p.id)) continue;
+      p.hand.lumber += 1;
+      p.hand.brick += 1;
+      p.hand.grain += 1;
+      p.loot += 1;
+    }
+  }
+  if (optionen.gesperrt && optionen.gesperrt.length > 0) state.gesperrt = [...optionen.gesperrt];
   // Drei Akte, so lang wie die Rundengrenze erlaubt (core/akte.ts).
   if (optionen.akte && state.ereignisseAn && state.rundenLimit && !state.szenario) {
     state.akte = { laenge: Math.max(5, Math.floor(state.rundenLimit / 3)), bosse: waehleBosse(state.worldSeed, state), stand: {}, siege: {} };
@@ -730,7 +743,7 @@ function enterDraft(
   }
   const spieler = playerById(state, state.order[state.current]!);
   const owned = spieler ? [...spieler.cards, ...spieler.equipment] : [];
-  const options = draftOptions(state.secretSeed, runde, source, owned);
+  const options = draftOptions(state.secretSeed, runde, source, owned, state.gesperrt ?? []);
   state.draft = { source, options };
   state.phase = { t: 'draft' };
   events.push({

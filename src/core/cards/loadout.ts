@@ -14,9 +14,14 @@ export const HAUPTSTADT_KARTEN_PLAETZE = 4;
 export const KOENIGSSITZ_KARTEN_PLAETZE = 5;
 
 export function reichskartenPlaetze(
-  state: Pick<GameState, 'hauptstaedte'>,
+  state: Pick<GameState, 'hauptstaedte'> & { stufe?: number },
   player: PlayerId,
 ): number {
+  // Chronikstufe 8: ein Platz weniger (core/stufe.ts).
+  return Math.max(1, grundPlaetze(state, player) - ((state.stufe ?? 0) >= 8 ? 1 : 0));
+}
+
+function grundPlaetze(state: Pick<GameState, 'hauptstaedte'>, player: PlayerId): number {
   const stufe = Object.values(state.hauptstaedte ?? {})
     .filter((h) => h.owner === player)
     .reduce((n, h) => Math.max(n, h.stufe), 0);

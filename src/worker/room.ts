@@ -56,6 +56,7 @@ import { botsSpielen } from '../core/bot';
 import { szenarioById } from '../core/szenario';
 import { totalPoints } from '../core/state';
 import { systemeFuer } from '../core/systeme';
+import { gesperrteKarten } from '../core/freischalt';
 import type { SystemId } from '../core/systeme';
 
 export type Env = {
@@ -111,6 +112,8 @@ type RoomData = {
   szenario?: string | null;
   /** Wie viele Partien jeder Browser schon gespielt hat (core/systeme.ts). */
   partien?: Record<PlayerId, number>;
+  /** Wie viele Bosse jeder Browser bezwungen hat (core/freischalt.ts). */
+  bosse?: Record<PlayerId, number>;
   /** Alles von Anfang an - der Gastgeber kennt das Spiel. */
   alleSysteme?: boolean;
 };
@@ -460,6 +463,7 @@ export class GameRoom implements DurableObject {
             szenario: room.szenario ?? null,
             ...(this.systemeFuer(room) ? { systeme: this.systemeFuer(room)! } : {}),
             akte: true,
+            gesperrt: this.gesperrtFuer(room),
           },
         );
         room.started = true;
@@ -579,6 +583,9 @@ export class GameRoom implements DurableObject {
     }
     if (playerId !== undefined && !room.started && typeof msg.partien === 'number' && Number.isInteger(msg.partien) && msg.partien >= 0) {
       room.partien = { ...(room.partien ?? {}), [playerId]: Math.min(msg.partien, 1000) };
+    }
+    if (playerId !== undefined && !room.started && typeof msg.bosse === 'number' && Number.isInteger(msg.bosse) && msg.bosse >= 0) {
+      room.bosse = { ...(room.bosse ?? {}), [playerId]: Math.min(msg.bosse, 1000) };
     }
     if (playerId !== undefined && !room.started && istErbstueck(msg.erbstueck)) {
       room.erbstuecke = { ...(room.erbstuecke ?? {}), [playerId]: msg.erbstueck };
@@ -786,6 +793,17 @@ export class GameRoom implements DurableObject {
     const n = room.rundenLimit ?? null;
     if (n === AKTE_ZUEGE && !room.tagesDatum && !room.szenario) return n * Math.max(1, room.members.length);
     return n;
+  }
+
+  /** Welche Karten noch zu sind - nach denselben Regeln wie die Systeme. */
+  private gesperrtFuer(room: RoomData): string[] {
+    if (room.alleSysteme || room.tagesDatum || room.szenario || room.koop) return [];
+    const menschen = room.members.filter((m) => !m.bot);
+    if (menschen.length !== 1) return [];
+    const id = menschen[0]!.id;
+    const n = room.partien?.[id];
+    if (n === undefined) return [];
+    return gesperrteKarten(n, room.bosse?.[id] ?? 0);
   }
 
   private systemeFuer(room: RoomData): SystemId[] | null {

@@ -1,0 +1,98 @@
+/**
+ * Freischaltungen (E14, nach Isaac und Balatro): der Kartentopf waechst mit
+ * den Partien.
+ *
+ * Die erste Partie kennt die alten Karten und eine Handvoll Engine-Karten.
+ * Jede gespielte Partie schaltet weitere Engine-Karten frei, jeder bezwungene
+ * Boss eine Schluesselkarte. So liegt in der naechsten Partie etwas, das man
+ * noch nie gesehen hat - und es gibt einen Grund, den Boss zu schlagen.
+ *
+ * Gezaehlt wird im Browser (client/profil.ts), der Raum gibt die Zahlen beim
+ * Start weiter (worker/room.ts). Mehrere Menschen, Tagesexpedition, Szenario
+ * oder "Alles von Anfang an": alles offen.
+ */
+
+/** Die Engine-Karten in der Reihenfolge, in der sie freikommen - einfache zuerst. */
+export const ENGINE_REIHE: readonly string[] = [
+  // Von Beginn an: einfache Ausloeser, je Sippe zwei.
+  'erntedank',
+  'gluecksklee',
+  'zollstation',
+  'pfandleiher',
+  'richtfest',
+  'meilenstein',
+  'kriegskasse',
+  'trommler',
+  'wegweiser',
+  'kraeuterkunde',
+  // Mit den Partien: Zaehler, Skalierung, Regelbrueche.
+  'saatgut',
+  'wechselstube',
+  'wegezoll',
+  'bollwerk',
+  'sammelbeutel',
+  'kontor',
+  'kornspeicher',
+  'zunfthaus',
+  'steinmetz',
+  'veteranen',
+  'lagerfeuer',
+  'pflugschar',
+  'seidenstrasse',
+  'bauboom',
+  'blutzoll',
+  'fernweh',
+  'fruchtwechsel',
+  'gildenbrief',
+  'fachwerk',
+  'beutezug',
+  'sternkarte',
+  'doppeljoch',
+  'hafenmeister',
+  'kriegsschmiede',
+  'jagdglueck',
+  'dreschflegel',
+  'wucherzins',
+  'grundstein',
+  'kopfgeld',
+  'sagenschreiber',
+];
+
+/** Die Schluesselkarten in der Reihenfolge, in der Bosse sie freigeben. */
+export const SCHLUESSEL_REIHE: readonly string[] = [
+  'fuellhorn',
+  'metropole',
+  'dorfidyll',
+  'eiserne_krone',
+  'raubritter',
+  'koenigsweg',
+  'siebenstern',
+  'karawanserei',
+  'ziegelgold',
+  'monopol',
+  'weltenbaum',
+  'zinseszins',
+  'blutmond_krone',
+  'nomadenherz',
+  'ahnenmutter',
+  'bund_der_sippen',
+];
+
+/** So viele Engine-Karten sind von Beginn an offen, so viele kommen je Partie dazu. */
+export const ENGINE_START = 10;
+export const ENGINE_JE_PARTIE = 6;
+/** So viele Schluesselkarten sind von Beginn an offen; je Boss eine mehr. */
+export const SCHLUESSEL_START = 2;
+
+/** Welche Karten nach so vielen Partien und Bossen noch gesperrt sind. */
+export function gesperrteKarten(partien: number, bosse: number): string[] {
+  const engine = ENGINE_REIHE.slice(ENGINE_START + ENGINE_JE_PARTIE * Math.max(0, partien));
+  const schluessel = SCHLUESSEL_REIHE.slice(SCHLUESSEL_START + Math.max(0, bosse));
+  return [...engine, ...schluessel];
+}
+
+/** Was zwischen zwei Staenden neu frei wurde - fuer die Chronik. */
+export function neuFrei(vorher: { partien: number; bosse: number }, nachher: { partien: number; bosse: number }): string[] {
+  const zu = new Set(gesperrteKarten(nachher.partien, nachher.bosse));
+  return gesperrteKarten(vorher.partien, vorher.bosse).filter((id) => !zu.has(id));
+}

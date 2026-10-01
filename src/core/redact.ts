@@ -117,6 +117,8 @@ export type PublicState = {
   akte: AkteStand | null;
   /** Die Systeme dieser Partie (core/systeme.ts); null: alle. */
   systeme: SystemId[] | null;
+  /** Noch gesperrte Karten (core/freischalt.ts). */
+  gesperrt: string[];
   /** Offene, bis zur naechsten Heeresrunde vorbereitete Taktiken. */
   tacticBuffs: GameState['tacticBuffs'];
   /** Die offene Kartenwahl - fuer alle sichtbar, gewaehlt wird vom Spieler am Zug. */
@@ -264,6 +266,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     handelsstrasse: state.handelsstrasse ?? null,
     akte: state.akte ?? null,
     systeme: state.systeme ?? null,
+    gesperrt: state.gesperrt ?? [],
     tacticBuffs: state.tacticBuffs,
     draft: state.draft,
     trade: state.trade,

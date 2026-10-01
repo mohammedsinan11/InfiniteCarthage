@@ -14,7 +14,7 @@ import {
 } from '../../core/protocol';
 import { playerColor } from '../theme';
 import { OmenListe } from '../ui/OmenListe';
-import { MAX_STUFE, STUFE_NAME, omenMitStufe } from '../../core/stufe';
+import { MAX_STUFE, STUFE_NAME, omenMitStufe, stufeRegelnBis } from '../../core/stufe';
 import { omenById } from '../../core/omen';
 import { leseProfil } from '../profil';
 import { KOOP_ZIEL_JE } from '../../core/rules/reducer';
@@ -206,7 +206,8 @@ export function Lobby() {
             )}
             {room.stufe > 0 && (
               <p className="note">
-                {STUFE_NAME[room.stufe]}: {room.stufe} {room.stufe === 1 ? 'Fluch' : 'Flueche'} mehr auf dieser Partie.
+                {STUFE_NAME[room.stufe]}: {Math.min(room.stufe, 6)} {room.stufe === 1 ? 'Fluch' : 'Flueche'} mehr auf dieser Partie.
+                {stufeRegelnBis(room.stufe).map((t) => ` ${t}`).join('')}
                 {(() => {
                   // Ein Fluch der Stufe hebt ein gewaehltes Omen auf - das soll man vorher sehen (Spieltest 6).
                   const bleibt = new Set(omenMitStufe(room.omens, room.stufe));

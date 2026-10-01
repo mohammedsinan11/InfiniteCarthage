@@ -6928,3 +6928,52 @@ em.off {
   color: var(--muted);
   text-align: center;
 }
+
+/* Neu freigeschaltete Karten in der Chronik (core/freischalt.ts). */
+.chronik-neue-karten {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0;
+  display: grid;
+  gap: 3px;
+  font-size: 12px;
+}
+.chronik-neue-karten b {
+  color: var(--accent);
+  margin-right: 6px;
+}
+
+/* Die Laeufe im Rueckblick (scenes/Home.tsx, E16). */
+.laeufe-liste {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0;
+  display: grid;
+  gap: 6px;
+}
+.laeufe-liste li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line);
+  background: var(--panel2);
+  font-size: 12px;
+}
+.laeufe-liste li.sieg {
+  border-left-color: var(--accent);
+}
+.lauf-kopf b {
+  font-family: var(--pixel);
+  color: var(--accent);
+  margin-right: 4px;
+}
+.lauf-krone {
+  color: #ffd76a;
+}
+.lauf-karten,
+.lauf-sippen,
+.lauf-bosse {
+  color: var(--muted);
+}

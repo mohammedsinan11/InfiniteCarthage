@@ -89,6 +89,8 @@ export type AkteStand = {
   stand: Record<PlayerId, BossStand>;
   /** Welche Akte jeder bestanden hat - je bestandenem Akt so viele Siegpunkte wie seine Zahl. */
   siege: Record<PlayerId, number[]>;
+  /** Abzuege fuer verfehlte Bosse (Chronikstufe 10). */
+  strafe?: Record<PlayerId, number>;
 };
 
 export const AKTE = 3;
@@ -109,7 +111,7 @@ export function waehleBosse(worldSeed: number, s: Pick<GameState, 'systeme'>): s
 
 /** Siegpunkte aus bestandenen Akten. */
 export function aktPunkte(akte: AkteStand | null | undefined, id: PlayerId): number {
-  return (akte?.siege[id] ?? []).reduce((n, a) => n + a, 0);
+  return (akte?.siege[id] ?? []).reduce((n, a) => n + a, 0) - (akte?.strafe?.[id] ?? 0);
 }
 
 /** Der Akt zu einer Runde (1..3) - danach bleibt es beim dritten. */
@@ -161,7 +163,7 @@ export const ZIEL_NAME: Record<ZielMass, [string, string]> = {
 
 /** Die Forderung eines Bosses an einen Spieler zu Beginn des Aktes. */
 export function forderungFuer(
-  s: Pick<GameState, 'worldSeed' | 'buildings' | 'roads' | 'order'>,
+  s: Pick<GameState, 'worldSeed' | 'buildings' | 'roads' | 'order'> & { stufe?: number },
   boss: BossDef,
   akt: number,
   id: PlayerId,
@@ -170,6 +172,8 @@ export function forderungFuer(
   punkte: (id: PlayerId) => number,
 ): BossForderung {
   const i = Math.max(0, Math.min(AKTE, akt) - 1);
+  // Ab Chronikstufe 7 fordern die Bosse mehr (core/stufe.ts).
+  const haerte = (s.stufe ?? 0) >= 7 ? 1 : 0;
   if (boss.art === 'tribut') {
     // Zwei oder drei Sorten, je Spieler verschieden, aber aus dem Weltseed.
     const rng = new Rng(hash3i(s.worldSeed, akt, s.order.indexOf(id) + 1, SALT_AKT + 1));
@@ -180,7 +184,7 @@ export function forderungFuer(
     // Der Hungerwinter will Getreide und Wolle - das sagt sein Name.
     if (boss.id === 'hungerwinter') wahl.splice(0, 2, 'grain', 'wool');
     const soll: Partial<Record<Resource, number>> = {};
-    const gesamt = TRIBUT_KARTEN[i]!;
+    const gesamt = TRIBUT_KARTEN[i]! + 2 * haerte;
     for (let k = 0; k < gesamt; k++) {
       const r = wahl[k % wahl.length]!;
       soll[r] = (soll[r] ?? 0) + 1;
@@ -188,13 +192,14 @@ export function forderungFuer(
     return { t: 'tribut', soll, gezahlt: {} };
   }
   if (boss.art === 'heer') {
-    const [anzahl, rang] = HEER[i]!;
+    const [grund, rang] = HEER[i]!;
+    const anzahl = grund + haerte;
     // Zur Mitte des Aktes bricht es auf - Zeit genug, sich zu ruesten.
     return { t: 'heer', anzahl, rang, ids: null, entkommen: false, abRunde: Math.max(beginn, bis - Math.floor((bis - beginn) / 2)) };
   }
   const mass = boss.mass ?? 'siedlungen';
   const start = zielWert(s, id, mass, punkte);
-  return { t: 'ziel', mass, start, soll: start + ZIEL_MEHR[mass][i]! };
+  return { t: 'ziel', mass, start, soll: start + ZIEL_MEHR[mass][i]! + haerte };
 }
 
 /** Ist die Forderung erfuellt? Fuer HEER erst, wenn das Heer aufgebrochen und vollstaendig gefallen ist. */

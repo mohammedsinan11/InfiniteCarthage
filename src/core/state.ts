@@ -514,6 +514,8 @@ export type GameState = {
   akte?: AkteStand | null;
   /** Welche Systeme in dieser Partie dabei sind (core/systeme.ts). Fehlt: alle. */
   systeme?: SystemId[];
+  /** Noch nicht freigeschaltete Karten (core/freischalt.ts) - nie im Angebot. Oeffentlich. */
+  gesperrt?: string[];
   /** VERALTET: nur fuer die Migration alter Staende. */
   largestArmy?: PlayerId | null;
   chunks: ChunkCoord[];

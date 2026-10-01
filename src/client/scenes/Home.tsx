@@ -11,6 +11,7 @@
  * und nennt dessen PIN (sie steht im Menue der Partie).
  */
 
+import { cardById } from '../../core/cards/catalog';
 import { hausById } from '../../core/haus';
 import { weltArtVon } from '../../core/weltart';
 import { tagesWeltSeed } from '../../core/tages';
@@ -508,6 +509,7 @@ export function Home() {
 function DeineChronik() {
   const [offen, setOffen] = useState(false);
   const [halle, setHalle] = useState(false);
+  const [laeufeOffen, setLaeufeOffen] = useState(false);
   const [dynastie, setDynastie] = useState(() => leseProfil().dynastie !== false);
   const p = leseProfil();
   if (p.partien === 0) return null;
@@ -524,6 +526,11 @@ function DeineChronik() {
         <button className="klein" onClick={() => setOffen((v) => !v)}>
           Taten {erreicht}/{TATEN.length} {offen ? '▲' : '▼'}
         </button>
+        {(p.laeufe?.length ?? 0) > 0 && (
+          <button className="klein" onClick={() => setLaeufeOffen((v) => !v)}>
+            Laeufe {p.laeufe!.length} {laeufeOffen ? '▲' : '▼'}
+          </button>
+        )}
         {p.ahnen.length > 0 && (
           <button className="klein" onClick={() => setHalle((v) => !v)}>
             Stammbaum {p.ahnen.length} {halle ? '▲' : '▼'}
@@ -575,6 +582,26 @@ function DeineChronik() {
             ))}
           </ol>
         </div>
+      )}
+      {/* Die Laeufe mit ihrem Bau (E16): welche Karten, welche Krone, welche Bosse. */}
+      {laeufeOffen && (
+        <ol className="laeufe-liste">
+          {(p.laeufe ?? []).map((l) => (
+            <li key={l.zeit} className={l.sieg ? 'sieg' : ''}>
+              <span className="lauf-kopf">
+                <b>{l.wertung}</b>
+                {l.basis !== undefined && l.mult !== undefined ? ` (${l.basis} x ${String(l.mult).replace('.', ',')})` : ''} · {l.welt}
+                {l.haus ? ` · ${hausById(l.haus)?.name ?? l.haus}` : ''}
+                {l.stufe > 0 ? ` · Stufe ${l.stufe}` : ''} · {new Date(l.zeit).toLocaleDateString('de-DE')}
+                {l.sieg ? ' · Sieg' : ''}
+              </span>
+              {l.bosse.length > 0 && <span className="lauf-bosse">Bosse: {l.bosse.map((b) => (b ? '✓' : '✗')).join(' ')}</span>}
+              {l.krone && <span className="lauf-krone">Krone: {cardById(l.krone)?.name ?? l.krone}</span>}
+              {l.sippen.length > 0 && <span className="lauf-sippen">{l.sippen.map((x) => `${x.sippe} ${x.n}`).join(' · ')}</span>}
+              <span className="lauf-karten">{l.karten.map((c) => cardById(c)?.name ?? c).join(', ') || 'keine Karten'}</span>
+            </li>
+          ))}
+        </ol>
       )}
       {offen && (
         <ul className="taten-liste">

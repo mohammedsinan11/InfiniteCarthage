@@ -12,6 +12,7 @@
  * Schild bringt es zurueck.
  */
 
+import { cardById } from '../../core/cards/catalog';
 import { wertungTeile } from '../../core/wertung';
 import type { WertungsTeile } from '../../core/wertung';
 import { siegwegById, siegwegText } from '../../core/siegwege';
@@ -168,12 +169,23 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
           )}
         </header>
 
-        {bilanz && !bilanz.schonGewertet && (bilanz.neueTaten.length > 0 || bilanz.neueStufe !== null) && (
+        {bilanz && !bilanz.schonGewertet && (bilanz.neueTaten.length > 0 || bilanz.neueStufe !== null || (bilanz.neueKarten?.length ?? 0) > 0) && (
           <section className="chronik-neu">
             {bilanz.neueStufe !== null && (
               <p className="chronik-stufe-frei">
                 Chronikstufe {bilanz.neueStufe} ({STUFE_NAME[bilanz.neueStufe]}) freigeschaltet - waehle sie in der Lobby.
               </p>
+            )}
+            {(bilanz.neueKarten?.length ?? 0) > 0 && (
+              <>
+                <h3>Neu im Kartentopf</h3>
+                <ul className="chronik-neue-karten">
+                  {bilanz.neueKarten!.map((id) => {
+                    const k = cardById(id);
+                    return k ? <li key={id}>{k.schluessel ? <b>Krone: {k.name}</b> : <b>{k.name}</b>} <span>{k.text}</span></li> : null;
+                  })}
+                </ul>
+              </>
             )}
             {bilanz.neueTaten.length > 0 && (
               <>

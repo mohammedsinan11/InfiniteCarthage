@@ -250,6 +250,7 @@ function vervollstaendige(msg: ServerMsg): void {
     msg.state.handelsstrasse ??= null;
     msg.state.akte ??= null;
     msg.state.systeme ??= null;
+    msg.state.gesperrt ??= [];
     for (const p of msg.state.players) {
       p.trophaeen ??= 0;
       p.zaehler ??= {};
@@ -849,7 +850,7 @@ export const useStore = create<Store>((set, get) => ({
         const ahn = letzterAhn();
         const erbstueck = aktuellesErbstueck();
         // Gespielte Partien: welche Systeme sich zeigen (core/systeme.ts).
-        sendMsg(ws, { t: 'join', name, token: token ?? loadToken(code), partien: leseProfil().partien, ...(ahn ? { ahn } : {}), ...(erbstueck ? { erbstueck } : {}) });
+        sendMsg(ws, { t: 'join', name, token: token ?? loadToken(code), partien: leseProfil().partien, bosse: leseProfil().bosse ?? 0, ...(ahn ? { ahn } : {}), ...(erbstueck ? { erbstueck } : {}) });
       },
       onClose: () => {
         // Nur die AKTUELLE Verbindung darf den Zustand aendern.
