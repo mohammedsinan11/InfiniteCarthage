@@ -6866,3 +6866,65 @@ em.off {
   font-family: var(--pixel);
   font-size: 11px;
 }
+
+/* Die Schlussrechnung (ui/Chronik.tsx, core/wertung.ts): Basis x Mult, wie bei Balatro. */
+.schluss-rechnung {
+  margin: 10px 0 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+.schluss-zeile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.schluss-basis,
+.schluss-mult {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 72px;
+  padding: 6px 12px 4px;
+  font-family: var(--pixel);
+  font-size: 20px;
+  color: #fff;
+  border: 2px solid rgba(0, 0, 0, 0.5);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45);
+}
+.schluss-basis {
+  background: #2f74c0;
+}
+.schluss-mult {
+  background: #c8402f;
+}
+.schluss-basis small,
+.schluss-mult small {
+  font-size: 8px;
+  letter-spacing: 1px;
+  opacity: 0.85;
+}
+.schluss-mal {
+  font-family: var(--pixel);
+  font-size: 18px;
+  color: var(--muted);
+}
+.schluss-gesamt {
+  font-family: var(--pixel);
+  font-size: 30px;
+  color: #ffd76a;
+  text-shadow: 0 2px 0 #6b4420, 0 0 12px rgba(255, 215, 106, 0.5);
+  min-width: 90px;
+  text-align: center;
+}
+.schluss-teile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+}

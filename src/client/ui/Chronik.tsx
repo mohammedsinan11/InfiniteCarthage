@@ -12,6 +12,8 @@
  * Schild bringt es zurueck.
  */
 
+import { wertungTeile } from '../../core/wertung';
+import type { WertungsTeile } from '../../core/wertung';
 import { siegwegById, siegwegText } from '../../core/siegwege';
 import { szenarioStand } from '../../core/szenario';
 import { weltArtVon } from '../../core/weltart';
@@ -92,7 +94,8 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
           farbe: playerColor(p.color),
           punkte,
           ruhm: p.ruhm,
-          wertung: punkte * 10 + p.ruhm,
+          // Mit Akten: Basis x Mult (core/wertung.ts).
+          wertung: wertungTeile(state, id, punkte).gesamt,
           haus: p.haus ?? null,
         };
       })
@@ -148,7 +151,8 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
           {state.players.find((p) => p.id === you)?.besiegt && phase.winner !== null && (
             <p className="note">Dein Reich ist gefallen.</p>
           )}
-          {tages && ich && (
+          {state.akte && ich && <SchlussRechnung teile={wertungTeile(state, ich.id, ich.punkte)} />}
+          {tages && ich && !state.akte && (
             <p className="chronik-wertung">
               Deine Wertung: <b>{ich.wertung}</b>
               <span className="note">
@@ -224,7 +228,7 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
                 <th>Spieler</th>
                 <th>Siegpunkte</th>
                 <th>Ruhm</th>
-                <th title="Siegpunkte x 10 + Ruhm">Wertung</th>
+                <th title={state.akte ? 'Basis (Siegpunkte x 10 + Ruhm x 3 + Kartenzaehler) mal Mult' : 'Siegpunkte x 10 + Ruhm'}>Wertung</th>
               </tr>
             </thead>
             <tbody>
@@ -490,5 +494,52 @@ function Zahlen({ state }: { state: PublicState }) {
         ))}
       </tbody>
     </table>
+  );
+}
+
+/**
+ * Die Schlussrechnung wie bei Balatro: blaue Basis mal rotes Mult, und die
+ * Wertung zaehlt hoch. Bei weniger Bewegung steht sie gleich da.
+ */
+function SchlussRechnung({ teile }: { teile: WertungsTeile }) {
+  const [zahl, setZahl] = useState(0);
+  useEffect(() => {
+    const ruhig = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (ruhig) {
+      setZahl(teile.gesamt);
+      return;
+    }
+    let raf = 0;
+    const start = performance.now();
+    const dauer = 1600;
+    const schritt = (t: number) => {
+      const x = Math.min(1, (t - start) / dauer);
+      setZahl(Math.round(teile.gesamt * (1 - Math.pow(1 - x, 3))));
+      if (x < 1) raf = requestAnimationFrame(schritt);
+    };
+    raf = requestAnimationFrame(schritt);
+    return () => cancelAnimationFrame(raf);
+  }, [teile.gesamt]);
+  const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1).replace('.', ','));
+  return (
+    <div className="schluss-rechnung" aria-label={`Wertung ${teile.gesamt}`}>
+      <div className="schluss-zeile">
+        <span className="schluss-basis" title={teile.basisZeilen.map((z) => `${z.text}: ${z.wert}`).join('\n')}>
+          {teile.basis}
+          <small>Basis</small>
+        </span>
+        <span className="schluss-mal">×</span>
+        <span className="schluss-mult" title={teile.multZeilen.map((z) => `${z.text}: ${fmt(z.wert)}`).join('\n')}>
+          {fmt(teile.mult)}
+          <small>Mult</small>
+        </span>
+        <span className="schluss-mal">=</span>
+        <span className="schluss-gesamt">{zahl}</span>
+      </div>
+      <div className="schluss-teile">
+        <span>{teile.basisZeilen.map((z) => `${z.text} ${z.wert}`).join(' · ')}</span>
+        <span>{teile.multZeilen.map((z) => `${z.text} ${fmt(z.wert)}`).join(' · ')}</span>
+      </div>
+    </div>
   );
 }

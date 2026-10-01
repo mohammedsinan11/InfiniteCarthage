@@ -19,6 +19,7 @@
  * sind gedeckelt. Auch eine Endlospartie waechst dadurch nur langsam.
  */
 
+import { wertungTeile } from './wertung';
 import { genitiv } from './factions';
 import { fraktionIn } from './fraktionsleben';
 import { vorhabenById } from './vorhaben';
@@ -123,8 +124,8 @@ export function neueChronik(state: Pick<GameState, 'players'>): Chronik {
  * Kampf, Auftraege und Veteranen.
  */
 export function wertung(state: GameState, id: PlayerId): number {
-  const p = playerById(state, id);
-  return totalPoints(state, id) * 10 + (p?.ruhm ?? 0);
+  // Mit Akten Basis x Mult (core/wertung.ts), sonst Siegpunkte x 10 + Ruhm.
+  return wertungTeile(state, id, totalPoints(state, id)).gesamt;
 }
 
 function punkteZeile(state: GameState, verdeckt: boolean): number[] {
