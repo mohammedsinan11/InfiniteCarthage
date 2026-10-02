@@ -47,7 +47,7 @@ import type { ClientMsg, Member, RoomInfo, ServerMsg } from '../core/protocol';
 import { MELDEN_ALLE_MS, VERZEICHNIS_NAME } from '../core/lobby';
 import type { RaumEintrag } from '../core/lobby';
 import { roundOf } from '../core/season';
-import { gueltigeOmen, wuerfleOmen } from '../core/omen';
+import { gueltigeOmen, omenById, wuerfleOmen } from '../core/omen';
 import { TAGES_RUNDEN, istTagesDatum, tagesDatum, tagesOmen, tagesWeltSeed } from '../core/tages';
 import type { BestenEintrag } from '../core/tages';
 import { wertung } from '../core/chronik';
@@ -449,7 +449,7 @@ export class GameRoom implements DurableObject {
           geheimSeed,
           room.koop && !tages ? 0 : room.targetPoints,
           {
-            omens: gueltigeOmen(room.omens ?? []),
+            omens: this.omenFuer(room),
             rundenLimit: room.koop && !tages ? (room.rundenLimit ?? 60) : this.rundenFuer(room),
             tagesDatum: tages,
             haeuser: true,
@@ -793,6 +793,17 @@ export class GameRoom implements DurableObject {
     const n = room.rundenLimit ?? null;
     if (n === AKTE_ZUEGE && !room.tagesDatum && !room.szenario) return n * Math.max(1, room.members.length);
     return n;
+  }
+
+  /**
+   * Die Omen beim Start: in der allerersten Partie nur Segen (Spieltest 8:
+   * "Leere Taschen" machte den Einstieg zur haertesten Partie).
+   */
+  private omenFuer(room: RoomData): string[] {
+    const omen = gueltigeOmen(room.omens ?? []);
+    const menschen = room.members.filter((m) => !m.bot);
+    const erste = !room.alleSysteme && !room.tagesDatum && !room.szenario && menschen.length === 1 && room.partien?.[menschen[0]!.id] === 0;
+    return erste ? omen.filter((id) => omenById(id)?.art === 'segen') : omen;
   }
 
   /** Welche Karten noch zu sind - nach denselben Regeln wie die Systeme. */

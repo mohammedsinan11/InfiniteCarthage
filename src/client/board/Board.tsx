@@ -2508,7 +2508,9 @@ export function Board({
    */
   const ausbauTreffer = (wx: number, wy: number): boolean => {
     const reichweite = 18 / scale;
-    if (raubMarke && onRaubMarke) {
+    // Beim Bauen gehoeren Klicks den Bauplaetzen, nicht dem Banner (Spieltest 8).
+    const baut = (targets.vertices?.length ?? 0) + (targets.edges?.length ?? 0) + (targets.hexes?.length ?? 0) > 0;
+    if (raubMarke && onRaubMarke && !baut) {
       const p = kronenFuss(raubMarke.q, raubMarke.r);
       if (Math.hypot(p.x - wx, p.y - 5 * SCALE - wy) <= reichweite + 5 * SCALE) {
         onRaubMarke();

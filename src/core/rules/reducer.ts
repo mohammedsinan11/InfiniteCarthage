@@ -108,6 +108,7 @@ import type { ArmyEvent } from './army';
 import { akteFortschreiben, bossZahlen } from './akt';
 import type { AktEvent } from './akt';
 import { waehleBosse } from '../akte';
+import { systemGesperrt } from '../freischalt';
 import { hatSystem, istSystem } from '../systeme';
 import type { SystemId } from '../systeme';
 import { nextStep } from '../units';
@@ -520,7 +521,12 @@ export function createGame(
     state.koop = true;
     state.koopErgebnis = null;
   }
-  if (optionen.systeme) state.systeme = optionen.systeme.filter(istSystem);
+  if (optionen.systeme) {
+    state.systeme = optionen.systeme.filter(istSystem);
+    // Karten fehlender Systeme kommen nicht ins Angebot (core/freischalt.ts).
+    const zu = systemGesperrt(state.systeme);
+    if (zu.length > 0) state.gesperrt = [...new Set([...(state.gesperrt ?? []), ...zu])];
+  }
   // Chronikstufe 9: die Rivalen beginnen mit mehr (core/stufe.ts).
   if ((optionen.stufe ?? 0) >= 9) {
     for (const p of state.players) {
@@ -531,7 +537,7 @@ export function createGame(
       p.loot += 1;
     }
   }
-  if (optionen.gesperrt && optionen.gesperrt.length > 0) state.gesperrt = [...optionen.gesperrt];
+  if (optionen.gesperrt && optionen.gesperrt.length > 0) state.gesperrt = [...new Set([...(state.gesperrt ?? []), ...optionen.gesperrt])];
   // Drei Akte, so lang wie die Rundengrenze erlaubt (core/akte.ts).
   if (optionen.akte && state.ereignisseAn && state.rundenLimit && !state.szenario) {
     state.akte = { laenge: Math.max(5, Math.floor(state.rundenLimit / 3)), bosse: waehleBosse(state.worldSeed, state), stand: {}, siege: {} };

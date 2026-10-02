@@ -352,7 +352,11 @@ export function Game() {
   const notbau = !!me && me.untergang !== null && !me.besiegt && !Object.values(state.buildings).some((b) => b.owner === me.id);
   // Geruechte (client/geruechte.ts): nur neu, wenn sich Reich, Sicht oder Funde aendern.
   const geruechteListe = useMemo(
-    () => (you && state.phase.t !== 'setup' ? geruechte(state, you, sicht) : []),
+    // Nur Geruechte zu Systemen dieser Partie (Spieltest 8: ein Wunder-Geruecht in der dritten Partie).
+    () =>
+      you && state.phase.t !== 'setup'
+        ? geruechte(state, you, sicht).filter((g) => (g.art === 'wunder' ? hatSystem(state, 'reich') : hatSystem(state, 'held')))
+        : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [you, state.buildings, state.exploredRuins, state.wunder, sicht, state.worldSeed],
   );
@@ -1115,9 +1119,12 @@ export function Game() {
   const [autoWurf, setAutoWurf] = useState(() => {
     try {
       const gewaehlt = localStorage.getItem(AUTO_WURF_KEY);
-      return gewaehlt === null ? state.order.length > 1 : gewaehlt !== 'aus';
+      // Nur gegen Menschen an - allein oder gegen Bots wartet niemand (Spieltest 8:
+      // die Uhr spielte Zuege, waehrend man Karten las).
+      const andereMenschen = state.order.some((id) => id !== you && !istBotId(id));
+      return gewaehlt === null ? andereMenschen : gewaehlt !== 'aus';
     } catch {
-      return state.order.length > 1;
+      return false;
     }
   });
   const [tafelOffen, setTafelOffen] = useState(false);
@@ -1725,7 +1732,8 @@ export function Game() {
                   <span className="wuerfel-symbol">
                     <DieIcon />
                   </span>
-                  <span className="wuerfel-text">{nurZugEnde ? 'Zug beenden' : 'Wuerfeln'}</span>
+                  {/* Nach dem Wurf beendet der Knopf den Zug - das soll er auch sagen (Spieltest 8). */}
+                  <span className="wuerfel-text">{nurZugEnde ? 'Zug beenden' : phase.t === 'main' ? 'Naechster Zug' : 'Wuerfeln'}</span>
                 </span>
                 {uhrLaeuft && (
                   <>

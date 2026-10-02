@@ -26,3 +26,18 @@ describe('Freischaltungen', () => {
     }
   });
 });
+
+describe('Systemkarten', () => {
+  it('jede Kennung gibt es, und ohne Systeme bleibt das Angebot voll', async () => {
+    const { SYSTEM_KARTEN, systemGesperrt } = await import('../src/core/freischalt');
+    for (const ids of Object.values(SYSTEM_KARTEN)) for (const id of ids) expect(cardById(id), id).toBeDefined();
+    const zu = [...systemGesperrt([]), ...gesperrteKarten(0, 0)];
+    for (const quelle of ['fund', 'belohnung', 'markt', 'gruendung', 'trophaee'] as const) {
+      for (let r = 1; r < 60; r++) {
+        const o = draftOptions(7, r, quelle, [], zu);
+        expect(new Set(o).size, `${quelle} ${r}`).toBe(3);
+        for (const id of o) expect(zu).not.toContain(id);
+      }
+    }
+  });
+});

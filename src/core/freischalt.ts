@@ -12,6 +12,8 @@
  * oder "Alles von Anfang an": alles offen.
  */
 
+import type { SystemId } from './systeme';
+
 /** Die Engine-Karten in der Reihenfolge, in der sie freikommen - einfache zuerst. */
 export const ENGINE_REIHE: readonly string[] = [
   // Von Beginn an: einfache Ausloeser, je Sippe zwei.
@@ -95,4 +97,32 @@ export function gesperrteKarten(partien: number, bosse: number): string[] {
 export function neuFrei(vorher: { partien: number; bosse: number }, nachher: { partien: number; bosse: number }): string[] {
   const zu = new Set(gesperrteKarten(nachher.partien, nachher.bosse));
   return gesperrteKarten(vorher.partien, vorher.bosse).filter((id) => !zu.has(id));
+}
+
+/**
+ * Karten, die ein System brauchen (core/systeme.ts): solange es in einer
+ * Partie fehlt, kommen sie nicht ins Angebot (Spieltest 8: Heldenkarten in
+ * der ersten Partie, als es noch keinen Helden gab).
+ */
+export const SYSTEM_KARTEN: Record<SystemId, readonly string[]> = {
+  // Kampf, Lager, Pluenderer - und alle Taktiken.
+  raub: [
+    'wehrhafte_doerfer', 'trophaeenhalle', 'kriegsbeute', 'feldscher', 'schildwall', 'sammeln', 'schlachtruf',
+    'belagerungsplan', 'feuerpfeile', 'letztes_aufgebot', 'kriegskasse', 'veteranen', 'blutzoll', 'bollwerk',
+    'beutezug', 'kopfgeld', 'raubritter', 'blutmond_krone',
+  ],
+  // Held, Ruinen, Wanderer und Auftraege.
+  held: [
+    'kartograph', 'weltenwanderer', 'freund_der_wanderer', 'heilkraeuter', 'glueck_des_hauses', 'proviant',
+    'spaeherpfad', 'schatzkarte', 'wegweiser', 'sammelbeutel', 'fernweh', 'kraeuterkunde', 'sagenschreiber',
+    'lagerfeuer', 'nomadenherz',
+  ],
+  // Karawanen.
+  ereignisse: ['zollstation', 'seidenstrasse'],
+  reich: [],
+};
+
+/** Welche Karten einer Partie mit diesen Systemen fehlen. */
+export function systemGesperrt(systeme: readonly SystemId[]): string[] {
+  return (Object.keys(SYSTEM_KARTEN) as SystemId[]).filter((id) => !systeme.includes(id)).flatMap((id) => [...SYSTEM_KARTEN[id]]);
 }
