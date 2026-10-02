@@ -139,6 +139,8 @@ export type Player = {
    * (Spieltest 8 und 9).
    */
   kartenWahl?: number;
+  /** In welcher Runde die Hortstrafe zuletzt traf (rules/raid.ts) - sie trifft einmal je Runde. */
+  hortZug?: number;
   /**
    * Ein Boss ist bezwungen: sein Lohn steht zur Wahl (B8, wie die Bossrelikte
    * bei Slay the Spire). null oder fehlend: nichts offen.

@@ -124,6 +124,15 @@ describe('Was die Pluenderung nimmt', () => {
     expect(raidLoss(game.state, 'p0', 1)).toBe(10);
   });
 
+  it('die Hortstrafe nimmt hoechstens zehn und trifft einmal je Runde', () => {
+    const game = solo();
+    const p = game.state.players[0]!;
+    for (const r of RESOURCES) p.hand[r] = 10; // 50 Karten
+    expect(raidLoss(game.state, 'p0', 1)).toBe(10);
+    p.hortZug = game.state.turn;
+    expect(raidLoss(game.state, 'p0', 1)).toBe(1);
+  });
+
   it('nimmt nie mehr, als jemand hat', () => {
     const game = solo();
     const p = game.state.players[0]!;

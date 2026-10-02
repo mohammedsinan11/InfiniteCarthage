@@ -136,6 +136,7 @@ import { bedrohungVon, hoechsteBedrohung, lagerFiel, raeuberRang, raubzugGroesse
 import type { FeuerEvent } from './feuer';
 import { clearExpiredTactics, hasTactic, tacticBonus } from './tactics';
 import { blutmond, mehrRaubzuege, raubzugRunde, schleimFaktor } from '../omen';
+import { isHoarding } from './handlimit';
 
 /**
  * Lager bis zu dieser Entfernung von einer Siedlung schicken Raubzuege.
@@ -1948,6 +1949,8 @@ export function tickArmy(s: GameState, world: World, events: Ereignisse): void {
     if (!p) continue;
     // Gierige Fraktionen (core/factions.ts) nehmen eine Karte mehr.
     const menge = raidLoss(s, owner, u.fraktion !== null && wesenIn(s, u.fraktion) === 'gierig' ? 2 : 1);
+    // Die Hortstrafe ist fuer diese Runde verbraucht (rules/raid.ts).
+    if (isHoarding(s, owner)) p.hortZug = s.turn;
     const taken = takeFromLargest(p.hand, menge);
     // Raubritter (ENGINE_KARTEN.md): wer die Krone traegt, bekommt, was ihm
     // genommen wuerde - die Pluenderer ziehen mit leeren Haenden ab.

@@ -20,6 +20,9 @@ import { hatWunder } from '../wunder';
 import type { Resource } from '../types';
 import type { GameState, Hand, PlayerId } from '../state';
 
+/** So viel nimmt die Hortstrafe hoechstens. */
+export const HORT_DECKEL = 10;
+
 /**
  * Wie viel dieser Spieler verliert: eine Karte je ankommendem Raeuber - wer
  * hortet, stattdessen die Haelfte. Es gilt der groessere Verlust.
@@ -29,7 +32,10 @@ export function raidLoss(state: GameState, id: PlayerId, raiders: number): numbe
   const p = state.players.find((x) => x.id === id);
   if (!p) return 0;
   const gehalten = handSize(p.hand);
-  const gehortet = isHoarding(state, id) ? Math.floor(gehalten / 2) : 0;
+  // Die Hortstrafe trifft hoechstens einmal je Runde und hoechstens HORT_DECKEL
+  // Karten (Spieltest 9: vier Trupps in einer Nacht nahmen 25+12+6+3 Karten -
+  // den Ertrag, der im fremden Zug kam und nicht auszugeben war).
+  const gehortet = isHoarding(state, id) && p.hortZug !== state.turn ? Math.min(HORT_DECKEL, Math.floor(gehalten / 2)) : 0;
   // Das Haus (core/haus.ts): Waldvolk und Ebene verlieren eine Karte mehr, die
   // Speicherherren eine weniger - aber nie weniger als keine.
   const koloss = hatWunder(state, id, 'koloss') ? 2 : 0;
