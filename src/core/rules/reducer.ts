@@ -1586,7 +1586,11 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       }
       const gruppe = liste as (typeof s.units)[number][];
       if (action.halt) {
-        for (const m of gruppe) {
+        // Halt gilt fuer den ganzen Verband - sonst zog der Rest weiter und
+        // nahm die Angehaltenen wieder mit (Spieltest 9: "Halt tat nichts").
+        const verbaende = new Set(gruppe.map((m) => m.verband).filter((v) => v !== null));
+        const alle = s.units.filter((u) => u.owner === actor && (gruppe.includes(u) || (u.verband !== null && verbaende.has(u.verband))));
+        for (const m of alle) {
           m.ziel = null;
           m.folgt = null;
           m.auftrag = 'befehl';
