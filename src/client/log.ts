@@ -233,6 +233,8 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
     }
     case 'bossNaht':
       return `${bossById(e.boss)?.name ?? 'Der Boss'}: ein Heer von ${e.anzahl} Kaempfern zieht gegen ${who(state, e.player)}.`;
+    case 'bossEntkommen':
+      return `${bossById(e.boss)?.name ?? 'Der Boss'}: sein Heer hat bei ${who(state, e.player)} gepluendert - der Akt ist verloren.`;
     case 'bossLohn':
       return `${who(state, e.player)} waehlt als Lohn: ${BOSS_LOHN_NAME[e.wahl]}.`;
     case 'bossZugabe':

@@ -199,6 +199,29 @@ describe('Akte', () => {
     }
   });
 
+  it('Heer: nur echte Beute verliert den Akt - umkehren allein nicht, und es wird gemeldet', () => {
+    const { s } = partie(['raub']);
+    s.akte!.bosse[0] = 'grenzfuerst';
+    dorf(s, 'p0', 0);
+    akteFortschreiben(s, sammeln(), null);
+    const st = s.akte!.stand.p0!;
+    if (st.forderung.t !== 'heer') return;
+    s.turn = st.forderung.abRunde;
+    akteFortschreiben(s, sammeln(), null);
+    if (st.forderung.t !== 'heer' || !st.forderung.ids) return;
+    const f = st.forderung;
+    const heer = s.units.filter((u) => f.ids!.includes(u.id));
+    expect(heer.every((u) => u.bossFuer === 'p0')).toBe(true);
+    heer[0]!.auftrag = 'heimkehr';
+    const e = sammeln();
+    akteFortschreiben(s, e, null);
+    expect(f.entkommen).toBe(false);
+    heer[0]!.traegt = 3;
+    akteFortschreiben(s, e, null);
+    expect(f.entkommen).toBe(true);
+    expect(e.ev.filter((x) => x.t === 'bossEntkommen').length).toBe(1);
+  });
+
   it('die Trophaee oeffnet eine Wahl, auch ueber die Wahlen je Zug hinaus', () => {
     const { g, s } = partie();
     s.players[0]!.trophaeen = 1;

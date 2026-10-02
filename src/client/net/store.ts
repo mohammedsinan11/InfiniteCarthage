@@ -508,6 +508,10 @@ function meldungenAus(
       meldung(`Mehr als ${WAHLEN_JE_ZUG} Kartenwahlen gibt es nicht je Zug - die Stadt steht, die Wahl kommt mit der naechsten.`, 'info');
       continue;
     }
+    if (e.t === 'bossEntkommen' && e.player === you) {
+      meldung(`${bossById(e.boss)?.name ?? 'Der Boss'}: sein Heer hat gepluendert - dieser Akt ist verloren`, 'raid');
+      continue;
+    }
     if (e.t === 'bossZugabe' && e.player === you) {
       meldung(`Zugabe! ${bossById(e.boss)?.name ?? 'Der Boss'} fordert noch einmal - jede bestandene: +1 Siegpunkt, +0,5 Mult`, 'raid');
       continue;

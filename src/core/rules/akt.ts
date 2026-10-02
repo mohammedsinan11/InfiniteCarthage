@@ -32,6 +32,8 @@ export type AktEvent =
   | { t: 'bossVerfehlt'; player: PlayerId; akt: number; boss: string; verloren: number }
   /** Tribut eingezahlt. */
   | { t: 'bossGezahlt'; player: PlayerId; resource: Resource; anzahl: number }
+  /** Das Heer des Bosses hat gepluendert - der Akt ist verloren. */
+  | { t: 'bossEntkommen'; player: PlayerId; boss: string }
   /** Der Lohn eines Bosses ist gewaehlt (B8). */
   | { t: 'bossLohn'; player: PlayerId; wahl: BossLohn };
 
@@ -149,8 +151,13 @@ export function akteFortschreiben(s: GameState, events: Ereignisse, beendet: num
           st.forderung = { t: 'ziel', mass: 'siedlungen', start, soll: start + 1 };
         }
       }
-      // Wer gepluendert hat, ist entkommen - dann ist der Akt nicht mehr zu gewinnen.
-      if (f.ids && s.units.some((u) => f.ids!.includes(u.id) && (u.traegt > 0 || u.auftrag === 'heimkehr'))) f.entkommen = true;
+      // Wer gepluendert hat, ist entkommen - dann ist der Akt nicht mehr zu
+      // gewinnen. Nur echte Beute zaehlt, und es wird laut gesagt (Spieltest 11:
+      // "der Akt war still verloren, ich dachte, ich gewinne den Kampf").
+      if (f.ids && !f.entkommen && s.units.some((u) => f.ids!.includes(u.id) && u.traegt > 0)) {
+        f.entkommen = true;
+        events.push({ t: 'bossEntkommen', player: p.id, boss: st.boss });
+      }
     }
 
     // Frueh geschafft: sofort belohnen.

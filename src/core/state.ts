@@ -303,6 +303,12 @@ export type UnitState = {
   kind: UnitKind;
   /** Mehr Leben aus Eigenschaften des Helden (core/heldenpfad.ts). */
   extraLeben?: number;
+  /**
+   * Das Heer eines Bosses (core/akte.ts): es zieht gegen diesen Spieler, was
+   * auch immer seine Fraktion mit ihm vereinbart hat, und kehrt nie von
+   * selbst um (Spieltest 11: das Heer blieb im Lager, der Akt war still verloren).
+   */
+  bossFuer?: PlayerId;
   owner: PlayerId | null;
   /** Fraktion bei Raeubern und Goblins (core/factions.ts), sonst null. */
   fraktion: string | null;

@@ -43,6 +43,7 @@ import { edgeKey, hexEdges, hexVertices, vertexKey } from '../../core/coords';
 import { garrisonOf, garrisonUnits, isNestActive, mauerSperrt, nestFraktionOf, wegNach } from '../../core/units';
 import type { Unit } from '../../core/units';
 import { heldKurz, heldVoll } from '../../core/lore';
+import { bossById } from '../../core/akte';
 import { istSpielerSeite, istKampf, kampfFelder, seiteVon, spielerAus } from '../../core/combat';
 import type { Seite } from '../../core/combat';
 import { fraktionById, istFraktion } from '../../core/factions';
@@ -371,6 +372,10 @@ function einheitenText(state: PublicState, du: string | null, gruppe: readonly U
           : 'deine'
         : `von ${state.players.find((p) => p.id === u.owner)?.name ?? 'jemandem'}`,
     );
+  } else if (u.bossFuer) {
+    // Das Heer eines Bosses - nicht mit den Raubzuegen der Lager verwechseln (Spieltest 11).
+    const st = state.akte?.stand[u.bossFuer];
+    teile.push(`Heer: ${bossById(st?.boss)?.name ?? 'der Boss'}${u.bossFuer === du ? ' - gegen dich' : ''}`);
   } else if (u.fraktion !== null) {
     teile.push(fraktionById(state.worldSeed, u.fraktion).name);
   }

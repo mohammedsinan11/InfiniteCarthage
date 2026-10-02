@@ -1125,7 +1125,7 @@ export function bossHeerAufstellen(
       ziel: weg.ziel,
       stufe: rang,
     });
-    ids.push(aufstellen(s, { ...vorlage, leben: maxLeben({ kind: vorlage.kind, stufe: rang }) }).id);
+    ids.push(aufstellen(s, { ...vorlage, bossFuer: id, leben: maxLeben({ kind: vorlage.kind, stufe: rang }) }).id);
   }
   return { ids, q: start.q, r: start.r, fraktion };
 }
@@ -1392,7 +1392,8 @@ function ziehe(
     }
 
     case 'raub': {
-      const siedlungen = zieleFuer(u.fraktion);
+      // Das Heer eines Bosses zieht nur gegen seinen Spieler, Frieden hin oder her.
+      const siedlungen = u.bossFuer ? new Set(settlementApproaches(s, u.bossFuer).keys()) : zieleFuer(u.fraktion);
       const weg = siedlungen.size > 0 ? nextStep(seed, u, siedlungen, SUCHE_RAEUBER) : null;
       if (weg) {
         schritt(weg.step);
@@ -1403,6 +1404,8 @@ function ziehe(
         u.ziel = { q: u.q, r: u.r };
         return false;
       }
+      // Ein Bossheer kehrt nicht um - es wartet, bis ein Weg frei ist.
+      if (u.bossFuer) return false;
       // Nichts zu holen: umkehren.
       u.auftrag = 'heimkehr';
       u.ziel = null;
@@ -1931,7 +1934,11 @@ export function tickArmy(s: GameState, world: World, events: Ereignisse): void {
 
   // 5. Pluenderung.
   for (const u of s.units.filter((x) => x.auftrag === 'raub').sort(nachNummer)) {
-    const owner = besitzerFuer(u.fraktion).get(hexKey(u.q, u.r));
+    const owner = u.bossFuer
+      ? settlementApproaches(s, u.bossFuer).has(hexKey(u.q, u.r))
+        ? u.bossFuer
+        : undefined
+      : besitzerFuer(u.fraktion).get(hexKey(u.q, u.r));
     if (owner === undefined || imKampf(s, u)) continue;
     // Eine Wache haelt sie auf (Spieltest 7: "der Ritter am Dorf half nicht"):
     // steht eine eigene Einheit auf dem Feld oder daneben, wird nicht
