@@ -238,6 +238,12 @@ export function CardDraft({
               {cardById(id)?.name ?? id}
               {/* Wer eine Vorratskarte ersetzt, haelt sofort weniger (Spieltest 8). */}
               {dauerwirkungen(cardById(id) ?? { lasting: undefined }).some((l) => l.t === 'handLimit' && l.amount > 0) ? ' (Handgrenze sinkt!)' : ''}
+              {/* Punktekarten zaehlen nur aktiv (Spieltest 11: ausgetauscht, und zwei Siegpunkte waren still weg). */}
+              {dauerwirkungen(cardById(id) ?? { lasting: undefined }).some(
+                (l) => l.t === 'punkte' || l.t === 'siegpunkte' || (l.t === 'je' && l.dann.t === 'punkte'),
+              )
+                ? ' (ihre Siegpunkte gehen mit!)'
+                : ''}
             </button>
           ))}
         </div>
