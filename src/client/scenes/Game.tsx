@@ -364,15 +364,7 @@ export function Game() {
     window.addEventListener('keydown', taste);
     return () => window.removeEventListener('keydown', taste);
   }, [kandidaten, zielWahl]);
-  // Esc schliesst auch die Tafeln der Leiste (Spieltest 10: die Kartentafel ging nur ueber einen anderen Knopf zu).
-  useEffect(() => {
-    if (tafel === null) return;
-    const taste = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setTafel(null);
-    };
-    window.addEventListener('keydown', taste);
-    return () => window.removeEventListener('keydown', taste);
-  }, [tafel]);
+
   /** Das Heer in Gruppen (client/heer.ts): Scharen und Felder. */
   const heer = useMemo(() => heerGruppen(meineEinheiten), [meineEinheiten]);
   /** Kein Gebaeude mehr, aber die Frist laeuft: eine Siedlung darf ueberall stehen (rules/untergang.ts). */
@@ -479,6 +471,19 @@ export function Game() {
   /** Der Heldenpfad (core/heldenpfad.ts): die Wahl des Ziels - oeffnet sich bei einem neuen Angebot. */
   const meinPfad = you ? state.pfade?.[you] : undefined;
   const [pfadOffen, setPfadOffen] = useState(false);
+  // Esc schliesst die Tafeln der Leiste, die Bosstafel und den Heldenpfad
+  // (Spieltest 10 und 11: sie gingen nur ueber einen anderen Knopf zu).
+  useEffect(() => {
+    if (tafel === null && !bossOffen && !pfadOffen) return;
+    const taste = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setTafel(null);
+      setBossOffen(false);
+      setPfadOffen(false);
+    };
+    window.addEventListener('keydown', taste);
+    return () => window.removeEventListener('keydown', taste);
+  }, [tafel, bossOffen, pfadOffen]);
   const pfadGesehen = useRef<string>('');
   useEffect(() => {
     const k = meinPfad?.angebot ? meinPfad.angebot.map((z) => `${z.q}:${z.r}`).join('|') : '';
