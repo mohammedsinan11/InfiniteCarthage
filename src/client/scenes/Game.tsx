@@ -1053,16 +1053,19 @@ export function Game() {
      * Turm, Palisade und Tor waehlen den Bau - die Plaetze zeigt dann die
      * Karte; Ritter und Bogen treten sofort an.
      */
-    const bauWahl = (name: string, kosten: Cost, m: BuildMode) => ({
+    // Was es tut, in einer Zeile (Spieltest 9: "Turm und Tor werden nirgends erklaert").
+    const bauWahl = (name: string, kosten: Cost, m: BuildMode, info: string) => ({
       name,
       kosten,
+      info,
       darf: jetzt && bezahlbar(kosten),
       hinweis: warum ?? armut(kosten),
       wahl: dann(() => setMode(m)),
     });
-    const truppe = (name: string, kosten: Cost, a: Action) => ({
+    const truppe = (name: string, kosten: Cost, a: Action, info: string) => ({
       name,
       kosten,
+      info,
       darf: jetzt && bezahlbar(kosten),
       hinweis: warum ?? armut(kosten),
       wahl: dann(() => act(a)),
@@ -1070,11 +1073,11 @@ export function Game() {
     // Wehr und Truppen erst, wenn Raubzuege dabei sind (core/systeme.ts).
     if (hatSystem(state, 'raub')) {
       optionen.push(
-        bauWahl('Turm', COST_TOWER, 'tower'),
-        bauWahl('Palisade', COST_MAUER, 'mauer'),
-        bauWahl('Tor', COST_TOR, 'tor'),
-        truppe('Ritter', COST_KNIGHT, { t: 'recruitKnight' }),
-        truppe('Bogen', COST_ARCHER, { t: 'recruitArcher' }),
+        bauWahl('Turm', COST_TOWER, 'tower', 'Auf einer freien Ecke: schiesst auf Feinde bis 2 Felder weit.'),
+        bauWahl('Palisade', COST_MAUER, 'mauer', 'Auf einer Kante in deinem Land: fremde Truppen kommen nicht hindurch.'),
+        bauWahl('Tor', COST_TOR, 'tor', 'Eine Palisade mit Durchlass - schliesst die Mauer, ohne Wege zu sperren.'),
+        truppe('Ritter', COST_KNIGHT, { t: 'recruitKnight' }, 'Tritt hier an: stark im Nahkampf.'),
+        truppe('Bogen', COST_ARCHER, { t: 'recruitArcher' }, 'Tritt hier an: schiesst aus der Ferne, schwach im Nahkampf.'),
       );
     }
     // Jedes fast geschlossene Feld an dieser Ecke - eine Stadt kann an mehreren Ringen liegen.

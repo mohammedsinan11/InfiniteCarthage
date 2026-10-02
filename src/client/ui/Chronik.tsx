@@ -13,6 +13,7 @@
  */
 
 import { cardById } from '../../core/cards/catalog';
+import { bossById } from '../../core/akte';
 import { wertungTeile } from '../../core/wertung';
 import type { WertungsTeile } from '../../core/wertung';
 import { siegwegById, siegwegText } from '../../core/siegwege';
@@ -171,6 +172,45 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
             <p className="note">Eingetragen in deine Ahnenhalle - zu finden auf der Startseite unter Deine Chronik.</p>
           )}
         </header>
+
+        {/* Der Ausblick (D12): was die naechste Partie zum ersten Mal zeigt - ein Grund fuer "noch eine". */}
+        {bilanz?.naechstesSystem && !bilanz.schonGewertet && (
+          <section className="chronik-ausblick">
+            <span className="chronik-titel">In der naechsten Partie neu</span>
+            <h3>{bilanz.naechstesSystem.name}</h3>
+            <p>{bilanz.naechstesSystem.text}</p>
+          </section>
+        )}
+
+        {/* Die Bosse dieser Partie: wer stand im Weg, und wie ging es aus. */}
+        {state.akte && ich && (
+          <section className="chronik-bosse">
+            <h3>Die Bosse</h3>
+            <ol>
+              {state.akte.bosse.map((id, i) => {
+                const akt = i + 1;
+                const erreicht = (state.akte!.stand[ich.id]?.akt ?? 0) >= akt;
+                const sieg = (state.akte!.siege[ich.id] ?? []).includes(akt);
+                return (
+                  <li key={id} className={!erreicht ? 'offen' : sieg ? 'gut' : 'schlecht'}>
+                    <span>Akt {akt}</span> <b>{bossById(id)?.name ?? id}</b>{' '}
+                    {!erreicht ? '- nicht erreicht' : sieg ? `- bezwungen, +${akt} Siegpunkte` : '- verfehlt'}
+                  </li>
+                );
+              })}
+              {(() => {
+                // Bestandene Zugaben: die laufende zaehlt nur, wenn sie bestanden ist.
+                const st = state.akte!.stand[ich.id];
+                const n = st?.zugabe ? st.zugabe - (st.ergebnis === 'besiegt' ? 0 : 1) : 0;
+                return n > 0 ? (
+                  <li className="gut">
+                    <span>Zugaben</span> <b>{n} bestanden</b> - je +1 Siegpunkt und +0,5 Mult
+                  </li>
+                ) : null;
+              })()}
+            </ol>
+          </section>
+        )}
 
         {bilanz && !bilanz.schonGewertet && (bilanz.neueTaten.length > 0 || bilanz.neueStufe !== null || (bilanz.neueKarten?.length ?? 0) > 0) && (
           <section className="chronik-neu">

@@ -23,6 +23,8 @@ import type { ErbstueckId, Familienart } from '../core/erbe';
 import { weltArtVon } from '../core/weltart';
 import { wertungTeile } from '../core/wertung';
 import { neuFrei } from '../core/freischalt';
+import { neuesSystem } from '../core/systeme';
+import type { SystemInfo } from '../core/systeme';
 
 const SPEICHER = 'infinitecarthage.profil';
 
@@ -275,6 +277,8 @@ export type Wertung = {
   schonGewertet: boolean;
   /** Karten, die diese Partie freigeschaltet hat (core/freischalt.ts). */
   neueKarten?: string[];
+  /** Was die naechste Partie zum ersten Mal zeigt (core/systeme.ts) - der Ausblick am Ende. */
+  naechstesSystem?: SystemInfo | null;
 };
 
 /**
@@ -346,5 +350,7 @@ export function werteAus(state: PublicState, you: string, code: string): Wertung
   for (const t of neueTaten) profil.taten[t.id] = Date.now();
   profil.gewertet = [...profil.gewertet, code].slice(-50);
   schreibe(profil);
-  return { neueTaten, neueStufe, sieg, schonGewertet: false, neueKarten };
+  // Nur, wer die Systeme Partie um Partie kennenlernt, bekommt den Ausblick.
+  const naechstesSystem = state.systeme ? neuesSystem(profil.partien) : null;
+  return { neueTaten, neueStufe, sieg, schonGewertet: false, neueKarten, naechstesSystem };
 }

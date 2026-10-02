@@ -240,7 +240,7 @@ export type AusbauTafel = {
   titel: string;
   /** Eine Zeile Erklaerung unter dem Titel. */
   text?: string;
-  optionen: { name: string; kosten?: Cost; darf: boolean; hinweis?: string; wahl: () => void }[];
+  optionen: { name: string; kosten?: Cost; darf: boolean; hinweis?: string; info?: string; wahl: () => void }[];
   /** Text, wenn es keine Optionen gibt. */
   leer?: string;
 };
@@ -2879,18 +2879,23 @@ export function Board({
             const p = vertexToPixel(v, LAYOUT);
             return { x: p.x, y: p.y - hoch };
           });
+          // Eine breite, unsichtbare Trefferflaeche - die Kante allein war
+          // schwer zu treffen (Spieltest 9). Zu den Enden hin gekuerzt, damit
+          // zwei Kanten an einer Ecke nicht umeinander streiten.
+          const k = 0.18;
+          const h1 = { x: a!.x + (b!.x - a!.x) * k, y: a!.y + (b!.y - a!.y) * k };
+          const h2 = { x: b!.x + (a!.x - b!.x) * k, y: b!.y + (a!.y - b!.y) * k };
           return (
-            <line
+            <g
               key={'et' + ek}
-              className="edge-target"
-              x1={a!.x}
-              y1={a!.y}
-              x2={b!.x}
-              y2={b!.y}
+              className="edge-target-g"
               onClick={pick('edge', ek)}
               onPointerEnter={() => setKanteHover(ek)}
               onPointerLeave={() => setKanteHover((alt) => (alt === ek ? null : alt))}
-            />
+            >
+              <line className="edge-hit" x1={h1.x} y1={h1.y} x2={h2.x} y2={h2.y} />
+              <line className="edge-target" x1={a!.x} y1={a!.y} x2={b!.x} y2={b!.y} />
+            </g>
           );
         })}
 
@@ -3347,6 +3352,7 @@ export function Board({
                     <span className="ausbau-name">{o.name}</span>
                     {o.kosten && <Kosten c={o.kosten} />}
                   </span>
+                  {o.info && <span className="ausbau-info">{o.info}</span>}
                   {!o.darf && o.hinweis && <span className="ausbau-hinweis">{o.hinweis}</span>}
                 </button>
               ))}
