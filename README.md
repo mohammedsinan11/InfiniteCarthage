@@ -180,6 +180,36 @@ Spielern, alle Entwicklungskarten, Groesste Rittermacht, 30/60/unendlich Siegpun
 
 Noch nicht enthalten: Laengste Handelsstrasse, Accounts.
 
+### Ein Lauf: drei Akte, Engine-Karten, Heldenpfad
+
+Eine Partie ist ein Lauf wie bei Slay the Spire oder Balatro - leicht
+begonnen, spaet tief:
+
+- **Sofort spielen** auf der Startseite: ein Klick, ein Rivale, los.
+- **Drei Akte** zu je zehn eigenen Zuegen (`core/akte.ts`). Jeder endet mit
+  einem Boss, den man ab Aktbeginn sieht: Tribut (einzahlen), Heer (schlagen,
+  bevor es pluendert) oder Wachstum. Bestanden: Siegpunkte in Hoehe der
+  Aktzahl, eine Trophaee (seltene bis legendaere Kartenwahl) und eine
+  Schmiedearbeit. Kein frueher Sieg - am Ende zaehlt die Wertung.
+- **Wertung Basis x Mult** (`core/wertung.ts`): Siegpunkte x 10 + Ruhm x 3 +
+  Kartenzaehler, mal 1 + 0,5 je Sippenstufe + 1 fuer die Krone + 0,5 je Boss.
+- **Engine-Karten** (`cards/ausloeser.ts`, `cards/wirkung.ts`): Ausloeser
+  ("Wenn X, dann Y"), Zaehler, die mitwachsen, und Regelbrueche. **16
+  Schluesselkarten** im Kronplatz beugen die Regeln - jede mit einem Preis.
+  Drei Kartenplaetze, vier mit Hauptstadt, fuenf mit Koenigssitz.
+- **Schmiede** (`rules/schmiede.ts`): Karten verbessern (Plus-Fassung,
+  `cards/plus.ts`) oder verbrennen.
+- **Heldenpfad** (`core/heldenpfad.ts`): je grosser Runde bis zu drei Ziele
+  mit Gefahr und Lohn, Begegnungen mit Proben (zwei Wuerfel plus Bonus),
+  Stufen mit Eigenschaften, Relikte ohne Platz; faellt der Held, bleibt nur
+  ein Relikt.
+- **Systeme ueber die Partien** (`core/systeme.ts`): die erste Partie kennt
+  nur das Herz des Spiels, jede weitere bringt etwas dazu (Raubzuege, Held,
+  Ereignisse und Karawanen, das Reich). "Alles von Anfang an" in der Lobby.
+- **Freischaltungen** (`core/freischalt.ts`): Partien schalten Engine-Karten
+  frei, bezwungene Bosse Schluesselkarten. **Zehn Chronikstufen**, ab Stufe 7
+  als Regeln. Die Startseite zeigt die letzten Laeufe mit ihrem Bau.
+
 ### Wiederspielwert: Omen, Tagesexpedition, Chronik
 
 Warum und was als Naechstes kommen koennte, steht in
