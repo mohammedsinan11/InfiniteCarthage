@@ -6268,6 +6268,8 @@ em.off {
 }
 .lobby-systeme li.aus::before {
   content: '· ';
+}
+
 /* --- Spielkarten (ui/Spielkarte.tsx, ui/KartenBild.tsx) ---------------------
    Eine Karte als Sammelkarte: Rahmen nach Seltenheit, Wappen und Fensterkante
    nach Sippe, die Form des Bildfensters nach Kartenart. Rahmen und Folie sind

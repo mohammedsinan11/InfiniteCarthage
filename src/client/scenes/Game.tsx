@@ -1576,7 +1576,7 @@ export function Game() {
         {state.szenario === 'gruendung' && phase.t !== 'hauswahl' && phase.t !== 'setup' && phase.t !== 'finished' && you && (
           <ErsteSchritte state={state} you={you} />
         )}
-        {sichtbareTipps.length > 0 && phase.t !== 'finished' && phase.t !== 'hauswahl' && state.draft === null && !bossOffen && (
+        {sichtbareTipps.length > 0 && phase.t !== 'finished' && phase.t !== 'hauswahl' && state.draft === null && !bossOffen && !(meinPfad?.angebot && pfadOffen) && (
           <TippBox tipp={sichtbareTipps[0]!} mehr={0} onGelesen={tippWeg} />
         )}
 
