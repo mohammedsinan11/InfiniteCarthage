@@ -10,7 +10,7 @@ import type { Season } from '../../core/season';
 
 /** Der Genitiv: Ende des Fruehlings, des Herbstes. */
 /** Hoechstens so viele Zeilen im Brief - der Rest steht beim Chronisten (Spieltest 5: zu viel Text). */
-const KURZ = 3;
+const KURZ = 4;
 
 const DES: Record<Season, string> = { spring: 'Fruehlings', summer: 'Sommers', autumn: 'Herbstes', winter: 'Winters' };
 
@@ -23,13 +23,15 @@ export function KundeTafel({ bericht, onZu }: { bericht: Bericht; onZu: () => vo
         </span>
         <h2>Kunde aus dem Land</h2>
         <ul className="kunde-zeilen">
-          {bericht.zeilen.slice(0, KURZ).map((z) => (
+          {/* Die Geschichten stehen vorn (core/kunde.ts); die neue Jahreszeit immer als letzte Zeile. */}
+          {bericht.zeilen.slice(0, Math.min(KURZ, bericht.zeilen.length - 1)).map((z) => (
             <li key={z}>{z}</li>
           ))}
+          <li className="kunde-saison">{bericht.zeilen[bericht.zeilen.length - 1]}</li>
         </ul>
-        {bericht.zeilen.length > KURZ && (
+        {bericht.zeilen.length - 1 > KURZ && (
           <p className="kunde-mehr">
-            Und {bericht.zeilen.length - KURZ} weitere Nachrichten - im Menue unter Chronik.
+            Und {bericht.zeilen.length - 1 - KURZ} weitere Nachrichten - im Menue unter Chronik.
           </p>
         )}
         <div className="ereignis-wahlen">

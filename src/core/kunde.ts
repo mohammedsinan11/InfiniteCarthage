@@ -18,6 +18,10 @@ import { genitiv, imSatz } from './factions';
 import { SEASON_NAME, JAHRESZEIT_WIRKUNG, seasonOf, yearOf } from './season';
 import type { Season } from './season';
 import { WUNDER } from './wunder';
+import { heldKurz } from './lore';
+import { bossById } from './akte';
+import { begegnungById } from './heldenpfad';
+import { cardById } from './cards/catalog';
 import type { WunderArt } from './wunder';
 
 export type SaisonBuch = {
@@ -41,6 +45,12 @@ type Ereignis = { t: string } & Record<string, unknown>;
 
 const name = (s: GameState, id: PlayerId) => s.players.find((p) => p.id === id)?.name ?? 'Jemand';
 const frak = (s: GameState, id: string) => fraktionIn(s, id).name;
+/** Der Held eines Spielers beim Namen - die Geschichten sind seine (Spieltest 10). */
+const held = (s: GameState, id: PlayerId) => {
+  const l = s.players.find((p) => p.id === id)?.held;
+  return l ? heldKurz(l) : `der Held von ${name(s, id)}`;
+};
+const gross = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 const add = (r: Record<string, number>, k: string, n: number) => ({ ...r, [k]: (r[k] ?? 0) + n });
 
 /** Nach jeder Aktion: die Ereignisse ins Saisonbuch. */
@@ -105,6 +115,28 @@ export function kundeFortschreiben(s: GameState, geschehen: readonly Ereignis[])
             : `${name(s, e.player as string)} zahlt Tribut an ${imSatz(frak(s, e.fraktion as string))}.`,
         );
         break;
+      // Der Held und die Bosse: das, wovon man spaeter erzaehlt.
+      case 'heroFell':
+        if (!e.zweig) merke(`${gross(held(s, e.player as string))} fiel im Kampf.`);
+        break;
+      case 'relikt':
+        merke(`${gross(held(s, e.player as string))} fand ${cardById(e.id as string)?.name ?? 'ein Relikt'}.`);
+        break;
+      case 'heldStufe':
+        merke(`${gross(held(s, e.player as string))} wuchs an den Wegen: Stufe ${e.stufe}.`);
+        break;
+      case 'eventResolved': {
+        const bg = begegnungById(e.id as string);
+        const probe = e.probe as { gelungen: boolean } | undefined;
+        if (bg) merke(`${gross(held(s, e.player as string))} wagte sich an ${bg.titel.replace(/^Die /, 'die ').replace(/^Der /, 'den ').replace(/^Das /, 'das ')}${probe ? (probe.gelungen ? ' - und bestand.' : ' - und scheiterte.') : '.'}`);
+        break;
+      }
+      case 'bossBesiegt':
+        if (!e.zugabe) merke(`${name(s, e.player as string)} bezwang ${bossById(e.boss as string)?.name.replace(/^Der /, 'den ') ?? 'den Boss'}.`);
+        break;
+      case 'bossVerfehlt':
+        merke(`${bossById(e.boss as string)?.name ?? 'Der Boss'} setzte sich gegen ${name(s, e.player as string)} durch.`);
+        break;
       default:
         break;
     }
@@ -127,7 +159,9 @@ export function kundeSchreiben(s: GameState, turn: number): Bericht | null {
   const vorher = turn - 1;
   const saison = seasonOf(vorher);
   const jahr = yearOf(vorher);
-  const zeilen: string[] = [];
+  // Erst die Geschichten, dann die Zahlen (Spieltest 10: die Ernte stand
+  // vorn, die Geschichten versteckten sich hinter "weitere Nachrichten").
+  const zeilen: string[] = [...b.besonderes.slice(0, 6)];
 
   const ernte = meiste(b.ertrag);
   const summe = Object.values(b.ertrag).reduce((n, x) => n + x, 0);
@@ -140,13 +174,12 @@ export function kundeSchreiben(s: GameState, turn: number): Bericht | null {
       `${b.raubzuege} ${b.raubzuege === 1 ? 'Raubzug zog' : 'Raubzuege zogen'} durchs Land` +
         (opfer ? `; am schwersten traf es ${name(s, opfer[0])} mit ${opfer[1]} Karten.` : ', doch niemand verlor etwas.'),
     );
-  } else {
+  } else if (zeilen.length === 0) {
     zeilen.push('Die Grenzen blieben ruhig - kein Raubzug brach auf.');
   }
   if (b.horden > 0) zeilen.push(`${b.horden === 1 ? 'Eine Horde kam' : `${b.horden} Horden kamen`} aus der Nacht.`);
   const brand = meiste(b.braende);
   if (brand) zeilen.push(`Feuer vernichtete ${brand[1]} ${brand[1] === 1 ? 'Bau' : 'Bauten'} bei ${name(s, brand[0])}.`);
-  zeilen.push(...b.besonderes.slice(0, 5));
   const nach = seasonOf(turn);
   const wirkung = JAHRESZEIT_WIRKUNG[nach].text;
   zeilen.push(`Nun kommt der ${SEASON_NAME[nach]}${wirkung ? `: ${wirkung}` : '.'}`);
