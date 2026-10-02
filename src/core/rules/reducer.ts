@@ -1219,8 +1219,14 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
 
     case 'setLoadout': {
       if (phase.t !== 'main') return fail('Die Karten werden in der Bauphase umgestellt.');
+      // Eine Umstellung je Zug (Spieltest 9: freies Hin- und Hertauschen
+      // machte aus drei Plaetzen beliebig viele - Ausloeser wurden kurz vor
+      // der Aktion eingeschoben). Nur Abschalten ist immer frei.
+      const neu = action.cards.some((c) => !actorPlayer.activeCards.includes(c));
+      if (neu && actorPlayer.umgestellt === s.turn) return fail('Nur eine Umstellung je Zug - im naechsten Zug wieder.');
       const why = setzeAktiveKarten(s, actorPlayer, action.cards);
       if (why) return fail(why);
+      if (neu) actorPlayer.umgestellt = s.turn;
       break;
     }
 

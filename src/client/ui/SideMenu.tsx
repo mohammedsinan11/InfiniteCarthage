@@ -576,7 +576,7 @@ export function SideMenu({
             )}
             <Kopf
               titel={`Reichskarten${cards.length > 0 ? ` · ${cards.length}` : ''}`}
-              hilfe="Nur Karten mit dem Siegel Aktiv liefern eine Dauerwirkung. Anfangs hast du drei Plaetze; eine Hauptstadt erweitert sie. Dazu kommt der Kronplatz fuer eine Schluesselkarte. Tippe eine Dauerkarte an, um sie ein- oder auszuschalten - in deiner Bauphase. Bei vollen Plaetzen waehlst du, welche weicht."
+              hilfe="Nur Karten mit dem Siegel Aktiv liefern eine Dauerwirkung. Anfangs hast du drei Plaetze; eine Hauptstadt erweitert sie. Umstellen geht einmal je Zug. Dazu kommt der Kronplatz fuer eine Schluesselkarte. Tippe eine Dauerkarte an, um sie ein- oder auszuschalten - in deiner Bauphase. Bei vollen Plaetzen waehlst du, welche weicht."
             />
             {/* Der Kronplatz (ENGINE_KARTEN.md): eine Schluesselkarte, die die Regeln beugt. */}
             {krone && cardById(krone) && (
@@ -652,6 +652,7 @@ export function SideMenu({
                             )}
                           </span>
                         )}
+                        {dauer && !kannUmstellen && <p className="menu-leer">Umstellen: einmal je Zug, in deiner Bauphase.</p>}
                         {k.schluessel && krone !== k.id && onKrone && (
                           <span className="menu-ritter-knoepfe">
                             <button disabled={!kannUmstellen} onClick={() => onKrone(k.id)}>

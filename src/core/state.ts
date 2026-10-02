@@ -141,6 +141,8 @@ export type Player = {
   kartenWahl?: number;
   /** In welcher Runde die Hortstrafe zuletzt traf (rules/raid.ts) - sie trifft einmal je Runde. */
   hortZug?: number;
+  /** In welchem Zug zuletzt Karten aktiviert wurden - eine Umstellung je Zug. */
+  umgestellt?: number;
   /**
    * Ein Boss ist bezwungen: sein Lohn steht zur Wahl (B8, wie die Bossrelikte
    * bei Slay the Spire). null oder fehlend: nichts offen.

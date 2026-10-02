@@ -1518,7 +1518,7 @@ export function Game() {
           cards={me?.cards ?? []}
           activeCards={me?.activeCards ?? []}
           kartenPlaetze={you ? reichskartenPlaetze(state, you) : 0}
-          kannUmstellen={isMine && phase.t === 'main'}
+          kannUmstellen={isMine && phase.t === 'main' && me?.umgestellt !== state.turn}
           onLoadout={(cards) => act({ t: 'setLoadout', cards })}
           tactics={me?.tactics ?? []}
           equipment={me?.equipment ?? []}

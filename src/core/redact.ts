@@ -54,6 +54,8 @@ export type PublicPlayer = {
   /** Offene Trophaeen besiegter Bosse - oeffentlich wie die Beute. */
   trophaeen: number;
   kartenWahl: number;
+  /** Zug der letzten Umstellung der aktiven Karten - eine je Zug. */
+  umgestellt: number | null;
   /** Der Lohn eines bezwungenen Bosses zur Wahl - oeffentlich wie die Trophaeen. */
   bossLohn: BossLohn[] | null;
   /** Zaehler der Engine-Karten - oeffentlich wie die Karten (ENGINE_KARTEN.md). */
@@ -225,6 +227,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
       loot: p.loot,
       trophaeen: p.trophaeen ?? 0,
       kartenWahl: p.kartenWahl ?? 0,
+      umgestellt: p.umgestellt ?? null,
       bossLohn: p.bossLohn ?? null,
       zaehler: { ...(p.zaehler ?? {}) },
       krone: p.krone ?? null,

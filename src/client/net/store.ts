@@ -289,6 +289,7 @@ function vervollstaendige(msg: ServerMsg): void {
       p.trophaeen ??= 0;
       p.kartenWahl ??= 0;
       p.bossLohn ??= null;
+      p.umgestellt ??= null;
       p.zaehler ??= {};
       p.krone ??= null;
       p.plus ??= [];
