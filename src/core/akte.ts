@@ -213,7 +213,10 @@ export function forderungFuer(
   }
   const mass = boss.mass ?? 'siedlungen';
   const start = zielWert(s, id, mass, punkte);
-  return { t: 'ziel', mass, start, soll: start + ZIEL_MEHR[mass][i]! + haerte };
+  // Siegpunkte wachsen mit der Engine: wer schon weit ist, muss mehr zeigen
+  // (Spieltest 11: "+5 Siegpunkte ist fuer eine Staedte-Engine trivial").
+  const mitEngine = mass === 'punkte' ? Math.round(start * (i === 2 ? 0.3 : i === 1 ? 0.2 : 0)) : 0;
+  return { t: 'ziel', mass, start, soll: start + Math.max(ZIEL_MEHR[mass][i]!, mitEngine) + haerte };
 }
 
 /**
@@ -227,7 +230,7 @@ export function forderungVorschau(boss: BossDef, akt: number, stufe = 0): string
   if (boss.art === 'heer') return `Heer: ${HEER[i]![0] + haerte} Kaempfer brechen zur Mitte des Aktes auf`;
   const mass = boss.mass ?? 'siedlungen';
   const n = ZIEL_MEHR[mass][i]! + haerte;
-  return `Wachstum: ${n} ${n === 1 ? ZIEL_NAME[mass][0] : ZIEL_NAME[mass][1]} mehr`;
+  return `Wachstum: ${mass === 'punkte' && i > 0 ? 'mindestens ' : ''}${n} ${n === 1 ? ZIEL_NAME[mass][0] : ZIEL_NAME[mass][1]} mehr`;
 }
 
 /** Ist die Forderung erfuellt? Fuer HEER erst, wenn das Heer aufgebrochen und vollstaendig gefallen ist. */
