@@ -132,7 +132,7 @@ import type { BedrohungEvent } from './bedrohung';
 import { imSpiel, imUntergang, untergangRunde, ueberspringeBesiegte } from './untergang';
 import type { UntergangEvent } from './untergang';
 import type { TacticEvent } from './tactics';
-import { ruhmAusEreignissen } from './ruhm';
+import { geben, ruhmAusEreignissen } from './ruhm';
 import { gueltigeOmen, siebenerBonus, startBeute } from '../omen';
 import { hausAngebot, hausById, hausWirkung } from '../haus';
 import { durstLindern, mangelHilfe } from './hilfe';
@@ -221,6 +221,8 @@ export type Action =
   | { t: 'disbandGroup'; verband: number }
   /** Eine Beute einloesen: eine Kartenwahl. */
   | { t: 'claimLoot' }
+  /** Ueberschuss spenden: SPENDE_KARTEN Karten von den groessten Stapeln fuer 1 Ruhm. */
+  | { t: 'spenden' }
   /** Eine eigene Schluesselkarte in den Kronplatz legen (ENGINE_KARTEN.md). */
   | { t: 'setKrone'; card: string }
   /** Eine Karte verbessern oder verbrennen (rules/schmiede.ts). */
@@ -287,6 +289,7 @@ export type GameEvent =
   | { t: 'cardTaken'; player: PlayerId; card: string }
   /** Eine Stadt brachte keine Wahl - die Wahlen dieses Zuges sind aufgebraucht. */
   | { t: 'wahlGedeckelt'; player: PlayerId }
+  | { t: 'gespendet'; player: PlayerId; given: Hand }
   | { t: 'chunks'; coords: ChunkCoord[] }
   | { t: 'turn'; player: PlayerId }
   | { t: 'houseChosen'; player: PlayerId; haus: string }
@@ -863,6 +866,9 @@ function siebenLiefert(s: GameState, world: World, actor: PlayerId, events: Game
 
 /** So viele Gruendungs- und Beutewahlen gibt es je Zug; Fund und Markt zaehlen nicht mit. */
 export const WAHLEN_JE_ZUG = 2;
+
+/** So viele Karten kostet eine Spende (1 Ruhm). */
+export const SPENDE_KARTEN = 5;
 
 /** Ist in diesem Zug noch eine Gruendungs- oder Beutewahl frei? Ohne Ereignisse immer. */
 export function wahlFrei(s: Pick<GameState, 'ereignisseAn' | 'wahlen' | 'turn'>): boolean {
@@ -1638,6 +1644,18 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       const mitglieder = s.units.filter((u) => u.owner === actor && u.verband === action.verband);
       if (mitglieder.length === 0) return fail('Diese Schar gibt es nicht.');
       for (const m of mitglieder) m.verband = null;
+      break;
+    }
+
+    case 'spenden': {
+      // Ein Abfluss fuer den Ueberschuss (Spieltest 9: "die grosse Zahl hat
+      // keinen Ort" - 33 Getreide aus einem Wurf, und die Pluenderer holten es).
+      if (phase.t !== 'main') return fail('Gespendet wird in der Bauphase.');
+      if (handSize(actorPlayer.hand) < SPENDE_KARTEN) return fail(`Eine Spende braucht ${SPENDE_KARTEN} Karten.`);
+      const weg = takeFromLargest(actorPlayer.hand, SPENDE_KARTEN);
+      for (const r of RESOURCES) actorPlayer.hand[r] -= weg[r];
+      geben(s, actor, 1, 'spende', events);
+      events.push({ t: 'gespendet', player: actor, given: weg });
       break;
     }
 

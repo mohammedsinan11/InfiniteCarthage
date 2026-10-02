@@ -9,7 +9,7 @@ export type RuhmEvent = {
   t: 'glory';
   player: PlayerId;
   amount: number;
-  reason: 'lager' | 'auftrag' | 'veteran' | 'morast' | 'ereignis' | 'wunder' | 'vorhaben' | 'sippe' | 'karte' | 'boss';
+  reason: 'lager' | 'auftrag' | 'veteran' | 'morast' | 'ereignis' | 'wunder' | 'vorhaben' | 'sippe' | 'karte' | 'boss' | 'spende';
 };
 
 type Ereignis = { t: string } & Record<string, unknown>;

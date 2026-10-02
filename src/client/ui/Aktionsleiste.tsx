@@ -39,7 +39,7 @@ import { REICHSBAU_NAME, REICHSBAU_ZWECK } from '../../core/rules/reich';
 import { COST_REICHSBAU } from '../../core/rules/costs';
 import type { Cost } from '../../core/rules/costs';
 import type { Action } from '../../core/rules/reducer';
-import { marktPreisFuer } from '../../core/rules/reducer';
+import { SPENDE_KARTEN, marktPreisFuer } from '../../core/rules/reducer';
 import type { PublicPlayer, PublicState } from '../../core/redact';
 import type { DevCardType, Hand, HeldZweig } from '../../core/state';
 import { ZWEIGE, ZWEIG_NAME, ZWEIG_ZWECK } from '../../core/rules/zweig';
@@ -413,6 +413,19 @@ function KartenTafel({
           onClick={() => act({ t: 'buyDev' })}
         >
           Kaufen
+        </button>
+      </div>
+      {/* Spenden: ein Abfluss fuer den Ueberschuss, ehe die Pluenderer ihn holen (Spieltest 9). */}
+      <div className="dock-karte dock-kaufen">
+        <SymKarte />
+        <span className="dock-karte-name">Spenden</span>
+        <span className="dock-karte-beschreibung">{SPENDE_KARTEN} Karten von den groessten Stapeln: 1 Ruhm.</span>
+        <button
+          disabled={!kaufen.darf || Object.values(kaufen.hand).reduce((n, x) => n + x, 0) < SPENDE_KARTEN}
+          title="Ruhm zaehlt in der Wertung - besser als Karten, die verderben oder geraubt werden"
+          onClick={() => act({ t: 'spenden' })}
+        >
+          Spenden
         </button>
       </div>
       {[...anzahl.keys()].map((t) => {

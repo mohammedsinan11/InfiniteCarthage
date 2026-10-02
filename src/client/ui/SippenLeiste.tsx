@@ -102,7 +102,12 @@ export function SippenSchild({ card, sippe, seit }: { card: string; sippe: Sippe
   const wirktDann = wirkendeSippen(danach, nachSeit).includes(s);
   const schaltetFrei = naechste !== null && naechste.fehlt === 1 && wirktDann;
   return (
-    <span className={schaltetFrei ? 'sippe-schild frei' : 'sippe-schild'} style={{ borderColor: SIPPE_FARBE[s] }}>
+    <span
+      className={schaltetFrei ? 'sippe-schild frei' : 'sippe-schild'}
+      style={{ borderColor: SIPPE_FARBE[s] }}
+      // "(ruht)" erklaeren (Spieltest 9): nur die zwei staerksten Familien wirken.
+      title={!wirktDann ? 'Ruht: nur deine zwei staerksten Familien wirken. Diese zaehlt mit, wirkt aber erst, wenn sie eine davon ueberholt.' : undefined}
+    >
       <SippenZeichen sippe={s} groesse={12} />
       {SIPPE_NAME[s]} {(sippe?.[s] ?? 0) + 1}
       {schaltetFrei ? ` - ${naechste.bonus.name}!` : !wirktDann && (danach[s] ?? 0) >= SIPPEN_STUFEN[0] ? ' (ruht)' : naechste ? ` (noch ${naechste.fehlt - 1})` : ''}
