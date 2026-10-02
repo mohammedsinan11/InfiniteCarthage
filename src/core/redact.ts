@@ -63,6 +63,8 @@ export type PublicPlayer = {
   schmiede: number;
   /** Der Heldenpfad (core/heldenpfad.ts): Erfahrung, Eigenschaften, offene Wahl und Begegnung. */
   heldXp: number;
+  /** Narben des Helden (C11): je Fall eine. */
+  narben: number;
   eigenschaften: string[];
   eigenschaftAngebot: string[] | null;
   begegnung: string | null;
@@ -224,6 +226,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
       plus: [...(p.plus ?? [])],
       schmiede: p.schmiede ?? 0,
       heldXp: p.heldXp ?? 0,
+      narben: p.narben ?? 0,
       eigenschaften: [...(p.eigenschaften ?? [])],
       eigenschaftAngebot: p.eigenschaftAngebot ?? null,
       begegnung: p.begegnung ?? null,

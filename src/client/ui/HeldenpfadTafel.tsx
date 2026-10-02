@@ -4,10 +4,10 @@
  * Wahl einer Eigenschaft nach einem Aufstieg. PLATZHALTER (ASSETS.md).
  */
 
-import { EIGENSCHAFTEN, HELD_STUFEN_AB, eigenschaftById, heldStufeVon } from '../../core/heldenpfad';
+import { EIGENSCHAFTEN, HELD_STUFEN_AB, NARBEN_MAX, eigenschaftById, heldStufeVon } from '../../core/heldenpfad';
 import type { PfadZiel } from '../../core/heldenpfad';
 
-const ART_NAME = { ruine: 'Ruine', lager: 'Lager', ort: 'Ort' } as const;
+const ART_NAME = { ruine: 'Ruine', lager: 'Lager', ort: 'Ort', hexe: 'Hexe' } as const;
 
 function Gefahr({ n }: { n: number }) {
   return (
@@ -107,6 +107,66 @@ export function HeldZeile({ xp, eigenschaften }: { xp: number; eigenschaften: re
           ? 'Noch keine Eigenschaften - Begegnungen bringen Erfahrung.'
           : eigenschaften.map((id) => EIGENSCHAFTEN.find((e) => e.id === id)?.name ?? id).join(' · ')}
       </span>
+    </div>
+  );
+}
+
+/** Ein Grabspruch je Stufe - aus dem, was der Held erlebt hat. */
+const GRABSPRUCH = [
+  'Nicht weit gekommen - aber immer voran.',
+  'Die Wege von damals tragen noch die Spuren.',
+  'An langen Abenden wird man davon erzaehlen.',
+  'Die Barden kennen den Namen schon jetzt.',
+  'Ein Lied fuer jeden Ort, der gesehen wurde.',
+  'Solche kommen nicht wieder.',
+];
+
+/**
+ * Der Fall des eigenen Helden als Szene (C11, Spieltest 10: "Heldentode sind
+ * keine Ereignisse - eine Meldung, eine Logzeile, dann kehrt er zurueck").
+ * Jetzt: Name, Grabspruch, was verloren ist, die Narbe, die bleibt.
+ */
+export function HeldFallSzene({
+  name,
+  weiblich,
+  xp,
+  narben,
+  relikteVerloren,
+  zurueck,
+  onZu,
+}: {
+  name: string;
+  weiblich: boolean;
+  xp: number;
+  narben: number;
+  relikteVerloren: number;
+  /** Runde der Rueckkehr - null, wenn die Partie vorher endet. */
+  zurueck: number | null;
+  onZu: () => void;
+}) {
+  const stufe = heldStufeVon(xp);
+  const spruch = GRABSPRUCH[Math.min(GRABSPRUCH.length - 1, stufe)]!;
+  const er = weiblich ? 'sie' : 'er';
+  return (
+    <div className="draft-overlay ereignis-huelle">
+      <div className="ereignis held-fall">
+        <span className="ereignis-zeit">Stufe {stufe} · {narben === 1 ? 'erste Narbe' : `${narben} Narben`}</span>
+        <h2>{name} ist gefallen</h2>
+        <p className="ereignis-text held-fall-spruch">„{spruch}“</p>
+        <ul className="held-fall-folgen">
+          {relikteVerloren > 0 && <li>{relikteVerloren === 1 ? 'Ein Relikt bleibt' : `${relikteVerloren} Relikte bleiben`} auf dem Schlachtfeld zurueck.</li>}
+          {narben <= NARBEN_MAX ? (
+            <li>Eine Narbe bleibt: ein Leben weniger, aber +1 bei Proben des Mutes.</li>
+          ) : (
+            <li>Mehr Narben traegt kein Koerper - die alten zaehlen weiter.</li>
+          )}
+          <li>Erfahrung und Eigenschaften bleiben.</li>
+          <li>{zurueck === null ? `In dieser Partie kehrt ${er} nicht mehr zurueck.` : `${weiblich ? 'Sie' : 'Er'} kehrt in Runde ${zurueck} zurueck.`}</li>
+        </ul>
+        <div className="ereignis-wahlen">
+          <button onClick={onZu}>Ehre {weiblich ? 'ihrem' : 'seinem'} Andenken</button>
+        </div>
+      </div>
     </div>
   );
 }

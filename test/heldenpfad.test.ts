@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { applyAction, createGame } from '../src/core/rules/reducer';
 import type { GameEvent } from '../src/core/rules/reducer';
-import { BEGEGNUNGEN, RELIKTE, heldStufeVon, pfadZiele, probeBonus } from '../src/core/heldenpfad';
+import { BEGEGNUNGEN, RELIKTE, heldStufeVon, lebenBonus, pfadZiele, probeBonus } from '../src/core/heldenpfad';
 import { heldWachsen, relikteBeiFall } from '../src/core/rules/pfad';
 import { ereignisById } from '../src/core/ereignis';
 import { cardById } from '../src/core/cards/catalog';
@@ -32,6 +32,20 @@ describe('Heldenpfad', () => {
     expect(heldStufeVon(12)).toBe(3);
     expect(probeBonus(2, ['mutig'], 'mut')).toBe(4);
     expect(probeBonus(2, ['mutig'], 'klugheit')).toBe(2);
+  });
+
+  it('Narben: je Fall ein Leben weniger und +1 Mut, hoechstens zwei', () => {
+    expect(probeBonus(0, [], 'mut', 1)).toBe(1);
+    expect(probeBonus(0, [], 'mut', 5)).toBe(2);
+    expect(probeBonus(0, [], 'klugheit', 2)).toBe(0);
+    expect(lebenBonus([], 1)).toBe(-1);
+    expect(lebenBonus([], 4)).toBe(-2);
+  });
+
+  it('das Hexenhaus ist ein Ziel des Pfades', () => {
+    const z = pfadZiele(1, 5, 0, { q: 3, r: 0 }, null, [], { q: 9, r: 9 });
+    expect(z[1]).toMatchObject({ art: 'hexe', begegnung: 'b_hexe' });
+    expect(ereignisById('b_hexe')?.wahlen.length).toBe(4);
   });
 
   it('ein Aufstieg bietet Eigenschaften an, die Wahl nimmt eine', () => {

@@ -144,7 +144,7 @@ import { kannBezahlen } from '../../core/rules/kosten';
 import type { Bauwerk } from '../../core/cards/types';
 import { leseProfil } from '../profil';
 import { BossTafel, aktZahl } from '../ui/BossTafel';
-import { EigenschaftWahl, PfadTafel } from '../ui/HeldenpfadTafel';
+import { EigenschaftWahl, HeldFallSzene, PfadTafel } from '../ui/HeldenpfadTafel';
 import type { BuildMode } from '../ui/Aktionsleiste';
 import { reichArtVon } from '../ui/Aktionsleiste';
 import { REICHSBAU_NAME, REICHSBAU_ZWECK, reichsbauHindernis, reichsgebiet } from '../../core/rules/reich';
@@ -201,6 +201,8 @@ export function Game() {
   }, [treffer, clearTreffer]);
   const clearProduceEffect = useStore((s) => s.clearProduceEffect);
   const kartenBlitze = useStore((s) => s.kartenBlitze);
+  const heldFall = useStore((s) => s.heldFall);
+  const schliesseHeldFall = useStore((s) => s.schliesseHeldFall);
   const clearKartenBlitze = useStore((s) => s.clearKartenBlitze);
   /** Eine Karte aus der Kartenleiste im Menue aufschlagen. */
   const [zeigeKarte, setZeigeKarte] = useState<{ id: string; nr: number } | null>(null);
@@ -1928,6 +1930,17 @@ export function Game() {
             <button className="pfad-chip" onClick={() => setPfadOffen(true)} title="Dein Held wartet auf ein Ziel">
               Heldenpfad ({meinPfad.angebot.length})
             </button>
+          )}
+          {heldFall && state.draft === null && pendingRoll === null && (
+            <HeldFallSzene
+              name={heldFall.lore ? heldKurz(heldFall.lore) : 'Dein Held'}
+              weiblich={heldFall.lore?.geschlecht === 'w'}
+              xp={heldFall.xp}
+              narben={heldFall.narben}
+              relikteVerloren={heldFall.relikteVerloren}
+              zurueck={state.rundenLimit !== null && heldFall.zurueck > state.rundenLimit ? null : heldFall.zurueck}
+              onZu={schliesseHeldFall}
+            />
           )}
           {me?.eigenschaftAngebot && me.eigenschaftAngebot.length > 0 && state.draft === null && (
             <EigenschaftWahl angebot={me.eigenschaftAngebot} xp={me.heldXp ?? 0} onWahl={(id) => act({ t: 'eigenschaftWaehlen', id })} />

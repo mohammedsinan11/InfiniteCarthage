@@ -57,6 +57,11 @@ export function pfadRunde(s: GameState, events: Ereignisse): void {
     let ruine: { q: number; r: number; d: number } | null = null;
     let lager: { q: number; r: number; d: number; name: string } | null = null;
     const orte: { q: number; r: number }[] = [];
+    // Eine Hexe, die schon vor ihrem Haus steht (rules/army.ts, hexenWache).
+    const hexeU = s.units
+      .filter((u) => u.kind === 'hexe' && hexDistance(held, u) <= PFAD_WEITE)
+      .sort((a, b) => hexDistance(held, a) - hexDistance(held, b))[0];
+    const hexe = hexeU ? { q: hexeU.q, r: hexeU.r } : null;
     for (const h of hexesInRange(held, PFAD_WEITE)) {
       const d = hexDistance(held, h);
       if (d < 2 || !isLandAt(s.worldSeed, h.q, h.r)) continue;
@@ -69,7 +74,7 @@ export function pfadRunde(s: GameState, events: Ereignisse): void {
         orte.push({ q: h.q, r: h.r });
       }
     }
-    const angebot = pfadZiele(s.worldSeed, s.turn, s.order.indexOf(p.id), ruine, lager, orte);
+    const angebot = pfadZiele(s.worldSeed, s.turn, s.order.indexOf(p.id), ruine, lager, orte, hexe);
     if (angebot.length === 0) continue;
     s.pfade = { ...(s.pfade ?? {}), [p.id]: { angebot, aktiv: null } };
     events.push({ t: 'pfadAngebot', player: p.id, anzahl: angebot.length });
@@ -103,7 +108,8 @@ export function pfadAnkunft(s: GameState, events: Ereignisse): void {
     const held = heldVon(s, id);
     const p = playerById(s, id);
     if (!held || !p) continue;
-    if (hexDistance(held, z) > (z.art === 'lager' ? 1 : 0)) continue;
+    // Vor Lager und Hexenhaus haelt der Held Abstand - die Szene beginnt an der Schwelle.
+    if (hexDistance(held, z) > (z.art === 'lager' ? 1 : z.art === 'hexe' ? 2 : 0)) continue;
     p.begegnung = z.begegnung;
     s.pfade = { ...s.pfade, [id]: { angebot: null, aktiv: null } };
     events.push({ t: 'pfadAnkunft', player: id, name: z.name, begegnung: z.begegnung });
@@ -133,7 +139,7 @@ function eigenschaftNehmen(s: GameState, p: Player, id: string, events: Ereignis
   // Mehr Leben gilt sofort fuer den Helden auf der Karte.
   const held = heldVon(s, p.id);
   if (held) {
-    held.extraLeben = lebenBonus(p.eigenschaften);
+    held.extraLeben = lebenBonus(p.eigenschaften, p.narben);
     if (eigenschaftById(id)?.leben) held.leben = Math.min(maxLeben(held), held.leben + eigenschaftById(id)!.leben!);
   }
   events.push({ t: 'eigenschaft', player: p.id, id });
@@ -170,7 +176,7 @@ export function probeWuerfeln(s: GameState, p: Player, art: Probe, ziel: number)
   const rng = new Rng(s.rngState);
   const wurf = 2 + rng.int(6) + rng.int(6);
   s.rngState = rng.getState();
-  const bonus = probeBonus(heldStufeVon(p.heldXp ?? 0), p.eigenschaften ?? [], art);
+  const bonus = probeBonus(heldStufeVon(p.heldXp ?? 0), p.eigenschaften ?? [], art, p.narben ?? 0);
   return { wurf, bonus, gelungen: wurf + bonus >= ziel };
 }
 

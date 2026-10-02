@@ -475,8 +475,8 @@ export function spawnHeld(s: GameState, id: PlayerId, events: Ereignisse): UnitS
   if (p) benenneHeld(s, p);
   const unit = aufstellen(s, einheitVorlage('held', feldAn.q, feldAn.r, { owner: id }));
   // Eigenschaften des Helden (core/heldenpfad.ts): Zaeh gibt mehr Leben.
-  const extra = lebenBonus(p?.eigenschaften);
-  if (extra > 0) {
+  const extra = lebenBonus(p?.eigenschaften, p?.narben);
+  if (extra !== 0) {
     unit.extraLeben = extra;
     unit.leben = maxLeben(unit);
   }
@@ -600,8 +600,10 @@ function heldFaellt(s: GameState, u: UnitState, events: Ereignisse): void {
     if (u.zweig && p.ernannt) p.ernannt.zurueck = zurueck;
     else {
       p.heldZurueck = zurueck;
-      // Ein Fall zaehlt (C11): die Relikte bis auf eines gehen verloren.
+      // Ein Fall zaehlt (C11): die Relikte bis auf eines gehen verloren,
+      // und eine Narbe bleibt.
       relikteBeiFall(p, events);
+      p.narben = (p.narben ?? 0) + 1;
     }
   }
   for (const x of s.units) if (x.folgt === u.id) x.folgt = null;

@@ -150,6 +150,11 @@ export type Player = {
   heldXp?: number;
   /** Gewaehlte Eigenschaften des Helden. */
   eigenschaften?: string[];
+  /**
+   * Narben (C11): jeder Fall des Helden hinterlaesst eine. Je Narbe ein Leben
+   * weniger, aber +1 bei Proben des Mutes - hoechstens zwei zaehlen.
+   */
+  narben?: number;
   /** Eine Stufe ist erreicht: diese Eigenschaften stehen zur Wahl. */
   eigenschaftAngebot?: string[] | null;
   /** Der Held ist angekommen - diese Begegnung kommt beim naechsten eigenen Wurf. */

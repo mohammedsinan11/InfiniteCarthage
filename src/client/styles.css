@@ -7268,3 +7268,22 @@ em.off {
     display: none;
   }
 }
+
+/* Der Fall des Helden (ui/HeldenpfadTafel.tsx, HeldFallSzene). */
+.held-fall {
+  border-color: #7a2418;
+}
+.held-fall h2 {
+  color: #e8b0a0;
+}
+.held-fall-spruch {
+  font-style: italic;
+  text-align: center;
+}
+.held-fall-folgen {
+  margin: 4px 0 10px;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}

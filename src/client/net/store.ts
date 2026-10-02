@@ -141,6 +141,9 @@ export type Treffer = {
   nr: number;
 };
 
+/** Der Fall des eigenen Helden - fuer die Szene (ui/HeldFall.tsx). */
+export type HeldFall = { lore: PublicState['players'][number]['held'] | null; zurueck: number; narben: number; relikteVerloren: number; xp: number };
+
 /** Eine eigene Karte hat ausgeloest - mit ihrem Lohn in Kurzform ("+2 Holz"). */
 export type KartenBlitz = { id: number; card: string; text: string };
 
@@ -214,6 +217,9 @@ export type Store = {
    */
   kartenBlitze: KartenBlitz[];
   clearKartenBlitze: () => void;
+  /** Der eigene Held ist gefallen - die Szene dazu (ui/HeldFall.tsx), bis man sie schliesst. */
+  heldFall: HeldFall | null;
+  schliesseHeldFall: () => void;
   /** Die frische Kunde aus dem Land, bis man sie wegklickt (core/kunde.ts). */
   kunde: Bericht | null;
   schliesseKunde: () => void;
@@ -287,6 +293,7 @@ function vervollstaendige(msg: ServerMsg): void {
       p.schmiede ??= 0;
       p.heldXp ??= 0;
       p.eigenschaften ??= [];
+      p.narben ??= 0;
       p.eigenschaftAngebot ??= null;
       p.begegnung ??= null;
     }
@@ -674,13 +681,8 @@ function meldungenAus(
     } else if (e.t === 'heroFell') {
       if (e.player === you) {
         playRaid();
-        const lim = state?.rundenLimit;
-        meldung(
-          lim != null && roundOf(e.zurueck) > lim
-            ? 'Dein Held faellt - in dieser Partie kehrt er nicht zurueck'
-            : `Dein Held faellt - er kehrt in Runde ${roundOf(e.zurueck)} zurueck`,
-          'raid',
-        );
+        // Fuer den Helden selbst zeigt HeldFallSzene die Szene - keine zweite Meldung.
+        if (e.zweig) meldung(`Dein Ernannter faellt - er kehrt in Runde ${e.zurueck} zurueck`, 'raid');
       }
     } else if (e.t === 'pact') {
       if (e.player === you) {
@@ -887,6 +889,8 @@ export const useStore = create<Store>((set, get) => ({
   pfeile: [],
   treffer: [],
   kartenBlitze: [],
+  heldFall: null,
+  schliesseHeldFall: () => set({ heldFall: null }),
   kunde: null,
   schliesseKunde: () => set({ kunde: null }),
 
@@ -1108,6 +1112,20 @@ export const useStore = create<Store>((set, get) => ({
               e.t === 'kartenLohn' && e.player === get().you ? [{ id: naechsteId++, card: e.card, text: lohnKurz(e) }] : [],
             );
             if (blitze.length > 0) set((s) => ({ kartenBlitze: [...s.kartenBlitze, ...blitze].slice(-12) }));
+            const fall = msg.events.find((e: GameEvent) => e.t === 'heroFell' && e.player === get().you && !e.zweig);
+            if (fall && fall.t === 'heroFell') {
+              const ich = get().state?.players.find((p) => p.id === get().you);
+              const verloren = msg.events.find((e: GameEvent) => e.t === 'relikteVerloren' && e.player === get().you);
+              set({
+                heldFall: {
+                  lore: ich?.held ?? null,
+                  zurueck: fall.zurueck,
+                  narben: ich?.narben ?? 1,
+                  relikteVerloren: verloren && verloren.t === 'relikteVerloren' ? verloren.anzahl : 0,
+                  xp: ich?.heldXp ?? 0,
+                },
+              });
+            }
             set((s) => ({
               log: buendeln(
                 s.log,

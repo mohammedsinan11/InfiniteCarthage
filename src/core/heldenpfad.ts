@@ -30,7 +30,7 @@ import type { PlayerId } from './state';
 export type Probe = 'mut' | 'geschick' | 'klugheit';
 export const PROBE_NAME: Record<Probe, string> = { mut: 'Mut', geschick: 'Geschick', klugheit: 'Klugheit' };
 
-export type PfadArt = 'ruine' | 'lager' | 'ort';
+export type PfadArt = 'ruine' | 'lager' | 'ort' | 'hexe';
 
 export type PfadZiel = {
   q: number;
@@ -91,13 +91,21 @@ export function eigenschaftAngebot(seed: number, stufe: number, spieler: number,
 }
 
 /** Der Bonus des Helden fuer eine Probe: seine Stufe plus passende Eigenschaft. */
-export function probeBonus(heldStufe: number, eigenschaften: readonly string[], art: Probe): number {
-  return heldStufe + (eigenschaften.some((id) => eigenschaftById(id)?.probe === art) ? 2 : 0);
+export function probeBonus(heldStufe: number, eigenschaften: readonly string[], art: Probe, narben = 0): number {
+  return (
+    heldStufe +
+    (eigenschaften.some((id) => eigenschaftById(id)?.probe === art) ? 2 : 0) +
+    // Wer schon gefallen ist, fuerchtet weniger (Narben, C11).
+    (art === 'mut' ? Math.min(NARBEN_MAX, narben) : 0)
+  );
 }
 
-/** Zusaetzliche Leben aus Eigenschaften. */
-export const lebenBonus = (eigenschaften: readonly string[] | undefined): number =>
-  (eigenschaften ?? []).reduce((n, id) => n + (eigenschaftById(id)?.leben ?? 0), 0);
+/** So viele Narben zaehlen hoechstens - fuer Leben und Mut. */
+export const NARBEN_MAX = 2;
+
+/** Zusaetzliche Leben aus Eigenschaften, abzueglich der Narben. */
+export const lebenBonus = (eigenschaften: readonly string[] | undefined, narben = 0): number =>
+  (eigenschaften ?? []).reduce((n, id) => n + (eigenschaftById(id)?.leben ?? 0), 0) - Math.min(NARBEN_MAX, narben);
 
 // --- Relikte -----------------------------------------------------------------
 
@@ -224,6 +232,85 @@ export const BEGEGNUNGEN: readonly Ereignis[] = [
       { text: 'Rasten und die Wunden pflegen', folge: { heilen: 3, xp: 1 } },
     ],
   },
+  {
+    id: 'b_hexe',
+    titel: 'Das Hexenhaus',
+    text: 'Rauch steigt aus einem schiefen Schornstein. Die Hexe sitzt vor der Tuer und schaelt Wurzeln. "Ich habe dich kommen sehen", sagt sie, ohne aufzublicken. "Was willst du - kaufen, wissen oder sterben?"',
+    wahlen: [
+      { text: 'Um einen Trank feilschen (2 Wolle, 1 Getreide)', folge: { zahle: { wool: 2, grain: 1 }, relikt: 'zufall', heilen: 3 } },
+      { text: 'Um eine Weissagung bitten', folge: {}, probe: { art: 'klugheit', ziel: 9, gelingt: { beute: 1, xp: 2 }, misslingt: { wunde: 2, xp: 1 } } },
+      { text: 'Sie herausfordern', folge: {}, probe: { art: 'mut', ziel: 11, gelingt: { relikt: 'zufall', ruhm: 3, xp: 3 }, misslingt: { wunde: 4 } } },
+      { text: 'Hoeflich gruessen und gehen', folge: {} },
+    ],
+  },
+  {
+    id: 'b_turnier',
+    titel: 'Das Turnier am Fluss',
+    text: 'Bunte Zelte, Wimpel, Gelaechter. Ein Landjunker haelt ein Turnier ab, und der Herold ruft: "Wer wagt es gegen den Schwarzen Ritter?"',
+    wahlen: [
+      { text: 'Die Lanze nehmen', folge: {}, probe: { art: 'mut', ziel: 9, gelingt: { ruhm: 3, xp: 2 }, misslingt: { wunde: 2, ruhm: 1 } } },
+      { text: 'Auf den Sieger wetten (2 Wolle)', folge: { zahle: { wool: 2 } }, probe: { art: 'klugheit', ziel: 7, gelingt: { zufall: 5 }, misslingt: {} } },
+      { text: 'Nur zuschauen und Geschichten sammeln', folge: { xp: 1 } },
+    ],
+  },
+  {
+    id: 'b_irrlichter',
+    titel: 'Die Irrlichter',
+    text: 'Im Moor tanzen blaue Lichter. Wer ihnen folgt, sagen die Alten, findet Gold - oder kommt nie zurueck.',
+    wahlen: [
+      { text: 'Den Lichtern folgen', folge: {}, probe: { art: 'klugheit', ziel: 8, gelingt: { relikt: 'zufall', xp: 2 }, misslingt: { wunde: 2, verliere: 1 } } },
+      { text: 'Einen Stein in die Mitte werfen', folge: {}, probe: { art: 'geschick', ziel: 7, gelingt: { zufall: 3, xp: 1 }, misslingt: { xp: 1 } } },
+      { text: 'Weiterziehen, ohne hinzusehen', folge: {} },
+    ],
+  },
+  {
+    id: 'b_wegelagerer',
+    titel: 'Die Wegelagerer',
+    text: 'Ein Baumstamm liegt quer ueber dem Weg. Dahinter grinsen sechs Gestalten. "Wegzoll", sagt der Groesste. "Oder dein Pferd."',
+    wahlen: [
+      { text: 'Zahlen (2 Getreide)', folge: { zahle: { grain: 2 }, xp: 1 } },
+      { text: 'Zum Schwert greifen', folge: {}, probe: { art: 'mut', ziel: 8, gelingt: { zufall: 4, ruhm: 1, xp: 2 }, misslingt: { wunde: 3, verliere: 2 } } },
+      { text: 'Sie in ein Gespraech verwickeln', folge: {}, probe: { art: 'klugheit', ziel: 8, gelingt: { ritter: 1, xp: 2 }, misslingt: { verliere: 2 } } },
+    ],
+  },
+  {
+    id: 'b_drachenknochen',
+    titel: 'Die Drachenknochen',
+    text: 'Rippen, hoch wie Kirchtuerme, ragen aus dem Hang. Zwischen ihnen glitzert etwas - und der Boden darunter ist hohl.',
+    wahlen: [
+      { text: 'Hinabsteigen', folge: {}, probe: { art: 'geschick', ziel: 9, gelingt: { relikt: 'zufall', gib: { ore: 2 }, xp: 2 }, misslingt: { wunde: 3 } } },
+      { text: 'Einen Zahn herausbrechen: +1 Ruhm', folge: { ruhm: 1, xp: 1 } },
+    ],
+  },
+  {
+    id: 'b_sternwarte',
+    titel: 'Die verfallene Sternwarte',
+    text: 'Ein Turm ohne Dach, darin Messingringe und Tafeln voller Zahlen. Wer sie liest, versteht, wie die Welt sich dreht.',
+    wahlen: [
+      { text: 'Die Tafeln studieren', folge: {}, probe: { art: 'klugheit', ziel: 8, gelingt: { schmiede: 1, xp: 2 }, misslingt: { xp: 1 } } },
+      { text: 'Das Messing mitnehmen: 3 Erz', folge: { gib: { ore: 3 } } },
+    ],
+  },
+  {
+    id: 'b_gefangener',
+    titel: 'Der Gefangene im Kaefig',
+    text: 'An einer Eiche haengt ein Kaefig. Darin ein Ritter in zerschlissenem Wappenrock. "Holt mich hier raus, und ich diene Euch!"',
+    wahlen: [
+      { text: 'Das Schloss knacken', folge: {}, probe: { art: 'geschick', ziel: 8, gelingt: { ritter: 1, xp: 2 }, misslingt: { wunde: 1, xp: 1 } } },
+      { text: 'Die Kette mit Gewalt sprengen', folge: {}, probe: { art: 'mut', ziel: 7, gelingt: { ritter: 1, xp: 1 }, misslingt: { wunde: 2 } } },
+      { text: 'Ihn haengen lassen', folge: {} },
+    ],
+  },
+  {
+    id: 'b_erntefest',
+    titel: 'Das Erntefest',
+    text: 'Ein Dorf feiert. Man laedt den Helden ein, zu bleiben - Brot, Bier und ein Platz am Feuer.',
+    wahlen: [
+      { text: 'Bleiben und feiern', folge: { heilen: 4, xp: 1 } },
+      { text: 'Beim Ringkampf mitmachen', folge: {}, probe: { art: 'mut', ziel: 7, gelingt: { ruhm: 2, xp: 1, gib: { grain: 2 } }, misslingt: { wunde: 1, xp: 1 } } },
+      { text: 'Den Bauern beim Einbringen helfen: 3 Getreide', folge: { gib: { grain: 3 } } },
+    ],
+  },
 ];
 
 export const begegnungById = (id: string | null | undefined): Ereignis | undefined => BEGEGNUNGEN.find((b) => b.id === id);
@@ -236,6 +323,13 @@ const ORTE: { name: string; begegnung: string; gefahr: 1 | 2 | 3; lohn: string }
   { name: 'Eine verlassene Mine', begegnung: 'b_mine', gefahr: 2, lohn: 'Erz' },
   { name: 'Die Wolfsschlucht', begegnung: 'b_wolfsschlucht', gefahr: 3, lohn: 'Relikt, Ruhm' },
   { name: 'Eine Waldkapelle', begegnung: 'b_kapelle', gefahr: 1, lohn: 'Relikt, Heilung' },
+  { name: 'Ein Turnier', begegnung: 'b_turnier', gefahr: 2, lohn: 'Ruhm, Rohstoffe' },
+  { name: 'Das Moor der Irrlichter', begegnung: 'b_irrlichter', gefahr: 2, lohn: 'Relikt' },
+  { name: 'Ein Hohlweg', begegnung: 'b_wegelagerer', gefahr: 2, lohn: 'Rohstoffe, Ritter' },
+  { name: 'Die Drachenknochen', begegnung: 'b_drachenknochen', gefahr: 3, lohn: 'Relikt, Erz' },
+  { name: 'Eine Sternwarte', begegnung: 'b_sternwarte', gefahr: 1, lohn: 'Schmiedearbeit' },
+  { name: 'Ein Kaefig an der Eiche', begegnung: 'b_gefangener', gefahr: 1, lohn: 'Ritter' },
+  { name: 'Ein Dorffest', begegnung: 'b_erntefest', gefahr: 1, lohn: 'Heilung, Getreide' },
 ];
 
 /**
@@ -250,13 +344,16 @@ export function pfadZiele(
   ruine: { q: number; r: number } | null,
   lager: { q: number; r: number; name: string } | null,
   orte: readonly { q: number; r: number }[],
+  hexe: { q: number; r: number } | null = null,
 ): PfadZiel[] {
   const rng = new Rng(hash3i(seed, turn, spieler, 419));
   const out: PfadZiel[] = [];
   if (ruine) {
     out.push({ ...ruine, art: 'ruine', name: 'Eine Ruine', begegnung: RUINEN_BEGEGNUNG[rng.int(RUINEN_BEGEGNUNG.length)]!, gefahr: 2, lohn: 'Relikt, Kartenwahlen' });
   }
-  if (lager) out.push({ q: lager.q, r: lager.r, art: 'lager', name: `Das Lager: ${lager.name}`, begegnung: 'b_anfuehrer', gefahr: 3, lohn: 'Ruhm, Erfahrung' });
+  // Die Hexe (core/hexe.ts) ist eine Szene, kein Gegner, den man stuermt (Spieltest 10).
+  if (hexe) out.push({ q: hexe.q, r: hexe.r, art: 'hexe', name: 'Das Hexenhaus', begegnung: 'b_hexe', gefahr: 3, lohn: 'Trank, Weissagung, Relikt' });
+  if (lager && out.length < 3) out.push({ q: lager.q, r: lager.r, art: 'lager', name: `Das Lager: ${lager.name}`, begegnung: 'b_anfuehrer', gefahr: 3, lohn: 'Ruhm, Erfahrung' });
   const pool = [...ORTE];
   for (const o of orte) {
     if (out.length >= 3 || pool.length === 0) break;

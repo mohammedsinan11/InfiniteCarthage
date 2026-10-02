@@ -47,7 +47,7 @@ export function EreignisTafel({
               const grund = wahlHindernis(state, offen.player, w.folge, w.brauchtHeld ?? false);
               // Eine Probe zeigt, wie gut die Chancen stehen (core/heldenpfad.ts).
               const p = state.players.find((x) => x.id === offen.player);
-              const bonus = w.probe ? probeBonus(heldStufeVon(p?.heldXp ?? 0), p?.eigenschaften ?? [], w.probe.art) : 0;
+              const bonus = w.probe ? probeBonus(heldStufeVon(p?.heldXp ?? 0), p?.eigenschaften ?? [], w.probe.art, p?.narben ?? 0) : 0;
               const chance = w.probe ? chanceMit(w.probe.ziel - bonus) : 0;
               return (
                 <button key={i} disabled={grund !== null} title={grund ?? undefined} onClick={() => onWahl(i)}>
