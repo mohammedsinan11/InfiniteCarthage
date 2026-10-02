@@ -3,6 +3,7 @@
  * der Server schickt Ereignisse, keine Saetze.
  */
 
+import { eigenschaftById } from '../core/heldenpfad';
 import { bossById } from '../core/akte';
 import { genitiv } from '../core/factions';
 import { sippenBonusById } from '../core/cards/sippen';
@@ -415,6 +416,20 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
       return `${who(state, e.player)} zieht das Angebot zurueck.`;
     case 'glory':
       return `${who(state, e.player)} gewinnt ${e.amount} Ruhm.`;
+    case 'pfadAngebot':
+      return `${who(state, e.player)}: der Held hat ${e.anzahl} Ziele zur Wahl.`;
+    case 'pfadAufbruch':
+      return `${who(state, e.player)}: der Held bricht auf - ${e.name}.`;
+    case 'pfadAnkunft':
+      return `${who(state, e.player)}: der Held erreicht ${e.name}.`;
+    case 'heldStufe':
+      return `${who(state, e.player)}: der Held erreicht Stufe ${e.stufe}.`;
+    case 'eigenschaft':
+      return `${who(state, e.player)}: der Held ist jetzt ${eigenschaftById(e.id)?.name ?? e.id}.`;
+    case 'relikt':
+      return `${who(state, e.player)}: der Held findet ${cardById(e.id)?.name ?? 'ein Relikt'}.`;
+    case 'relikteVerloren':
+      return `${who(state, e.player)}: mit dem Helden gehen ${e.anzahl === 1 ? 'ein Relikt' : `${e.anzahl} Relikte`} verloren.`;
     case 'wahlGedeckelt':
       return `${who(state, e.player)}: keine Kartenwahl mehr in diesem Zug - die naechste Stadt bringt wieder eine.`;
     case 'geschmiedet':

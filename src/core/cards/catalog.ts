@@ -27,6 +27,7 @@
 import type { Card } from './types';
 import { SIPPEN_BONI } from './sippen';
 import { basisKennung, istPlus, verbessert } from './plus';
+import { RELIKTE } from '../heldenpfad';
 
 export const CARDS: readonly Card[] = [
   // --- gewoehnlich: Wert 3 bis 6 --------------------------------------------
@@ -779,6 +780,7 @@ const BY_ID = new Map(CARDS.map((c) => [c.id, c]));
 const SIPPEN_BY_ID = new Map<string, Card>(SIPPEN_BONI.map((c) => [c.id, c]));
 
 const PLUS_BY_ID = new Map<string, Card>();
+const RELIKT_BY_ID = new Map<string, Card>(RELIKTE.map((c) => [c.id, c]));
 
 export function cardById(id: string): Card | undefined {
   // Verbesserte Karten (cards/plus.ts) heissen "kennung+" und entstehen bei Bedarf.
@@ -794,5 +796,6 @@ export function cardById(id: string): Card | undefined {
   }
   // Die Sippenstufen (cards/sippen.ts) sind unsichtbare Karten - nicht im
   // Katalog, also nie im Angebot, aber fuer modifiersOf lesbar.
-  return BY_ID.get(id) ?? SIPPEN_BY_ID.get(id);
+  // Relikte des Helden (core/heldenpfad.ts) - nie im Angebot, aber lesbar.
+  return BY_ID.get(id) ?? SIPPEN_BY_ID.get(id) ?? RELIKT_BY_ID.get(id);
 }

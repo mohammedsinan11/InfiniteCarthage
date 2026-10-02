@@ -162,7 +162,7 @@ export function stufeFuer(siege: number): number {
 }
 
 /** Was eine Einheit von Haus aus kann - beim ernannten Helden sein Zweig. */
-type Traeger = Pick<UnitState, 'kind'> & { zweig?: HeldZweig; stufe?: number };
+type Traeger = Pick<UnitState, 'kind'> & { zweig?: HeldZweig; stufe?: number; extraLeben?: number };
 
 const grundwerte = (u: Traeger) => (u.zweig ? ZWEIG_WERTE[u.zweig] : WERTE[u.kind]);
 
@@ -182,7 +182,8 @@ export function angriffVon(u: Traeger): number {
  * (rules/army.ts, Erholung).
  */
 export function maxLeben(u: Traeger): number {
-  return grundwerte(u).leben + STUFE_LEBEN * (u.stufe ?? 0);
+  // extraLeben: Eigenschaften des Helden (core/heldenpfad.ts, Zaeh).
+  return grundwerte(u).leben + STUFE_LEBEN * (u.stufe ?? 0) + (u.extraLeben ?? 0);
 }
 
 /** Was die Deckungsregel vom Zustand braucht. */

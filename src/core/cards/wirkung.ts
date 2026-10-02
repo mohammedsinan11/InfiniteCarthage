@@ -32,6 +32,8 @@ export type KartenSpieler = {
   zaehler?: Record<string, number>;
   /** Verbesserte Karten - sie wirken als "kennung+" (cards/plus.ts). */
   plus?: readonly string[];
+  /** Ausruestung und Relikte des Helden - sie wirken ohne Platz (core/heldenpfad.ts). */
+  equipment?: readonly string[];
   ruhm?: number;
   /** Server: die Hand. */
   hand?: Partial<Record<Resource, number>>;
@@ -48,8 +50,8 @@ export type PunkteSicht = {
 };
 
 /** Eigene Karten, die wirken koennen: aktive und die Krone. */
-export const eigeneWirkKarten = (p: Pick<KartenSpieler, 'activeCards' | 'krone' | 'plus'>): string[] => {
-  const ids = p.krone ? [...p.activeCards, p.krone] : [...p.activeCards];
+export const eigeneWirkKarten = (p: Pick<KartenSpieler, 'activeCards' | 'krone' | 'plus' | 'equipment'>): string[] => {
+  const ids = [...p.activeCards, ...(p.krone ? [p.krone] : []), ...(p.equipment ?? [])];
   // Verbesserte Karten wirken in ihrer Plus-Fassung (cards/plus.ts).
   return p.plus && p.plus.length > 0 ? ids.map((id) => (p.plus!.includes(id) ? id + PLUS : id)) : ids;
 };
@@ -72,7 +74,7 @@ export function sippenRegeln(ids: readonly string[]): SippenRegeln {
 }
 
 /** Aktive Karten, Krone und erreichte Sippenstufen - das, was modifiersOf rechnen soll. */
-export function wirksameKarten(p: Pick<KartenSpieler, 'activeCards' | 'krone' | 'sippe' | 'sippeSeit' | 'plus'>): string[] {
+export function wirksameKarten(p: Pick<KartenSpieler, 'activeCards' | 'krone' | 'sippe' | 'sippeSeit' | 'plus' | 'equipment'>): string[] {
   const eigene = eigeneWirkKarten(p);
   return wirksameKartenRoh({ ...p, activeCards: eigene, krone: null }, sippenRegeln(eigene));
 }

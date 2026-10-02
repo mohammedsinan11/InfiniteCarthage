@@ -7,6 +7,9 @@
  * der Server, ohne dass ein einziges Gelaendefeld uebertragen wird.
  */
 
+import { cardById } from '../../core/cards/catalog';
+import { PROBE_NAME } from '../../core/heldenpfad';
+import type { Probe } from '../../core/heldenpfad';
 import { WAHLEN_JE_ZUG } from '../../core/rules/reducer';
 import { bossById } from '../../core/akte';
 import { sippenBonusById } from '../../core/cards/sippen';
@@ -252,12 +255,17 @@ function vervollstaendige(msg: ServerMsg): void {
     msg.state.akte ??= null;
     msg.state.systeme ??= null;
     msg.state.gesperrt ??= [];
+    msg.state.pfade ??= {};
     for (const p of msg.state.players) {
       p.trophaeen ??= 0;
       p.zaehler ??= {};
       p.krone ??= null;
       p.plus ??= [];
       p.schmiede ??= 0;
+      p.heldXp ??= 0;
+      p.eigenschaften ??= [];
+      p.eigenschaftAngebot ??= null;
+      p.begegnung ??= null;
     }
     msg.state.koop ??= false;
     msg.state.szenario ??= null;
@@ -440,6 +448,28 @@ function meldungenAus(
     }
     if (e.t === 'bossNaht' && e.player === you) {
       meldung(`${bossById(e.boss)?.name ?? 'Der Boss'}: sein Heer bricht auf (${e.anzahl} Kaempfer)`, 'raid');
+      continue;
+    }
+    // Der Heldenpfad: Proben, Aufstieg, Relikte (core/heldenpfad.ts).
+    if (e.t === 'eventResolved' && e.probe && e.player === you) {
+      const p = e.probe;
+      meldung(`Probe ${PROBE_NAME[p.art as Probe] ?? p.art}: ${p.wurf} + ${p.bonus} = ${p.wurf + p.bonus} gegen ${p.ziel} - ${p.gelungen ? 'gelungen!' : 'misslungen'}`, p.gelungen ? 'gain' : 'raid');
+      continue;
+    }
+    if (e.t === 'heldStufe' && e.player === you) {
+      meldung(`Dein Held erreicht Stufe ${e.stufe} - waehle eine Eigenschaft`, 'gain');
+      continue;
+    }
+    if (e.t === 'relikt' && e.player === you) {
+      meldung(`Relikt gefunden: ${cardById(e.id)?.name ?? e.id}`, 'gain');
+      continue;
+    }
+    if (e.t === 'relikteVerloren' && e.player === you) {
+      meldung(`Mit dem Helden ${e.anzahl === 1 ? 'ging ein Relikt' : `gingen ${e.anzahl} Relikte`} verloren`, 'raid');
+      continue;
+    }
+    if (e.t === 'pfadAnkunft' && e.player === you) {
+      meldung(`Dein Held erreicht ${e.name} - beim naechsten Wurf wartet die Begegnung`, 'info');
       continue;
     }
     if (e.t === 'wahlGedeckelt' && e.player === you) {

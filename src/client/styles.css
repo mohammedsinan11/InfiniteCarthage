@@ -6998,3 +6998,102 @@ em.off {
   min-height: 3em;
   box-sizing: border-box;
 }
+
+/* --- Heldenpfad (ui/HeldenpfadTafel.tsx, core/heldenpfad.ts). PLATZHALTER (ASSETS.md) --- */
+.pfad-tafel {
+  position: absolute;
+  top: var(--heerleiste-oben, 52px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 11;
+  width: min(380px, calc(100% - 24px));
+  padding: 10px 12px 12px;
+  background: rgba(23, 18, 12, 0.97);
+  border: 2px solid #5aa05a;
+  box-shadow: 0 0 0 2px var(--bg), 0 8px 24px rgba(0, 0, 0, 0.5);
+  font-size: 13px;
+}
+.pfad-tafel h3 {
+  margin: 4px 0 8px;
+  font-family: var(--pixel);
+  font-size: 12px;
+}
+.pfad-liste {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.pfad-liste li {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-left: 3px solid #5aa05a;
+  background: var(--panel2);
+}
+.pfad-liste li.pfad-lager {
+  border-left-color: var(--danger);
+}
+.pfad-liste li.pfad-ruine {
+  border-left-color: var(--accent);
+}
+.pfad-kopf {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.pfad-lohn {
+  color: var(--muted);
+  font-size: 12px;
+}
+.pfad-knoepfe {
+  display: flex;
+  gap: 6px;
+}
+.pfad-gefahr {
+  display: inline-flex;
+  gap: 2px;
+}
+.pfad-gefahr i {
+  width: 8px;
+  height: 8px;
+  background: var(--line);
+}
+.pfad-gefahr i.an {
+  background: var(--danger);
+}
+.pfad-chip {
+  position: absolute;
+  top: calc(var(--heerleiste-oben, 52px) + 30px);
+  left: 10px;
+  z-index: 8;
+  font-family: var(--pixel);
+  font-size: 10px;
+  padding: 5px 8px;
+  border: 2px solid #5aa05a;
+  background: rgba(23, 18, 12, 0.9);
+  color: #9fdc9f;
+}
+.ereignis-probe {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: #9ad0ff;
+}
+.held-zeile {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+}
+.held-eigenschaften {
+  color: var(--muted);
+}
+.eigenschaft-wahl b {
+  font-family: var(--pixel);
+  font-size: 10px;
+  margin-right: 6px;
+}

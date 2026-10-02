@@ -14,6 +14,7 @@
  * wer spielt, liest sie einmal, danach nehmen sie nur Platz.
  */
 
+import { HeldZeile } from './HeldenpfadTafel';
 import { SippenLeiste } from './SippenLeiste';
 import type { SippenZaehler } from '../../core/cards/sippen';
 import { useEffect, useState } from 'react';
@@ -247,7 +248,12 @@ export function SideMenu({
   plus = [],
   schmiede = 0,
   onSchmieden,
+  heldXp = 0,
+  eigenschaften = [],
 }: {
+  /** Erfahrung und Eigenschaften des Helden (core/heldenpfad.ts). */
+  heldXp?: number;
+  eigenschaften?: readonly string[];
   /** Verbesserte Karten (cards/plus.ts). */
   plus?: readonly string[];
   /** Offene Schmiedearbeiten (rules/schmiede.ts). */
@@ -723,6 +729,9 @@ export function SideMenu({
 
         {reiter === 'reich' && mitHeld && (
           <>
+            {/* Der Held (core/heldenpfad.ts): Stufe, Erfahrung, Eigenschaften. Relikte stehen bei der Ausruestung. */}
+            <Kopf titel="Dein Held" hilfe="Pfade und Begegnungen bringen Erfahrung. Jede Stufe: eine Eigenschaft nach Wahl. Relikte wirken wie Reichskarten ohne Platz - faellt der Held, bleibt nur eines." />
+            <HeldZeile xp={heldXp} eigenschaften={eigenschaften} />
             {/* Auftraege der Wanderer (rules/auftraege.ts). */}
             <Kopf titel="Auftraege" hilfe="Wanderer bieten Auftraege an, wenn sie an deinen Siedlungen vorbeikommen. Lohn: eine Kartenwahl." />
             {auftraege.length === 0 ? (

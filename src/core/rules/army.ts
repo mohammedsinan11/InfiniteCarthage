@@ -59,6 +59,9 @@ import { strassenFelder } from '../handelswege';
 import type { KarawanenEvent } from '../karawane';
 import { szenarioById } from '../szenario';
 import { hatSystem } from '../systeme';
+import { lebenBonus } from '../heldenpfad';
+import { relikteBeiFall } from './pfad';
+import type { PfadEvent } from './pfad';
 import { wirkungenVon } from '../cards/wirkung';
 import { Rng } from '../rng';
 import { hexDistance, hexKey, hexVertices, hexesInRange, neighbors, parseVertexKey, vertexAdjacentHexes, vertexKey } from '../coords';
@@ -230,6 +233,7 @@ export type Verlust = { seite: Seite; kind: UnitKind | 'besatzung'; anzahl: numb
 
 export type ArmyEvent =
   | KarawanenEvent
+  | PfadEvent
   /** Ein Ritter oder Bogenschuetze tritt an (kind fehlt bei alten Staenden: Ritter). */
   | { t: 'knightReady'; player: PlayerId; unit: number; q: number; r: number; kind?: 'ritter' | 'bogen' }
   | {
@@ -470,6 +474,12 @@ export function spawnHeld(s: GameState, id: PlayerId, events: Ereignisse): UnitS
   const zurueck = p?.heldZurueck !== null && p?.heldZurueck !== undefined;
   if (p) benenneHeld(s, p);
   const unit = aufstellen(s, einheitVorlage('held', feldAn.q, feldAn.r, { owner: id }));
+  // Eigenschaften des Helden (core/heldenpfad.ts): Zaeh gibt mehr Leben.
+  const extra = lebenBonus(p?.eigenschaften);
+  if (extra > 0) {
+    unit.extraLeben = extra;
+    unit.leben = maxLeben(unit);
+  }
   if (p) p.heldZurueck = null;
   events.push({ t: 'heroReady', player: id, unit: unit.id, q: unit.q, r: unit.r, zurueck });
   return unit;
@@ -588,7 +598,11 @@ function heldFaellt(s: GameState, u: UnitState, events: Ereignisse): void {
   // den anderen vom Feld (rules/zweig.ts).
   if (p) {
     if (u.zweig && p.ernannt) p.ernannt.zurueck = zurueck;
-    else p.heldZurueck = zurueck;
+    else {
+      p.heldZurueck = zurueck;
+      // Ein Fall zaehlt (C11): die Relikte bis auf eines gehen verloren.
+      relikteBeiFall(p, events);
+    }
   }
   for (const x of s.units) if (x.folgt === u.id) x.folgt = null;
   events.push({ t: 'heroFell', player: u.owner, q: u.q, r: u.r, zurueck, zweig: u.zweig });

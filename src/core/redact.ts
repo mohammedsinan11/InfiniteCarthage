@@ -12,6 +12,7 @@
  *   fremde Haende und Karten - nur die Anzahl geht raus
  */
 
+import type { PfadStand } from './heldenpfad';
 import type { AkteStand } from './akte';
 import type { SystemId } from './systeme';
 import { emptyHand, handSize, publicPoints } from './state';
@@ -60,6 +61,11 @@ export type PublicPlayer = {
   plus: string[];
   /** Offene Schmiedearbeiten. */
   schmiede: number;
+  /** Der Heldenpfad (core/heldenpfad.ts): Erfahrung, Eigenschaften, offene Wahl und Begegnung. */
+  heldXp: number;
+  eigenschaften: string[];
+  eigenschaftAngebot: string[] | null;
+  begegnung: string | null;
   /** Wann der gefallene Held zurueckkehrt, oder null - oeffentlich wie sein Fall. */
   heldZurueck: number | null;
   /** Frist bis zum Untergang (Zugnummer) oder null - oeffentlich: alle sehen, wer wankt. */
@@ -119,6 +125,8 @@ export type PublicState = {
   systeme: SystemId[] | null;
   /** Noch gesperrte Karten (core/freischalt.ts). */
   gesperrt: string[];
+  /** Pfade der Helden (core/heldenpfad.ts). */
+  pfade: Record<PlayerId, PfadStand>;
   /** Offene, bis zur naechsten Heeresrunde vorbereitete Taktiken. */
   tacticBuffs: GameState['tacticBuffs'];
   /** Die offene Kartenwahl - fuer alle sichtbar, gewaehlt wird vom Spieler am Zug. */
@@ -215,6 +223,10 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
       krone: p.krone ?? null,
       plus: [...(p.plus ?? [])],
       schmiede: p.schmiede ?? 0,
+      heldXp: p.heldXp ?? 0,
+      eigenschaften: [...(p.eigenschaften ?? [])],
+      eigenschaftAngebot: p.eigenschaftAngebot ?? null,
+      begegnung: p.begegnung ?? null,
       heldZurueck: p.heldZurueck,
       untergang: p.untergang ?? null,
       besiegt: p.besiegt ?? false,
@@ -267,6 +279,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
     akte: state.akte ?? null,
     systeme: state.systeme ?? null,
     gesperrt: state.gesperrt ?? [],
+    pfade: state.pfade ?? {},
     tacticBuffs: state.tacticBuffs,
     draft: state.draft,
     trade: state.trade,

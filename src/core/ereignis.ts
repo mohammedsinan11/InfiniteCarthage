@@ -16,6 +16,8 @@
  * nach Jahreszeit; schon gesehene kommen erst wieder, wenn alle durch sind.
  */
 
+import { begegnungById } from './heldenpfad';
+import type { Probe } from './heldenpfad';
 import { Rng } from './rng';
 import { hash3i } from './hash';
 import type { Bundle, Resource } from './types';
@@ -37,6 +39,14 @@ export type Folge = {
   ritter?: number;
   /** Schmiedearbeiten: eine Karte verbessern oder verbrennen (rules/schmiede.ts). */
   schmiede?: number;
+  /** Ein Relikt fuer den Helden (core/heldenpfad.ts) - eine Kennung oder 'zufall'. */
+  relikt?: string;
+  /** Erfahrung fuer den Helden. */
+  xp?: number;
+  /** So viele Leben verliert der Held - nie mehr als bis auf eines. */
+  wunde?: number;
+  /** So viele Leben gewinnt der Held. */
+  heilen?: number;
 };
 
 export type Wahl = {
@@ -44,6 +54,11 @@ export type Wahl = {
   folge: Folge;
   /** Nur mit Held auf der Karte waehlbar. */
   brauchtHeld?: boolean;
+  /**
+   * Eine Probe (core/heldenpfad.ts): zwei Wuerfel plus Bonus des Helden gegen
+   * ziel. Gelingt sie, gilt gelingt, sonst misslingt - zusaetzlich zu folge.
+   */
+  probe?: { art: Probe; ziel: number; gelingt: Folge; misslingt: Folge };
 };
 
 export type Ereignis = {
@@ -311,7 +326,8 @@ export const EREIGNISSE: readonly Ereignis[] = [
 ];
 
 const NACH_ID = new Map(EREIGNISSE.map((e) => [e.id, e]));
-export const ereignisById = (id: string): Ereignis | undefined => NACH_ID.get(id);
+// Auch die Begegnungen des Heldenpfads (core/heldenpfad.ts) laufen als Ereignis.
+export const ereignisById = (id: string): Ereignis | undefined => NACH_ID.get(id) ?? begegnungById(id);
 
 /** Ab dem wievielten eigenen Zug, und in welchem Abstand, ein Ereignis kommt. */
 export const EREIGNIS_AB = 4;

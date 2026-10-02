@@ -248,6 +248,8 @@ export type AusbauTafel = {
 /** Eine Krone ueber einem fast oder ganz geschlossenen Feld (rules/hauptstadt.ts). */
 export type Krone = { q: number; r: number; bereit: boolean; titel: string };
 
+const KEINE_PFADMARKEN: { q: number; r: number; titel: string; art: 'ziel' | 'angebot' }[] = [];
+
 type Props = {
   world: World;
   state: PublicState;
@@ -295,6 +297,8 @@ type Props = {
   kronen?: Krone[];
   /** Klick auf eine Krone. */
   onKrone?: (q: number, r: number) => void;
+  /** Ziele des Heldenpfads (core/heldenpfad.ts): angeboten oder aktiv. */
+  pfadMarken?: { q: number; r: number; titel: string; art: 'ziel' | 'angebot' }[];
   /** Ein Raubzug zieht auf dieses Feld: rotes Banner darueber (statt eines Kastens). */
   raubMarke?: { q: number; r: number; titel: string } | null;
   /** Klick auf das Banner - oeffnet die Gegenmittel. */
@@ -451,6 +455,7 @@ export function Board({
   onKrone,
   raubMarke = null,
   onRaubMarke,
+  pfadMarken = KEINE_PFADMARKEN,
   onGebaeude,
   onHauptstadtKlick,
   onLeer,
@@ -3088,6 +3093,21 @@ export function Board({
                     }
                   : undefined
               }
+            />
+          );
+        })}
+
+        {/* Heldenpfad (core/heldenpfad.ts): das Ziel des Helden, und was zur Wahl steht. */}
+        {pfadMarken.map((m, i) => {
+          const c = hexToPixel(m.q, m.r, LAYOUT);
+          return (
+            <AuftragsZeichen
+              key={'pfad' + i}
+              x={c.x}
+              y={c.y - liftHex(m.q, m.r) - LAYOUT.h * 0.5}
+              k={SCALE}
+              art={m.art}
+              titel={m.titel}
             />
           );
         })}

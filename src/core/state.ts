@@ -23,6 +23,7 @@ import type { Wunder } from './wunder';
 import { aktPunkte } from './akte';
 import type { AkteStand } from './akte';
 import type { SystemId } from './systeme';
+import type { PfadStand } from './heldenpfad';
 
 export type PlayerId = string;
 
@@ -145,6 +146,14 @@ export type Player = {
   plus?: string[];
   /** Offene Schmiedearbeiten: je eine Karte verbessern oder verbrennen (rules/schmiede.ts). */
   schmiede?: number;
+  /** Erfahrung des Helden (core/heldenpfad.ts) - bleibt ueber seinen Fall hinaus. Oeffentlich. */
+  heldXp?: number;
+  /** Gewaehlte Eigenschaften des Helden. */
+  eigenschaften?: string[];
+  /** Eine Stufe ist erreicht: diese Eigenschaften stehen zur Wahl. */
+  eigenschaftAngebot?: string[] | null;
+  /** Der Held ist angekommen - diese Begegnung kommt beim naechsten eigenen Wurf. */
+  begegnung?: string | null;
 };
 
 /** Die drei Helden, die der Koenigssitz freischaltet - einer davon, fuer immer. */
@@ -273,6 +282,8 @@ export type Auftrag =
 export type UnitState = {
   id: number;
   kind: UnitKind;
+  /** Mehr Leben aus Eigenschaften des Helden (core/heldenpfad.ts). */
+  extraLeben?: number;
   owner: PlayerId | null;
   /** Fraktion bei Raeubern und Goblins (core/factions.ts), sonst null. */
   fraktion: string | null;
@@ -516,6 +527,8 @@ export type GameState = {
   systeme?: SystemId[];
   /** Noch nicht freigeschaltete Karten (core/freischalt.ts) - nie im Angebot. Oeffentlich. */
   gesperrt?: string[];
+  /** Pfade des Helden je Spieler (core/heldenpfad.ts): Angebot und Ziel. Oeffentlich. */
+  pfade?: Record<PlayerId, PfadStand>;
   /** Was in diesem Zug schon zur Wahl stand - kommt moeglichst nicht wieder. Nur serverseitig. */
   angeboteZug?: { turn: number; ids: string[] };
   /** VERALTET: nur fuer die Migration alter Staende. */

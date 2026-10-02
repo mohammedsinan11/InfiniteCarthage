@@ -143,6 +143,7 @@ import { kannBezahlen } from '../../core/rules/kosten';
 import type { Bauwerk } from '../../core/cards/types';
 import { leseProfil } from '../profil';
 import { BossTafel, aktZahl } from '../ui/BossTafel';
+import { EigenschaftWahl, PfadTafel } from '../ui/HeldenpfadTafel';
 import type { BuildMode } from '../ui/Aktionsleiste';
 import { reichArtVon } from '../ui/Aktionsleiste';
 import { REICHSBAU_NAME, REICHSBAU_ZWECK, reichsbauHindernis, reichsgebiet } from '../../core/rules/reich';
@@ -444,6 +445,15 @@ export function Game() {
   const [weggeklickt, setWeggeklickt] = useState<Record<string, number>>({});
   /** Die Tafel des Aktes (core/akte.ts) - oeffnet sich, wenn ein neuer Akt beginnt. */
   const [bossOffen, setBossOffen] = useState(false);
+  /** Der Heldenpfad (core/heldenpfad.ts): die Wahl des Ziels - oeffnet sich bei einem neuen Angebot. */
+  const meinPfad = you ? state.pfade?.[you] : undefined;
+  const [pfadOffen, setPfadOffen] = useState(false);
+  const pfadGesehen = useRef<string>('');
+  useEffect(() => {
+    const k = meinPfad?.angebot ? meinPfad.angebot.map((z) => `${z.q}:${z.r}`).join('|') : '';
+    if (k && k !== pfadGesehen.current) setPfadOffen(true);
+    pfadGesehen.current = k;
+  }, [meinPfad]);
   const meinAkt = you ? state.akte?.stand[you] : undefined;
   const gesehenerAkt = useRef<number | null>(null);
   useEffect(() => {
@@ -1439,6 +1449,8 @@ export function Game() {
           krone={me?.krone ?? null}
           onKrone={(card) => act({ t: 'setKrone', card })}
           plus={me?.plus ?? []}
+          heldXp={me?.heldXp ?? 0}
+          eigenschaften={me?.eigenschaften ?? []}
           schmiede={me?.schmiede ?? 0}
           onSchmieden={(card, art) => act({ t: 'schmieden', card, art })}
           mitHeld={hatSystem(state, 'held')}
@@ -1613,6 +1625,10 @@ export function Game() {
           geisterKante={isMine ? geisterKante : 'strasse'}
           kronen={kronen}
           onKrone={(q, r) => setAusbauOrt({ art: 'feld', key: hexKey(q, r) })}
+          pfadMarken={[
+            ...(meinPfad?.aktiv ? [{ q: meinPfad.aktiv.q, r: meinPfad.aktiv.r, titel: `Ziel deines Helden: ${meinPfad.aktiv.name}`, art: 'ziel' as const }] : []),
+            ...(meinPfad?.angebot ?? []).map((z) => ({ q: z.q, r: z.r, titel: `Zur Wahl: ${z.name} (Gefahr ${z.gefahr})`, art: 'angebot' as const })),
+          ]}
           raubMarke={
             raubWarnung
               ? { q: raubWarnung.u.ziel!.q, r: raubWarnung.u.ziel!.r, titel: `Raubzug von ${fraktionIn(state, raubWarnung.u.fraktion!).name} - antippen fuer Gegenmittel` }
@@ -1870,6 +1886,28 @@ export function Game() {
               Ziel fuer {auswahl.length > 1 ? `${auswahl.length} Einheiten` : heerNamen.get(auswahl[0]!) ?? 'die Einheit'}{' '}
               waehlen · Esc bricht ab
             </div>
+          )}
+
+          {/* Heldenpfad: das Angebot als Tafel, zugeklappt als Knopf links oben. */}
+          {meinPfad?.angebot && pfadOffen && !bossOffen && state.draft === null && phase.t !== 'finished' && (
+            <PfadTafel
+              ziele={meinPfad.angebot}
+              darf={isMine && (phase.t === 'main' || phase.t === 'roll')}
+              onWahl={(i) => {
+                act({ t: 'pfadWaehlen', index: i });
+                setPfadOffen(false);
+              }}
+              onZeigen={(q, r) => zeigeFeld(q, r)}
+              onZu={() => setPfadOffen(false)}
+            />
+          )}
+          {meinPfad?.angebot && !pfadOffen && (
+            <button className="pfad-chip" onClick={() => setPfadOffen(true)} title="Dein Held wartet auf ein Ziel">
+              Heldenpfad ({meinPfad.angebot.length})
+            </button>
+          )}
+          {me?.eigenschaftAngebot && me.eigenschaftAngebot.length > 0 && state.draft === null && (
+            <EigenschaftWahl angebot={me.eigenschaftAngebot} xp={me.heldXp ?? 0} onWahl={(id) => act({ t: 'eigenschaftWaehlen', id })} />
           )}
 
           {/* Heerleiste: je Schar oder Feld ein Kaertchen, dazu "untaetig" (ui/Heerleiste.tsx). */}

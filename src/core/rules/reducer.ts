@@ -118,6 +118,8 @@ import { cardKind, dauerwirkungen, istEinzigartig, wiederholbar } from '../cards
 import { gesperrt } from '../cards/effects';
 import { ausloeserAusEreignissen } from '../cards/ausloeser';
 import { schmieden } from './schmiede';
+import { eigenschaftWaehlen, heldFolge, heldWachsen, pfadAnkunft, pfadRunde, pfadWaehlen, probeWuerfeln } from './pfad';
+import { begegnungById, eigenschaftById } from '../heldenpfad';
 import type { SchmiedeArt, SchmiedeEvent } from './schmiede';
 import type { AusloeserEvent } from '../cards/ausloeser';
 import { bezahle, kannBezahlen } from './kosten';
@@ -222,6 +224,10 @@ export type Action =
   | { t: 'setKrone'; card: string }
   /** Eine Karte verbessern oder verbrennen (rules/schmiede.ts). */
   | { t: 'schmieden'; card: string; art: SchmiedeArt }
+  /** Einen Pfad fuer den Helden waehlen - oder keinen (core/heldenpfad.ts). */
+  | { t: 'pfadWaehlen'; index: number | null }
+  /** Eine Eigenschaft fuer den Helden nach einem Stufenaufstieg. */
+  | { t: 'eigenschaftWaehlen'; id: string }
   /** Tribut an den Boss des Aktes zahlen: so viel von dieser Sorte, wie fehlt (core/akte.ts). */
   | { t: 'bossZahlen'; resource: Resource }
   /** Ein eigenes Feuer mit einer Rohstoffkarte loeschen (rules/feuer.ts). */
@@ -286,7 +292,16 @@ export type GameEvent =
   /** Auf dem Markt bezahlt - danach folgt die Kartenwahl (visitMarket). */
   | { t: 'market'; player: PlayerId; paid: Hand }
   | { t: 'wonderGift'; player: PlayerId; art: WunderArt; ruhm: number; beute: number }
-  | { t: 'eventResolved'; player: PlayerId; id: string; wahl: number; ruhm: number; verloren: number }
+  | {
+      t: 'eventResolved';
+      player: PlayerId;
+      id: string;
+      wahl: number;
+      ruhm: number;
+      verloren: number;
+      /** Eine Probe des Helden (core/heldenpfad.ts). */
+      probe?: { art: string; wurf: number; bonus: number; ziel: number; gelungen: boolean };
+    }
   | { t: 'win'; player: PlayerId }
   /** Heer, Raubzuege, Gefechte, Lager, Ruinen, Held und Feuer - siehe rules/army.ts. */
   | ArmyEvent
@@ -695,6 +710,8 @@ function wendeFolgeAn(s: GameState, p: Player, folge: Folge, events: GameEvent[]
   }
   p.loot += folge.beute ?? 0;
   p.schmiede = (p.schmiede ?? 0) + (folge.schmiede ?? 0);
+  // Relikt, Erfahrung, Wunden, Heilung des Helden (rules/pfad.ts).
+  heldFolge(s, p, folge, events);
   for (let i = 0; i < (folge.ritter ?? 0); i++) spawnKnight(s, p.id, events);
   return verloren;
 }
@@ -908,11 +925,30 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       if (!ereignis || !wahl) return fail('Diese Wahl gibt es nicht.');
       const why = wahlHindernis(s, actor, wahl.folge, wahl.brauchtHeld ?? false);
       if (why) return fail(why);
-      const verloren = wendeFolgeAn(s, actorPlayer, wahl.folge, events);
+      let verloren = wendeFolgeAn(s, actorPlayer, wahl.folge, events);
+      let ruhm = wahl.folge.ruhm ?? 0;
+      // Eine Probe (core/heldenpfad.ts): zwei Wuerfel plus Bonus gegen das Ziel.
+      let probe: { art: string; wurf: number; bonus: number; ziel: number; gelungen: boolean } | undefined;
+      if (wahl.probe) {
+        const r = probeWuerfeln(s, actorPlayer, wahl.probe.art, wahl.probe.ziel);
+        probe = { art: wahl.probe.art, wurf: r.wurf, bonus: r.bonus, ziel: wahl.probe.ziel, gelungen: r.gelungen };
+        const folge = r.gelungen ? wahl.probe.gelingt : wahl.probe.misslingt;
+        verloren += wendeFolgeAn(s, actorPlayer, folge, events);
+        ruhm += folge.ruhm ?? 0;
+        if (r.gelungen) {
+          for (const e of actorPlayer.eigenschaften ?? []) {
+            const je = eigenschaftById(e)?.jeProbe;
+            if (je === 'wahl') actorPlayer.loot += 1;
+            if (je === 'ruhm') ruhm += 1;
+          }
+        }
+      }
+      // Jede Begegnung des Pfades bringt dem Helden Erfahrung.
+      if (begegnungById(ereignis.id)) heldWachsen(s, actorPlayer, 1, events);
       s.ereignisseGesehen = [...(s.ereignisseGesehen ?? []), ereignis.id];
       s.ereignis = null;
       s.phase = { t: 'main' };
-      events.push({ t: 'eventResolved', player: actor, id: ereignis.id, wahl: action.wahl, ruhm: wahl.folge.ruhm ?? 0, verloren });
+      events.push({ t: 'eventResolved', player: actor, id: ereignis.id, wahl: action.wahl, ruhm, verloren, ...(probe ? { probe } : {}) });
       checkWin(s, events);
       break;
     }
@@ -1054,7 +1090,13 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       botAufholen(s, actor, events);
       // Alle paar eigenen Zuege ein Ereignis mit einer Wahl (core/ereignis.ts) -
       // bei einer 7 erst nach der Kartenwahl.
-      if (s.ereignisseAn && hatSystem(s, 'ereignisse') && ereignisFaellig(s.turn, s.order.length)) {
+      // Der Held ist angekommen: seine Begegnung geht jedem Ereignis vor (core/heldenpfad.ts).
+      if (actorPlayer.begegnung && begegnungById(actorPlayer.begegnung)) {
+        s.ereignis = { id: actorPlayer.begegnung, player: actor };
+        actorPlayer.begegnung = null;
+        events.push({ t: 'eventOffered', player: actor, id: s.ereignis.id });
+        if (s.phase.t === 'main') s.phase = { t: 'ereignis' };
+      } else if (s.ereignisseAn && hatSystem(s, 'ereignisse') && ereignisFaellig(s.turn, s.order.length)) {
         const id = waehleEreignis(s.secretSeed, s.turn, seasonOf(s.turn), s.ereignisseGesehen ?? []);
         s.ereignis = { id, player: actor };
         events.push({ t: 'eventOffered', player: actor, id });
@@ -1123,6 +1165,19 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       s.phase = s.ereignis ? { t: 'ereignis' } : { t: 'main' };
       events.push({ t: 'cardTaken', player: actor, card: karte.id });
       checkWin(s, events);
+      break;
+    }
+
+    case 'pfadWaehlen': {
+      if (phase.t !== 'main' && phase.t !== 'roll') return fail('Jetzt bricht niemand auf.');
+      const why = pfadWaehlen(s, actor, action.index, events);
+      if (why) return fail(why);
+      break;
+    }
+
+    case 'eigenschaftWaehlen': {
+      const why = eigenschaftWaehlen(s, actor, action.id, events);
+      if (why) return fail(why);
       break;
     }
 
@@ -1789,6 +1844,8 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         tributRunde(s, events);
         // Vorhaben (core/vorhaben.ts): verfallen lassen, neue anbieten.
         if (hatSystem(s, 'reich')) vorhabenRunde(s, events);
+        // Der Heldenpfad: neue Ziele fuer den Helden (core/heldenpfad.ts).
+        pfadRunde(s, events);
         // Die Siedlungen wachsen (core/bevoelkerung.ts).
         bevoelkerungRunde(s, world, events);
         // Wer eine Sorte gar nicht erzeugt, bekommt sie ab und zu (rules/hilfe.ts).
@@ -1913,6 +1970,9 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       break;
     }
   }
+
+  // Heldenpfad: ist ein Held an seinem Ziel? (core/heldenpfad.ts)
+  if ((s.phase as GameState['phase']).t !== 'finished') pfadAnkunft(s, events);
 
   // Akte: neuer Akt, das Heer des Bosses, frueh bestandene Forderungen (core/akte.ts).
   {
