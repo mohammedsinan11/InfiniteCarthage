@@ -69,7 +69,7 @@ import type { UnitState as HeerEinheit } from '../../core/state';
 import { bundleText, resourceName } from '../log';
 import { eckenWert, istBotId } from '../../core/bot';
 import { weltArtVon } from '../../core/weltart';
-import { einwohnerVon, platzFuer, stadtReif } from '../../core/bevoelkerung';
+import { EINWOHNER_FUER_STADT, einwohnerVon, platzFuer, stadtReif } from '../../core/bevoelkerung';
 import { erstarkt, fraktionIn, stimmungText, stimmungVon } from '../../core/fraktionsleben';
 import { geruechte } from '../geruechte';
 import { holeTagesInfo } from '../net/socket';
@@ -1052,12 +1052,14 @@ export function Game() {
     if (!b || b.owner !== you) return null;
     const feuer = brennt(state, ausbauOrt.key) ? 'Hier brennt es' : undefined;
     const optionen: AusbauTafel['optionen'] = [];
+    const zuKlein = state.ereignisseAn && einwohnerVon(state, ausbauOrt.key) < EINWOHNER_FUER_STADT;
     if (b.type === 'settlement') {
       optionen.push({
         name: 'Stadt',
         kosten: COST_CITY,
-        darf: jetzt && !feuer && bezahlbar(COST_CITY, 'stadt'),
-        hinweis: warum ?? feuer ?? armut(COST_CITY),
+        // Zu wenige Einwohner: sagen statt still scheitern (Spieltest 9).
+        darf: jetzt && !feuer && !zuKlein && bezahlbar(COST_CITY, 'stadt'),
+        hinweis: warum ?? feuer ?? (zuKlein ? `Braucht ${EINWOHNER_FUER_STADT} Einwohner - das Dorf waechst jede grosse Runde` : armut(COST_CITY)),
         wahl: dann(() => {
           act({ t: 'buildCity', vertex: ausbauOrt.key });
           playBuild();
