@@ -114,7 +114,7 @@ import type { SystemId } from '../systeme';
 import { nextStep } from '../units';
 import { bigRoundChangedAt, seasonChangedAt } from '../season';
 import { DRAFT_SIZE, draftOptions } from '../cards/draft';
-import { cardById } from '../cards/catalog';
+import { CARDS, cardById } from '../cards/catalog';
 import { cardKind, dauerwirkungen, istEinzigartig, wiederholbar } from '../cards/types';
 import { gesperrt } from '../cards/effects';
 import { ausloeserAusEreignissen } from '../cards/ausloeser';
@@ -774,7 +774,19 @@ function enterDraft(
   // (Spieltest 7: Fund und Gruendung zeigten dieselben Karten).
   const schon = state.angeboteZug?.turn === state.turn ? state.angeboteZug.ids : [];
   const ohne = schon.length > 0 ? draftOptions(state.secretSeed, runde, source, owned, [...(state.gesperrt ?? []), ...schon]) : [];
-  const options = ohne.length === DRAFT_SIZE && new Set(ohne).size === DRAFT_SIZE ? ohne : draftOptions(state.secretSeed, runde, source, owned, state.gesperrt ?? []);
+  let options = ohne.length === DRAFT_SIZE && new Set(ohne).size === DRAFT_SIZE ? ohne : draftOptions(state.secretSeed, runde, source, owned, state.gesperrt ?? []);
+  /*
+   * Eine Trophaee ohne Krone bietet immer eine Schluesselkarte (Spieltest 9:
+   * in 45 Wahlen ueber 60 Runden kam keine einzige - der Kronplatz blieb leer).
+   */
+  if (source === 'trophaee' && spieler && !spieler.krone && !options.some((id) => cardById(id)?.schluessel)) {
+    const zu = new Set([...(state.gesperrt ?? []), ...owned]);
+    const kronen = CARDS.filter((c) => c.schluessel && !zu.has(c.id));
+    if (kronen.length > 0) {
+      const rng = new Rng(hash3i(state.secretSeed, runde, 7, 977));
+      options = [...options.slice(0, DRAFT_SIZE - 1), kronen[rng.int(kronen.length)]!.id];
+    }
+  }
   state.angeboteZug = { turn: state.turn, ids: [...schon, ...options] };
   state.draft = { source, options };
   state.phase = { t: 'draft' };

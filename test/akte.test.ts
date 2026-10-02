@@ -9,6 +9,7 @@ import { handSize, publicPoints } from '../src/core/state';
 import type { GameState } from '../src/core/state';
 import { hatSystem, neuesSystem, systemeFuer } from '../src/core/systeme';
 import { siegwegeAn } from '../src/core/siegwege';
+import { cardById } from '../src/core/cards/catalog';
 import { hexVertices, vertexKey } from '../src/core/coords';
 import { isLandAt } from '../src/core/units';
 
@@ -220,6 +221,15 @@ describe('Akte', () => {
     akteFortschreiben(s, e, null);
     expect(f.entkommen).toBe(true);
     expect(e.ev.filter((x) => x.t === 'bossEntkommen').length).toBe(1);
+  });
+
+  it('eine Trophaee ohne Krone bietet immer eine Schluesselkarte', () => {
+    const { g, s } = partie();
+    s.players[0]!.trophaeen = 1;
+    s.gesperrt = [];
+    const r = applyAction(g, { t: 'claimLoot' }, 'p0');
+    expect(r.ok).toBe(true);
+    expect(g.state.draft!.options.some((id) => cardById(id)?.schluessel)).toBe(true);
   });
 
   it('die Trophaee oeffnet eine Wahl, auch ueber die Wahlen je Zug hinaus', () => {
