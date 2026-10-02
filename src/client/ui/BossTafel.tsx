@@ -55,7 +55,10 @@ export function BossTafel({ state, you, darfZahlen, onZahlen, onZeigen, onZu }: 
         <BossWappen art={boss?.art ?? 'ziel'} />
         <div>
           <b>{boss?.name ?? 'Ein Boss'}</b>
-          <span>{ART_NAME[boss?.art ?? 'ziel']}</span>
+          <span>
+            {ART_NAME[boss?.art ?? 'ziel']}
+            {st.zugabe ? ` · ${st.zugabe}. Zugabe` : ''}
+          </span>
         </div>
       </div>
       {boss && <p className="boss-text">{boss.text}</p>}
@@ -70,14 +73,19 @@ export function BossTafel({ state, you, darfZahlen, onZahlen, onZeigen, onZu }: 
           <p className="boss-frist">
             {rest <= 1 ? 'Diese Runde ist die letzte!' : `Noch ${rest} Runden (etwa ${Math.ceil(rest / Math.max(1, state.order.length))} eigene Zuege) - bis Runde ${st.bis}.`}
           </p>
-          <p className="boss-lohn">
-            Bestanden: +{st.akt} {st.akt === 1 ? 'Siegpunkt' : 'Siegpunkte'} und eine Trophaee (seltene Karte). Verfehlt: die Haelfte der
-            Hand und 1 Ruhm.
-          </p>
+          {st.zugabe ? (
+            <p className="boss-lohn">Bestanden: +1 Siegpunkt und +0,5 Mult - dann fordert er wieder. Offen am Ende: kein Verlust.</p>
+          ) : (
+            <p className="boss-lohn">
+              Bestanden: +{st.akt} {st.akt === 1 ? 'Siegpunkt' : 'Siegpunkte'} und eine Trophaee (seltene Karte)
+              {st.akt === 3 ? ', danach Zugaben' : ''}. Verfehlt: die Haelfte der Hand und 1 Ruhm.
+            </p>
+          )}
         </>
       ) : (
         <p className={st.ergebnis === 'besiegt' ? 'boss-ergebnis gut' : 'boss-ergebnis schlecht'}>
-          {st.ergebnis === 'besiegt' ? 'Bezwungen!' : 'Verfehlt.'} Der naechste Akt beginnt in Runde {st.bis + 1}.
+          {st.ergebnis === 'besiegt' ? 'Bezwungen!' : 'Verfehlt.'}{' '}
+          {st.akt < 3 ? `Der naechste Akt beginnt in Runde ${st.bis + 1}.` : 'Das war der letzte Akt - jetzt zaehlt die Wertung.'}
         </p>
       )}
 

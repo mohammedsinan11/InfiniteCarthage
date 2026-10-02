@@ -78,6 +78,11 @@ export type BossStand = {
   bis: number;
   forderung: BossForderung;
   ergebnis: 'offen' | 'besiegt' | 'verfehlt';
+  /**
+   * Zugabe (wie Balatros Endlos-Runden): der letzte Boss ist vor der Zeit
+   * geschlagen, er fordert noch einmal. Die wievielte - fehlt ausserhalb.
+   */
+  zugabe?: number;
 };
 
 export type AkteStand = {
@@ -100,9 +105,14 @@ const SALT_AKT = 211;
 export function waehleBosse(worldSeed: number, s: Pick<GameState, 'systeme'>): string[] {
   const out: string[] = [];
   for (let akt = 1; akt <= AKTE; akt++) {
-    const moeglich = BOSSE.filter(
+    const alle = BOSSE.filter(
       (b) => b.akte.includes(akt as 1 | 2 | 3) && (!b.braucht || hatSystem(s, b.braucht)) && !out.includes(b.id),
     );
+    // Keine zwei Bosse derselben Art, wenn es sich vermeiden laesst (Spieltest 10:
+    // zwei Tribute in einer Partie - "Bosse sind Rechnungen").
+    const arten = out.map((id) => bossById(id)?.art);
+    const anders = alle.filter((b) => !arten.includes(b.art));
+    const moeglich = anders.length > 0 ? anders : alle;
     const rng = new Rng(hash3i(worldSeed, akt, 0, SALT_AKT));
     out.push(moeglich[rng.int(moeglich.length)]!.id);
   }

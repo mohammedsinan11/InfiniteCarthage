@@ -237,13 +237,12 @@ export function Lobby() {
             )}
             {room.rundenLimit !== null && (
               <p className="note">
+                {/* Jede Partie mit Rundengrenze hat Akte (worker/room.ts) - auch mit 60 Runden (Spieltest 10). */}
                 {room.rundenLimit === AKTE_ZUEGE
                   ? `Drei Akte zu je ${AKTE_ZUEGE / 3} eigenen Zuegen (${AKTE_ZUEGE * room.members.length} Runden). Danach`
-                  : `Nach ${room.rundenLimit} Runden`}{' '}
+                  : `Drei Akte in ${room.rundenLimit} Runden. Danach`}{' '}
                 ist Schluss, dann gewinnt die hoechste Wertung
-                {room.rundenLimit === AKTE_ZUEGE
-                  ? '(Basis mal Mult, siehe Chronik). Es gibt keinen fruehen Sieg. Jeder Akt endet mit einem Boss: wer ihn besteht, bekommt Siegpunkte, eine seltene Karte und eine Schmiedearbeit.'
-                  : '(Siegpunkte mal 10 plus Ruhm) - wenn nicht vorher jemand das Ziel erreicht.'}
+                {' (Basis mal Mult, siehe Chronik). Es gibt keinen fruehen Sieg. Jeder Akt endet mit einem Boss: wer ihn besteht, bekommt Siegpunkte, eine seltene Karte und eine Schmiedearbeit.'}
               </p>
             )}
 

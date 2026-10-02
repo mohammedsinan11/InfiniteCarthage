@@ -9,7 +9,7 @@ import { genitiv } from '../core/factions';
 import { sippenBonusById } from '../core/cards/sippen';
 import { vorhabenById } from '../core/vorhaben';
 import { WESEN } from '../core/factions';
-import { SEASON_NAME } from '../core/season';
+import { SEASON_NAME, roundOf } from '../core/season';
 import { fraktionIn } from '../core/fraktionsleben';
 import type { GameEvent } from '../core/rules/reducer';
 import type { Verlust } from '../core/rules/army';
@@ -91,7 +91,7 @@ export function auftragText(
 ): string {
   switch (a.art) {
     case 'lager':
-      return a.fraktion ? `Zerstoere das Lager der ${nameVon(a.fraktion)}` : 'Zerstoere das Lager';
+      return a.fraktion ? `Zerstoere das Lager ${lagerVon(nameVon(a.fraktion))}` : 'Zerstoere das Lager';
     case 'ruine':
       return 'Erkunde die alte Ruine';
     case 'liefern':
@@ -111,6 +111,12 @@ export const devName = (d: keyof typeof DEV_NAME): string => DEV_NAME[d];
 function who(state: PublicState | null, id: string): string {
   return state?.players.find((p) => p.id === id)?.name ?? 'Jemand';
 }
+
+/** "der Pilzschlucker", nicht "der Die Pilzschlucker" (Spieltest 10). */
+const lagerVon = (name: string): string => {
+  const g = genitiv(name);
+  return g === name ? `von ${name}` : g;
+};
 
 const karten = (n: number): string => `${n} ${n === 1 ? 'Karte' : 'Karten'}`;
 
@@ -219,10 +225,13 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
     }
     case 'bossNaht':
       return `${bossById(e.boss)?.name ?? 'Der Boss'}: ein Heer von ${e.anzahl} Kaempfern zieht gegen ${who(state, e.player)}.`;
+    case 'bossZugabe':
+      return `${bossById(e.boss)?.name ?? 'Der Boss'} fordert eine Zugabe von ${who(state, e.player)} - bis Runde ${roundOf(e.bis)}. Jede bestandene Zugabe: +1 Siegpunkt und +0,5 Mult.`;
     case 'bossBesiegt':
+      if (e.zugabe) return `${who(state, e.player)} besteht die ${e.zugabe}. Zugabe: +1 Siegpunkt, +0,5 Mult.`;
       return `${who(state, e.player)} besteht ${bossById(e.boss)?.name ?? 'den Boss'} - Akt ${e.akt}: +${e.punkte} ${e.punkte === 1 ? 'Siegpunkt' : 'Siegpunkte'} und eine Trophaee.`;
     case 'bossVerfehlt':
-      return `${who(state, e.player)} verfehlt ${bossById(e.boss)?.name ?? 'den Boss'} - ${e.verloren} Karten und ein Punkt Ruhm sind verloren.`;
+      return `${who(state, e.player)} verfehlt ${bossById(e.boss)?.name ?? 'den Boss'} - ${karten(e.verloren)} und ein Punkt Ruhm sind verloren.`;
     case 'bossGezahlt':
       return `${who(state, e.player)} zahlt Tribut: ${e.anzahl} ${resourceName(e.resource)}.`;
     case 'sippenRuhm':
@@ -345,7 +354,12 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
       const lore = e.zweig ? p?.ernannt?.lore : p?.held;
       const amt = e.zweig ? ZWEIG_NAME[e.zweig] : 'Der Held';
       const wer = lore ? heldKurz(lore) : `${amt} von ${who(state, e.player)}`;
-      return `${wer} faellt. Er kehrt in Runde ${e.zurueck} zurueck.`;
+      // zurueck ist ein Zug, keine Runde (Spieltest 10: "Runde 66" in einer Partie mit 60).
+      const er = lore?.geschlecht === 'w' ? 'Sie' : 'Er';
+      const runde = roundOf(e.zurueck);
+      return state?.rundenLimit != null && runde > state.rundenLimit
+        ? `${wer} faellt - und kehrt in dieser Partie nicht mehr zurueck.`
+        : `${wer} faellt. ${er} kehrt in Runde ${runde} zurueck.`;
     }
     case 'ernennung': {
       const lore = state?.players.find((x) => x.id === e.player)?.ernannt?.lore;
@@ -457,7 +471,7 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
       return `${ereignisById(e.id)?.titel ?? 'Ein Ereignis'} - ${who(state, e.player)} muss entscheiden.`;
     case 'eventResolved': {
       const wahl = ereignisById(e.id)?.wahlen[e.wahl]?.text ?? '';
-      return `${who(state, e.player)} entscheidet: ${wahl.split(':')[0]!.split('(')[0]!.trim()}.${e.verloren > 0 ? ` ${e.verloren} Karten gehen verloren.` : ''}`;
+      return `${who(state, e.player)} entscheidet: ${wahl.split(':')[0]!.split('(')[0]!.trim()}.${e.verloren > 0 ? ` ${karten(e.verloren)} ${e.verloren === 1 ? 'geht' : 'gehen'} verloren.` : ''}`;
     }
     case 'wonder':
       return `${who(state, e.player)} errichtet ${WUNDER[e.art].name}! (+${WUNDER[e.art].punkte} Siegpunkte)`;

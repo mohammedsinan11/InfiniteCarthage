@@ -109,8 +109,16 @@ export function CardDraft({
   const rabattDoppelt = (id: string): boolean =>
     !!rabattDa && id !== rabattDa && dauerwirkungen(cardById(id) ?? {}).some((l) => l.t === 'tradeDiscount');
 
+  /*
+   * Die Wahl erscheint, sobald die Wuerfel weg sind - der zweite Klick, mit
+   * dem man die Wuerfel wegklickt, traf sonst eine Karte (Spieltest 10). Erst
+   * nach einem Augenblick nimmt sie Klicks an.
+   */
+  const [scharf, setScharf] = useState(false);
   useEffect(() => {
     playCardDeal();
+    const t = window.setTimeout(() => setScharf(true), 450);
+    return () => window.clearTimeout(t);
   }, []);
 
   return (
@@ -141,7 +149,7 @@ export function CardDraft({
           const gewaehlt = genommen === id;
           const verworfen = genommen !== null && !gewaehlt;
           const nehmen = () => {
-            if (genommen !== null) return;
+            if (genommen !== null || !scharf) return;
             setGenommen(id);
             playCardPick(stufe);
             window.setTimeout(playCardVanish, 180);

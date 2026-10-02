@@ -46,6 +46,8 @@ import { ZWEIGE, ZWEIG_NAME, ZWEIG_ZWECK } from '../../core/rules/zweig';
 import { devName, resourceName } from '../log';
 import { ResourceGlyph } from './ResourceIcon';
 import { KartenBild } from './KartenBild';
+import { einheitNamen } from '../heer';
+import { heldKurz } from '../../core/lore';
 import { cardById } from '../../core/cards/catalog';
 import { taktikwirkungen } from '../../core/cards/types';
 
@@ -360,6 +362,7 @@ function KartenTafel({
   anzahl,
   taktiken,
   einheiten,
+  heldName,
   darfTaktik,
   kannSpielen,
   kaufen,
@@ -371,11 +374,14 @@ function KartenTafel({
   anzahl: Map<DevCardType, number>;
   taktiken: string[];
   einheiten: PublicState['units'];
+  /** Der Name des Helden (core/lore.ts) - statt "held" im Zielfeld. */
+  heldName?: string | null;
   darfTaktik: boolean;
   kannSpielen: (t: DevCardType) => boolean;
   act: (a: Action) => void;
   onZu: () => void;
 }) {
+  const namen = einheitNamen(einheiten, heldName ?? undefined);
   const [monopol, setMonopol] = useState<Resource>('lumber');
   const [erfA, setErfA] = useState<Resource>('lumber');
   const [erfB, setErfB] = useState<Resource>('brick');
@@ -458,7 +464,8 @@ function KartenTafel({
             >
               {kandidaten.map((u) => (
                 <option key={u.id} value={u.id}>
-                  {u.kind} #{u.id} · Feld {u.q}/{u.r}
+                  {namen.get(u.id) ?? 'Einheit'}
+                  {u.leben !== undefined ? ` · ${u.leben} Leben` : ''}
                 </option>
               ))}
             </select>
@@ -553,7 +560,10 @@ export function Aktionsleiste({
 
   const offen = (me?.dev ?? []).filter((d) => !d.played);
   const taktiken = me?.tactics ?? [];
-  const eigeneEinheiten = state.units.filter((u) => u.owner === me?.id);
+  // Nur Kaempfer - Karawanen kann keine Taktik treffen (Spieltest 10: "karawane #79" im Ziel).
+  const eigeneEinheiten = state.units.filter(
+    (u) => u.owner === me?.id && (u.kind === 'held' || u.kind === 'ritter' || u.kind === 'bogen'),
+  );
   const anzahl = new Map<DevCardType, number>();
   for (const d of offen) anzahl.set(d.type, (anzahl.get(d.type) ?? 0) + 1);
   const kannSpielen = (t: DevCardType): boolean =>
@@ -682,6 +692,7 @@ export function Aktionsleiste({
           anzahl={anzahl}
           taktiken={taktiken}
           einheiten={eigeneEinheiten}
+          heldName={me?.held ? heldKurz(me.held) : null}
           darfTaktik={isMine && phase.t === 'main'}
           kannSpielen={kannSpielen}
           kaufen={{ darf: bauen, hand }}

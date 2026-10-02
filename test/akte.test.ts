@@ -111,6 +111,31 @@ describe('Akte', () => {
     expect(e.ev.some((x) => x.t === 'bossBesiegt')).toBe(true);
   });
 
+  it('der letzte Boss frueh bezwungen fordert eine Zugabe: +1 Punkt, eine offene kostet nichts', () => {
+    const { s } = partie();
+    s.akte!.bosse[2] = 'eiserne_koenigin';
+    s.turn = 2 * s.akte!.laenge + 1;
+    akteFortschreiben(s, sammeln(), null);
+    const st = s.akte!.stand.p0!;
+    expect(st.akt).toBe(3);
+    const f = st.forderung as Extract<typeof st.forderung, { t: 'tribut' }>;
+    const p = s.players[0]!;
+    p.hand = { lumber: 20, brick: 20, wool: 20, grain: 20, ore: 20 };
+    const e = sammeln();
+    for (const r of Object.keys(f.soll) as (keyof typeof f.soll)[]) bossZahlen(s, 'p0', r, e);
+    akteFortschreiben(s, e, null);
+    expect(s.akte!.siege.p0).toEqual([3]);
+    const zugabe = s.akte!.stand.p0!;
+    expect(zugabe.zugabe).toBe(1);
+    expect(zugabe.ergebnis).toBe('offen');
+    expect(e.ev.some((x) => x.t === 'bossZugabe')).toBe(true);
+    // Am Ende offen: kein Verlust.
+    const hand = handSize(p.hand);
+    akteFortschreiben(s, sammeln(), zugabe.bis);
+    expect(zugabe.ergebnis).toBe('verfehlt');
+    expect(handSize(p.hand)).toBe(hand);
+  });
+
   it('verfehlt am Ende des Aktes: die Haelfte der Hand und ein Punkt Ruhm', () => {
     const { s } = partie();
     s.akte!.bosse[0] = 'kronbote';

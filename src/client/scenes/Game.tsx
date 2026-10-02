@@ -351,6 +351,15 @@ export function Game() {
     window.addEventListener('keydown', taste);
     return () => window.removeEventListener('keydown', taste);
   }, [kandidaten, zielWahl]);
+  // Esc schliesst auch die Tafeln der Leiste (Spieltest 10: die Kartentafel ging nur ueber einen anderen Knopf zu).
+  useEffect(() => {
+    if (tafel === null) return;
+    const taste = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setTafel(null);
+    };
+    window.addEventListener('keydown', taste);
+    return () => window.removeEventListener('keydown', taste);
+  }, [tafel]);
   /** Das Heer in Gruppen (client/heer.ts): Scharen und Felder. */
   const heer = useMemo(() => heerGruppen(meineEinheiten), [meineEinheiten]);
   /** Kein Gebaeude mehr, aber die Frist laeuft: eine Siedlung darf ueberall stehen (rules/untergang.ts). */

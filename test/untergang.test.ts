@@ -73,6 +73,19 @@ describe('Untergang', () => {
     expect(events.map((e) => e.t)).toEqual(['defeated', 'win']);
   });
 
+  it('laesst mit Akten den Letzten weiterspielen - die Bosse warten noch', () => {
+    const game = spiel(2);
+    game.state.akte = { laenge: 10, bosse: ['steuervogt', 'grenzfuerst', 'kriegsherr'], stand: {}, siege: {} } as never;
+    dorf(game, 'p1', 5, 5);
+    untergangRunde(game.state, []);
+    game.state.turn = 10 + UNTERGANG_ZUEGE * 2;
+    const events: GameEvent[] = [];
+    untergangRunde(game.state, events);
+    expect(game.state.players[0]!.besiegt).toBe(true);
+    expect(game.state.phase).toEqual({ t: 'main' });
+    expect(events.map((e) => e.t)).toEqual(['defeated']);
+  });
+
   it('zaehlt vor dem ersten Aufbau nicht als Fall', () => {
     const game = spiel();
     game.state.phase = { t: 'setup', step: 0, awaiting: 'settlement', lastVertex: null };

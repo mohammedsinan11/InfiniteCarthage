@@ -82,7 +82,10 @@ export function untergangRunde(s: GameState, events: Ereignisse): void {
   if (uebrig.length === 0) {
     s.phase = { t: 'finished', winner: null };
     events.push({ t: 'lost' });
-  } else if (s.order.length > 1 && uebrig.length === 1 && !s.koop) {
+  } else if (s.order.length > 1 && uebrig.length === 1 && !s.koop && !s.akte) {
+    // Mit Akten (core/akte.ts) spielt der Letzte weiter: die Bosse warten
+    // noch, und am Ende entscheidet die Wertung (Spieltest 10: der Bot ging
+    // unter, und die Partie endete in Runde 33 mit 2 Siegpunkten).
     // Gemeinsam spielt der Letzte weiter - dort entscheidet nur die Summe am Ende.
     s.phase = { t: 'finished', winner: uebrig[0]! };
     events.push({ t: 'win', player: uebrig[0]! });

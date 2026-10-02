@@ -21,7 +21,9 @@ export type AktEvent =
   | { t: 'aktBeginn'; player: PlayerId; akt: number; boss: string; bis: number }
   /** Das Heer eines Bosses bricht auf. */
   | { t: 'bossNaht'; player: PlayerId; boss: string; q: number; r: number; anzahl: number }
-  | { t: 'bossBesiegt'; player: PlayerId; akt: number; boss: string; punkte: number }
+  | { t: 'bossBesiegt'; player: PlayerId; akt: number; boss: string; punkte: number; zugabe?: number }
+  /** Der letzte Boss ist frueh geschlagen und fordert noch einmal (Zugabe). */
+  | { t: 'bossZugabe'; player: PlayerId; boss: string; zugabe: number; bis: number }
   | { t: 'bossVerfehlt'; player: PlayerId; akt: number; boss: string; verloren: number }
   /** Tribut eingezahlt. */
   | { t: 'bossGezahlt'; player: PlayerId; resource: Resource; anzahl: number };
@@ -30,10 +32,20 @@ type Ereignisse = { push(...e: AktEvent[]): number };
 
 const punkteVon = (s: GameState) => (id: PlayerId) => publicPoints(s, id);
 
+/** So viele Runden muessen fuer eine Zugabe mindestens bleiben. */
+const ZUGABE_MIN_RUNDEN = 3;
+
 /** Bestanden: Siegpunkte in Hoehe der Aktzahl und eine Trophaee. */
 function besiegt(s: GameState, st: BossStand, id: PlayerId, events: Ereignisse): void {
   st.ergebnis = 'besiegt';
   const akte = s.akte!;
+  if (st.zugabe) {
+    // Eine Zugabe bringt einen Siegpunkt - und zaehlt im Mult wie ein Boss (core/wertung.ts).
+    akte.siege[id] = [...(akte.siege[id] ?? []), 1];
+    events.push({ t: 'bossBesiegt', player: id, akt: st.akt, boss: st.boss, punkte: 1, zugabe: st.zugabe });
+    zugabe(s, st, id, events);
+    return;
+  }
   akte.siege[id] = [...(akte.siege[id] ?? []), st.akt];
   const p = playerById(s, id);
   // Dazu eine Schmiedearbeit (rules/schmiede.ts): verbessern oder verbrennen.
@@ -42,6 +54,22 @@ function besiegt(s: GameState, st: BossStand, id: PlayerId, events: Ereignisse):
     p.schmiede = (p.schmiede ?? 0) + 1;
   }
   events.push({ t: 'bossBesiegt', player: id, akt: st.akt, boss: st.boss, punkte: st.akt });
+  zugabe(s, st, id, events);
+}
+
+/**
+ * Der letzte Boss frueh geschlagen: statt elf Runden ohne Ziel (Spieltest 10)
+ * fordert er noch einmal - mit einer frischen Forderung des dritten Aktes.
+ */
+function zugabe(s: GameState, st: BossStand, id: PlayerId, events: Ereignisse): void {
+  if (st.akt < AKTE || st.bis - s.turn < ZUGABE_MIN_RUNDEN * s.order.length) return;
+  const boss = bossById(st.boss);
+  if (!boss) return;
+  const n = (st.zugabe ?? 0) + 1;
+  const punkte = punkteVon(s);
+  const neu: BossStand = { akt: st.akt, boss: boss.id, bis: st.bis, forderung: forderungFuer(s, boss, AKTE, id, s.turn, st.bis, punkte), ergebnis: 'offen', zugabe: n };
+  s.akte!.stand[id] = neu;
+  events.push({ t: 'bossZugabe', player: id, boss: boss.id, zugabe: n, bis: st.bis });
 }
 
 /** Verfehlt: die Haelfte der Hand (von den groessten Stapeln) und ein Punkt Ruhm. */
@@ -79,6 +107,8 @@ export function akteFortschreiben(s: GameState, events: Ereignisse, beendet: num
     // Die letzte Runde des Aktes ist gespielt: Entscheidung.
     if (st && st.ergebnis === 'offen' && beendet !== null && beendet >= st.bis) {
       if (erfuellt(s, p.id, st.forderung, punkte)) besiegt(s, st, p.id, events);
+      // Eine offene Zugabe kostet nichts - sie war ein Angebot, keine Drohung.
+      else if (st.zugabe) st.ergebnis = 'verfehlt';
       else verfehlt(s, st, p.id, events);
     }
 

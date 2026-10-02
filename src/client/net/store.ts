@@ -499,12 +499,20 @@ function meldungenAus(
       meldung(`Mehr als ${WAHLEN_JE_ZUG} Kartenwahlen gibt es nicht je Zug - die Stadt steht, die Wahl kommt mit der naechsten.`, 'info');
       continue;
     }
+    if (e.t === 'bossZugabe' && e.player === you) {
+      meldung(`Zugabe! ${bossById(e.boss)?.name ?? 'Der Boss'} fordert noch einmal - jede bestandene: +1 Siegpunkt, +0,5 Mult`, 'raid');
+      continue;
+    }
+    if (e.t === 'bossBesiegt' && e.zugabe) {
+      if (e.player === you) meldung(`${e.zugabe}. Zugabe bestanden: +1 Siegpunkt, +0,5 Mult`, 'gain');
+      continue;
+    }
     if (e.t === 'bossBesiegt') {
       meldung(e.player === you ? `${bossById(e.boss)?.name ?? 'Der Boss'} bezwungen: +${e.punkte} Siegpunkte und eine Trophaee` : `${wer(e.player)} bezwingt ${bossById(e.boss)?.name ?? 'den Boss'}`, e.player === you ? 'gain' : 'info');
       continue;
     }
     if (e.t === 'bossVerfehlt' && e.player === you) {
-      meldung(`${bossById(e.boss)?.name ?? 'Der Boss'} hat gesiegt: ${e.verloren} Karten verloren`, 'raid');
+      meldung(`${bossById(e.boss)?.name ?? 'Der Boss'} hat gesiegt: ${e.verloren} ${e.verloren === 1 ? 'Karte' : 'Karten'} verloren`, 'raid');
       continue;
     }
     if (e.t === 'capital') {
@@ -666,7 +674,13 @@ function meldungenAus(
     } else if (e.t === 'heroFell') {
       if (e.player === you) {
         playRaid();
-        meldung(`Dein Held faellt - er kehrt in Runde ${e.zurueck} zurueck`, 'raid');
+        const lim = state?.rundenLimit;
+        meldung(
+          lim != null && roundOf(e.zurueck) > lim
+            ? 'Dein Held faellt - in dieser Partie kehrt er nicht zurueck'
+            : `Dein Held faellt - er kehrt in Runde ${roundOf(e.zurueck)} zurueck`,
+          'raid',
+        );
       }
     } else if (e.t === 'pact') {
       if (e.player === you) {

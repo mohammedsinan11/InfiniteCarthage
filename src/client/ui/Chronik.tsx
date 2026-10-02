@@ -51,6 +51,7 @@ type Zeile = {
   ruhm: number;
   wertung: number;
   haus: string | null;
+  besiegt: boolean;
 };
 
 export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
@@ -98,9 +99,11 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
           // Mit Akten: Basis x Mult (core/wertung.ts).
           wertung: wertungTeile(state, id, punkte).gesamt,
           haus: p.haus ?? null,
+          besiegt: !!p.besiegt,
         };
       })
-      .sort((a, b) => b.wertung - a.wertung);
+      // Wer untergegangen ist, gewinnt nicht mehr - er steht hinten (Spieltest 10).
+      .sort((a, b) => Number(a.besiegt) - Number(b.besiegt) || b.wertung - a.wertung);
   }, [chronik, state, you]);
 
   if (phase.t !== 'finished') return null;
@@ -250,6 +253,7 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
                   <td>
                     <span className="dot" style={{ background: z.farbe }} /> {z.name}
                     {z.haus && <span className="chronik-haus"> · {hausById(z.haus)?.name}</span>}
+                    {z.besiegt && <span className="chronik-haus"> · untergegangen</span>}
                   </td>
                   <td>{z.punkte}</td>
                   <td>{z.ruhm}</td>
