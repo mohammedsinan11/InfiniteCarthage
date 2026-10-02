@@ -18,6 +18,7 @@ import type { DraftSource } from './cards/types';
 import type { HeldLore } from './lore';
 import type { Chronik } from './chronik';
 import { kartenPunkte } from './cards/wirkung';
+import type { PunkteSicht } from './cards/wirkung';
 import { wunderPunkte } from './wunder';
 import type { Wunder } from './wunder';
 import { aktPunkte } from './akte';
@@ -731,7 +732,9 @@ export function publicPoints(
  */
 export function punkteQuellen(
   state: Pick<GameState, 'buildings' | 'ruhmreichster' | 'hauptstaedte'> &
-    Partial<Pick<GameState, 'roads' | 'players' | 'chronik' | 'wunder' | 'handelsstrasse' | 'akte'>>,
+    Partial<Pick<GameState, 'roads' | 'wunder' | 'handelsstrasse' | 'akte'>> &
+    // Auch die redigierte Sicht des Clients (redact.ts) genuegt.
+    Partial<Pick<PunkteSicht, 'players' | 'chronik'>>,
   id: PlayerId,
 ): { text: string; wert: number }[] {
   const out: { text: string; wert: number }[] = [];
