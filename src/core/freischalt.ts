@@ -92,7 +92,7 @@ export const SCHLUESSEL_REIHE: readonly string[] = [
 
 /** So viele Engine-Karten sind von Beginn an offen, so viele kommen je Partie dazu. */
 export const ENGINE_START = 10;
-export const ENGINE_JE_PARTIE = 6;
+export const ENGINE_JE_PARTIE = 8;
 /** So viele Schluesselkarten sind von Beginn an offen; je Boss eine mehr. */
 export const SCHLUESSEL_START = 2;
 
