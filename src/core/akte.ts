@@ -48,19 +48,23 @@ export type BossDef = {
   braucht?: SystemId;
   /** Nur fuer ZIEL: was gemessen wird. */
   mass?: ZielMass;
+  /** Was er selbst sagt - Bosse mit Gesicht, nicht nur Rechnungen (Spieltest 10). */
+  spruch?: string;
+  /** Was er sagt, wenn man ihn bezwingt. */
+  abgang?: string;
 };
 
 export const BOSSE: readonly BossDef[] = [
-  { id: 'steuervogt', name: 'Der Steuervogt', art: 'tribut', akte: [1, 2], text: 'Der Koenig will seinen Anteil - und sein Vogt zaehlt genau.' },
-  { id: 'kronbote', name: 'Der Kronbote', art: 'ziel', mass: 'siedlungen', akte: [1], text: 'Die Krone will Siedler sehen, keine leeren Huegel.' },
-  { id: 'wegemeister', name: 'Der Wegemeister', art: 'ziel', mass: 'strassen', akte: [1, 2], text: 'Ein Reich ohne Wege ist kein Reich. Baut Strassen!' },
-  { id: 'grenzfuerst', name: 'Der Grenzfuerst', art: 'heer', akte: [1, 2], braucht: 'raub', text: 'Ein Fuerst der Wildnis sammelt seine Leute gegen dich.' },
-  { id: 'hungerwinter', name: 'Der Hungerwinter', art: 'tribut', akte: [2, 3], text: 'Ein langer Winter kommt. Fuellt die Speicher, oder die Doerfer hungern.' },
-  { id: 'thronanwaerter', name: 'Der Thronanwaerter', art: 'ziel', mass: 'punkte', akte: [2, 3], text: 'Ein Vetter erhebt Anspruch auf den Thron. Zeige, wer herrscht.' },
-  { id: 'staedtebund', name: 'Der Staedtebund', art: 'ziel', mass: 'staedte', akte: [2, 3], text: 'Die freien Staedte nehmen nur Gleiche auf. Baue Staedte.' },
-  { id: 'kriegsherr', name: 'Der Kriegsherr', art: 'heer', akte: [2, 3], braucht: 'raub', text: 'Ein Kriegsherr zieht mit erprobten Kaempfern heran.' },
-  { id: 'eiserne_koenigin', name: 'Die Eiserne Koenigin', art: 'tribut', akte: [3], text: 'Die Koenigin des Nordens verlangt Tribut - oder sie kommt ihn holen.' },
-  { id: 'schwarzes_banner', name: 'Das Schwarze Banner', art: 'heer', akte: [3], braucht: 'raub', text: 'Unter dem schwarzen Banner sammelt sich, was die Wildnis an Grausamem hat.' },
+  { id: 'steuervogt', name: 'Der Steuervogt', art: 'tribut', akte: [1, 2], text: 'Der Koenig will seinen Anteil - und sein Vogt zaehlt genau.', spruch: '"Der Koenig zaehlt auf Euch. Ich zaehle fuer ihn - und ich verzaehle mich nie."', abgang: '"Bezahlt, bis auf den letzten Scheffel. Der Koenig wird zufrieden sein. Vorerst."' },
+  { id: 'kronbote', name: 'Der Kronbote', art: 'ziel', mass: 'siedlungen', akte: [1], text: 'Die Krone will Siedler sehen, keine leeren Huegel.', spruch: '"Leere Huegel zahlen keine Steuern. Die Krone will Doerfer sehen, wenn ich wiederkomme."', abgang: '"Ich werde berichten, dass hier Menschen leben. Viele Menschen."' },
+  { id: 'wegemeister', name: 'Der Wegemeister', art: 'ziel', mass: 'strassen', akte: [1, 2], text: 'Ein Reich ohne Wege ist kein Reich. Baut Strassen!', spruch: '"Wo kein Weg ist, ist kein Reich. Nur Wildnis mit einem Namen."', abgang: '"Gute Wege. Man koennte fast meinen, Ihr wolltet bleiben."' },
+  { id: 'grenzfuerst', name: 'Der Grenzfuerst', art: 'heer', akte: [1, 2], braucht: 'raub', text: 'Ein Fuerst der Wildnis sammelt seine Leute gegen dich.', spruch: '"Dieses Land war unser, bevor Euer erster Stein lag. Wir holen es zurueck."', abgang: '"Die Grenze haelt. Diesmal."' },
+  { id: 'hungerwinter', name: 'Der Hungerwinter', art: 'tribut', akte: [2, 3], text: 'Ein langer Winter kommt. Fuellt die Speicher, oder die Doerfer hungern.', spruch: 'Der Wind traegt keine Worte, nur Kaelte. Die Alten sagen: wer jetzt nicht fuellt, isst im Winter Rinde.', abgang: 'Der Schnee schmilzt. Die Speicher haben gereicht.' },
+  { id: 'thronanwaerter', name: 'Der Thronanwaerter', art: 'ziel', mass: 'punkte', akte: [2, 3], text: 'Ein Vetter erhebt Anspruch auf den Thron. Zeige, wer herrscht.', spruch: '"Vetter, Ihr sitzt auf meinem Stuhl. Zeigt mir, dass Ihr ihn verdient - oder steht auf."', abgang: '"Nun gut. Ein Reich wie dieses... das haette ich nicht gekonnt." Er beugt das Knie.' },
+  { id: 'staedtebund', name: 'Der Staedtebund', art: 'ziel', mass: 'staedte', akte: [2, 3], text: 'Die freien Staedte nehmen nur Gleiche auf. Baue Staedte.', spruch: '"Wir sprechen mit Staedten, nicht mit Bauern. Kommt wieder, wenn Ihr Mauern habt."', abgang: '"Willkommen im Bund. Eure Staedte sind nun auch die unseren - im Handel, versteht sich."' },
+  { id: 'kriegsherr', name: 'Der Kriegsherr', art: 'heer', akte: [2, 3], braucht: 'raub', text: 'Ein Kriegsherr zieht mit erprobten Kaempfern heran.', spruch: '"Ich habe zehn Fuersten fallen sehen. Ihr werdet der elfte."', abgang: '"Ein Krieger erkennt einen Krieger." Er zieht sich zurueck, und sein Banner sinkt.' },
+  { id: 'eiserne_koenigin', name: 'Die Eiserne Koenigin', art: 'tribut', akte: [3], text: 'Die Koenigin des Nordens verlangt Tribut - oder sie kommt ihn holen.', spruch: '"Ihr habt hier etwas aufgebaut. Das gefaellt mir. Es gehoert jetzt mir - ein Teil davon, jedes Jahr."', abgang: '"Ihr zahlt wie eine Koenigin. Vielleicht seid Ihr eine."' },
+  { id: 'schwarzes_banner', name: 'Das Schwarze Banner', art: 'heer', akte: [3], braucht: 'raub', text: 'Unter dem schwarzen Banner sammelt sich, was die Wildnis an Grausamem hat.', spruch: 'Kein Herold, kein Brief. Nur ein schwarzes Tuch an einem Baum am Waldrand - und Spuren, viele Spuren.', abgang: 'Das schwarze Banner brennt. Die Spuren fuehren zurueck in den Wald, und keine kommt wieder.' },
 ];
 
 export const bossById = (id: string | undefined | null): BossDef | undefined => BOSSE.find((b) => b.id === id);

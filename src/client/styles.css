@@ -7345,3 +7345,13 @@ em.off {
   color: var(--muted);
   text-align: left;
 }
+
+/* Was der Boss sagt (ui/BossTafel.tsx). */
+.boss-spruch {
+  margin: 6px 0;
+  padding: 4px 10px;
+  border-left: 3px solid #7a2418;
+  font-style: italic;
+  font-size: 13px;
+  color: #e8d8b8;
+}

@@ -62,6 +62,9 @@ export function BossTafel({ state, you, darfZahlen, onZahlen, onZeigen, onZu }: 
         </div>
       </div>
       {boss && <p className="boss-text">{boss.text}</p>}
+      {/* Was der Boss selbst sagt - beim Auftritt, und beim Abgang, wenn er bezwungen ist. */}
+      {boss?.spruch && st.ergebnis === 'offen' && !st.zugabe && <blockquote className="boss-spruch">{boss.spruch}</blockquote>}
+      {boss?.abgang && st.ergebnis === 'besiegt' && <blockquote className="boss-spruch">{boss.abgang}</blockquote>}
 
       {st.ergebnis === 'offen' ? (
         <>
