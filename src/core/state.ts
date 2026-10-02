@@ -721,24 +721,44 @@ export function publicPoints(
     Partial<Pick<GameState, 'roads' | 'players' | 'chronik' | 'wunder' | 'handelsstrasse' | 'akte'>>,
   id: PlayerId,
 ): number {
-  let pts = 0;
+  return punkteQuellen(state, id).reduce((n, q) => n + q.wert, 0);
+}
+
+/**
+ * Woher die offenen Siegpunkte kommen - eine Zeile je Quelle, fuer die Chronik
+ * (Spieltest 8 und 11: "die Punkte nach Herkunft fehlen am Ende"). publicPoints
+ * ist ihre Summe, damit beides nie auseinanderlaeuft.
+ */
+export function punkteQuellen(
+  state: Pick<GameState, 'buildings' | 'ruhmreichster' | 'hauptstaedte'> &
+    Partial<Pick<GameState, 'roads' | 'players' | 'chronik' | 'wunder' | 'handelsstrasse' | 'akte'>>,
+  id: PlayerId,
+): { text: string; wert: number }[] {
+  const out: { text: string; wert: number }[] = [];
+  let doerfer = 0;
+  let staedte = 0;
   for (const b of Object.values(state.buildings)) {
-    if (b.owner === id) pts += b.type === 'city' ? 2 : 1;
+    if (b.owner !== id) continue;
+    if (b.type === 'city') staedte += 1;
+    else doerfer += 1;
   }
-  if (state.ruhmreichster === id) pts += 2;
+  out.push({ text: 'Doerfer', wert: doerfer }, { text: 'Staedte', wert: staedte * 2 });
+  if (state.ruhmreichster === id) out.push({ text: 'Ruhmreichster', wert: 2 });
   // Die Handelsstrasse (core/handelswege.ts, HANDELSSTRASSE_PUNKTE).
-  if (state.handelsstrasse === id) pts += 2;
+  if (state.handelsstrasse === id) out.push({ text: 'Handelsstrasse', wert: 2 });
   // Bestandene Akte (core/akte.ts): je Akt so viele Punkte wie seine Zahl.
-  pts += aktPunkte(state.akte, id);
+  out.push({ text: 'Bosse', wert: aktPunkte(state.akte, id) });
+  let haupt = 0;
   for (const h of Object.values(state.hauptstaedte ?? {})) {
-    if (h.owner === id) pts += HAUPTSTADT_PUNKTE + (h.stufe - 1) * STUFE_PUNKTE;
+    if (h.owner === id) haupt += HAUPTSTADT_PUNKTE + (h.stufe - 1) * STUFE_PUNKTE;
   }
+  out.push({ text: 'Hauptstadt', wert: haupt });
+  out.push({ text: 'Wunder', wert: wunderPunkte(state, id) });
   // Aktive Karten mit Punktewirkung (cards/effects.ts, kartenPunkte).
-  pts += wunderPunkte(state, id);
   if (state.players && state.roads) {
-    pts += kartenPunkte({ players: state.players, buildings: state.buildings, roads: state.roads, chronik: state.chronik }, id);
+    out.push({ text: 'Karten', wert: kartenPunkte({ players: state.players, buildings: state.buildings, roads: state.roads, chronik: state.chronik }, id) });
   }
-  return pts;
+  return out.filter((q) => q.wert !== 0);
 }
 
 /** Gesamtpunkte inklusive verdeckter Karten - nur serverseitig verwenden. */

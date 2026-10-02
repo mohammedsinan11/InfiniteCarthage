@@ -14,6 +14,7 @@
 
 import { cardById } from '../../core/cards/catalog';
 import { bossById } from '../../core/akte';
+import { punkteQuellen } from '../../core/state';
 import { wertungTeile } from '../../core/wertung';
 import type { WertungsTeile } from '../../core/wertung';
 import { siegwegById, siegwegText } from '../../core/siegwege';
@@ -53,6 +54,7 @@ type Zeile = {
   wertung: number;
   haus: string | null;
   besiegt: boolean;
+  quellen: { text: string; wert: number }[];
 };
 
 export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
@@ -101,6 +103,12 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
           wertung: wertungTeile(state, id, punkte).gesamt,
           haus: p.haus ?? null,
           besiegt: !!p.besiegt,
+          quellen: (() => {
+            // Woher die Punkte kamen (core/state.ts, punkteQuellen); der Rest sind Siegpunktkarten.
+            const q = punkteQuellen(state, id);
+            const rest = punkte - q.reduce((n, x) => n + x.wert, 0);
+            return rest > 0 ? [...q, { text: 'Siegpunktkarten', wert: rest }] : q;
+          })(),
         };
       })
       // Wer untergegangen ist, gewinnt nicht mehr - er steht hinten (Spieltest 10).
@@ -294,6 +302,9 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
                     <span className="dot" style={{ background: z.farbe }} /> {z.name}
                     {z.haus && <span className="chronik-haus"> · {hausById(z.haus)?.name}</span>}
                     {z.besiegt && <span className="chronik-haus"> · untergegangen</span>}
+                    {z.quellen.length > 0 && (
+                      <small className="chronik-quellen">{z.quellen.map((q) => `${q.text} ${q.wert}`).join(' · ')}</small>
+                    )}
                   </td>
                   <td>{z.punkte}</td>
                   <td>{z.ruhm}</td>
