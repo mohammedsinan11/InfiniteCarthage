@@ -53,7 +53,7 @@ import { neuerRaumCode } from '../net/socket';
 import { garrisonOf, isNestActive, nestFraktionOf, sightOf } from '../../core/units';
 import { abkommenVon } from '../../core/combat';
 import { WESEN, fraktionById } from '../../core/factions';
-import { hexDistance, hexKey, hexVertices, hexesInRange, parseVertexKey, vertexAdjacentHexes, vertexKey } from '../../core/coords';
+import { edgeEndpoints, hexDistance, hexKey, hexVertices, hexesInRange, parseEdgeKey, parseVertexKey, vertexAdjacentHexes, vertexKey } from '../../core/coords';
 import { beiStumm, initAudio, istStumm, playBuild, playGain, playTurm, playWurfStart, setStumm } from '../audio';
 import { setAmbiente } from '../ambiente';
 import { roundOf, seasonOf } from '../../core/season';
@@ -106,6 +106,12 @@ import type { Cost } from '../../core/rules/costs';
 import { Diagnose, diagnoseAn } from '../ui/Diagnose';
 
 /** Nach so vielen Millisekunden wuerfelt der Knopf von selbst. Erst fuenf, dann acht - beides zu knapp, um sich umzusehen und zu planen. */
+/** Liegen diese Felder hoechstens zwei Felder von der Ecke anker entfernt? */
+function nahAm(anker: string, felder: readonly { q: number; r: number }[]): boolean {
+  const um = vertexAdjacentHexes(parseVertexKey(anker));
+  return felder.some((f) => um.some((u) => hexDistance(u, f) <= 1));
+}
+
 const AUTO_WURF_MS = 30000;
 const AUTO_WURF_KEY = 'infinitecarthage.autowurf';
 
@@ -208,6 +214,11 @@ export function Game() {
   const [zeigeKarte, setZeigeKarte] = useState<{ id: string; nr: number } | null>(null);
 
   const [mode, setMode] = useState<BuildMode>(null);
+  /** Am Dorf gewaehlte Wehrbauten: nur Plaetze in dessen Naehe (Eckenschluessel). */
+  const [bauAnker, setBauAnker] = useState<string | null>(null);
+  useEffect(() => {
+    if (mode === null) setBauAnker(null);
+  }, [mode]);
   /** Wo die Ausbau-Tafel offen ist: an einem eigenen Gebaeude oder an einer Krone. */
   const [ausbauOrt, setAusbauOrt] = useState<{ art: 'ecke' | 'feld' | 'raub'; key: string } | null>(null);
   /*
@@ -584,12 +595,17 @@ export function Game() {
         }
         if (mode === 'tower') {
           // Freie Ecke an einer eigenen Strasse oder im eigenen Einflussbereich,
-          // ohne Abstandsregel (rules/placement.ts).
-          return { vertices: legalTowerVertices(state, world, you) };
+          // ohne Abstandsregel (rules/placement.ts). Am Dorf gewaehlt: nur in
+          // dessen Naehe (Spieltest 11: der Turm leuchtete auf der ganzen Karte).
+          const alle = legalTowerVertices(state, world, you);
+          const nah = bauAnker ? alle.filter((vk) => nahAm(bauAnker, vertexAdjacentHexes(parseVertexKey(vk)))) : alle;
+          return { vertices: nah.length > 0 ? nah : alle };
         }
         if (mode === 'mauer' || mode === 'tor') {
           // Freie Kante im eigenen Einflussbereich - dieselbe Regel fuer Wand und Tor.
-          return { edges: legalMauerEdges(state, world, you) };
+          const alle = legalMauerEdges(state, world, you);
+          const nah = bauAnker ? alle.filter((ek) => nahAm(bauAnker, edgeEndpoints(parseEdgeKey(ek)).flatMap(vertexAdjacentHexes))) : alle;
+          return { edges: nah.length > 0 ? nah : alle };
         }
         if (reichArtVon(mode) !== null) {
           // Phase 2: alle Kacheln des eigenen Reichs, auf denen ein Bau erlaubt ist.
@@ -609,7 +625,7 @@ export function Game() {
       default:
         return {};
     }
-  }, [state, world, you, isMine, phase, mode, hand]);
+  }, [state, world, you, isMine, phase, mode, hand, bauAnker]);
 
   /** Gibt es ueberhaupt einen Platz fuer ein Dorf? Sonst bleibt der Knopf aus (Spieltest 5). */
   const dorfPlatz = useMemo(
@@ -1061,7 +1077,10 @@ export function Game() {
       info,
       darf: jetzt && bezahlbar(kosten),
       hinweis: warum ?? armut(kosten),
-      wahl: dann(() => setMode(m)),
+      wahl: dann(() => {
+        setBauAnker(ausbauOrt.key);
+        setMode(m);
+      }),
     });
     const truppe = (name: string, kosten: Cost, a: Action, info: string) => ({
       name,

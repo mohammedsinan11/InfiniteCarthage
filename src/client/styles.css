@@ -479,8 +479,11 @@ em.off {
 }
 
 .edge-target {
-  stroke: rgba(242, 231, 208, 0.32);
+  /* Deutlicher: die Plaetze fuer Strassen waren kaum zu sehen (Spieltest 9 und 11). */
+  stroke: rgba(255, 226, 140, 0.6);
   stroke-width: 8;
+  stroke-dasharray: 6 4;
+  animation: kante-puls 1.6s ease-in-out infinite;
   stroke-linecap: round;
   cursor: pointer;
 }
@@ -7370,4 +7373,19 @@ em.off {
 }
 .main:not(:has(.raub-zeile:not(.feuer-zeile))) .feuer-zeile {
   bottom: calc(var(--unten-oben, 118px) + 46px);
+}
+
+@keyframes kante-puls {
+  0%,
+  100% {
+    stroke-opacity: 0.55;
+  }
+  50% {
+    stroke-opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .edge-target {
+    animation: none;
+  }
 }
