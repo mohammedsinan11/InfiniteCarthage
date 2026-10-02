@@ -7099,3 +7099,164 @@ em.off {
   font-size: 10px;
   margin-right: 6px;
 }
+
+/*
+ * Die Kartenleiste (ui/KartenLeiste.tsx): die eigene Engine rechts am Rand,
+ * neben der Menue-Lasche. Loest eine Karte aus, leuchtet sie auf, und ihr
+ * Lohn steigt nach links auf.
+ */
+.kartenleiste {
+  position: absolute;
+  top: var(--menu-oben, 52px);
+  right: 34px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /* Kein Scrollen: sonst schnitte der Rand die aufsteigenden Lohnzeilen ab.
+     Es sind ohnehin selten mehr als acht Karten (3-5 Plaetze, Krone, Relikte). */
+  pointer-events: none;
+}
+.kl-karte,
+.kl-zu,
+.kl-zu-knopf {
+  pointer-events: auto;
+}
+.kl-zu {
+  align-self: flex-end;
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 14px;
+  opacity: 0.7;
+}
+.kl-zu-knopf {
+  position: absolute;
+  top: var(--menu-oben, 52px);
+  right: 34px;
+  z-index: 6;
+  font-family: var(--pixel);
+  font-size: 9px;
+  padding: 6px 8px;
+}
+.kl-karte {
+  position: relative;
+  width: 64px;
+  padding: 3px 3px 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  background: #1d150e;
+  border: 2px solid var(--sippe);
+  box-shadow: 0 2px 0 #0008;
+  text-align: center;
+}
+.kl-karte .kl-bild .karten-bild {
+  display: block;
+  width: 100%;
+}
+.kl-karte .kl-bild svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.kl-name {
+  font-family: var(--pixel);
+  font-size: 7px;
+  line-height: 9px;
+  color: #e8d8b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kl-krone {
+  border-color: #f0c84a;
+  background: #2a1f0c;
+}
+.kl-krone::before {
+  content: '♛';
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #f0c84a;
+  font-size: 11px;
+  text-shadow: 0 1px 0 #000;
+}
+.kl-relikt {
+  border-style: dashed;
+}
+.kl-zaehler {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 14px;
+  padding: 0 2px;
+  font-family: var(--pixel);
+  font-size: 8px;
+  line-height: 12px;
+  color: #1d150e;
+  background: #f0c84a;
+}
+.kl-karte.blitz {
+  animation: kl-blitz 0.9s ease-out 2;
+}
+@keyframes kl-blitz {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 #f0c84a;
+  }
+  25% {
+    transform: scale(1.12);
+    box-shadow: 0 0 14px 4px #f0c84acc;
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 2px 0 #0008;
+  }
+}
+.kl-lohn {
+  position: absolute;
+  right: calc(100% + 6px);
+  top: 50%;
+  white-space: nowrap;
+  font-family: var(--pixel);
+  font-size: 10px;
+  color: #ffe9a0;
+  background: #1d150ee6;
+  border: 1px solid #f0c84a;
+  padding: 2px 5px;
+  pointer-events: none;
+  opacity: 0;
+  animation: kl-lohn 2.4s ease-out forwards;
+}
+@keyframes kl-lohn {
+  0% {
+    opacity: 0;
+    transform: translate(8px, -50%);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(0, -50%);
+  }
+  75% {
+    opacity: 1;
+    transform: translate(0, -110%);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(0, -160%);
+  }
+}
+@media (max-width: 700px) {
+  .kartenleiste {
+    right: 30px;
+    gap: 3px;
+  }
+  .kl-karte {
+    width: 44px;
+  }
+  .kl-name {
+    display: none;
+  }
+}

@@ -26,6 +26,7 @@ import type { ClientMsg, RoomInfo, ServerMsg } from '../../core/protocol';
 import type { PublicState } from '../../core/redact';
 import type { Seite } from '../../core/combat';
 import type { Action, GameEvent } from '../../core/rules/reducer';
+import type { Resource } from '../../core/types';
 import {
   playAbgebrannt,
   playAuftrag,
@@ -140,6 +141,22 @@ export type Treffer = {
   nr: number;
 };
 
+/** Eine eigene Karte hat ausgeloest - mit ihrem Lohn in Kurzform ("+2 Holz"). */
+export type KartenBlitz = { id: number; card: string; text: string };
+
+function lohnKurz(e: { gained: Record<string, number>; ruhm: number; wahl: number; zaehler: number }): string {
+  return [
+    ...Object.entries(e.gained)
+      .filter(([, n]) => n > 0)
+      .map(([r, n]) => `+${n} ${resourceName(r as Resource)}`),
+    e.ruhm > 0 ? `+${e.ruhm} Ruhm` : '',
+    e.wahl > 0 ? `+${e.wahl} Wahl` : '',
+    e.zaehler > 0 ? `+${e.zaehler} Zaehler` : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
 /** Unter welchem Namen zuletzt beigetreten wurde - fuer die Platzwahl auf derselben Verbindung. */
 let beitrittsName = '';
 /** Sofort spielen (D13): sobald der Raum steht, ein Bot dazu und starten. */
@@ -191,6 +208,12 @@ export type Store = {
   pfeile: Pfeil[];
   /** Treffer der letzten Kampfrunde - das Brett zeigt sie kurz, Game raeumt sie weg. */
   treffer: Treffer[];
+  /**
+   * Eigene Karten, die gerade ausgeloest haben (kartenLohn): die Kartenleiste
+   * laesst sie aufleuchten und zeigt den Lohn (ui/KartenLeiste.tsx).
+   */
+  kartenBlitze: KartenBlitz[];
+  clearKartenBlitze: () => void;
   /** Die frische Kunde aus dem Land, bis man sie wegklickt (core/kunde.ts). */
   kunde: Bericht | null;
   schliesseKunde: () => void;
@@ -849,6 +872,7 @@ export const useStore = create<Store>((set, get) => ({
   produceEffect: null,
   pfeile: [],
   treffer: [],
+  kartenBlitze: [],
   kunde: null,
   schliesseKunde: () => set({ kunde: null }),
 
@@ -1066,6 +1090,10 @@ export const useStore = create<Store>((set, get) => ({
                 : [],
             );
             if (treffer.length > 0) set({ treffer });
+            const blitze: KartenBlitz[] = msg.events.flatMap((e: GameEvent) =>
+              e.t === 'kartenLohn' && e.player === get().you ? [{ id: naechsteId++, card: e.card, text: lohnKurz(e) }] : [],
+            );
+            if (blitze.length > 0) set((s) => ({ kartenBlitze: [...s.kartenBlitze, ...blitze].slice(-12) }));
             set((s) => ({
               log: buendeln(
                 s.log,
@@ -1171,6 +1199,7 @@ export const useStore = create<Store>((set, get) => ({
   clearProduceEffect: () => set({ produceEffect: null }),
   clearPfeile: () => set({ pfeile: [] }),
   clearTreffer: () => set({ treffer: [] }),
+  clearKartenBlitze: () => set({ kartenBlitze: [] }),
 }));
 
 /*

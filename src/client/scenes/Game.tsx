@@ -89,6 +89,7 @@ import {
 import { einheitNamen, gruppenStatus, heerGruppen, untaetig } from '../heer';
 import { heldKurz } from '../../core/lore';
 import { Heerleiste } from '../ui/Heerleiste';
+import { KartenLeiste } from '../ui/KartenLeiste';
 import { Inventar } from '../ui/Inventar';
 import {
   FAST_GESCHLOSSEN,
@@ -199,6 +200,10 @@ export function Game() {
     return () => window.clearTimeout(t);
   }, [treffer, clearTreffer]);
   const clearProduceEffect = useStore((s) => s.clearProduceEffect);
+  const kartenBlitze = useStore((s) => s.kartenBlitze);
+  const clearKartenBlitze = useStore((s) => s.clearKartenBlitze);
+  /** Eine Karte aus der Kartenleiste im Menue aufschlagen. */
+  const [zeigeKarte, setZeigeKarte] = useState<{ id: string; nr: number } | null>(null);
 
   const [mode, setMode] = useState<BuildMode>(null);
   /** Wo die Ausbau-Tafel offen ist: an einem eigenen Gebaeude oder an einer Krone. */
@@ -1453,6 +1458,7 @@ export function Game() {
         <SideMenu
           onVerlassen={disconnect}
           zaehler={me?.zaehler}
+          zeigeKarte={zeigeKarte}
           krone={me?.krone ?? null}
           onKrone={(card) => act({ t: 'setKrone', card })}
           plus={me?.plus ?? []}
@@ -1944,6 +1950,18 @@ export function Game() {
               zeigeFeld(u.q, u.r);
             }}
           />
+          {me && phase.t !== 'setup' && phase.t !== 'finished' && (
+            <KartenLeiste
+              activeCards={me.activeCards}
+              krone={me.krone}
+              equipment={me.equipment}
+              plus={me.plus ?? []}
+              zaehler={me.zaehler ?? {}}
+              blitze={kartenBlitze}
+              onAbgelaufen={clearKartenBlitze}
+              onOeffnen={(id) => setZeigeKarte((z) => ({ id, nr: (z?.nr ?? 0) + 1 }))}
+            />
+          )}
           {diagnoseAn() && <Diagnose />}
 
           {pendingRoll !== null && (

@@ -243,6 +243,7 @@ export function SideMenu({
   mitHeld = true,
   mitReich = true,
   zaehler,
+  zeigeKarte,
   krone = null,
   onKrone,
   plus = [],
@@ -261,6 +262,8 @@ export function SideMenu({
   onSchmieden?: (card: string, art: 'verbessern' | 'verbrennen') => void;
   /** Zaehler der Engine-Karten (ENGINE_KARTEN.md). */
   zaehler?: Record<string, number>;
+  /** Von aussen eine Karte aufschlagen (ui/KartenLeiste.tsx); nr stoesst es jedes Mal neu an. */
+  zeigeKarte?: { id: string; nr: number } | null;
   /** Die Schluesselkarte im Kronplatz. */
   krone?: string | null;
   /** Eine andere eigene Schluesselkarte in den Kronplatz legen. */
@@ -368,6 +371,12 @@ export function SideMenu({
   /** Welche Karte ihren Text zeigt. */
   const [karteOffen, setKarteOffen] = useState<string | null>(null);
   const [logFilter, setLogFilter] = useState<LogFilter>('alles');
+  useEffect(() => {
+    if (!zeigeKarte) return;
+    setOffen(true);
+    setReiter('reich');
+    setKarteOffen(zeigeKarte.id);
+  }, [zeigeKarte]);
   const [ton, setTon] = useState(getVolume);
   const [musik, setMusik] = useState<MusicMode>(getMusicMode);
   const [musikPegel, setMusikPegel] = useState(getMusicVolume);
