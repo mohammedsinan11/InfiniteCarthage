@@ -244,7 +244,10 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
       connected: p.connected,
       haus: p.haus ?? null,
       erbstueck: p.erbstueck ?? null,
-      points: publicPoints(state, p.id),
+      // Mit Akten gibt es keinen fruehen Sieg - verdeckte Siegpunktkarten
+      // verbergen dann nur den Spielstand (Spieltest 11: verloren um 9 Wertung
+      // gegen Punkte, die man nie sah). Also offen.
+      points: publicPoints(state, p.id) + (state.akte ? p.dev.filter((d) => d.type === 'victoryPoint').length : 0),
     };
     if (p.id === viewer) {
       base.hand = { ...p.hand };

@@ -1,5 +1,6 @@
 /** Warteraum: Mitspieler sammeln, Zielpunkte, Laenge und Omen waehlen, starten. */
 
+import { useEffect, useRef } from 'react';
 import { botNatur } from '../../core/bot';
 import { WELTARTEN, weltArtInfo } from '../../core/weltart';
 import { useStore } from '../net/store';
@@ -34,6 +35,22 @@ export function Lobby() {
   const isHost = room.hostId === you;
   const canStart = isHost && room.members.length >= MIN_PLAYERS;
   const tages = room.tagesDatum;
+  /*
+   * "Alles von Anfang an" merkt sich der Browser (Spieltest 11: im naechsten
+   * Raum war es wieder aus). Einmal je Raum, nur als Gastgeber.
+   */
+  const alleGesetzt = useRef(false);
+  useEffect(() => {
+    if (alleGesetzt.current || !isHost || room.started || room.systeme === undefined) return;
+    alleGesetzt.current = true;
+    let gemerkt = false;
+    try {
+      gemerkt = localStorage.getItem('infinitecarthage.alleSysteme') === 'an';
+    } catch {
+      // Privater Modus.
+    }
+    if (gemerkt && !room.alleSysteme) send({ t: 'setOptions', alleSysteme: true });
+  }, [isHost, room.started, room.systeme, room.alleSysteme, send]);
 
   return (
     <div className="home">
@@ -268,7 +285,14 @@ export function Lobby() {
                     type="checkbox"
                     checked={room.alleSysteme ?? false}
                     disabled={!isHost}
-                    onChange={(e) => send({ t: 'setOptions', alleSysteme: e.target.checked })}
+                    onChange={(e) => {
+                      try {
+                        localStorage.setItem('infinitecarthage.alleSysteme', e.target.checked ? 'an' : 'aus');
+                      } catch {
+                        // Privater Modus - dann nur fuer diesen Raum.
+                      }
+                      send({ t: 'setOptions', alleSysteme: e.target.checked });
+                    }}
                   />
                   Alles von Anfang an (fuer alle, die das Spiel kennen)
                 </label>

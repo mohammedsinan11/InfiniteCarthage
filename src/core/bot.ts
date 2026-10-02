@@ -343,13 +343,19 @@ export function botNimmtHandel(s: GameState, id: PlayerId): boolean {
   if (!t || !p) return false;
   let gib = 0;
   let nimm = 0;
+  let letzte = false;
   for (const r of RESOURCES) {
     const will = t.want[r] ?? 0;
-    if (will > 0 && p.hand[r] - will < 1) return false;
+    if (will > p.hand[r]) return false;
+    // Die letzte Karte einer Sorte gibt der Bot nur fuer ein gutes Angebot her.
+    if (will > 0 && p.hand[r] - will < 1) letzte = true;
     gib += will;
     nimm += t.give[r] ?? 0;
   }
-  return gib > 0 && nimm >= gib;
+  // Spieltest 11: 0 von 7 Angeboten angenommen - der Bot bestand darauf, von
+  // jeder Sorte eine zu behalten. Jetzt: fair genuegt, fuer die letzte Karte
+  // muss es mehr sein.
+  return gib > 0 && (letzte ? nimm > gib : nimm >= gib);
 }
 
 export function botsSpielen(game: Game, istBot: (id: PlayerId) => boolean, grenze = 600): GameEvent[][] {

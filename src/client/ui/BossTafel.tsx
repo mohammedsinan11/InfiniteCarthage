@@ -7,7 +7,7 @@
  * Sinn: nicht ueberrascht werden, sondern auf ihn hin bauen.
  */
 
-import { AKTE, bossById, forderungText, fortschritt, zielWert, ZIEL_NAME } from '../../core/akte';
+import { AKTE, bossById, forderungText, forderungVorschau, fortschritt, zielWert, ZIEL_NAME } from '../../core/akte';
 import type { BossStand } from '../../core/akte';
 import type { PublicState } from '../../core/redact';
 import type { BossLohn } from '../../core/state';
@@ -104,6 +104,7 @@ export function BossTafel({ state, you, darfZahlen, onZahlen, onZeigen, onZu }: 
               <span>{aktZahl(akt)}</span>
               {b?.name ?? id}
               <i>{vorbei ? (gesiegt ? '✓' : '✗') : `+${akt}`}</i>
+              {akt > st.akt && b && <small className="boss-vorschau">{forderungVorschau(b, akt, state.stufe)}</small>}
             </li>
           );
         })}

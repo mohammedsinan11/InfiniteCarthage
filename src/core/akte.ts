@@ -216,6 +216,20 @@ export function forderungFuer(
   return { t: 'ziel', mass, start, soll: start + ZIEL_MEHR[mass][i]! + haerte };
 }
 
+/**
+ * Was ein Boss in einem kuenftigen Akt fordern wird, grob - damit man vorsorgen
+ * kann (Spieltest 11: "die Forderung des naechsten Aktes bleibt verborgen").
+ */
+export function forderungVorschau(boss: BossDef, akt: number, stufe = 0): string {
+  const i = Math.max(0, Math.min(AKTE, akt) - 1);
+  const haerte = stufe >= 7 ? 1 : 0;
+  if (boss.art === 'tribut') return `Tribut: ${TRIBUT_KARTEN[i]! + 2 * haerte} Karten aus ${akt >= 3 ? 'drei' : 'zwei'} Sorten`;
+  if (boss.art === 'heer') return `Heer: ${HEER[i]![0] + haerte} Kaempfer brechen zur Mitte des Aktes auf`;
+  const mass = boss.mass ?? 'siedlungen';
+  const n = ZIEL_MEHR[mass][i]! + haerte;
+  return `Wachstum: ${n} ${n === 1 ? ZIEL_NAME[mass][0] : ZIEL_NAME[mass][1]} mehr`;
+}
+
 /** Ist die Forderung erfuellt? Fuer HEER erst, wenn das Heer aufgebrochen und vollstaendig gefallen ist. */
 export function erfuellt(
   s: Pick<GameState, 'buildings' | 'roads' | 'units'>,

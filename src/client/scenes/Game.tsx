@@ -66,7 +66,7 @@ import { brennt } from '../../core/rules/feuer';
 import { maxLeben } from '../../core/combat';
 import { kampfFelder as kampfFelderVon } from '../../core/combat';
 import type { UnitState as HeerEinheit } from '../../core/state';
-import { bundleText } from '../log';
+import { bundleText, resourceName } from '../log';
 import { eckenWert, istBotId } from '../../core/bot';
 import { weltArtVon } from '../../core/weltart';
 import { einwohnerVon, platzFuer, stadtReif } from '../../core/bevoelkerung';
@@ -1441,7 +1441,7 @@ export function Game() {
                   <span key={p.id} className={p.besiegt ? 'besiegt' : undefined}>
                     <i className="dot" style={{ background: p.color }} />
                     <span className="hud-lang">{p.name} </span>★{p.points}
-                    {p.devCount > 0 ? '+?' : ''}
+                    {p.devCount > 0 && !state.akte ? '+?' : ''}
                   </span>
                 ))}
             </span>
@@ -1885,6 +1885,23 @@ export function Game() {
                   Danke
                 </button>
               </span>
+            </div>
+          )}
+
+          {/* Es brennt: eine Zeile, die bleibt, bis geloescht ist (Spieltest 11: eine Stadt brannte ab, das Flammenzeichen war leicht zu uebersehen). */}
+          {meineBraende.length > 0 && !zielWahl && tafel === null && (
+            <div className="raub-zeile feuer-zeile" role="alert">
+              <button title="Zum Feuer" onClick={() => zeigeFeld(meineBraende[0]!.q, meineBraende[0]!.r)}>
+                <b>Es brennt!</b>
+                {meineBraende.length === 1
+                  ? `${meineBraende[0]!.art === 'strasse' ? 'Eine Strasse' : meineBraende[0]!.art === 'stadt' ? 'Eine Stadt' : 'Ein Dorf'} - loesche, bevor es niederbrennt`
+                  : `${meineBraende.length} Feuer - loesche, bevor sie niederbrennen`}
+              </button>
+              {loeschenMoeglich && loeschKarte && (
+                <button className="klein" title={`Kostet 1 ${resourceName(loeschKarte)}`} onClick={() => loeschen(meineBraende[0]!.key)}>
+                  Loeschen
+                </button>
+              )}
             </div>
           )}
 
