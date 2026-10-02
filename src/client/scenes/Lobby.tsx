@@ -242,7 +242,7 @@ export function Lobby() {
                   ? `Drei Akte zu je ${AKTE_ZUEGE / 3} eigenen Zuegen (${AKTE_ZUEGE * room.members.length} Runden). Danach`
                   : `Drei Akte in ${room.rundenLimit} Runden. Danach`}{' '}
                 ist Schluss, dann gewinnt die hoechste Wertung
-                {' (Basis mal Mult, siehe Chronik). Es gibt keinen fruehen Sieg. Jeder Akt endet mit einem Boss: wer ihn besteht, bekommt Siegpunkte, eine seltene Karte und eine Schmiedearbeit.'}
+                {' (Basis mal Mult, siehe Chronik). Es gibt keinen fruehen Sieg. Jeder Akt endet mit einem Boss: wer ihn besteht, bekommt Siegpunkte und waehlt einen Lohn: eine seltene Karte, Schmiedearbeiten oder ein Relikt.'}
               </p>
             )}
 

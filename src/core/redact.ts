@@ -16,7 +16,7 @@ import type { PfadStand } from './heldenpfad';
 import type { AkteStand } from './akte';
 import type { SystemId } from './systeme';
 import { emptyHand, handSize, publicPoints } from './state';
-import type { DevCard, GameState, Hand, Phase, PlayerId, TradeOffer } from './state';
+import type { BossLohn, DevCard, GameState, Hand, Phase, PlayerId, TradeOffer } from './state';
 import type { ChunkCoord } from './chunks';
 import type { GameEvent } from './rules/reducer';
 import type { HeldLore } from './lore';
@@ -54,6 +54,8 @@ export type PublicPlayer = {
   /** Offene Trophaeen besiegter Bosse - oeffentlich wie die Beute. */
   trophaeen: number;
   kartenWahl: number;
+  /** Der Lohn eines bezwungenen Bosses zur Wahl - oeffentlich wie die Trophaeen. */
+  bossLohn: BossLohn[] | null;
   /** Zaehler der Engine-Karten - oeffentlich wie die Karten (ENGINE_KARTEN.md). */
   zaehler: Record<string, number>;
   /** Die Schluesselkarte im Kronplatz. */
@@ -223,6 +225,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
       loot: p.loot,
       trophaeen: p.trophaeen ?? 0,
       kartenWahl: p.kartenWahl ?? 0,
+      bossLohn: p.bossLohn ?? null,
       zaehler: { ...(p.zaehler ?? {}) },
       krone: p.krone ?? null,
       plus: [...(p.plus ?? [])],

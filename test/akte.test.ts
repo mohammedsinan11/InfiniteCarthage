@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest';
 import { applyAction, createGame } from '../src/core/rules/reducer';
 import type { GameEvent } from '../src/core/rules/reducer';
 import { BOSSE, aktVon, bossById, waehleBosse } from '../src/core/akte';
-import { akteFortschreiben, bossZahlen } from '../src/core/rules/akt';
+import { akteFortschreiben, bossLohnNehmen, bossZahlen } from '../src/core/rules/akt';
 import { handSize, publicPoints } from '../src/core/state';
 import type { GameState } from '../src/core/state';
 import { hatSystem, neuesSystem, systemeFuer } from '../src/core/systeme';
@@ -106,9 +106,15 @@ describe('Akte', () => {
     akteFortschreiben(s, e, null);
     expect(st.ergebnis).toBe('besiegt');
     expect(s.akte!.siege.p0).toEqual([1]);
-    expect(p.trophaeen).toBe(1);
     expect(publicPoints(s, 'p0')).toBe(vorher + 1);
     expect(e.ev.some((x) => x.t === 'bossBesiegt')).toBe(true);
+    // Der Lohn steht zur Wahl (B8).
+    expect(p.bossLohn).toEqual(['trophaee', 'schmiede', 'relikt']);
+    expect(bossLohnNehmen(s, 'p0', 'ruhm', e)).not.toBeNull();
+    expect(bossLohnNehmen(s, 'p0', 'schmiede', e)).toBeNull();
+    expect(p.schmiede).toBe(2);
+    expect(p.bossLohn).toBeNull();
+    expect(bossLohnNehmen(s, 'p0', 'trophaee', e)).not.toBeNull();
   });
 
   it('der letzte Boss frueh bezwungen fordert eine Zugabe: +1 Punkt, eine offene kostet nichts', () => {

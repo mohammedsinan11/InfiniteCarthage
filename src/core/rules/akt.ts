@@ -10,7 +10,12 @@
 import { AKTE, aktVon, bossById, erfuellt, forderungFuer } from '../akte';
 import type { BossStand } from '../akte';
 import { handSize, playerById, publicPoints } from '../state';
-import type { GameState, PlayerId } from '../state';
+import type { BossLohn, GameState, PlayerId } from '../state';
+import { hatSystem } from '../systeme';
+import { heldFolge } from './pfad';
+import type { PfadEvent } from './pfad';
+import { geben } from './ruhm';
+import type { RuhmEvent } from './ruhm';
 import { RESOURCES } from '../types';
 import type { Resource } from '../types';
 import { bossHeerAufstellen } from './army';
@@ -26,9 +31,11 @@ export type AktEvent =
   | { t: 'bossZugabe'; player: PlayerId; boss: string; zugabe: number; bis: number }
   | { t: 'bossVerfehlt'; player: PlayerId; akt: number; boss: string; verloren: number }
   /** Tribut eingezahlt. */
-  | { t: 'bossGezahlt'; player: PlayerId; resource: Resource; anzahl: number };
+  | { t: 'bossGezahlt'; player: PlayerId; resource: Resource; anzahl: number }
+  /** Der Lohn eines Bosses ist gewaehlt (B8). */
+  | { t: 'bossLohn'; player: PlayerId; wahl: BossLohn };
 
-type Ereignisse = { push(...e: AktEvent[]): number };
+type Ereignisse = { push(...e: (AktEvent | PfadEvent | RuhmEvent)[]): number };
 
 const punkteVon = (s: GameState) => (id: PlayerId) => publicPoints(s, id);
 
@@ -48,10 +55,12 @@ function besiegt(s: GameState, st: BossStand, id: PlayerId, events: Ereignisse):
   }
   akte.siege[id] = [...(akte.siege[id] ?? []), st.akt];
   const p = playerById(s, id);
-  // Dazu eine Schmiedearbeit (rules/schmiede.ts): verbessern oder verbrennen.
+  // Dazu ein Lohn zur Wahl (B8): seltene Karte, Schmiedearbeiten, Relikt oder Ruhm.
+  // Bots nehmen die Trophaee - sie haben keine Tafel.
   if (p) {
-    p.trophaeen = (p.trophaeen ?? 0) + 1;
-    p.schmiede = (p.schmiede ?? 0) + 1;
+    const angebot: BossLohn[] = ['trophaee', 'schmiede', hatSystem(s, 'held') ? 'relikt' : 'ruhm'];
+    if ((s.bots ?? []).includes(id)) bossLohnNehmen(s, id, 'trophaee', events);
+    else p.bossLohn = angebot;
   }
   events.push({ t: 'bossBesiegt', player: id, akt: st.akt, boss: st.boss, punkte: st.akt });
   zugabe(s, st, id, events);
@@ -147,6 +156,21 @@ export function akteFortschreiben(s: GameState, events: Ereignisse, beendet: num
     // Frueh geschafft: sofort belohnen.
     if (erfuellt(s, p.id, st.forderung, punkte)) besiegt(s, st, p.id, events);
   }
+}
+
+/** Den Lohn eines bezwungenen Bosses nehmen. Gibt einen Grund zurueck, wenn es nicht geht. */
+export function bossLohnNehmen(s: GameState, id: PlayerId, wahl: BossLohn, events: Ereignisse): string | null {
+  const p = playerById(s, id);
+  if (!p) return 'Unbekannter Spieler.';
+  const bot = (s.bots ?? []).includes(id);
+  if (!bot && !p.bossLohn?.includes(wahl)) return 'Dieser Lohn steht nicht zur Wahl.';
+  p.bossLohn = null;
+  if (wahl === 'trophaee') p.trophaeen = (p.trophaeen ?? 0) + 1;
+  else if (wahl === 'schmiede') p.schmiede = (p.schmiede ?? 0) + 2;
+  else if (wahl === 'relikt') heldFolge(s, p, { relikt: 'zufall', xp: 2 }, events);
+  else geben(s, id, 3, 'boss', events);
+  events.push({ t: 'bossLohn', player: id, wahl });
+  return null;
 }
 
 /**

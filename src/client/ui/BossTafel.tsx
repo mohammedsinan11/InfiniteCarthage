@@ -10,6 +10,7 @@
 import { AKTE, bossById, forderungText, fortschritt, zielWert, ZIEL_NAME } from '../../core/akte';
 import type { BossStand } from '../../core/akte';
 import type { PublicState } from '../../core/redact';
+import type { BossLohn } from '../../core/state';
 import { RESOURCES } from '../../core/types';
 import type { Resource } from '../../core/types';
 import { resourceName } from '../log';
@@ -80,7 +81,7 @@ export function BossTafel({ state, you, darfZahlen, onZahlen, onZeigen, onZu }: 
             <p className="boss-lohn">Bestanden: +1 Siegpunkt und +0,5 Mult - dann fordert er wieder. Offen am Ende: kein Verlust.</p>
           ) : (
             <p className="boss-lohn">
-              Bestanden: +{st.akt} {st.akt === 1 ? 'Siegpunkt' : 'Siegpunkte'} und eine Trophaee (seltene Karte)
+              Bestanden: +{st.akt} {st.akt === 1 ? 'Siegpunkt' : 'Siegpunkte'} und ein Lohn zur Wahl (seltene Karte, Schmiedearbeiten oder Relikt)
               {st.akt === 3 ? ', danach Zugaben' : ''}. Verfehlt: die Haelfte der Hand und 1 Ruhm.
             </p>
           )}
@@ -204,5 +205,33 @@ function BossWappen({ art }: { art: 'tribut' | 'heer' | 'ziel' }) {
         </>
       )}
     </svg>
+  );
+}
+
+const LOHN_TEXT: Record<BossLohn, { titel: string; text: string }> = {
+  trophaee: { titel: 'Trophaee', text: 'Eine Kartenwahl aus seltenen und epischen Karten.' },
+  schmiede: { titel: 'Zwei Schmiedearbeiten', text: 'Zwei Karten verbessern oder verbrennen - die Engine schaerfen.' },
+  relikt: { titel: 'Ein Relikt', text: 'Ein Relikt fuer deinen Helden, dazu Erfahrung.' },
+  ruhm: { titel: '3 Ruhm', text: 'Ruhm zaehlt in der Wertung und fuer manche Karten.' },
+};
+
+/** Der Lohn eines bezwungenen Bosses zur Wahl (B8). */
+export function BossLohnWahl({ boss, angebot, onWahl }: { boss: string; angebot: readonly BossLohn[]; onWahl: (w: BossLohn) => void }) {
+  return (
+    <div className="draft-overlay ereignis-huelle">
+      <div className="ereignis boss-lohn-wahl">
+        <span className="ereignis-zeit">Bezwungen</span>
+        <h2>{bossById(boss)?.name ?? 'Der Boss'} ist besiegt</h2>
+        {bossById(boss)?.abgang && <p className="ereignis-text boss-spruch">{bossById(boss)!.abgang}</p>}
+        <p className="ereignis-text">Waehle deinen Lohn.</p>
+        <div className="ereignis-wahlen">
+          {angebot.map((w) => (
+            <button key={w} onClick={() => onWahl(w)}>
+              <b>{LOHN_TEXT[w].titel}</b> {LOHN_TEXT[w].text}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

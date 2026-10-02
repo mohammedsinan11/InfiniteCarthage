@@ -288,6 +288,7 @@ function vervollstaendige(msg: ServerMsg): void {
     for (const p of msg.state.players) {
       p.trophaeen ??= 0;
       p.kartenWahl ??= 0;
+      p.bossLohn ??= null;
       p.zaehler ??= {};
       p.krone ??= null;
       p.plus ??= [];
@@ -516,7 +517,7 @@ function meldungenAus(
       continue;
     }
     if (e.t === 'bossBesiegt') {
-      meldung(e.player === you ? `${bossById(e.boss)?.name ?? 'Der Boss'} bezwungen: +${e.punkte} Siegpunkte und eine Trophaee` : `${wer(e.player)} bezwingt ${bossById(e.boss)?.name ?? 'den Boss'}`, e.player === you ? 'gain' : 'info');
+      meldung(e.player === you ? `${bossById(e.boss)?.name ?? 'Der Boss'} bezwungen: +${e.punkte} Siegpunkte - waehle deinen Lohn` : `${wer(e.player)} bezwingt ${bossById(e.boss)?.name ?? 'den Boss'}`, e.player === you ? 'gain' : 'info');
       continue;
     }
     if (e.t === 'bossVerfehlt' && e.player === you) {

@@ -140,6 +140,11 @@ export type Player = {
    */
   kartenWahl?: number;
   /**
+   * Ein Boss ist bezwungen: sein Lohn steht zur Wahl (B8, wie die Bossrelikte
+   * bei Slay the Spire). null oder fehlend: nichts offen.
+   */
+  bossLohn?: BossLohn[] | null;
+  /**
    * Zaehler der Engine-Karten (cards/ausloeser.ts): Kartenkennung oder ein
    * benannter Topf mit '#' -> Stand. Oeffentlich wie die Karten.
    */
@@ -237,6 +242,9 @@ export type Mauer = { owner: PlayerId; art: MauerArt };
 export type Reichsbau = { owner: PlayerId; art: string; seit: number };
 
 /** Was auf der Karte laufen kann. */
+/** Was ein bezwungener Boss zur Wahl stellt (rules/akt.ts). */
+export type BossLohn = 'trophaee' | 'schmiede' | 'relikt' | 'ruhm';
+
 export type UnitKind =
   | 'ritter'
   | 'raeuber'

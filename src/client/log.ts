@@ -118,6 +118,14 @@ const lagerVon = (name: string): string => {
   return g === name ? `von ${name}` : g;
 };
 
+/** Der Lohn eines Bosses in Worten (rules/akt.ts, B8). */
+export const BOSS_LOHN_NAME = {
+  trophaee: 'eine seltene Kartenwahl',
+  schmiede: 'zwei Schmiedearbeiten',
+  relikt: 'ein Relikt fuer den Helden',
+  ruhm: '3 Ruhm',
+} as const;
+
 const karten = (n: number): string => `${n} ${n === 1 ? 'Karte' : 'Karten'}`;
 
 /** Ein Rohstoffbuendel als Text, z.B. "2x Holz, 1x Erz". */
@@ -225,11 +233,13 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
     }
     case 'bossNaht':
       return `${bossById(e.boss)?.name ?? 'Der Boss'}: ein Heer von ${e.anzahl} Kaempfern zieht gegen ${who(state, e.player)}.`;
+    case 'bossLohn':
+      return `${who(state, e.player)} waehlt als Lohn: ${BOSS_LOHN_NAME[e.wahl]}.`;
     case 'bossZugabe':
       return `${bossById(e.boss)?.name ?? 'Der Boss'} fordert eine Zugabe von ${who(state, e.player)} - bis Runde ${roundOf(e.bis)}. Jede bestandene Zugabe: +1 Siegpunkt und +0,5 Mult.`;
     case 'bossBesiegt':
       if (e.zugabe) return `${who(state, e.player)} besteht die ${e.zugabe}. Zugabe: +1 Siegpunkt, +0,5 Mult.`;
-      return `${who(state, e.player)} besteht ${bossById(e.boss)?.name ?? 'den Boss'} - Akt ${e.akt}: +${e.punkte} ${e.punkte === 1 ? 'Siegpunkt' : 'Siegpunkte'} und eine Trophaee.`;
+      return `${who(state, e.player)} besteht ${bossById(e.boss)?.name ?? 'den Boss'} - Akt ${e.akt}: +${e.punkte} ${e.punkte === 1 ? 'Siegpunkt' : 'Siegpunkte'}.`;
     case 'bossVerfehlt':
       return `${who(state, e.player)} verfehlt ${bossById(e.boss)?.name ?? 'den Boss'} - ${karten(e.verloren)} und ein Punkt Ruhm sind verloren.`;
     case 'bossGezahlt':

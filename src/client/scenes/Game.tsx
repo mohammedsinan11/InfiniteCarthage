@@ -143,7 +143,7 @@ import { wirkungenVon } from '../../core/cards/wirkung';
 import { kannBezahlen } from '../../core/rules/kosten';
 import type { Bauwerk } from '../../core/cards/types';
 import { leseProfil } from '../profil';
-import { BossTafel, aktZahl } from '../ui/BossTafel';
+import { BossLohnWahl, BossTafel, aktZahl } from '../ui/BossTafel';
 import { EigenschaftWahl, HeldFallSzene, PfadTafel } from '../ui/HeldenpfadTafel';
 import type { BuildMode } from '../ui/Aktionsleiste';
 import { reichArtVon } from '../ui/Aktionsleiste';
@@ -1934,6 +1934,14 @@ export function Game() {
             <button className="pfad-chip" onClick={() => setPfadOffen(true)} title="Dein Held wartet auf ein Ziel">
               Heldenpfad ({meinPfad.angebot.length})
             </button>
+          )}
+          {/* Der Lohn des bezwungenen Bosses (B8): der zuletzt bestandene Akt nennt ihn. */}
+          {me?.bossLohn && me.bossLohn.length > 0 && state.akte && state.draft === null && pendingRoll === null && (
+            <BossLohnWahl
+              boss={state.akte.bosse[((state.akte.siege[me.id] ?? []).at(-1) ?? 1) - 1] ?? ''}
+              angebot={me.bossLohn}
+              onWahl={(wahl) => act({ t: 'bossLohn', wahl })}
+            />
           )}
           {heldFall && state.draft === null && pendingRoll === null && (
             <HeldFallSzene

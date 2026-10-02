@@ -60,7 +60,7 @@ import {
   setupPlayerId,
   totalPoints,
 } from '../state';
-import type { GameState, Hand, HeldZweig, MauerArt, PlayerId, Player } from '../state';
+import type { BossLohn, GameState, Hand, HeldZweig, MauerArt, PlayerId, Player } from '../state';
 // Turmstufen: 1 Grenzposten, 2 Geschuetzturm (state.ts, Turm).
 import { MAX_TURM_STUFE, TURM_NAME } from '../state';
 import type { DevCardType } from '../state';
@@ -105,7 +105,7 @@ import { auftraegePruefen, aufAuftragAntworten, auftragLiefern, wandererBieten }
 import type { AuftragEvent } from './auftraege';
 import { nachtBeginntAt, tagBeginntAt } from '../zeit';
 import type { ArmyEvent } from './army';
-import { akteFortschreiben, bossZahlen } from './akt';
+import { akteFortschreiben, bossLohnNehmen, bossZahlen } from './akt';
 import type { AktEvent } from './akt';
 import { waehleBosse } from '../akte';
 import { systemGesperrt } from '../freischalt';
@@ -229,6 +229,8 @@ export type Action =
   | { t: 'pfadWaehlen'; index: number | null }
   /** Eine Eigenschaft fuer den Helden nach einem Stufenaufstieg. */
   | { t: 'eigenschaftWaehlen'; id: string }
+  /** Den Lohn eines bezwungenen Bosses waehlen (B8). */
+  | { t: 'bossLohn'; wahl: BossLohn }
   /** Tribut an den Boss des Aktes zahlen: so viel von dieser Sorte, wie fehlt (core/akte.ts). */
   | { t: 'bossZahlen'; resource: Resource }
   /** Ein eigenes Feuer mit einer Rohstoffkarte loeschen (rules/feuer.ts). */
@@ -1636,6 +1638,12 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       wahlZaehlen(s);
       actorPlayer.loot -= 1;
       enterDraft(s, 'belohnung', events, 1 + actorPlayer.cards.length);
+      break;
+    }
+
+    case 'bossLohn': {
+      const why = bossLohnNehmen(s, actor, action.wahl, events);
+      if (why) return fail(why);
       break;
     }
 
