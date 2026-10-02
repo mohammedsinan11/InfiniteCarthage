@@ -58,6 +58,16 @@ export const ENGINE_REIHE: readonly string[] = [
   'grundstein',
   'kopfgeld',
   'sagenschreiber',
+  // A5: die neuen Legendaeren und Epischen kommen zuletzt frei.
+  'zehntscheune',
+  'gesandtschaft',
+  'feldlager',
+  'wegkreuz',
+  'goldene_aehre',
+  'kaufmannsgilde',
+  'kathedrale',
+  'heerbann',
+  'sternenpfad',
 ];
 
 /** Die Schluesselkarten in der Reihenfolge, in der Bosse sie freigeben. */
@@ -109,16 +119,16 @@ export const SYSTEM_KARTEN: Record<SystemId, readonly string[]> = {
   raub: [
     'wehrhafte_doerfer', 'trophaeenhalle', 'kriegsbeute', 'feldscher', 'schildwall', 'sammeln', 'schlachtruf',
     'belagerungsplan', 'feuerpfeile', 'letztes_aufgebot', 'kriegskasse', 'veteranen', 'blutzoll', 'bollwerk',
-    'beutezug', 'kopfgeld', 'raubritter', 'blutmond_krone',
+    'beutezug', 'kopfgeld', 'raubritter', 'blutmond_krone', 'heerbann',
   ],
   // Held, Ruinen, Wanderer und Auftraege.
   held: [
     'kartograph', 'weltenwanderer', 'freund_der_wanderer', 'heilkraeuter', 'glueck_des_hauses', 'proviant',
     'spaeherpfad', 'schatzkarte', 'wegweiser', 'sammelbeutel', 'fernweh', 'kraeuterkunde', 'sagenschreiber',
-    'lagerfeuer', 'nomadenherz',
+    'lagerfeuer', 'nomadenherz', 'sternenpfad',
   ],
   // Karawanen.
-  ereignisse: ['zollstation', 'seidenstrasse'],
+  ereignisse: ['zollstation', 'seidenstrasse', 'wegkreuz'],
   reich: [],
 };
 

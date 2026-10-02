@@ -14,7 +14,7 @@ describe('Freischaltungen', () => {
   });
 
   it('erste Partie: 10 Engine-Karten und 2 Kronen; danach waechst es', () => {
-    expect(gesperrteKarten(0, 0)).toHaveLength(30 + 14);
+    expect(gesperrteKarten(0, 0)).toHaveLength(39 + 14);
     expect(gesperrteKarten(5, 14)).toEqual([]);
     expect(neuFrei({ partien: 0, bosse: 0 }, { partien: 1, bosse: 2 })).toHaveLength(6 + 2);
   });

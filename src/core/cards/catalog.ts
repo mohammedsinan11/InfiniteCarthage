@@ -675,6 +675,73 @@ export const CARDS: readonly Card[] = [
       { t: 'je', groesse: { aus: 'zaehler' }, pro: 4, max: 5, dann: { t: 'punkte', amount: 1 } },
     ],
   },
+  // A5: mehr Legendaeres und Episches (Spieltest 11: dieselbe legendaere Karte in jeder Partie).
+  {
+    id: 'goldene_aehre', name: 'Goldene Aehre', rarity: 'legendaer', wert: 24,
+    text: 'Faellt deine 6 oder 8: 2 Getreide. Felder liefern dir +1 Getreide.',
+    lasting: [
+      { t: 'wenn', anlass: { bei: 'wurf', zahlen: [6, 8], wer: 'ich' }, dann: { t: 'gain', resources: { grain: 2 } } },
+      { t: 'terrainBonus', terrain: 'field', amount: 1 },
+    ],
+  },
+  {
+    id: 'kaufmannsgilde', name: 'Kaufmannsgilde', rarity: 'legendaer', wert: 24,
+    text: 'Bankhandel kostet eine Karte weniger. Jeder Handel zu 2:1 oder besser: 1 Ruhm, zweimal je Zug.',
+    lasting: [
+      { t: 'tradeDiscount', amount: 1 },
+      { t: 'wenn', anlass: { bei: 'handel', kurs: 2 }, dann: { t: 'ruhm', amount: 1 }, jeZug: 2 },
+    ],
+  },
+  {
+    id: 'kathedrale', name: 'Kathedrale', rarity: 'legendaer', wert: 24,
+    text: 'Je 4 eigene Strassen: 1 Siegpunkt (hoechstens 4). Jede neue Stadt: 2 Ruhm.',
+    lasting: [
+      { t: 'je', groesse: { aus: 'bau', art: 'strasse' }, pro: 4, max: 4, dann: { t: 'punkte', amount: 1 } },
+      { t: 'wenn', anlass: { bei: 'stadt' }, dann: { t: 'ruhm', amount: 2 } },
+    ],
+  },
+  {
+    id: 'heerbann', name: 'Heerbann', rarity: 'legendaer', wert: 23,
+    text: 'Jeder gewonnene Kampf: 1 Ruhm. Jeder abgewehrte Raubzug: 3 zufaellige Rohstoffe.',
+    lasting: [
+      { t: 'wenn', anlass: { bei: 'kampfSieg' }, dann: { t: 'ruhm', amount: 1 }, jeZug: 3 },
+      { t: 'wenn', anlass: { bei: 'raubzugAbgewehrt' }, dann: { t: 'gainAny', count: 3 } },
+    ],
+  },
+  {
+    id: 'sternenpfad', name: 'Sternenpfad', rarity: 'legendaer', wert: 23,
+    text: 'Jede erkundete Ruine und jeder erfuellte Auftrag: eine Kartenwahl und 1 Ruhm.',
+    lasting: [
+      { t: 'wenn', anlass: { bei: 'ruine' }, dann: [{ t: 'wahl', anzahl: 1 }, { t: 'ruhm', amount: 1 }] },
+      { t: 'wenn', anlass: { bei: 'auftrag' }, dann: [{ t: 'wahl', anzahl: 1 }, { t: 'ruhm', amount: 1 }] },
+    ],
+  },
+  {
+    id: 'zehntscheune', name: 'Zehntscheune', rarity: 'episch', wert: 17,
+    text: 'Jeder Jahreszeitwechsel: 1 Getreide je eigene Stadt (hoechstens 5).',
+    lasting: { t: 'wenn', anlass: { bei: 'jahreszeit' }, dann: { t: 'gainJe', je: { aus: 'bau', art: 'stadt' }, pro: 1, max: 5, resource: 'grain' } },
+  },
+  {
+    id: 'gesandtschaft', name: 'Gesandtschaft', rarity: 'episch', wert: 16,
+    text: 'Jeder Marktbesuch: +1 Zaehler. Je 3: 1 Siegpunkt (hoechstens 3).',
+    lasting: [
+      { t: 'wenn', anlass: { bei: 'markt' }, dann: { t: 'zaehler', amount: 1 } },
+      { t: 'je', groesse: { aus: 'zaehler' }, pro: 3, max: 3, dann: { t: 'punkte', amount: 1 } },
+    ],
+  },
+  {
+    id: 'feldlager', name: 'Feldlager', rarity: 'episch', wert: 15,
+    text: 'Jeder bezwungene Boss: 3 Ruhm und eine Kartenwahl.',
+    lasting: { t: 'wenn', anlass: { bei: 'bossBesiegt' }, dann: [{ t: 'ruhm', amount: 3 }, { t: 'wahl', anzahl: 1 }] },
+  },
+  {
+    id: 'wegkreuz', name: 'Wegkreuz', rarity: 'episch', wert: 16,
+    text: 'Jede angekommene Karawane: 1 zufaelliger Rohstoff und +1 Zaehler. Je 5: 1 Siegpunkt (hoechstens 3).',
+    lasting: [
+      { t: 'wenn', anlass: { bei: 'karawane' }, dann: [{ t: 'gainAny', count: 1 }, { t: 'zaehler', amount: 1 }] },
+      { t: 'je', groesse: { aus: 'zaehler' }, pro: 5, max: 3, dann: { t: 'punkte', amount: 1 } },
+    ],
+  },
   {
     id: 'jagdglueck', name: 'Jagdglueck', rarity: 'selten', wert: 11,
     text: 'Bei jeder 7: +1 Zaehler. Je 3: Weiden liefern +1 Wolle.',
