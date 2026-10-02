@@ -287,6 +287,7 @@ function vervollstaendige(msg: ServerMsg): void {
     msg.state.pfade ??= {};
     for (const p of msg.state.players) {
       p.trophaeen ??= 0;
+      p.kartenWahl ??= 0;
       p.zaehler ??= {};
       p.krone ??= null;
       p.plus ??= [];

@@ -224,7 +224,8 @@ export function ausloeserAusEreignissen(
                 break;
               }
               case 'wahl':
-                p.loot += lohn.anzahl;
+                // Ausserhalb der Wahlen je Zug, wie Trophaeen (rules/reducer.ts, claimLoot).
+                p.kartenWahl = (p.kartenWahl ?? 0) + lohn.anzahl;
                 wahl += lohn.anzahl;
                 break;
               case 'heilen':

@@ -1625,6 +1625,12 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         enterDraft(s, 'trophaee', events, 7 + actorPlayer.cards.length);
         break;
       }
+      // Kartenwahlen aus Karten (Grundstein ...) ebenso.
+      if ((actorPlayer.kartenWahl ?? 0) > 0) {
+        actorPlayer.kartenWahl = actorPlayer.kartenWahl! - 1;
+        enterDraft(s, 'belohnung', events, 1 + actorPlayer.cards.length);
+        break;
+      }
       if (actorPlayer.loot <= 0) return fail('Keine Beute vorhanden.');
       if (!wahlFrei(s)) return fail(`Mehr als ${WAHLEN_JE_ZUG} Kartenwahlen gibt es nicht je Zug - die Beute wartet bis zum naechsten.`);
       wahlZaehlen(s);

@@ -53,6 +53,7 @@ export type PublicPlayer = {
   loot: number;
   /** Offene Trophaeen besiegter Bosse - oeffentlich wie die Beute. */
   trophaeen: number;
+  kartenWahl: number;
   /** Zaehler der Engine-Karten - oeffentlich wie die Karten (ENGINE_KARTEN.md). */
   zaehler: Record<string, number>;
   /** Die Schluesselkarte im Kronplatz. */
@@ -221,6 +222,7 @@ export function redactStateFor(state: GameState, viewer: PlayerId): PublicState 
       equipment: [...p.equipment],
       loot: p.loot,
       trophaeen: p.trophaeen ?? 0,
+      kartenWahl: p.kartenWahl ?? 0,
       zaehler: { ...(p.zaehler ?? {}) },
       krone: p.krone ?? null,
       plus: [...(p.plus ?? [])],

@@ -134,6 +134,12 @@ export type Player = {
   /** Offene Trophaeen besiegter Bosse (core/akte.ts) - je eine Kartenwahl mit seltenen Karten. */
   trophaeen?: number;
   /**
+   * Kartenwahlen aus Karten (Grundstein, Sagenschreiber ...): wie Trophaeen
+   * ausserhalb der Wahlen je Zug - sonst kamen sie einen Zug zu spaet
+   * (Spieltest 8 und 9).
+   */
+  kartenWahl?: number;
+  /**
    * Zaehler der Engine-Karten (cards/ausloeser.ts): Kartenkennung oder ein
    * benannter Topf mit '#' -> Stand. Oeffentlich wie die Karten.
    */

@@ -516,7 +516,8 @@ export function Game() {
    * und Beutestand nur ein Versuch - scheitert er, bleibt die Beute liegen.
    */
   const beuteVersucht = useRef(new Set<string>());
-  const meineTrophaeen = me?.trophaeen ?? 0;
+  // Trophaeen und Kartenwahlen aus Karten kommen ausserhalb der Wahlen je Zug.
+  const meineTrophaeen = (me?.trophaeen ?? 0) + (me?.kartenWahl ?? 0);
   const meineBeute = (me?.loot ?? 0) + meineTrophaeen;
   useEffect(() => {
     if (!isMine || phase.t !== 'main' || meineBeute <= 0 || state.draft !== null) return;

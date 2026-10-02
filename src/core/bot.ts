@@ -215,7 +215,7 @@ export function botAktion(state: GameState, world: World, id: PlayerId, versucht
   }
 
   // Trophaeen besiegter Bosse - sie zaehlen nicht gegen die Wahlen je Zug.
-  if ((p.trophaeen ?? 0) > 0) {
+  if ((p.trophaeen ?? 0) > 0 || (p.kartenWahl ?? 0) > 0) {
     const a = neu({ t: 'claimLoot' });
     if (a) return a;
   }
