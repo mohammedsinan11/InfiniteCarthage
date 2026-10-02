@@ -9,11 +9,29 @@
 
 import type { PublicState } from '../../core/redact';
 import { ereignisById } from '../../core/ereignis';
+import type { Folge } from '../../core/ereignis';
 import { wahlHindernis } from '../../core/rules/reducer';
 import { SEASON_NAME, seasonOf } from '../../core/season';
 import { PROBE_NAME, begegnungById, heldStufeVon, probeBonus } from '../../core/heldenpfad';
 
 /** Wie wahrscheinlich zwei Wuerfel mindestens n zeigen. */
+/** Was eine Folge bringt, ganz kurz - fuer "gelingt / misslingt" an einer Probe. */
+function folgeKurz(f: Folge): string {
+  const teile: string[] = [];
+  if (f.relikt) teile.push('Relikt');
+  if (f.beute) teile.push(f.beute === 1 ? 'Kartenwahl' : `${f.beute} Kartenwahlen`);
+  if (f.ruhm) teile.push(`${f.ruhm} Ruhm`);
+  if (f.ritter) teile.push(f.ritter === 1 ? 'ein Ritter' : `${f.ritter} Ritter`);
+  if (f.schmiede) teile.push('Schmiedearbeit');
+  const roh = Object.values(f.gib ?? {}).reduce<number>((n, x) => n + (x ?? 0), 0) + (f.zufall ?? 0);
+  if (roh > 0) teile.push(`${roh} Rohstoffe`);
+  if (f.heilen) teile.push('Heilung');
+  if (f.xp) teile.push(`${f.xp} Erfahrung`);
+  if (f.wunde) teile.push(`${f.wunde} ${f.wunde === 1 ? 'Wunde' : 'Wunden'}`);
+  if (f.verliere) teile.push(`${f.verliere} ${f.verliere === 1 ? 'Karte' : 'Karten'} weg`);
+  return teile.length > 0 ? teile.join(', ') : 'nichts';
+}
+
 function chanceMit(n: number): number {
   let gut = 0;
   for (let a = 1; a <= 6; a++) for (let b = 1; b <= 6; b++) if (a + b >= n) gut += 1;
@@ -55,6 +73,11 @@ export function EreignisTafel({
                   {w.probe && (
                     <span className="ereignis-probe">
                       Probe {PROBE_NAME[w.probe.art]}: {w.probe.ziel}+ mit 2 Wuerfeln, dein Bonus +{bonus} · {Math.round(chance * 100)}%
+                    </span>
+                  )}
+                  {w.probe && (
+                    <span className="ereignis-probe">
+                      Gelingt: {folgeKurz(w.probe.gelingt)} · Misslingt: {folgeKurz(w.probe.misslingt)}
                     </span>
                   )}
                   {grund && <span className="ereignis-grund">{grund}</span>}
