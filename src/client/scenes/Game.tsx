@@ -1545,6 +1545,7 @@ export function Game() {
             plaetze={you ? reichskartenPlaetze(state, you) : 0}
             sippe={state.ereignisseAn ? (me?.sippe ?? {}) : undefined}
             sippeSeit={me?.sippeSeit}
+            krone={me?.krone ?? null}
             onChoose={(card, replace) => act({ t: 'chooseCard', card, replace })}
           />
         )}
@@ -1563,7 +1564,7 @@ export function Game() {
         {state.szenario === 'gruendung' && phase.t !== 'hauswahl' && phase.t !== 'setup' && phase.t !== 'finished' && you && (
           <ErsteSchritte state={state} you={you} />
         )}
-        {sichtbareTipps.length > 0 && phase.t !== 'finished' && phase.t !== 'hauswahl' && state.draft === null && (
+        {sichtbareTipps.length > 0 && phase.t !== 'finished' && phase.t !== 'hauswahl' && state.draft === null && !bossOffen && (
           <TippBox tipp={sichtbareTipps[0]!} mehr={0} onGelesen={tippWeg} />
         )}
 

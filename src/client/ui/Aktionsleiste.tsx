@@ -300,7 +300,11 @@ function HandelTafel({
   const [gib, setGib] = useState<Resource>(() =>
     RESOURCES.reduce((a, b) => (hand[b] > hand[a] ? b : a)),
   );
-  const [nimm, setNimm] = useState<Resource>('ore');
+  // Nie dieselbe Sorte vorschlagen (Spieltest 8: "4x Erz gegen Erz"): die knappste andere.
+  const [nimm, setNimm] = useState<Resource>(() => {
+    const geben = RESOURCES.reduce((a, b) => (hand[b] > hand[a] ? b : a));
+    return RESOURCES.filter((r) => r !== geben).reduce((a, b) => (hand[b] < hand[a] ? b : a));
+  });
   const v = verhaeltnis(gib);
   const geht = darf && gib !== nimm && hand[gib] >= v;
   return (
@@ -315,9 +319,9 @@ function HandelTafel({
       </div>
       {/* Der Aufschlag stand nur im Kleingedruckten (Spieltest 7) - jetzt sichtbar. */}
       {(gruende?.(gib) ?? []).some((g) => g.includes('Tausch in diesem Zug')) ? (
-        <p className="dock-tafel-warnung">Teurer: jeder weitere Tausch in diesem Zug kostet mehr - der Markt ist oft guenstiger.</p>
+        <p className="dock-tafel-warnung dock-tafel-aufschlag">Teurer: jeder weitere Tausch in diesem Zug kostet mehr - der Markt ist oft guenstiger.</p>
       ) : (
-        <p className="dock-tafel-klein">Der erste Tausch je Zug zum Grundkurs, jeder weitere kostet mehr.</p>
+        <p className="dock-tafel-klein dock-tafel-aufschlag">Der erste Tausch je Zug zum Grundkurs, jeder weitere kostet mehr.</p>
       )}
       <button className="primary dock-tafel-los" disabled={!geht} onClick={() => onTausch(gib, nimm)}>
         {v}x {resourceName(gib)} gegen {resourceName(nimm)}

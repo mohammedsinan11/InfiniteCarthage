@@ -6993,3 +6993,8 @@ em.off {
   border: 1px solid #c9a227;
   background: rgba(201, 162, 39, 0.12);
 }
+/* Gleich hoch, ob Hinweis oder Warnung - sonst springt der Knopf (Spieltest 8: Fehlklick). */
+.dock-tafel-aufschlag {
+  min-height: 3em;
+  box-sizing: border-box;
+}

@@ -161,7 +161,8 @@ export function Lobby() {
               </p>
             )}
 
-            {!room.koop && (
+            {/* Mit drei Akten gibt es kein Punkteziel - am Ende zaehlt die Wertung (core/akte.ts). */}
+            {!room.koop && room.rundenLimit !== AKTE_ZUEGE && (
             <label>
               Siegpunkte
               <div className="choices">
@@ -240,8 +241,9 @@ export function Lobby() {
                   ? `Drei Akte zu je ${AKTE_ZUEGE / 3} eigenen Zuegen (${AKTE_ZUEGE * room.members.length} Runden). Danach`
                   : `Nach ${room.rundenLimit} Runden`}{' '}
                 ist Schluss, dann gewinnt die hoechste Wertung
-                (Siegpunkte mal 10 plus Ruhm) - wenn nicht vorher jemand das Ziel erreicht. Jeder Akt endet
-                mit einem Boss: wer ihn besteht, bekommt Siegpunkte und eine seltene Karte.
+                {room.rundenLimit === AKTE_ZUEGE
+                  ? '(Basis mal Mult, siehe Chronik). Es gibt keinen fruehen Sieg. Jeder Akt endet mit einem Boss: wer ihn besteht, bekommt Siegpunkte, eine seltene Karte und eine Schmiedearbeit.'
+                  : '(Siegpunkte mal 10 plus Ruhm) - wenn nicht vorher jemand das Ziel erreicht.'}
               </p>
             )}
 

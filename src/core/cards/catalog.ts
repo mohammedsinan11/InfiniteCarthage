@@ -745,7 +745,7 @@ export const CARDS: readonly Card[] = [
     lasting: [{ t: 'beuteStattVerlust' }, { t: 'sperre', was: 'mauer' }],
   },
   {
-    id: 'blutmond_krone', name: 'Blutmond', rarity: 'legendaer', schluessel: true, wert: 25,
+    id: 'blutmond_krone', name: 'Blutrausch', rarity: 'legendaer', schluessel: true, wert: 25,
     text: 'Deine Wenn-Karten fuer gewonnene Kaempfe loesen doppelt aus. Kein Markt.',
     lasting: [{ t: 'nachhall', bei: 'kampfSieg' }, { t: 'sperre', was: 'markt' }],
   },

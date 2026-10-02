@@ -66,7 +66,10 @@ export function CardDraft({
   sippe,
   sippeSeit,
   onChoose,
+  krone = null,
 }: {
+  /** Die Schluesselkarte im Kronplatz - eine neue verdraengt sie (bleibt im Besitz). */
+  krone?: string | null;
   /** Karten je Familie (core/cards/sippen.ts) - nur mit Ereignissen. */
   sippe?: SippenZaehler;
   sippeSeit?: SippenZaehler;
@@ -184,6 +187,12 @@ export function CardDraft({
                   Bankrabatt zaehlt nur einmal - {cardById(rabattDa!)?.name} gibt ihn schon
                 </span>
               )}
+              {/* Eine neue Schluesselkarte nimmt den Kronplatz (Spieltest 8: geschah ohne Hinweis). */}
+              {karte.schluessel && krone && krone !== id && (
+                <span className="draft-nochmal draft-verdraengt">
+                  Ersetzt deine Krone {cardById(krone)?.name ?? ''} - sie bleibt im Besitz, im Menue zurueckholbar
+                </span>
+              )}
               {voll && bringtNeueDauer(id) && (
                 <span className="draft-nochmal draft-verdraengt">
                   {ersetze === null ? 'Kein Platz - bleibt inaktiv' : `Ersetzt ${cardById(ersetze)?.name ?? '?'}`}
@@ -219,6 +228,8 @@ export function CardDraft({
               title={cardById(id)?.text}
             >
               {cardById(id)?.name ?? id}
+              {/* Wer eine Vorratskarte ersetzt, haelt sofort weniger (Spieltest 8). */}
+              {dauerwirkungen(cardById(id) ?? { lasting: undefined }).some((l) => l.t === 'handLimit' && l.amount > 0) ? ' (Handgrenze sinkt!)' : ''}
             </button>
           ))}
         </div>
