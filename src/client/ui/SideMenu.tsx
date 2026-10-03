@@ -698,7 +698,14 @@ export function SideMenu({
             <Kopf titel={`Taktiken${tactics.length > 0 ? ` · ${tactics.length}` : ''}`} hilfe="Taktiken liegen auf deiner Hand. Spiele sie ueber 'Karten kaufen und spielen' auf eine Einheit; danach sind sie verbraucht." />
             {/* Der Kartenknopf der Leiste ist weg (Spieltest 7) - hier oeffnet sich dieselbe Tafel. */}
             {onKarten && (
-              <button className="klein menu-karten-knopf" onClick={onKarten}>
+              <button
+                className="klein menu-karten-knopf"
+                onClick={() => {
+                  // Auf dem Handy laege die Kartentafel hinter dem Menue.
+                  if (window.innerWidth < 700) setOffen(false);
+                  onKarten();
+                }}
+              >
                 Karten kaufen und spielen
               </button>
             )}
