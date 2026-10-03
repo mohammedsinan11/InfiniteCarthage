@@ -20,12 +20,17 @@ function Gefahr({ n }: { n: number }) {
 }
 
 export function PfadTafel({
+  held = null,
+  nacht = false,
   ziele,
   darf,
   onWahl,
   onZeigen,
   onZu,
 }: {
+  /** Leben des Helden - vor dem Aufbruch sichtbar (Spieltest 13: "er laeuft blind in den Tod"). */
+  held?: { leben: number; max: number } | null;
+  nacht?: boolean;
   ziele: readonly PfadZiel[];
   darf: boolean;
   onWahl: (i: number | null) => void;
@@ -41,6 +46,13 @@ export function PfadTafel({
         </button>
       </div>
       <h3>Wohin zieht dein Held?</h3>
+      {held && (
+        <p className={held.leben * 2 <= held.max ? 'pfad-warnung' : 'pfad-leben'}>
+          Dein Held: {held.leben} von {held.max} Leben
+          {held.leben * 2 <= held.max ? ' - verwundet! Gefahr 2 und 3 koennen ihn toeten. Rasten heilt (Waldkapelle, Erntefest).' : ''}
+        </p>
+      )}
+      {nacht && <p className="pfad-warnung">Es ist Nacht: Schleime ziehen umher - unterwegs droht ein Kampf.</p>}
       <ul className="pfad-liste">
         {ziele.map((z, i) => (
           <li key={i} className={`pfad-${z.art}`}>
@@ -145,7 +157,8 @@ export function HeldFallSzene({
   onZu: () => void;
 }) {
   const stufe = heldStufeVon(xp);
-  const spruch = GRABSPRUCH[Math.min(GRABSPRUCH.length - 1, stufe)]!;
+  // Nicht jedes Mal derselbe Spruch (Spieltest 13): Stufe und Narben waehlen ihn.
+  const spruch = GRABSPRUCH[(stufe + narben * 2) % GRABSPRUCH.length]!;
   const er = weiblich ? 'sie' : 'er';
   return (
     <div className="draft-overlay ereignis-huelle">

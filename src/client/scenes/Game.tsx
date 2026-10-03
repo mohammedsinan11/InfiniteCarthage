@@ -2008,6 +2008,11 @@ export function Game() {
           {/* Heldenpfad: das Angebot als Tafel, zugeklappt als Knopf links oben. */}
           {meinPfad?.angebot && pfadOffen && !bossOffen && state.draft === null && phase.t !== 'finished' && (
             <PfadTafel
+              held={(() => {
+                const h = state.units.find((u) => u.owner === you && u.kind === 'held' && !u.zweig);
+                return h ? { leben: h.leben, max: maxLeben(h) } : null;
+              })()}
+              nacht={tageszeitOf(state.turn) === 'nacht'}
               ziele={meinPfad.angebot}
               darf={isMine && (phase.t === 'main' || phase.t === 'roll')}
               onWahl={(i) => {

@@ -7572,3 +7572,15 @@ em.off {
     font-size: 18px;
   }
 }
+
+/* Heldenpfad: Leben und Warnungen vor dem Aufbruch. */
+.pfad-leben {
+  margin: 2px 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.pfad-warnung {
+  margin: 2px 0 6px;
+  font-size: 12px;
+  color: #e8907a;
+}

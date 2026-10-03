@@ -10,6 +10,7 @@
  * Die Besatzung eines Lagers kaempft fuer die Fraktion des Lagers.
  */
 
+import { HEXE_FRAKTION } from './factions';
 import { WERTE, ZWEIG_WERTE, garrisonOf, isNestActive, nestFraktionOf } from './units';
 import type { ArmyView } from './units';
 import type { Abkommen, Auftrag, GameState, HeldZweig, PlayerId, UnitState } from './state';
@@ -64,6 +65,9 @@ export function feindlich(a: Seite, b: Seite, view?: PaktSicht): boolean {
   const sa = istSpielerSeite(a);
   const sb = istSpielerSeite(b);
   if (sa && sb) return false;
+  // Die Hexe kaempft nur mit Spielern - Banden und Goblins lassen sie in Ruhe,
+  // sonst starb sie, ehe man sie je fand (Spieltest 13, ihre Szene ging verloren).
+  if (!sa && !sb && (a === HEXE_FRAKTION || b === HEXE_FRAKTION)) return false;
   if (view && sa !== sb) {
     const [spieler, fraktion] = sa ? [spielerAus(a), b] : [spielerAus(b), a];
     if (abkommenVon(view, spieler, fraktion)) return false;

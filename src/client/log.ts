@@ -328,6 +328,10 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
     }
     case 'plunder':
       // Nichts geholt ist keine Zeile wert - Goblins versuchen es oft.
+      if (e.count > 0 && e.bossHeer) {
+        const boss = bossById(state?.akte?.stand[e.player]?.boss)?.name ?? 'des Bosses';
+        return `Das Heer (${boss}) pluendert ${who(state, e.player)}: ${karten(e.count)}.`;
+      }
       return e.count > 0 ? `${fraktionName(state, e.fraktion)} pluendern ${who(state, e.player)}: ${karten(e.count)}.` : '';
     case 'homecoming':
       return e.count > 0

@@ -28,6 +28,8 @@ import { siegwegById } from './siegwege';
 import { cardById } from './cards/catalog';
 import { fraktionById } from './factions';
 import { ereignisById } from './ereignis';
+import { begegnungById } from './heldenpfad';
+import { bossById } from './akte';
 import { WUNDER } from './wunder';
 import { SEASON_NAME, bigRoundChangedAt, roundOf, seasonOf, yearOf } from './season';
 import { hausById } from './haus';
@@ -73,6 +75,10 @@ export type MomentArt =
   | 'untergang'
   /** Eine Entscheidung in einem Ereignis (core/ereignis.ts). */
   | 'ereignis'
+  /** Eine Begegnung des Helden (core/heldenpfad.ts) - davon erzaehlt die Saga zuerst. */
+  | 'begegnung'
+  /** Ein bezwungener Boss (core/akte.ts). */
+  | 'boss'
   /** Frieden oder Tribut mit einer Fraktion (rules/diplomatie.ts). */
   | 'pakt'
   /** Ein Anfuehrer schwoert Rache (rules/army.ts, Groll). */
@@ -280,9 +286,17 @@ export function chronikFortschreiben(state: GameState, events: readonly GameEven
       case 'eventResolved': {
         const ev = ereignisById(e.id);
         const wahl = ev?.wahlen[e.wahl]?.text.split(':')[0]!.split('(')[0]!.trim();
-        if (ev && wahl) moment(e.player, 'ereignis', `${ev.titel}: ${nameVon(state, e.player)} - ${wahl}.`);
+        // Begegnungen des Helden sind Geschichten, kein Wirtschaftsereignis (Spieltest 13:
+        // die Saga erzaehlte von der Schafschur statt von der Hexe).
+        if (ev && wahl && begegnungById(e.id)) {
+          const ausgang = e.probe ? (e.probe.gelungen ? ' - und es gelang' : ' - und es misslang') : '';
+          moment(e.player, 'begegnung', `${ev.titel}: ${wahl}${ausgang}.`);
+        } else if (ev && wahl) moment(e.player, 'ereignis', `${ev.titel}: ${nameVon(state, e.player)} - ${wahl}.`);
         break;
       }
+      case 'bossBesiegt':
+        if (!e.zugabe) moment(e.player, 'boss', `${nameVon(state, e.player)} bezwang ${bossById(e.boss)?.name ?? 'einen Boss'}.`);
+        break;
       case 'fall':
         moment(e.player, 'untergang', `Das letzte Gebaeude von ${nameVon(state, e.player)} ist gefallen.`);
         break;
@@ -386,8 +400,21 @@ export function saga(s: SagaSicht, du: PlayerId): string {
   if (rache) saetze.push(rache.text.replace(' schwoert ', ' schwor '));
   const karte = erste('karte');
   if (karte) saetze.push(karte.text.replace(`${p.name} nimmt`, 'Das Schicksal brachte'));
-  const ereignis = erste('ereignis');
-  if (ereignis) saetze.push(`Lange erzaehlte man sich von jenem Tag ${wann(ereignis.turn)}: ${ereignis.text.split(':')[0]}.`);
+  // Bosse und Begegnungen zuerst - sie sind die Geschichte dieser Partie.
+  const bosse = meine.filter((m) => m.art === 'boss');
+  if (bosse.length > 0) saetze.push(bosse.map((m) => m.text.replace(`${p.name} bezwang `, '')).length === 1
+    ? `${gross(wann(bosse[0]!.turn))} beugte sich ${bosse[0]!.text.replace(`${p.name} bezwang `, '').replace(/\.$/, '')}.`
+    : `Sie beugten sich, einer nach dem anderen: ${bosse.map((m) => m.text.replace(`${p.name} bezwang `, '').replace(/\.$/, '')).join(', ')}.`);
+  const begegnungen = meine.filter((m) => m.art === 'begegnung');
+  const hexe = begegnungen.find((m) => m.text.startsWith('Das Hexenhaus'));
+  const begegnung = hexe ?? begegnungen[0];
+  if (begegnung) {
+    const wer = held ? (p.held?.vorname ?? 'der Held') : 'der Held';
+    saetze.push(`Lange erzaehlte man sich, wie ${wer} ${wann(begegnung.turn)} vor ${begegnung.text.split(':')[0]!.replace(/^Die /, 'der ').replace(/^Der /, 'dem ').replace(/^Das /, 'dem ')} stand${begegnung.text.includes('gelang') && !begegnung.text.includes('misslang') ? ' - und bestand' : ''}.`);
+  } else {
+    const ereignis = erste('ereignis');
+    if (ereignis) saetze.push(`Lange erzaehlte man sich von jenem Tag ${wann(ereignis.turn)}: ${ereignis.text.split(':')[0]}.`);
+  }
   if (s.phase.t === 'finished') {
     const i = s.order.indexOf(du);
     const pkt = s.chronik?.verlauf[s.chronik.verlauf.length - 1]?.punkte[i];

@@ -50,7 +50,7 @@ function besiegt(s: GameState, st: BossStand, id: PlayerId, events: Ereignisse):
   const akte = s.akte!;
   if (st.zugabe) {
     // Eine Zugabe bringt einen Siegpunkt - und zaehlt im Mult wie ein Boss (core/wertung.ts).
-    akte.siege[id] = [...(akte.siege[id] ?? []), 1];
+    akte.zugaben = { ...(akte.zugaben ?? {}), [id]: (akte.zugaben?.[id] ?? 0) + 1 };
     events.push({ t: 'bossBesiegt', player: id, akt: st.akt, boss: st.boss, punkte: 1, zugabe: st.zugabe });
     zugabe(s, st, id, events);
     return;

@@ -830,7 +830,7 @@ export const CARDS: readonly Card[] = [
   },
   {
     id: 'bund_der_sippen', name: 'Bund der Sippen', rarity: 'legendaer', schluessel: true, wert: 26,
-    text: 'Drei Sippen wirken, doch keine erreicht die dritte Stufe.',
+    text: 'Drei statt zwei Sippen wirken - ihre Boni gelten alle. Dafuer erreicht keine die dritte Stufe (6 Karten).',
     lasting: [{ t: 'sippenPlatz', amount: 1 }, { t: 'sippenDeckel', ab: 6 }],
   },
   {

@@ -334,6 +334,8 @@ export type ArmyEvent =
       /** Was genommen wurde. Fuer Fremde redigiert (redact.ts). */
       taken: Hand;
       count: number;
+      /** Das Heer eines Bosses war es, nicht eine Bande (Spieltest 13). */
+      bossHeer?: boolean;
     }
   | { t: 'homecoming'; q: number; r: number; fraktion: string; count: number }
   | {
@@ -1977,6 +1979,7 @@ export function tickArmy(s: GameState, world: World, events: Ereignisse): void {
       r: u.r,
       taken,
       count: menge,
+      ...(u.bossFuer ? { bossHeer: true } : {}),
     });
     feuerLegen(s, rng, u, owner, events);
   }

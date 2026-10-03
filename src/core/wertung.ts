@@ -62,7 +62,7 @@ export function wertungTeile(s: WertungsSicht, id: string, punkte: number): Wert
     ...(zaehler > 0 ? [{ text: 'Kartenzaehler', wert: zaehler }] : []),
   ];
   const stufen = sippenBoni(p.sippe, p.sippeSeit, sippenRegeln(eigeneWirkKarten(p))).length;
-  const bosse = (s.akte.siege[id] ?? []).length;
+  const bosse = (s.akte.siege[id] ?? []).length + (s.akte.zugaben?.[id] ?? 0);
   const multZeilen = [
     { text: 'Grundwert', wert: 1 },
     ...(stufen > 0 ? [{ text: `${stufen} Sippenstufen x 0,5`, wert: stufen * 0.5 }] : []),

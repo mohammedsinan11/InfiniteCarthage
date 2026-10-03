@@ -132,6 +132,7 @@ describe('Akte', () => {
     for (const r of Object.keys(f.soll) as (keyof typeof f.soll)[]) bossZahlen(s, 'p0', r, e);
     akteFortschreiben(s, e, null);
     expect(s.akte!.siege.p0).toEqual([3]);
+    expect(s.akte!.zugaben?.p0 ?? 0).toBe(0);
     const zugabe = s.akte!.stand.p0!;
     expect(zugabe.zugabe).toBe(1);
     expect(zugabe.ergebnis).toBe('offen');

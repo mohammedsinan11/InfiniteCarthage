@@ -2059,6 +2059,9 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
     if (akt.length > 0) {
       events.push(...akt);
       chronikFortschreiben(s, akt);
+      // Auch ins Saisonbuch - frueh bezwungene Bosse fehlten in der Kunde,
+      // nur die verfehlten standen darin (Spieltest 13).
+      kundeFortschreiben(s, akt as never);
     }
   }
 

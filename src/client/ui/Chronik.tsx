@@ -207,9 +207,7 @@ export function Chronik({ state, you, code, nochmal, verlassen }: Props) {
                 );
               })}
               {(() => {
-                // Bestandene Zugaben: die laufende zaehlt nur, wenn sie bestanden ist.
-                const st = state.akte!.stand[ich.id];
-                const n = st?.zugabe ? st.zugabe - (st.ergebnis === 'besiegt' ? 0 : 1) : 0;
+                const n = state.akte!.zugaben?.[ich.id] ?? 0;
                 return n > 0 ? (
                   <li className="gut">
                     <span>Zugaben</span> <b>{n} bestanden</b> - je +1 Siegpunkt und +0,5 Mult

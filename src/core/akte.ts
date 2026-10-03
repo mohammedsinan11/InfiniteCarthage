@@ -98,6 +98,11 @@ export type AkteStand = {
   stand: Record<PlayerId, BossStand>;
   /** Welche Akte jeder bestanden hat - je bestandenem Akt so viele Siegpunkte wie seine Zahl. */
   siege: Record<PlayerId, number[]>;
+  /**
+   * Bestandene Zugaben je Spieler - getrennt von den Akten, sonst las sich
+   * eine Zugabe (1 Punkt) wie ein bezwungener erster Akt (Spieltest 13).
+   */
+  zugaben?: Record<PlayerId, number>;
   /** Abzuege fuer verfehlte Bosse (Chronikstufe 10). */
   strafe?: Record<PlayerId, number>;
 };
@@ -125,7 +130,7 @@ export function waehleBosse(worldSeed: number, s: Pick<GameState, 'systeme'>): s
 
 /** Siegpunkte aus bestandenen Akten. */
 export function aktPunkte(akte: AkteStand | null | undefined, id: PlayerId): number {
-  return (akte?.siege[id] ?? []).reduce((n, a) => n + a, 0) - (akte?.strafe?.[id] ?? 0);
+  return (akte?.siege[id] ?? []).reduce((n, a) => n + a, 0) + (akte?.zugaben?.[id] ?? 0) - (akte?.strafe?.[id] ?? 0);
 }
 
 /** Der Akt zu einer Runde (1..3) - danach bleibt es beim dritten. */
