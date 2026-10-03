@@ -38,7 +38,8 @@ export function KartenLeiste({
   onAbgelaufen: () => void;
   onOeffnen: (id: string) => void;
 }) {
-  const [zu, setZu] = useState(false);
+  // Auf dem Handy zugeklappt - dort zaehlt jeder Streifen Karte.
+  const [zu, setZu] = useState(() => typeof window !== 'undefined' && window.innerWidth < 600);
   // Die Blitze leben gut zwei Sekunden, dann raeumt die Leiste sie weg.
   useEffect(() => {
     if (blitze.length === 0) return;

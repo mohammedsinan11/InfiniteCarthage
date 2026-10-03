@@ -152,7 +152,10 @@ const zoomStufen = (dpr: number): number[] => DEVICE_FACTORS.map((f) => f / (SCA
  * Geraetepixeln - die Kachel bleibt dabei gleich gross, nur schaerfer.
  */
 const startStufe = (dpr: number): number => {
-  const wunsch = 3 * dpr;
+  // Auf dem Handy zwei CSS-Pixel: bei drei sah man fuenf mal sechs Felder und
+  // die eigenen Doerfer am Bildrand ("man sieht das Spiel kaum").
+  const schmal = typeof window !== 'undefined' && window.innerWidth < 700;
+  const wunsch = (schmal ? 2 : 3) * dpr;
   let best = 0;
   for (let i = 1; i < DEVICE_FACTORS.length; i++) {
     if (Math.abs(DEVICE_FACTORS[i]! - wunsch) < Math.abs(DEVICE_FACTORS[best]! - wunsch)) {

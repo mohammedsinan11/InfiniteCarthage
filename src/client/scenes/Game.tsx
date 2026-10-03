@@ -492,11 +492,20 @@ export function Game() {
   }, [meinPfad]);
   const meinAkt = you ? state.akte?.stand[you] : undefined;
   const gesehenerAkt = useRef<number | null>(null);
+  /** Ein neuer Akt, dessen Tafel noch nicht offen war - der Knopf oben pulsiert. */
+  const [aktNeu, setAktNeu] = useState(false);
+  useEffect(() => {
+    if (bossOffen) setAktNeu(false);
+  }, [bossOffen]);
   useEffect(() => {
     if (!meinAkt || state.phase.t === 'finished') return;
     if (gesehenerAkt.current !== meinAkt.akt) {
       // Beim Wiedereinstieg mitten im Akt nicht noch einmal aufdraengen.
-      if (gesehenerAkt.current !== null || state.turn - (meinAkt.bis - (state.akte?.laenge ?? 0)) <= 2) setBossOffen(true);
+      // Auf dem Handy deckte die Tafel zwei Drittel der Karte - dort genuegt
+      // die Meldung und der pulsierende Akt-Knopf oben.
+      const schmal = typeof window !== 'undefined' && window.innerWidth < 700;
+      if (!schmal && (gesehenerAkt.current !== null || state.turn - (meinAkt.bis - (state.akte?.laenge ?? 0)) <= 2)) setBossOffen(true);
+      if (schmal) setAktNeu(true);
       gesehenerAkt.current = meinAkt.akt;
     }
   }, [meinAkt, state.turn, state.akte?.laenge, state.phase.t]);
@@ -1447,7 +1456,7 @@ export function Game() {
           {/* Der Akt und sein Boss (core/akte.ts): Name, Fortschritt, wie lange noch. */}
           {meinAkt && phase.t !== 'finished' && (
             <button
-              className={['hud-akt', meinAkt.ergebnis !== 'offen' ? meinAkt.ergebnis : meinAkt.bis - state.turn < 3 ? 'knapp' : ''].filter(Boolean).join(' ')}
+              className={['hud-akt', aktNeu ? 'neu' : '', meinAkt.ergebnis !== 'offen' ? meinAkt.ergebnis : meinAkt.bis - state.turn < 3 ? 'knapp' : ''].filter(Boolean).join(' ')}
               title={`Akt ${meinAkt.akt}: ${bossById(meinAkt.boss)?.name ?? 'Boss'} - bis Runde ${meinAkt.bis}. Antippen fuer Einzelheiten.`}
               onClick={() => setBossOffen((v) => !v)}
             >

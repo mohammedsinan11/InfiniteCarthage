@@ -7389,3 +7389,62 @@ em.off {
     animation: none;
   }
 }
+
+/* --- Handy, dritter Anlauf ("man sieht das Spiel kaum") -------------------
+   Die Karte zuerst: der Akt-Knopf pulsiert statt die Tafel aufzudraengen,
+   hoechstens zwei Meldungen, die Bauleiste flach, die Bosstafel als
+   scrollbares Blatt von unten. */
+.hud-akt.neu {
+  animation: akt-puls 1.2s ease-in-out infinite;
+}
+@keyframes akt-puls {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(212, 90, 68, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(212, 90, 68, 0.7);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hud-akt.neu {
+    animation: none;
+    outline: 2px solid var(--danger);
+  }
+}
+@media (max-width: 600px) {
+  .meldung:nth-child(n + 3) {
+    display: none;
+  }
+  .boss-tafel,
+  .pfad-tafel {
+    top: auto;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    max-height: 62vh;
+    font-size: 12px;
+  }
+  /* Die Bauleiste flach: Zeichen, Name und Kosten in einer Zeile. */
+  .unten .dock {
+    padding: 3px;
+  }
+  .unten .dock-knopf {
+    flex-direction: row;
+    flex: 1 1 0;
+    width: auto;
+    min-height: 34px;
+    padding: 3px 6px;
+    gap: 5px;
+    align-items: center;
+    justify-content: center;
+  }
+  .unten .dock-knopf .dock-sym {
+    width: 16px;
+    height: 16px;
+  }
+  .unten .dock-knopf .dock-titel {
+    font-size: 8px;
+  }
+  .unten .dock-reihe {
+    width: 100%;
+  }
+}
