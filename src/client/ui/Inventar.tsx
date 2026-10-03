@@ -8,7 +8,7 @@
  * dass es ihn gibt. PLATZHALTER-Gestaltung (ASSETS.md).
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 /** Eine Truhe mit Beschlag und Schloss. PLATZHALTER (ASSETS.md). */
 function TruhenIcon() {
@@ -34,6 +34,15 @@ const beschreibe = (id: string) => DINGE[id] ?? { name: id, zeichen: '?', was: '
 
 export function Inventar({ inventar }: { inventar: Readonly<Record<string, number>> }) {
   const [offen, setOffen] = useState(false);
+  // Esc schliesst die Truhe - sie lag sonst ueber "Spenden" (Spieltest 13).
+  useEffect(() => {
+    if (!offen) return;
+    const taste = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOffen(false);
+    };
+    window.addEventListener('keydown', taste);
+    return () => window.removeEventListener('keydown', taste);
+  }, [offen]);
   const zeilen = Object.entries(inventar)
     .filter(([, n]) => n > 0)
     .sort(([a], [b]) => (beschreibe(a).name < beschreibe(b).name ? -1 : 1));
