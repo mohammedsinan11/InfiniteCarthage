@@ -6,6 +6,10 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ command }) => ({
   base: command === 'build' ? '/InfiniteCarthage/' : '/',
   plugins: [react()],
+  // Der Abhaengigkeits-Cache je Arbeitskopie, nicht in node_modules: mehrere
+  // Worktrees teilen sich node_modules ueber einen Link, und ihre Dev-Server
+  // optimierten sich gegenseitig React weg ("Invalid hook call", leere Seite).
+  cacheDir: '.vite-cache',
   // Port aus der Umgebung, damit ein bereits belegter Standardport nicht
   // den Start verhindert.
   server: { port: Number(process.env.PORT) || 5173 },

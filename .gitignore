@@ -10,3 +10,4 @@ dist/
 mockups/
 dogfood-output/
 .claude/worktrees/
+.vite-cache/
