@@ -2895,8 +2895,11 @@ export function Board({
               key={'et' + ek}
               className="edge-target-g"
               onClick={pick('edge', ek)}
-              onPointerEnter={() => setKanteHover(ek)}
-              onPointerLeave={() => setKanteHover((alt) => (alt === ek ? null : alt))}
+              // Nur die Maus: ein Finger loest nach dem Tipp pointerleave aus und
+              // loeschte die Vorschau des ersten Tipps - der zweite baute nie
+              // (am Handy liess sich kein Dorf setzen).
+              onPointerEnter={(e) => e.pointerType === 'mouse' && setKanteHover(ek)}
+              onPointerLeave={(e) => e.pointerType === 'mouse' && setKanteHover((alt) => (alt === ek ? null : alt))}
             >
               <line className="edge-hit" x1={h1.x} y1={h1.y} x2={h2.x} y2={h2.y} />
               <line className="edge-target" x1={a!.x} y1={a!.y} x2={b!.x} y2={b!.y} />
@@ -2920,8 +2923,8 @@ export function Board({
               key={'vt' + vk}
               className={eckeHover === vk ? 'vertex-target aktiv' : 'vertex-target'}
               onClick={pick('vertex', vk)}
-              onPointerEnter={() => setEckeHover(vk)}
-              onPointerLeave={() => setEckeHover((alt) => (alt === vk ? null : alt))}
+              onPointerEnter={(e) => e.pointerType === 'mouse' && setEckeHover(vk)}
+              onPointerLeave={(e) => e.pointerType === 'mouse' && setEckeHover((alt) => (alt === vk ? null : alt))}
             >
               <circle cx={p.x} cy={y} r={12} className="vertex-treffer" />
               <circle cx={p.x} cy={y} r={7} className="vertex-ring" />
