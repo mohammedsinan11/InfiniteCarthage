@@ -433,7 +433,7 @@ export const CARDS: readonly Card[] = [
   // Ernte
   {
     id: 'saatgut', name: 'Saatgut', rarity: 'ungewoehnlich', wert: 8,
-    text: 'Faellt eine 6 oder 8: +1 Zaehler. Felder liefern +1 je 5.',
+    text: 'Faellt eine 6 oder 8: +1 Zaehler. Felder liefern +1 je 5 Zaehler.',
     lasting: [
       { t: 'wenn', anlass: { bei: 'wurf', zahlen: [6, 8] }, dann: { t: 'zaehler', amount: 1 } },
       { t: 'je', groesse: { aus: 'zaehler' }, pro: 5, max: 3, dann: { t: 'terrainBonus', terrain: 'field', amount: 1 } },
@@ -446,7 +446,7 @@ export const CARDS: readonly Card[] = [
   },
   {
     id: 'kornspeicher', name: 'Kornspeicher', rarity: 'ungewoehnlich', wert: 8,
-    text: 'Jede neue Stadt: +1 Zaehler. Jeder eigene Wurf: 1 Getreide je 2.',
+    text: 'Jede neue Stadt: +1 Zaehler. Jeder eigene Wurf: 1 Getreide je 2 Zaehler (hoechstens 3).',
     lasting: [
       { t: 'wenn', anlass: { bei: 'stadt' }, dann: { t: 'zaehler', amount: 1 } },
       { t: 'wenn', anlass: { bei: 'wurf', wer: 'ich' }, dann: { t: 'gainJe', je: { aus: 'zaehler' }, pro: 2, max: 3, resource: 'grain' } },
@@ -530,7 +530,7 @@ export const CARDS: readonly Card[] = [
   // Bau
   {
     id: 'wegezoll', name: 'Wegezoll', rarity: 'ungewoehnlich', wert: 8,
-    text: 'Jede neue Strasse: +1 Zaehler. Jeder eigene Wurf: 1 Holz je 4.',
+    text: 'Jede neue Strasse: +1 Zaehler. Jeder eigene Wurf: 1 Holz je 4 Zaehler (hoechstens 3).',
     lasting: [
       { t: 'wenn', anlass: { bei: 'strasse' }, dann: { t: 'zaehler', amount: 1 } },
       { t: 'wenn', anlass: { bei: 'wurf', wer: 'ich' }, dann: { t: 'gainJe', je: { aus: 'zaehler' }, pro: 4, max: 3, resource: 'lumber' } },
@@ -553,7 +553,7 @@ export const CARDS: readonly Card[] = [
   },
   {
     id: 'bauboom', name: 'Bauboom', rarity: 'selten', wert: 12,
-    text: 'Jedes Dorf und jede Stadt: +1 Zaehler. Jede Strasse: 1 Rohstoff je 3, zweimal je Zug.',
+    text: 'Jedes Dorf und jede Stadt: +1 Zaehler. Jede Strasse: 1 Rohstoff je 3 Zaehler (hoechstens 3), zweimal je Zug.',
     lasting: [
       { t: 'wenn', anlass: { bei: 'dorf' }, dann: { t: 'zaehler', amount: 1 } },
       { t: 'wenn', anlass: { bei: 'stadt' }, dann: { t: 'zaehler', amount: 1 } },
@@ -622,7 +622,7 @@ export const CARDS: readonly Card[] = [
   },
   {
     id: 'kopfgeld', name: 'Kopfgeld', rarity: 'episch', wert: 16,
-    text: 'Jeder gewonnene Kampf: +1 Zaehler. Jeder eigene Wurf: 1 Rohstoff je 4.',
+    text: 'Jeder gewonnene Kampf: +1 Zaehler. Jeder eigene Wurf: 1 Rohstoff je 4 Zaehler (hoechstens 3).',
     lasting: [
       { t: 'wenn', anlass: { bei: 'kampfSieg' }, dann: { t: 'zaehler', amount: 1 } },
       { t: 'wenn', anlass: { bei: 'wurf', wer: 'ich' }, dann: { t: 'gainJe', je: { aus: 'zaehler' }, pro: 4, max: 3 } },

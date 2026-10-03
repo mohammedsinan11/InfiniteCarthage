@@ -90,6 +90,7 @@ import { einheitNamen, gruppenStatus, heerGruppen, untaetig } from '../heer';
 import { heldKurz } from '../../core/lore';
 import { Heerleiste } from '../ui/Heerleiste';
 import { KartenLeiste } from '../ui/KartenLeiste';
+import { wertungTeile } from '../../core/wertung';
 import { Inventar } from '../ui/Inventar';
 import {
   FAST_GESCHLOSSEN,
@@ -762,7 +763,9 @@ export function Game() {
       // Mit Akten gibt es kein Punkteziel - am Ende zaehlt die Wertung.
       ziel: state.akte ? 0 : state.targetPoints,
       rundenLimit: state.rundenLimit,
-      wertung: state.myPoints * 10 + (state.players.find((p) => p.id === you)?.ruhm ?? 0),
+      // Dieselbe Rechnung wie am Ende (core/wertung.ts) - mit Akten Basis x Mult
+      // (Spieltest 15: hier stand die alte Formel, 177 statt 1100).
+      wertung: you ? wertungTeile(state, you, state.myPoints).gesamt : 0,
       zeilen: [
         { text: `Doerfer ${doerfer} × 1`, wert: doerfer > 0 ? doerfer : null },
         { text: `Staedte ${staedte} × 2`, wert: staedte > 0 ? staedte * 2 : null },
@@ -1439,6 +1442,11 @@ export function Game() {
           >
             ★ {state.myPoints}
             {state.targetPoints > 0 && !state.akte ? ` / ${state.targetPoints}` : ''}
+            {/* Die Wertung waehrend der Partie: Basis x Mult, wie am Ende (Spieltest 15). */}
+            {state.akte && you && (() => {
+              const w = wertungTeile(state, you, state.myPoints);
+              return <span className="hud-lang"> · {w.basis}×{String(w.mult).replace('.', ',')}</span>;
+            })()}
           </span>
           {/* Szenario: wie weit das Ziel ist (core/szenario.ts). */}
           {szenarioById(state.szenario) && you && (

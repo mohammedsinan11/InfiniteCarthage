@@ -7547,3 +7547,12 @@ em.off {
   border: 1px solid var(--line);
   pointer-events: none;
 }
+
+/* Die Tafeln der Leiste liegen ueber dem Wuerfelknopf, nicht darunter
+   (Spieltest 15: "Mitspielern etwas anbieten" lag unter "Naechster Zug"). */
+.unten .dock {
+  z-index: 2;
+}
+.dock-tafel {
+  z-index: 5;
+}

@@ -84,7 +84,11 @@ function plusText(c: Card): string {
   const arten = new Set((Array.isArray(c.lasting) ? (c.lasting as readonly Lasting[]) : c.lasting ? [c.lasting as Lasting] : []).map((l) => l.t));
   const teile: string[] = [];
   if (arten.has('wenn')) teile.push('jeder Lohn +1');
-  if (arten.has('je')) teile.push('waechst schneller');
+  // "je N" wird je N-1, die Obergrenze steigt (Spieltest 15: es stand weiter "hoechstens 3").
+  const liste = Array.isArray(c.lasting) ? (c.lasting as readonly Lasting[]) : c.lasting ? [c.lasting as Lasting] : [];
+  const jeLohn = liste.some((l) => l.t === 'wenn' && (Array.isArray(l.dann) ? (l.dann as readonly Lohn[]) : [l.dann as Lohn]).some((d) => d.t === 'gainJe'));
+  if (jeLohn) teile.push('"je" braucht eins weniger, hoechstens eins mehr');
+  if (arten.has('je')) teile.push('waechst schneller (eins weniger je Stufe, zwei Stufen mehr)');
   if (arten.has('terrainBonus') || arten.has('schutz') || arten.has('punkte') || arten.has('siebenGabe') || arten.has('handLimit')) teile.push('+1');
   if (c.instant) teile.push('Sofort je Sorte +1');
   return `Verbessert: ${teile.length > 0 ? teile.join(', ') : 'staerker'}.`;

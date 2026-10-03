@@ -1090,7 +1090,10 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         // den Pluenderungen.
         // Siebenstern (ENGINE_KARTEN.md): kein Fund, dafuer liefert die beste Zahl.
         const wkWerfer = wirkungenVon(s, actor);
+        // Ohne Fund geht es gleich in die Bauphase - sonst blieb die Partie im
+        // Wurf stehen, und ein Bot wuerfelte dieselbe 7 endlos (Spieltest 15).
         if (!gesperrt(wkWerfer, 'fund')) enterDraft(s, 'fund', events);
+        else s.phase = { t: 'main' };
         if (wkWerfer.siebenLiefert) siebenLiefert(s, world, actor, events);
         // Glueckliche Sieben (core/omen.ts) fuer den Werfer, Siebenergaben
         // aus Karten (cards/effects.ts) fuer jeden, der sie aktiv hat.
