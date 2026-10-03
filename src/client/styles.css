@@ -7448,3 +7448,16 @@ em.off {
     width: 100%;
   }
 }
+@media (max-width: 600px) {
+  /* Das Menue ueber die ganze Breite - als Spalte von 168 Punkten brach der
+     Rat Wort fuer Wort um, und "Rat?" lag halb ausserhalb. */
+  .menu {
+    left: 30px;
+    width: auto;
+  }
+  /* Die Bosstafel liegt ueber einer offenen Dorftafel, nicht darunter. */
+  .boss-tafel,
+  .pfad-tafel {
+    z-index: 15;
+  }
+}
