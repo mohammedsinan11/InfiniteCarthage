@@ -19,4 +19,16 @@ describe('Spenden', () => {
     q.hand = { lumber: 1, brick: 1, wool: 1, grain: 1, ore: 0 };
     expect(applyAction(g, { t: 'spenden' }, 'p0').ok).toBe(false);
   });
+
+  it('spendet mehrere Paeckchen auf einmal, nie mehr als die Hand hergibt', () => {
+    const g = createGame([{ id: 'p0', name: 'S' }], 3, 4, 15);
+    g.state.phase = { t: 'main' };
+    const p = g.state.players[0]!;
+    p.hand = { lumber: 6, brick: 6, wool: 0, grain: 0, ore: 0 };
+    const ruhm = p.ruhm;
+    expect(applyAction(g, { t: 'spenden', mal: 5 }, 'p0').ok).toBe(true);
+    const q = g.state.players[0]!;
+    expect(handSize(q.hand)).toBe(2);
+    expect(q.ruhm).toBe(ruhm + 2);
+  });
 });

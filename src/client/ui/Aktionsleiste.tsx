@@ -50,6 +50,7 @@ import { einheitNamen } from '../heer';
 import { heldKurz } from '../../core/lore';
 import { cardById } from '../../core/cards/catalog';
 import { taktikwirkungen } from '../../core/cards/types';
+import { limitFor } from '../../core/rules/handlimit';
 
 /**
  * Was gerade gebaut wird. Die Reichsbauten der Phase 2 stehen auf Kacheln,
@@ -369,11 +370,14 @@ function KartenTafel({
   darfTaktik,
   kannSpielen,
   kaufen,
+  grenze,
   act,
   onZu,
 }: {
   /** Eine neue Karte kaufen - frueher ein eigener Knopf in der Leiste. */
   kaufen: { darf: boolean; hand: Hand };
+  /** Die Handgrenze - "Ueberschuss spenden" nimmt alles darueber. */
+  grenze?: number;
   anzahl: Map<DevCardType, number>;
   taktiken: string[];
   einheiten: PublicState['units'];
@@ -430,6 +434,16 @@ function KartenTafel({
         >
           Spenden
         </button>
+        {(() => {
+          // Alles ueber der Grenze in einem Tipp.
+          const ueber = Object.values(kaufen.hand).reduce((n, x) => n + x, 0) - (grenze ?? Infinity);
+          const n = Math.floor(ueber / SPENDE_KARTEN);
+          return n >= 2 ? (
+            <button disabled={!kaufen.darf} title="Alles ueber deiner Handgrenze, in Fuenferpaeckchen" onClick={() => act({ t: 'spenden', mal: n })}>
+              Ueberschuss: {n}x
+            </button>
+          ) : null;
+        })()}
       </div>
       {[...anzahl.keys()].map((t) => {
         switch (t) {
@@ -713,6 +727,7 @@ export function Aktionsleiste({
           darfTaktik={isMine && phase.t === 'main'}
           kannSpielen={kannSpielen}
           kaufen={{ darf: bauen, hand }}
+          grenze={me ? limitFor(state, me.id) : undefined}
           act={act}
           onZu={() => setTafel(null)}
         />

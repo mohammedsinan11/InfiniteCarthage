@@ -488,6 +488,11 @@ export function Board({
   }, [dpr]);
   const zoomSteps = useMemo(() => zoomStufen(dpr), [dpr]);
   const [cam, setCam] = useState<Camera>(() => ({ cx: 0, cy: 0, zi: startStufe(leseDpr()) }));
+  // Ein angetipptes Feld bleibt nicht ueber den Zug hinaus stehen - am Handy
+  // blieb die Feldinfo sonst ueber Runden oben haengen (Handy-Spieltest).
+  useEffect(() => {
+    if (letzterZeiger.current !== 'mouse') setHover(null);
+  }, [state.turn]);
   const scale = zoomSteps[cam.zi]!;
   const drag = useRef<{ x: number; y: number; cx: number; cy: number } | null>(null);
   const moved = useRef(false);

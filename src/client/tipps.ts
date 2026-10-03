@@ -36,7 +36,7 @@ export const TIPPS: Record<string, Omit<Tipp, 'id'>> = {
   },
   feuer: {
     titel: 'Feuer!',
-    text: 'Es brennt! Klicke das Feuer an und loesche es mit einer Karte, oder stelle einen Ritter daneben - du hast einen Zug.',
+    text: 'Es brennt! Tippe das Feuer an (oder "Loeschen" in der Zeile unten) und loesche es mit einer Karte, oder stelle einen Ritter daneben - du hast einen Zug.',
   },
   nacht: {
     titel: 'Die Nacht',
@@ -56,7 +56,7 @@ export const TIPPS: Record<string, Omit<Tipp, 'id'>> = {
   },
   held: {
     titel: 'Dein Held',
-    text: 'Oben links steht dein Held: anklicken, dann "Erkunden".',
+    text: 'Oben links steht dein Held: antippen, dann "Erkunden".',
   },
 };
 

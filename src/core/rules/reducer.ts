@@ -222,7 +222,7 @@ export type Action =
   /** Eine Beute einloesen: eine Kartenwahl. */
   | { t: 'claimLoot' }
   /** Ueberschuss spenden: SPENDE_KARTEN Karten von den groessten Stapeln fuer 1 Ruhm. */
-  | { t: 'spenden' }
+  | { t: 'spenden'; mal?: number }
   /** Eine eigene Schluesselkarte in den Kronplatz legen (ENGINE_KARTEN.md). */
   | { t: 'setKrone'; card: string }
   /** Eine Karte verbessern oder verbrennen (rules/schmiede.ts). */
@@ -1662,10 +1662,18 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       // keinen Ort" - 33 Getreide aus einem Wurf, und die Pluenderer holten es).
       if (phase.t !== 'main') return fail('Gespendet wird in der Bauphase.');
       if (handSize(actorPlayer.hand) < SPENDE_KARTEN) return fail(`Eine Spende braucht ${SPENDE_KARTEN} Karten.`);
-      const weg = takeFromLargest(actorPlayer.hand, SPENDE_KARTEN);
-      for (const r of RESOURCES) actorPlayer.hand[r] -= weg[r];
-      geben(s, actor, 1, 'spende', events);
-      events.push({ t: 'gespendet', player: actor, given: weg });
+      // Mehrere auf einmal - sechs Tipps je Zug waren am Handy zu viel (Handy-Spieltest).
+      const mal = Math.max(1, Math.min(20, Math.floor(action.mal ?? 1), Math.floor(handSize(actorPlayer.hand) / SPENDE_KARTEN)));
+      const given = emptyHand();
+      for (let i = 0; i < mal; i++) {
+        const weg = takeFromLargest(actorPlayer.hand, SPENDE_KARTEN);
+        for (const r of RESOURCES) {
+          actorPlayer.hand[r] -= weg[r];
+          given[r] += weg[r];
+        }
+      }
+      geben(s, actor, mal, 'spende', events);
+      events.push({ t: 'gespendet', player: actor, given });
       break;
     }
 

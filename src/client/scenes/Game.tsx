@@ -1997,7 +1997,11 @@ export function Game() {
           {zielWahl && auswahl.length > 0 && (
             <div className="befehl-hinweis">
               Ziel fuer {auswahl.length > 1 ? `${auswahl.length} Einheiten` : heerNamen.get(auswahl[0]!) ?? 'die Einheit'}{' '}
-              waehlen · Esc bricht ab
+              waehlen{' '}
+              {/* Ein Knopf statt nur "Esc" - auf dem Handy gibt es keine Taste (Handy-Spieltest). */}
+              <button className="klein" onClick={() => setZielWahl(false)}>
+                Abbrechen
+              </button>
             </div>
           )}
 
