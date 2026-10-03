@@ -7461,3 +7461,22 @@ em.off {
     z-index: 15;
   }
 }
+
+/* Handy quer (und andere flache Fenster): die Leiste unten nahm fast die
+   halbe Hoehe. Kleiner skaliert, ohne Zoombalken und Mauszeilen. */
+@media (max-height: 500px) {
+  .unten {
+    transform: scale(min(var(--unten-skala, 1), 0.68));
+  }
+  .zoom-balken,
+  .board-hint {
+    display: none;
+  }
+  .hud {
+    font-size: 11px;
+  }
+  .boss-tafel,
+  .pfad-tafel {
+    max-height: calc(100% - 70px);
+  }
+}

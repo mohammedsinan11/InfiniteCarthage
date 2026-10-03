@@ -154,7 +154,7 @@ const zoomStufen = (dpr: number): number[] => DEVICE_FACTORS.map((f) => f / (SCA
 const startStufe = (dpr: number): number => {
   // Auf dem Handy zwei CSS-Pixel: bei drei sah man fuenf mal sechs Felder und
   // die eigenen Doerfer am Bildrand ("man sieht das Spiel kaum").
-  const schmal = typeof window !== 'undefined' && window.innerWidth < 700;
+  const schmal = typeof window !== 'undefined' && (window.innerWidth < 700 || window.innerHeight < 500);
   const wunsch = (schmal ? 2 : 3) * dpr;
   let best = 0;
   for (let i = 1; i < DEVICE_FACTORS.length; i++) {

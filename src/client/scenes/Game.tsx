@@ -503,7 +503,7 @@ export function Game() {
       // Beim Wiedereinstieg mitten im Akt nicht noch einmal aufdraengen.
       // Auf dem Handy deckte die Tafel zwei Drittel der Karte - dort genuegt
       // die Meldung und der pulsierende Akt-Knopf oben.
-      const schmal = typeof window !== 'undefined' && window.innerWidth < 700;
+      const schmal = typeof window !== 'undefined' && (window.innerWidth < 700 || window.innerHeight < 500);
       if (!schmal && (gesehenerAkt.current !== null || state.turn - (meinAkt.bis - (state.akte?.laenge ?? 0)) <= 2)) setBossOffen(true);
       if (schmal) setAktNeu(true);
       gesehenerAkt.current = meinAkt.akt;
