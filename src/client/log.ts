@@ -236,7 +236,8 @@ export function describeEvent(e: GameEvent, state: PublicState | null): string {
     case 'gespendet':
       return `${who(state, e.player)} spendet ${bundleText(e.given)} - 1 Ruhm.`;
     case 'bossEntkommen':
-      return `${bossById(e.boss)?.name ?? 'Der Boss'}: sein Heer hat bei ${who(state, e.player)} gepluendert - der Akt ist verloren.`;
+      // Mit Namen: die Zeile gilt dem Beraubten, nicht jedem, der sie liest (Spieltest 12).
+      return `${bossById(e.boss)?.name ?? 'Der Boss'}: sein Heer hat bei ${who(state, e.player)} gepluendert - fuer ${who(state, e.player)} ist der Akt verloren.`;
     case 'bossLohn':
       return `${who(state, e.player)} waehlt als Lohn: ${BOSS_LOHN_NAME[e.wahl]}.`;
     case 'bossZugabe':

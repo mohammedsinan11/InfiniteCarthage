@@ -232,6 +232,40 @@ describe('Akte', () => {
     expect(g.state.draft!.options.some((id) => cardById(id)?.schluessel)).toBe(true);
   });
 
+  it('frueh bezwungen: der naechste Akt beginnt sofort, mit seiner normalen Frist', () => {
+    const { s } = partie();
+    s.akte!.bosse[0] = 'steuervogt';
+    akteFortschreiben(s, sammeln(), null);
+    const st = s.akte!.stand.p0!;
+    const f = st.forderung as Extract<typeof st.forderung, { t: 'tribut' }>;
+    s.players[0]!.hand = { lumber: 9, brick: 9, wool: 9, grain: 9, ore: 9 };
+    const e = sammeln();
+    for (const r of Object.keys(f.soll) as (keyof typeof f.soll)[]) bossZahlen(s, 'p0', r, e);
+    akteFortschreiben(s, e, null);
+    expect(st.ergebnis).toBe('besiegt');
+    akteFortschreiben(s, e, null);
+    const neu = s.akte!.stand.p0!;
+    expect(neu.akt).toBe(2);
+    expect(neu.bis).toBe(2 * s.akte!.laenge);
+    expect(e.ev.some((x) => x.t === 'aktBeginn' && x.akt === 2)).toBe(true);
+  });
+
+  it('Heer: wer bis zum Ende standhaelt, ohne gepluendert zu werden, hat bestanden', () => {
+    const { s } = partie(['raub']);
+    s.akte!.bosse[0] = 'grenzfuerst';
+    dorf(s, 'p0', 0);
+    akteFortschreiben(s, sammeln(), null);
+    const st = s.akte!.stand.p0!;
+    if (st.forderung.t !== 'heer') return;
+    s.turn = st.forderung.abRunde;
+    akteFortschreiben(s, sammeln(), null);
+    if (st.forderung.t !== 'heer' || !st.forderung.ids) return;
+    const ids = st.forderung.ids;
+    akteFortschreiben(s, sammeln(), st.bis);
+    expect(st.ergebnis).toBe('besiegt');
+    expect(s.units.some((u) => ids.includes(u.id))).toBe(false);
+  });
+
   it('die Trophaee oeffnet eine Wahl, auch ueber die Wahlen je Zug hinaus', () => {
     const { g, s } = partie();
     s.players[0]!.trophaeen = 1;

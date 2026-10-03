@@ -776,15 +776,22 @@ function enterDraft(
   // Was in diesem Zug schon angeboten wurde, kommt moeglichst nicht wieder
   // (Spieltest 7: Fund und Gruendung zeigten dieselben Karten).
   const schon = state.angeboteZug?.turn === state.turn ? state.angeboteZug.ids : [];
-  const ohne = schon.length > 0 ? draftOptions(state.secretSeed, runde, source, owned, [...(state.gesperrt ?? []), ...schon]) : [];
-  let options = ohne.length === DRAFT_SIZE && new Set(ohne).size === DRAFT_SIZE ? ohne : draftOptions(state.secretSeed, runde, source, owned, state.gesperrt ?? []);
+  // Eine Schluesselkarte gibt es nur einmal in der Partie (Spieltest 12: der
+  // Bot nahm das Fuellhorn, das man selbst in der Krone trug).
+  const fremdeKronen = state.players
+    .filter((x) => x.id !== spieler?.id)
+    .flatMap((x) => [...x.cards, ...(x.krone ? [x.krone] : [])])
+    .filter((id) => cardById(id)?.schluessel);
+  const zu = [...(state.gesperrt ?? []), ...fremdeKronen];
+  const ohne = schon.length > 0 ? draftOptions(state.secretSeed, runde, source, owned, [...zu, ...schon]) : [];
+  let options = ohne.length === DRAFT_SIZE && new Set(ohne).size === DRAFT_SIZE ? ohne : draftOptions(state.secretSeed, runde, source, owned, zu);
   /*
    * Eine Trophaee ohne Krone bietet immer eine Schluesselkarte (Spieltest 9:
    * in 45 Wahlen ueber 60 Runden kam keine einzige - der Kronplatz blieb leer).
    */
   if (source === 'trophaee' && spieler && !spieler.krone && !options.some((id) => cardById(id)?.schluessel)) {
-    const zu = new Set([...(state.gesperrt ?? []), ...owned]);
-    const kronen = CARDS.filter((c) => c.schluessel && !zu.has(c.id));
+    const nicht = new Set([...zu, ...owned]);
+    const kronen = CARDS.filter((c) => c.schluessel && !nicht.has(c.id));
     if (kronen.length > 0) {
       const rng = new Rng(hash3i(state.secretSeed, runde, 7, 977));
       options = [...options.slice(0, DRAFT_SIZE - 1), kronen[rng.int(kronen.length)]!.id];

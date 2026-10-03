@@ -117,15 +117,27 @@ export function akteFortschreiben(s: GameState, events: Ereignisse, beendet: num
 
     // Die letzte Runde des Aktes ist gespielt: Entscheidung.
     if (st && st.ergebnis === 'offen' && beendet !== null && beendet >= st.bis) {
-      if (erfuellt(s, p.id, st.forderung, punkte)) besiegt(s, st, p.id, events);
+      // Ein Heer, das bis zum Ende nicht gepluendert hat, ist abgewehrt - wer
+      // standhielt, hat bestanden (Spieltest 12: das Heer kam nie an, und der
+      // Akt galt als verloren, obwohl die Ritter in den Doerfern bereitstanden).
+      const standgehalten = st.forderung.t === 'heer' && st.forderung.ids !== null && !st.forderung.entkommen;
+      if (standgehalten) {
+        // Das Heer zieht ab - es soll nicht im naechsten Akt weiterpluendern.
+        const ids = (st.forderung as Extract<BossStand['forderung'], { t: 'heer' }>).ids ?? [];
+        s.units = s.units.filter((u) => !ids.includes(u.id));
+        besiegt(s, st, p.id, events);
+      } else if (erfuellt(s, p.id, st.forderung, punkte)) besiegt(s, st, p.id, events);
       // Eine offene Zugabe kostet nichts - sie war ein Angebot, keine Drohung.
       else if (st.zugabe) st.ergebnis = 'verfehlt';
       else verfehlt(s, st, p.id, events);
     }
 
-    // Ein neuer Akt beginnt (auch der erste, gleich nach dem Aufbau).
-    const akt = aktVon(akte, s.turn);
-    if ((!st || (st.akt < akt && s.turn > st.bis)) && akt <= AKTE) {
+    // Ein neuer Akt beginnt (auch der erste, gleich nach dem Aufbau). Wer den
+    // Boss frueh bezwingt, bekommt den naechsten sofort - mit dessen normaler
+    // Frist (Spieltest 12: "15 Runden ohne Ziel zwischen den Bossen").
+    const frueh = st && st.ergebnis === 'besiegt' && !st.zugabe && st.akt < AKTE;
+    const akt = frueh ? st!.akt + 1 : aktVon(akte, s.turn);
+    if ((!st || frueh || (st.akt < akt && s.turn > st.bis)) && akt <= AKTE) {
       const boss = bossById(akte.bosse[akt - 1]);
       if (boss) {
         const beginn = (akt - 1) * akte.laenge + 1;

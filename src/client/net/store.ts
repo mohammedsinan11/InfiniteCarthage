@@ -219,6 +219,11 @@ export type Store = {
   clearKartenBlitze: () => void;
   /** Der eigene Held ist gefallen - die Szene dazu (ui/HeldFall.tsx), bis man sie schliesst. */
   heldFall: HeldFall | null;
+  /**
+   * Der letzte Wurf, gleich von wem, und was er einem selbst brachte - am
+   * Wuerfelknopf (Handy-Spieltest: "den eigenen Wurf sieht man nie").
+   */
+  letzterWurf: { player: string; dice: [number, number]; ertrag: number } | null;
   schliesseHeldFall: () => void;
   /** Die frische Kunde aus dem Land, bis man sie wegklickt (core/kunde.ts). */
   kunde: Bericht | null;
@@ -751,6 +756,8 @@ function meldungenAus(
         out.push({ id: naechsteId++, text: e.kind === 'bogen' ? 'Ein Bogenschuetze tritt an' : 'Ein Ritter tritt an', kind: 'info' });
       }
     } else if (e.t === 'draftOffered') {
+      // Nur die eigene Wahl - "Ein Fund!" erschien auch bei der 7 des Bots (Handy-Spieltest).
+      if (e.player !== you) continue;
       out.push({
         id: naechsteId++,
         text:
@@ -897,6 +904,7 @@ export const useStore = create<Store>((set, get) => ({
   treffer: [],
   kartenBlitze: [],
   heldFall: null,
+  letzterWurf: null,
   schliesseHeldFall: () => set({ heldFall: null }),
   kunde: null,
   schliesseKunde: () => set({ kunde: null }),
@@ -1119,6 +1127,15 @@ export const useStore = create<Store>((set, get) => ({
               e.t === 'kartenLohn' && e.player === get().you ? [{ id: naechsteId++, card: e.card, text: lohnKurz(e) }] : [],
             );
             if (blitze.length > 0) set((s) => ({ kartenBlitze: [...s.kartenBlitze, ...blitze].slice(-12) }));
+            if (wurf && wurf.t === 'roll') {
+              const ich = get().you;
+              const ertrag = msg.events.reduce((n: number, e: GameEvent) => {
+                if (e.t !== 'production' || !ich) return n;
+                const h = e.payout[ich];
+                return n + (h ? Object.values(h).reduce((a: number, x) => a + ((x as number) ?? 0), 0) : 0);
+              }, 0);
+              set({ letzterWurf: { player: wurf.player, dice: wurf.dice, ertrag } });
+            }
             const fall = msg.events.find((e: GameEvent) => e.t === 'heroFell' && e.player === get().you && !e.zweig);
             if (fall && fall.t === 'heroFell') {
               const ich = get().state?.players.find((p) => p.id === get().you);

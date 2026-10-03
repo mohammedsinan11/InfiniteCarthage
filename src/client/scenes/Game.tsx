@@ -208,6 +208,7 @@ export function Game() {
   const clearProduceEffect = useStore((s) => s.clearProduceEffect);
   const kartenBlitze = useStore((s) => s.kartenBlitze);
   const heldFall = useStore((s) => s.heldFall);
+  const letzterWurf = useStore((s) => s.letzterWurf);
   const schliesseHeldFall = useStore((s) => s.schliesseHeldFall);
   const clearKartenBlitze = useStore((s) => s.clearKartenBlitze);
   /** Eine Karte aus der Kartenleiste im Menue aufschlagen. */
@@ -274,10 +275,17 @@ export function Game() {
    * lag abgedunkelt da, genau in dem Moment, in dem man sie lesen muss, um einen
    * Platz zu waehlen.
    */
-  const sicht = useMemo(
-    () => (you && state.phase.t !== 'setup' ? sightOf(state, you, sichtLage(state.worldSeed, state.turn)) : null),
-    [state, you],
-  );
+  const sicht = useMemo(() => {
+    if (!you || state.phase.t === 'setup') return null;
+    const s = sightOf(state, you, sichtLage(state.worldSeed, state.turn));
+    // Das Heer des eigenen Bosses sieht man immer, auch im Nebel (Spieltest 12:
+    // "Heer zeigen" zeigte ein leeres Feld).
+    const boss = state.units.filter((u) => u.bossFuer === you);
+    if (boss.length === 0) return s;
+    const mehr = new Set(s);
+    for (const u of boss) mehr.add(hexKey(u.q, u.r));
+    return mehr;
+  }, [state, you]);
 
   /** Tageszeit und Wetter (core/zeit.ts) - ueber die Adresse vorgebbar, siehe wetterVorschau. */
   const vorschau = useMemo(() => wetterVorschau(), []);
@@ -492,6 +500,14 @@ export function Game() {
   }, [meinPfad]);
   const meinAkt = you ? state.akte?.stand[you] : undefined;
   const gesehenerAkt = useRef<number | null>(null);
+  // Ein verfehlter Akt kommt als Tafel, nicht nur als Logzeile (Handy-Spieltest:
+  // "Akt 1 still verfehlt"). Bestandene bringen ohnehin die Lohnwahl.
+  const altesErgebnis = useRef<string | null>(null);
+  useEffect(() => {
+    const e = meinAkt ? `${meinAkt.akt}:${meinAkt.ergebnis}` : null;
+    if (e && altesErgebnis.current && e !== altesErgebnis.current && meinAkt?.ergebnis === 'verfehlt' && !meinAkt.zugabe) setBossOffen(true);
+    altesErgebnis.current = e;
+  }, [meinAkt]);
   /** Ein neuer Akt, dessen Tafel noch nicht offen war - der Knopf oben pulsiert. */
   const [aktNeu, setAktNeu] = useState(false);
   useEffect(() => {
@@ -1800,6 +1816,14 @@ export function Game() {
                     />
                     <span className="wuerfel-rest">{rest}</span>
                   </>
+                )}
+                {/* Der letzte Wurf bleibt stehen - wer, was, und was er dir brachte. */}
+                {letzterWurf && pendingRoll === null && (
+                  <span className="letzter-wurf">
+                    {letzterWurf.player === you ? 'Du' : (state.players.find((p) => p.id === letzterWurf.player)?.name ?? '?')}:{' '}
+                    {letzterWurf.dice[0] + letzterWurf.dice[1]}
+                    {letzterWurf.ertrag > 0 ? ` · +${letzterWurf.ertrag}` : ''}
+                  </span>
                 )}
                 {wurfStoss > 0 && (
                   <span key={`f${wurfStoss}`} className="wuerfel-funken" aria-hidden="true">

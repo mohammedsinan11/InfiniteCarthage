@@ -86,8 +86,8 @@ export function KartenLeiste({
               <KartenBild karte={karte} klein />
             </span>
             <span className="kl-name">
+              {/* Die Plus-Fassung traegt das + schon im Namen (Spieltest 12: "Saegewerk++"). */}
               {karte.name}
-              {p.plus ? '+' : ''}
             </span>
             {z !== undefined && z > 0 && <span className="kl-zaehler">{z}</span>}
             {meine.map((b, i) => (

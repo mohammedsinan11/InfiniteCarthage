@@ -287,7 +287,7 @@ export function forderungText(f: BossForderung): string {
     case 'ziel': {
       const [eins, viele] = ZIEL_NAME[f.mass];
       const mehr = f.soll - f.start;
-      return `Komme auf ${f.soll} ${f.soll === 1 ? eins : viele} (${mehr} mehr als zu Beginn des Aktes).`;
+      return `Komme auf ${f.soll} ${f.soll === 1 ? eins : viele} (${mehr} mehr als zu Beginn).`;
     }
   }
 }

@@ -594,7 +594,7 @@ export function SideMenu({
                   {kartenStapel(cards).map(({ karte, anzahl }) => (
                     <li key={karte.id}>
                       <button
-                        className={[`menu-karte-kachel sk-kachel selt-${karte.rarity}`, karteOffen === karte.id ? 'aktiv' : '', dauerwirkungen(karte).length > 0 && !activeCards.includes(karte.id) ? 'inaktiv' : '']
+                        className={[`menu-karte-kachel sk-kachel selt-${karte.rarity}`, karteOffen === karte.id ? 'aktiv' : '', dauerwirkungen(karte).length > 0 && !activeCards.includes(karte.id) && karte.id !== krone ? 'inaktiv' : '']
                           .filter(Boolean)
                           .join(' ')}
                         title={karte.text}
@@ -615,7 +615,7 @@ export function SideMenu({
                     if (!k) return null;
                     const basisId = karteOffen;
                     const dauer = dauerwirkungen(k).length > 0 && !k.schluessel;
-                    const an = activeCards.includes(k.id);
+                    const an = activeCards.includes(basisId);
                     const voll = activeCards.length >= kartenPlaetze;
                     return (
                       <div className="menu-karte-detail">
@@ -627,14 +627,14 @@ export function SideMenu({
                             {an ? (
                               <button
                                 disabled={!kannUmstellen}
-                                onClick={() => onLoadout(activeCards.filter((c) => c !== k.id))}
+                                onClick={() => onLoadout(activeCards.filter((c) => c !== basisId))}
                               >
                                 Abschalten
                               </button>
                             ) : !voll ? (
                               <button
                                 disabled={!kannUmstellen}
-                                onClick={() => onLoadout([...activeCards, k.id])}
+                                onClick={() => onLoadout([...activeCards, basisId])}
                               >
                                 Aktivieren
                               </button>
@@ -644,7 +644,7 @@ export function SideMenu({
                                   key={alt}
                                   disabled={!kannUmstellen}
                                   title={cardById(alt)?.text}
-                                  onClick={() => onLoadout(activeCards.map((c) => (c === alt ? k.id : c)))}
+                                  onClick={() => onLoadout(activeCards.map((c) => (c === alt ? basisId : c)))}
                                 >
                                   Statt {cardById(alt)?.name ?? alt}
                                 </button>
@@ -653,9 +653,9 @@ export function SideMenu({
                           </span>
                         )}
                         {dauer && !kannUmstellen && <p className="menu-leer">Umstellen: einmal je Zug, in deiner Bauphase.</p>}
-                        {k.schluessel && krone !== k.id && onKrone && (
+                        {k.schluessel && krone !== basisId && onKrone && (
                           <span className="menu-ritter-knoepfe">
-                            <button disabled={!kannUmstellen} onClick={() => onKrone(k.id)}>
+                            <button disabled={!kannUmstellen} onClick={() => onKrone(basisId)}>
                               In die Krone
                             </button>
                           </span>

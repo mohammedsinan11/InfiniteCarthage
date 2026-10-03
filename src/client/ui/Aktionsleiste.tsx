@@ -279,6 +279,7 @@ function HandelTafel({
   gruende,
   darf,
   sturm,
+  bankGesperrt = false,
   onTausch,
   onZu,
   markt,
@@ -295,6 +296,8 @@ function HandelTafel({
   darf: boolean;
   /** Bei Sturm sind die Haefen zu (core/zeit.ts). */
   sturm: boolean;
+  /** Die Krone verbietet den Bankhandel (Fuellhorn) - der Knopf sagt es, statt eine Absage zu ernten. */
+  bankGesperrt?: boolean;
   onTausch: (gib: Resource, nimm: Resource) => void;
   onZu: () => void;
 }) {
@@ -308,7 +311,7 @@ function HandelTafel({
     return RESOURCES.filter((r) => r !== geben).reduce((a, b) => (hand[b] < hand[a] ? b : a));
   });
   const v = verhaeltnis(gib);
-  const geht = darf && gib !== nimm && hand[gib] >= v;
+  const geht = darf && !bankGesperrt && gib !== nimm && hand[gib] >= v;
   return (
     <Tafel titel="Bankhandel" onZu={onZu}>
       <div className="dock-tafel-zeile">
@@ -326,7 +329,7 @@ function HandelTafel({
         <p className="dock-tafel-klein dock-tafel-aufschlag">Der erste Tausch je Zug zum Grundkurs, jeder weitere kostet mehr.</p>
       )}
       <button className="primary dock-tafel-los" disabled={!geht} onClick={() => onTausch(gib, nimm)}>
-        {v}x {resourceName(gib)} gegen {resourceName(nimm)}
+        {bankGesperrt ? 'Deine Krone verbietet den Bankhandel' : `${v}x ${resourceName(gib)} gegen ${resourceName(nimm)}`}
       </button>
       <p className="dock-tafel-klein">
         Kurs {v}:1 - Grundkurs 4:1
@@ -674,6 +677,7 @@ export function Aktionsleiste({
           verhaeltnis={verhaeltnis}
           gruende={gruende}
           darf={bauen}
+          bankGesperrt={!!wk && gesperrt(wk, 'bank')}
           onTausch={(give, receive) => act({ t: 'bankTrade', give, receive })}
           sturm={haefenZu(state)}
           onZu={() => setTafel(null)}

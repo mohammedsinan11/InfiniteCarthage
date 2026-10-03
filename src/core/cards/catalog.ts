@@ -758,8 +758,9 @@ export const CARDS: readonly Card[] = [
   },
   {
     id: 'fuellhorn', name: 'Fuellhorn', rarity: 'legendaer', schluessel: true, wert: 28,
-    text: 'Alle deine Ertraege doppelt. Die Bank handelt nicht mit dir.',
-    lasting: [{ t: 'ertragMal', faktor: 2 }, { t: 'sperre', was: 'bank' }],
+    // Bank allein war kein Preis: Markt und Bots nahmen den Ueberschuss (Spieltest 12, 58 zu 13).
+    text: 'Alle deine Ertraege doppelt. Bank und Markt handeln nicht mit dir.',
+    lasting: [{ t: 'ertragMal', faktor: 2 }, { t: 'sperre', was: 'bank' }, { t: 'sperre', was: 'markt' }],
   },
   {
     id: 'siebenstern', name: 'Siebenstern', rarity: 'legendaer', schluessel: true, wert: 26,

@@ -70,6 +70,7 @@ import type { Hex } from '../coords';
 import { ensureGenerated, isGenerated } from '../world';
 import type { World } from '../world';
 import type { ChunkCoord } from '../chunks';
+import { chunkKey, chunkKeyOf } from '../chunks';
 import { ruinAt, ruinResultFor } from '../ruins';
 import type { RuinResult } from '../ruins';
 import { RESOURCES } from '../types';
@@ -1093,11 +1094,15 @@ export function bossHeerAufstellen(
 ): { ids: number[]; q: number; r: number; fraktion: string } | null {
   const ziele = new Set(settlementApproaches(s, id).keys());
   if (ziele.size === 0) return null;
+  const offen = new Set(s.chunks.map((c) => chunkKey(c.m, c.n)));
+  const erkundet = (q: number, r: number) => offen.has(chunkKeyOf(q, r));
   const an = [...ziele].sort().map(feld);
   let start: { q: number; r: number; d: number; lager: boolean } | null = null;
   for (const a of an) {
     for (const c of hexesInRange(a, BOSS_LAGER_SUCHE)) {
-      if (!isNestActive(s, c.q, c.r)) continue;
+      // Nur aus erkundetem Land - sonst steht das Heer im Ungezeichneten und
+      // ist nicht zu sehen (Spieltest 12).
+      if (!isNestActive(s, c.q, c.r) || !erkundet(c.q, c.r)) continue;
       const d = hexDistance(a, c);
       if (!start || d < start.d) start = { q: c.q, r: c.r, d, lager: true };
     }
@@ -1106,7 +1111,7 @@ export function bossHeerAufstellen(
     // Keine Lager in der Naehe: das Heer kommt aus der Wildnis, acht Felder vor dem Reich.
     const a = an[0]!;
     for (const c of hexesInRange(a, 8)) {
-      if (hexDistance(a, c) !== 8 || !isLandAt(s.worldSeed, c.q, c.r)) continue;
+      if (hexDistance(a, c) !== 8 || !isLandAt(s.worldSeed, c.q, c.r) || !erkundet(c.q, c.r)) continue;
       if (an.some((x) => hexDistance(x, c) < 6)) continue;
       start = { q: c.q, r: c.r, d: 8, lager: false };
       break;

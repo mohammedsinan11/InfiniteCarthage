@@ -7480,3 +7480,70 @@ em.off {
     max-height: calc(100% - 70px);
   }
 }
+
+/* --- Handy, nach dem Handy-Spieltest ------------------------------------
+   Dorf-, Raub- und Befehlstafel hingen ueber ihrem Feld und liefen oben aus
+   dem Bild (die Stadt war unerreichbar). Auf dem Handy sind sie ein Blatt
+   ueber der Leiste unten - wie die Bosstafel, und keine liegt unter der Leiste. */
+@media (max-width: 600px), (max-height: 500px) {
+  .ausbau-tafel,
+  .ausbau-tafel.nach-unten,
+  .ausbau-tafel.befehls-tafel.angedockt {
+    left: 8px !important;
+    right: 8px;
+    top: auto !important;
+    bottom: calc(var(--unten-oben, 118px) + 8px);
+    transform: none;
+    min-width: 0;
+    max-width: none;
+    max-height: 46vh;
+    overflow-y: auto;
+  }
+  .ausbau-tafel::after {
+    display: none;
+  }
+  .boss-tafel,
+  .pfad-tafel {
+    bottom: calc(var(--unten-oben, 118px) + 8px);
+    max-height: calc(100% - var(--unten-oben, 118px) - 70px);
+  }
+  /* Daumengross: Schliessen, Knoepfe in Tafeln, Zoom. */
+  .dock-zu,
+  .ausbau-tafel .dock-zu,
+  .boss-tafel .dock-zu {
+    min-width: 40px;
+    min-height: 36px;
+  }
+  .dock-tafel button,
+  .ausbau-option,
+  .befehl-knoepfe button {
+    min-height: 40px;
+  }
+  .zoom button {
+    min-width: 40px;
+    min-height: 40px;
+  }
+}
+@media (max-height: 500px) {
+  /* Quer: das Menue als volle Spalte, nicht als schmaler Streifen. */
+  .menu {
+    left: 30px;
+    width: auto;
+  }
+}
+
+/* Der letzte Wurf ueber dem Wuerfelknopf. */
+.letzter-wurf {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 4px);
+  transform: translateX(-50%);
+  white-space: nowrap;
+  padding: 2px 6px;
+  font-family: var(--pixel);
+  font-size: 9px;
+  color: #f2e7d0;
+  background: rgba(18, 14, 9, 0.9);
+  border: 1px solid var(--line);
+  pointer-events: none;
+}

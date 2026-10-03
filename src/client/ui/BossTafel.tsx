@@ -81,7 +81,7 @@ export function BossTafel({ state, you, darfZahlen, onZahlen, onZeigen, onZu }: 
             <p className="boss-lohn">Bestanden: +1 Siegpunkt und +0,5 Mult - dann fordert er wieder. Offen am Ende: kein Verlust.</p>
           ) : (
             <p className="boss-lohn">
-              Bestanden: +{st.akt} {st.akt === 1 ? 'Siegpunkt' : 'Siegpunkte'} und ein Lohn zur Wahl (seltene Karte, Schmiedearbeiten oder Relikt)
+              Bestanden: +{st.akt} {st.akt === 1 ? 'Siegpunkt' : 'Siegpunkte'} und ein Lohn zur Wahl (seltene Karte, Schmiedearbeiten, Relikt oder Ruhm)
               {st.akt === 3 ? ', danach Zugaben' : ''}. Verfehlt: die Haelfte der Hand und 1 Ruhm.
             </p>
           )}
