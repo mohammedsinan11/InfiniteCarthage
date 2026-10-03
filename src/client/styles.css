@@ -7584,3 +7584,9 @@ em.off {
   font-size: 12px;
   color: #e8907a;
 }
+
+/* Nie hoeher als der Platz: der Rest scrollt (Spieltest 14). */
+.ausbau-tafel {
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+}

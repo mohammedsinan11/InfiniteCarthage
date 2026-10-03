@@ -65,6 +65,12 @@ export const BOSSE: readonly BossDef[] = [
   { id: 'kriegsherr', name: 'Der Kriegsherr', art: 'heer', akte: [2, 3], braucht: 'raub', text: 'Ein Kriegsherr zieht mit erprobten Kaempfern heran.', spruch: '"Ich habe zehn Fuersten fallen sehen. Ihr werdet der elfte."', abgang: '"Ein Krieger erkennt einen Krieger." Er zieht sich zurueck, und sein Banner sinkt.' },
   { id: 'eiserne_koenigin', name: 'Die Eiserne Koenigin', art: 'tribut', akte: [3], text: 'Die Koenigin des Nordens verlangt Tribut - oder sie kommt ihn holen.', spruch: '"Ihr habt hier etwas aufgebaut. Das gefaellt mir. Es gehoert jetzt mir - ein Teil davon, jedes Jahr."', abgang: '"Ihr zahlt wie eine Koenigin. Vielleicht seid Ihr eine."' },
   { id: 'schwarzes_banner', name: 'Das Schwarze Banner', art: 'heer', akte: [3], braucht: 'raub', text: 'Unter dem schwarzen Banner sammelt sich, was die Wildnis an Grausamem hat.', spruch: 'Kein Herold, kein Brief. Nur ein schwarzes Tuch an einem Baum am Waldrand - und Spuren, viele Spuren.', abgang: 'Das schwarze Banner brennt. Die Spuren fuehren zurueck in den Wald, und keine kommt wieder.' },
+  // Mehr Gesichter (Spieltest 14: "dieselben drei Bosse in beiden Partien").
+  { id: 'seuchenarzt', name: 'Der Seuchenarzt', art: 'tribut', akte: [1, 2], text: 'Eine Seuche geht um. Der Arzt verlangt Vorraete fuer seine Kranken.', spruch: '"Ich heile, wen ich kann. Aber Kraeuter und Brot wachsen nicht in meiner Tasche."', abgang: '"Die Kranken stehen wieder auf. Ihr habt gut gegeben."' },
+  { id: 'kaufmannsprinz', name: 'Der Kaufmannsprinz', art: 'ziel', mass: 'punkte', akte: [1, 2], text: 'Ein Prinz aus dem Sueden will wissen, ob sich ein Handel mit Euch lohnt.', spruch: '"Zeigt mir ein Reich, das waechst - dann reden wir ueber Gold."', abgang: '"Ihr seid ein Partner, den man sich merkt."' },
+  { id: 'wolfsrudel', name: 'Das Wolfsrudel', art: 'heer', akte: [1, 3], braucht: 'raub', text: 'Ein harter Winter treibt Raeuber und Woelfe zusammen aus den Waeldern.', spruch: 'Nachts heulen sie naeher als gestern. Morgen werden sie da sein.', abgang: 'Das Heulen verstummt. Im Schnee bleiben nur Spuren zurueck.' },
+  { id: 'landvermesser', name: 'Die Landvermesser', art: 'ziel', mass: 'siedlungen', akte: [2, 3], text: 'Die Krone vermisst das Land neu. Wo niemand wohnt, faellt es an andere.', spruch: '"Leeres Land gehoert dem, der es zuerst besiedelt - so steht es im Gesetz."', abgang: '"Eingetragen, gesiegelt, Euer. Gute Arbeit."' },
+  { id: 'kirchenfuerst', name: 'Der Kirchenfuerst', art: 'tribut', akte: [2, 3], text: 'Der Kirchenfuerst baut einen Dom und erwartet den Zehnten.', spruch: '"Der Himmel ist geduldig. Ich bin es nicht."', abgang: '"Der Dom wird Euren Namen tragen - im Fenster ueber dem Portal."' },
 ];
 
 export const bossById = (id: string | undefined | null): BossDef | undefined => BOSSE.find((b) => b.id === id);
@@ -189,10 +195,12 @@ export function forderungFuer(
   beginn: number,
   bis: number,
   punkte: (id: PlayerId) => number,
+  /** Die wievielte Zugabe - jede fordert mehr (Spieltest 14: "immer dasselbe 4/4/4"). */
+  zugabe = 0,
 ): BossForderung {
   const i = Math.max(0, Math.min(AKTE, akt) - 1);
-  // Ab Chronikstufe 7 fordern die Bosse mehr (core/stufe.ts).
-  const haerte = (s.stufe ?? 0) >= 7 ? 1 : 0;
+  // Ab Chronikstufe 7 fordern die Bosse mehr (core/stufe.ts); jede Zugabe auch.
+  const haerte = ((s.stufe ?? 0) >= 7 ? 1 : 0) + zugabe;
   if (boss.art === 'tribut') {
     // Zwei oder drei Sorten, je Spieler verschieden, aber aus dem Weltseed.
     const rng = new Rng(hash3i(s.worldSeed, akt, s.order.indexOf(id) + 1, SALT_AKT + 1));

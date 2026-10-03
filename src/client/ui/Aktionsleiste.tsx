@@ -281,6 +281,7 @@ function HandelTafel({
   darf,
   sturm,
   bankGesperrt = false,
+  onSpenden,
   onTausch,
   onZu,
   markt,
@@ -299,6 +300,8 @@ function HandelTafel({
   sturm: boolean;
   /** Die Krone verbietet den Bankhandel (Fuellhorn) - der Knopf sagt es, statt eine Absage zu ernten. */
   bankGesperrt?: boolean;
+  /** Spenden auch hier - in der Kartentafel fand es niemand (Spieltest 14). */
+  onSpenden?: () => void;
   onTausch: (gib: Resource, nimm: Resource) => void;
   onZu: () => void;
 }) {
@@ -337,6 +340,13 @@ function HandelTafel({
         {(gruende?.(gib) ?? []).map((g) => `, ${g}`).join('')}
       </p>
       {sturm && <p className="dock-tafel-klein">Sturm: die Haefen sind geschlossen.</p>}
+      {onSpenden && Object.values(hand).reduce((n, x) => n + x, 0) >= SPENDE_KARTEN && (
+        <div className="dock-markt">
+          <button disabled={!darf} onClick={onSpenden} title="Ruhm zaehlt in der Wertung - besser als Karten, die verderben oder geraubt werden">
+            Spenden: {SPENDE_KARTEN} Karten gegen 1 Ruhm
+          </button>
+        </div>
+      )}
       {markt && (
         <div className="dock-markt">
           <button
@@ -692,6 +702,7 @@ export function Aktionsleiste({
           gruende={gruende}
           darf={bauen}
           bankGesperrt={!!wk && gesperrt(wk, 'bank')}
+          onSpenden={() => act({ t: 'spenden' })}
           onTausch={(give, receive) => act({ t: 'bankTrade', give, receive })}
           sturm={haefenZu(state)}
           onZu={() => setTafel(null)}

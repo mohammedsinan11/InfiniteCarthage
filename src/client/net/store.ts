@@ -514,6 +514,11 @@ function meldungenAus(
       meldung(`Mehr als ${WAHLEN_JE_ZUG} Kartenwahlen gibt es nicht je Zug - die Stadt steht, die Wahl kommt mit der naechsten.`, 'info');
       continue;
     }
+    if (e.t === 'bossLohn' && e.player === you && e.wahl === 'schmiede') {
+      // Sonst blieben die Schmiedearbeiten unbemerkt im Menue (Spieltest 12 und 14).
+      meldung('Zwei Schmiedearbeiten: im Menue unter Reich eine Karte antippen - verbessern oder verbrennen', 'gain');
+      continue;
+    }
     if (e.t === 'bossEntkommen' && e.player === you) {
       meldung(`${bossById(e.boss)?.name ?? 'Der Boss'}: sein Heer hat gepluendert - dieser Akt ist verloren`, 'raid');
       continue;

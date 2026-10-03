@@ -1222,7 +1222,15 @@ export function Game() {
     ausbauOrt === null &&
     state.draft === null &&
     state.trade === null &&
-    !tafelOffen;
+    !tafelOffen &&
+    // Keine Uhr unter einer offenen Tafel oder Wahl (Spieltest 14: nach einem
+    // Ereignis wuerfelte sie darunter weiter).
+    state.ereignis === null &&
+    !bossOffen &&
+    !(me?.bossLohn && me.bossLohn.length > 0) &&
+    !(me?.eigenschaftAngebot && me.eigenschaftAngebot.length > 0) &&
+    heldFall === null &&
+    !(meinPfad?.angebot && pfadOffen);
   const [uhrStart, setUhrStart] = useState({ zeit: 0, n: 0 });
   const [rest, setRest] = useState(AUTO_WURF_MS / 1000);
   /** Zaehlt jeden Wurf - der Schluessel startet Funken und Stoss neu. */

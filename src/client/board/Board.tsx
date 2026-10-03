@@ -3342,7 +3342,10 @@ export function Board({
           const sx = (wx - view.x) * scale;
           const halb = TAFEL_BREITE / 2;
           const links = Math.min(Math.max(sx, halb + 8), size.w - halb - 8);
-          const unten = (wyOben - view.y) * scale < TAFEL_HOEHE;
+          // Die Tafel waechst mit ihren Moeglichkeiten (mit Erklaerzeile rund 50 je
+          // Option) - mit fester Hoehe ragte sie oben aus dem Bild (Spieltest 14).
+          const hoehe = Math.max(TAFEL_HOEHE, 56 + ausbau.optionen.length * 50);
+          const unten = (wyOben - view.y) * scale < hoehe;
           return (
             <div
               className={unten ? 'ausbau-tafel nach-unten' : 'ausbau-tafel'}

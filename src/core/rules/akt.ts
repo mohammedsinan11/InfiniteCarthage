@@ -78,7 +78,7 @@ function zugabe(s: GameState, st: BossStand, id: PlayerId, events: Ereignisse): 
   if (!boss) return;
   const n = (st.zugabe ?? 0) + 1;
   const punkte = punkteVon(s);
-  const neu: BossStand = { akt: st.akt, boss: boss.id, bis: st.bis, forderung: forderungFuer(s, boss, AKTE, id, s.turn, st.bis, punkte), ergebnis: 'offen', zugabe: n };
+  const neu: BossStand = { akt: st.akt, boss: boss.id, bis: st.bis, forderung: forderungFuer(s, boss, AKTE, id, s.turn, st.bis, punkte, n), ergebnis: 'offen', zugabe: n };
   s.akte!.stand[id] = neu;
   events.push({ t: 'bossZugabe', player: id, boss: boss.id, zugabe: n, bis: st.bis });
 }

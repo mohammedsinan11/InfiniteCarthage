@@ -119,7 +119,7 @@ import { cardKind, dauerwirkungen, istEinzigartig, wiederholbar } from '../cards
 import { gesperrt } from '../cards/effects';
 import { ausloeserAusEreignissen } from '../cards/ausloeser';
 import { schmieden } from './schmiede';
-import { eigenschaftWaehlen, heldFolge, heldWachsen, pfadAnkunft, pfadRunde, pfadWaehlen, probeWuerfeln } from './pfad';
+import { eigenschaftWaehlen, heldFolge, heldVon, heldWachsen, pfadAnkunft, pfadRunde, pfadWaehlen, probeWuerfeln } from './pfad';
 import { begegnungById, eigenschaftById } from '../heldenpfad';
 import type { SchmiedeArt, SchmiedeEvent } from './schmiede';
 import type { AusloeserEvent } from '../cards/ausloeser';
@@ -1127,6 +1127,9 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
       // Alle paar eigenen Zuege ein Ereignis mit einer Wahl (core/ereignis.ts) -
       // bei einer 7 erst nach der Kartenwahl.
       // Der Held ist angekommen: seine Begegnung geht jedem Ereignis vor (core/heldenpfad.ts).
+      // Ein gefallener Held erlebt nichts mehr - die Begegnung verfaellt
+      // (Spieltest 14: der Tote nahm noch die Weissagung der Hexe an).
+      if (actorPlayer.begegnung && !heldVon(s, actor)) actorPlayer.begegnung = null;
       if (actorPlayer.begegnung && begegnungById(actorPlayer.begegnung)) {
         s.ereignis = { id: actorPlayer.begegnung, player: actor };
         actorPlayer.begegnung = null;
