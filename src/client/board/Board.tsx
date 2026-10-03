@@ -3477,6 +3477,21 @@ export function Board({
         >
           −
         </button>
+        {/* Zurueck zum eigenen Reich (Handy-Spieltest: "meine Doerfer suche ich staendig"). */}
+        {du !== null && Object.values(state.buildings).some((b) => b.owner === du) && (
+          <button
+            className="zoom-knopf"
+            title="Zum eigenen Reich"
+            onClick={() => {
+              const ecken = Object.entries(state.buildings).filter(([, b]) => b.owner === du).map(([vk]) => vertexToPixel(parseVertexKey(vk), LAYOUT));
+              const x = ecken.reduce((n, p) => n + p.x, 0) / ecken.length;
+              const y = ecken.reduce((n, p) => n + p.y, 0) / ecken.length;
+              setCam((c) => ({ ...c, cx: x, cy: y }));
+            }}
+          >
+            ⌂
+          </button>
+        )}
         <button
           className={uebersichtAuf ? 'zoom-knopf aktiv' : 'zoom-knopf'}
           title="Uebersichtskarte"

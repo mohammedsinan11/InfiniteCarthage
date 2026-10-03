@@ -7556,3 +7556,19 @@ em.off {
 .dock-tafel {
   z-index: 5;
 }
+
+/* Bauplaetze fuer den Finger: groessere Ringe und dickere Kanten, damit sie
+   auch beim weiteren Handy-Zoom sichtbar bleiben (Handy-Spieltest: "fuer jede
+   Strasse ganz heranzoomen"). */
+@media (pointer: coarse) {
+  .vertex-ring {
+    r: 10px;
+    stroke-width: 3;
+  }
+  .edge-target {
+    stroke-width: 12;
+  }
+  .vertex-empfohlen {
+    font-size: 18px;
+  }
+}
