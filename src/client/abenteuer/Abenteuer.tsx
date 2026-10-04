@@ -76,7 +76,7 @@ const TAKT_MS = 170;
 /** So lange steigen Zahlen noch nach ihrem Takt auf (in Takten). */
 const NACHKLANG = 5;
 /** So lange rollt der Wuerfel. */
-const ROLL_MS = 850;
+const ROLL_MS = 540;
 /** Faecher im Inventar - es steht immer da, auch leer. */
 const FAECHER = 12;
 
@@ -253,10 +253,11 @@ function Wuerfel({ n, wurfNr, matt }: { n: number | null; wurfNr: number; matt: 
     setStand('rollt');
     const schritt = () => {
       i += 1;
-      if (i >= 9) {
+      if (i >= 7) {
+        klang('wuerfelLand');
         setGezeigt(ziel.current);
         setStand('landet');
-        t = window.setTimeout(() => setStand('ruht'), 650);
+        t = window.setTimeout(() => setStand('ruht'), 450);
         return;
       }
       setGezeigt((alt) => {
@@ -264,7 +265,9 @@ function Wuerfel({ n, wurfNr, matt }: { n: number | null; wurfNr: number; matt: 
         if (neu === alt) neu = (neu % 6) + 1;
         return neu;
       });
-      t = window.setTimeout(schritt, 38 + i * i * 2.6);
+      // Jeder Wechsel der Augen klackert - erst schnell, dann langsamer.
+      klang('wuerfelKlack');
+      t = window.setTimeout(schritt, 28 + i * i * 3);
     };
     schritt();
     return () => window.clearTimeout(t);

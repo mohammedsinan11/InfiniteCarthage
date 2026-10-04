@@ -233,7 +233,7 @@ function gleit(c: AudioContext, t: number, art: OscillatorType, von: number, bis
   o.stop(t + dauer + 0.02);
 }
 
-export type Klang = 'schritt' | 'huepf' | 'hieb' | 'treffer' | 'platsch' | 'geblockt' | 'leer' | 'warnung' | 'zerplatzt' | 'beben' | 'probe';
+export type Klang = 'schritt' | 'huepf' | 'hieb' | 'treffer' | 'platsch' | 'geblockt' | 'leer' | 'warnung' | 'zerplatzt' | 'beben' | 'probe' | 'wuerfelKlack' | 'wuerfelLand';
 
 /** Ein kurzer Klang - nur, wenn der Ton an ist. */
 export function klang(art: Klang): void {
@@ -278,6 +278,19 @@ export function klang(art: Klang): void {
       // Der Koenig: ein tiefes Grollen.
       gleit(c, t, 'sine', 70, 38, 0.6, 0.35);
       stoss(c, t, 0.5, 0.5, 'lowpass', 250, 60);
+      break;
+    case 'wuerfelKlack': {
+      // Holz auf Holz: ein kurzer, heller Klack, jedes Mal ein wenig anders.
+      const h = 1800 + Math.random() * 1400;
+      stoss(c, t, 0.03, 0.35, 'bandpass', h, h * 0.8, 6);
+      gleit(c, t, 'triangle', h / 3, h / 4, 0.03, 0.05);
+      break;
+    }
+    case 'wuerfelLand':
+      // Der Wuerfel liegt: ein dumpfer Plock und ein letzter Klack.
+      gleit(c, t, 'sine', 220, 110, 0.12, 0.25);
+      stoss(c, t, 0.05, 0.45, 'bandpass', 1500, 900, 4);
+      stoss(c, t + 0.06, 0.025, 0.2, 'bandpass', 2400, 2000, 6);
       break;
     case 'probe':
       gleit(c, t, 'triangle', 660, 660, 0.12, 0.2);
