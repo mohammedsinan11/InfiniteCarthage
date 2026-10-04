@@ -1,7 +1,7 @@
 /** Abenteuer (src/abenteuer/regeln.ts): wuerfeln, gehen, kaempfen, sammeln - im Takt der Spieluhr. */
 
 import { describe, it, expect } from 'vitest';
-import { BOSS_LEBEN, BOSS_NACH, benutzen, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden } from '../src/abenteuer/regeln';
+import { BOSS_LEBEN, BOSS_NACH, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden } from '../src/abenteuer/regeln';
 import type { Abenteuer, Taste } from '../src/abenteuer/regeln';
 import { HEX_DIRS, hexDistance } from '../src/core/coords';
 
@@ -21,6 +21,11 @@ function freieTaste(a: Abenteuer): Taste {
     if (g && g !== 'water' && g !== 'mountain') return t;
   }
   throw new Error('kein freier Nachbar');
+}
+
+/** Den naechsten Schritt im Hin und Her: zurueck, wenn man draussen steht, sonst hinaus. */
+function i6(a: Abenteuer, hin: Taste, zurueck: Taste): Taste {
+  return a.pfad.length % 2 === 0 ? zurueck : hin;
 }
 
 describe('Abenteuer', () => {
@@ -268,6 +273,47 @@ describe('Abenteuer', () => {
       }
     }
     expect(treffer).toBeGreaterThan(0);
+  });
+
+  it('Waffen laden mit Schritten und Treffern; voll wirkt ihre Faehigkeit', () => {
+    const a0 = neuesAbenteuer(21);
+    let a = debugAktion(imZug(21, [], 20), { t: 'waffe', id: 'flammenschwert' });
+    expect(ladungVon(a)).toMatchObject({ ist: 0, voll: 7, faehigkeit: 'feuerkreis' });
+    const t = freieTaste(a);
+    const zurueck = (['e', 'd', 'x', 'z', 'a', 'q'] as Taste[])[(['e', 'd', 'x', 'z', 'a', 'q'].indexOf(t) + 3) % 6]!;
+    for (let i = 0; i < 6; i++) a = taste(a, i % 2 ? zurueck : t);
+    expect(a.ladung).toBe(6);
+    // Der siebte Schritt fuellt den Balken: Feuerkreis um den Ritter.
+    a.schleime = [{ id: 70, q: a0.pos.q, r: a0.pos.r - 1, leben: 2, gross: false }];
+    a = taste(a, i6(a, t, zurueck));
+    expect(a.ereignisse.some((e) => e.art === 'faehigkeit' && e.name === 'feuerkreis')).toBe(true);
+    expect(a.ladung).toBe(0);
+  });
+
+  it('Debug: Ladung voll loest die Faehigkeit sofort aus', () => {
+    const a0 = neuesAbenteuer(13);
+    let a = debugAktion(imZug(13, [{ id: 71, q: a0.pos.q + 1, r: a0.pos.r, leben: 2, gross: false }]), { t: 'waffe', id: 'flammenschwert' });
+    a = debugAktion(a, { t: 'ladung' });
+    expect(a.schleime).toHaveLength(0);
+    a = debugAktion(debugAktion(a, { t: 'waffe', id: 'breitschwert' }), { t: 'ladung' });
+    expect(a.bereit).toBe('schutzwall');
+  });
+
+  it('Legendaer: Solo-Leveling gibt Level mit Statups, der Herzcontainer ein leeres Herz', () => {
+    let a = imZug(5);
+    const max = maxLebenVon(a);
+    a = debugAktion(a, { t: 'legendaer', id: 'herzcontainer' });
+    expect(maxLebenVon(a)).toBe(max + 1);
+    expect(a.leben).toBe(GRUND_LEBEN);
+    a = debugAktion(a, { t: 'legendaer', id: 'sololeveling' });
+    expect(a.stufe).toEqual({ lv: 1, ep: 0 });
+    a = debugAktion(a, { t: 'ep' });
+    expect(a.stufe?.lv).toBe(2);
+    expect(maxLebenVon(a)).toBe(max + 2);
+    const angriff = angriffVon(a);
+    a = debugAktion(a, { t: 'ep' });
+    expect(angriffVon(a)).toBe(angriff + 1);
+    expect(a.legendaer).toEqual(['herzcontainer', 'sololeveling']);
   });
 
   it('Herzen werden gleich verbraucht - bei vollem Leben bleiben sie liegen', () => {

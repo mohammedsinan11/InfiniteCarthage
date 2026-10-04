@@ -42,6 +42,21 @@ export const SLOT_NAME: Record<Slot, string> = {
   zubehoer: 'Zubehoer',
 };
 
+/**
+ * FAEHIGKEITEN der Waffen (Ladebalken):
+ *   feuerkreis  alle Gegner rundum nehmen 2 Schaden (Flammenschwert)
+ *   runenblitz  ein Blitz trifft den naechsten Gegner bis 3 Felder weit, 2 Schaden (Runenklinge)
+ *   spalthieb   der naechste Treffer macht 2 Schaden mehr (Streitaxt)
+ *   schutzwall  der naechste Treffer gegen den Ritter wird abgefangen (Breitschwert)
+ */
+export type Faehigkeit = 'feuerkreis' | 'runenblitz' | 'spalthieb' | 'schutzwall';
+export const FAEHIGKEIT_NAME: Record<Faehigkeit, string> = {
+  feuerkreis: 'Feuerkreis',
+  runenblitz: 'Runenblitz',
+  spalthieb: 'Spalthieb',
+  schutzwall: 'Schutzwall',
+};
+
 export type Gegenstand = {
   id: string;
   name: string;
@@ -55,16 +70,24 @@ export type Gegenstand = {
   sicht?: number;
   /** Vorrat, der sich benutzen laesst: so viele Leben zurueck. */
   heilt?: number;
+  /** Legendaer: veraendert das Spiel grundsaetzlich, wirkt gleich beim Aufheben. */
+  legendaer?: boolean;
   /** Waffen: so viel Schaden bei einer gewuerfelten 6 (sonst 2). */
   krit?: number;
+  /**
+   * Waffen mit Faehigkeit: so viele Ladungen bis zur Faehigkeit. Jeder
+   * Schritt und jeder Treffer laedt eins; ist der Balken voll, wirkt sie.
+   */
+  ladung?: number;
+  faehigkeit?: Faehigkeit;
 };
 
 export const GEGENSTAENDE: readonly Gegenstand[] = [
   { id: 'schwert', name: 'Schwert', slot: 'waffe', angriff: 1, text: '+1 auf jeden Angriffswurf.' },
-  { id: 'axt', name: 'Streitaxt', slot: 'waffe', angriff: 2, text: '+2 auf jeden Angriffswurf.' },
-  { id: 'breitschwert', name: 'Breitschwert', slot: 'waffe', angriff: 2, text: '+2 auf jeden Angriffswurf.' },
-  { id: 'runenklinge', name: 'Runenklinge', slot: 'waffe', angriff: 2, krit: 3, text: '+2 auf jeden Angriffswurf; eine 6 trifft dreifach.' },
-  { id: 'flammenschwert', name: 'Flammenschwert', slot: 'waffe', angriff: 3, text: '+3 auf jeden Angriffswurf.' },
+  { id: 'axt', name: 'Streitaxt', slot: 'waffe', angriff: 2, ladung: 5, faehigkeit: 'spalthieb', text: '+2 auf jeden Angriffswurf. Ladung 5: Spalthieb - der naechste Treffer macht 2 Schaden mehr.' },
+  { id: 'breitschwert', name: 'Breitschwert', slot: 'waffe', angriff: 2, ladung: 6, faehigkeit: 'schutzwall', text: '+2 auf jeden Angriffswurf. Ladung 6: Schutzwall - der naechste Treffer gegen dich wird abgefangen.' },
+  { id: 'runenklinge', name: 'Runenklinge', slot: 'waffe', angriff: 2, krit: 3, ladung: 5, faehigkeit: 'runenblitz', text: '+2 auf jeden Angriffswurf; eine 6 trifft dreifach. Ladung 5: Runenblitz - 2 Schaden am naechsten Gegner (bis 3 Felder).' },
+  { id: 'flammenschwert', name: 'Flammenschwert', slot: 'waffe', angriff: 3, ladung: 7, faehigkeit: 'feuerkreis', text: '+3 auf jeden Angriffswurf. Ladung 7: Feuerkreis - alle Gegner rundum nehmen 2 Schaden.' },
   { id: 'schild', name: 'Schild', slot: 'schild', abwehr: 1, text: 'Schleime brauchen eine Augenzahl mehr, um zu treffen.' },
   { id: 'helm', name: 'Helm', slot: 'kopf', leben: 1, text: '+1 Leben.' },
   { id: 'ruestung', name: 'Kettenhemd', slot: 'koerper', leben: 2, text: '+2 Leben.' },
@@ -73,6 +96,18 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
   { id: 'kraut', name: 'Heilkraut', heilt: 2, text: 'Antippen: 2 Leben zurueck.' },
   { id: 'herz', name: 'Herz', heilt: 1, text: 'Ein ganzes Leben, gleich beim Aufheben. Bei vollem Leben bleibt es liegen.' },
   { id: 'halbherz', name: 'Halbes Herz', heilt: 0.5, text: 'Ein halbes Leben, gleich beim Aufheben. Bei vollem Leben bleibt es liegen.' },
+  {
+    id: 'sololeveling',
+    name: 'Solo-Leveling',
+    legendaer: true,
+    text: 'Legendaer. Du bekommst Level: jeder erschlagene Gegner gibt Erfahrung, jeder Aufstieg macht dich staerker (Leben, Angriff, Abwehr im Wechsel).',
+  },
+  {
+    id: 'herzcontainer',
+    name: 'Leerer Herzcontainer',
+    legendaer: true,
+    text: 'Legendaer. Ein Herz mehr - leer, es will erst gefuellt werden.',
+  },
   { id: 'gold', name: 'Gold', text: 'Glaenzt. Noch kauft hier niemand etwas.' },
   { id: 'gelee', name: 'Schleimgelee', text: 'Was ein Schleim zuruecklaesst - der Beweis deiner Taten.' },
 ];
@@ -158,8 +193,14 @@ export type Ereignis =
   | { art: 'hieb'; takt: number; wer: Wer; ziel: Wer | null; feld?: Hex; wurf: number; schaden: number }
   /** Ein Schleim holt aus: im naechsten Takt trifft er dieses Feld (der Koenig auch mehrere). */
   | { art: 'ansage'; takt: number; wer: number; feld: Hex; felder?: Hex[] }
+  /** Ein legendaerer Fund wirkt. */
+  | { art: 'legende'; takt: number; id: string }
+  /** Solo-Leveling: ein Levelaufstieg. */
+  | { art: 'stufe'; takt: number; lv: number; bonus: string }
   /** Der Koenig springt und schlaegt auf - alle angesagten Felder beben. */
   | { art: 'stampf'; takt: number; wer: number; felder: Hex[] }
+  /** Eine Waffe entfesselt ihre Faehigkeit (Ladebalken voll). */
+  | { art: 'faehigkeit'; takt: number; name: Faehigkeit; felder?: Hex[]; ziel?: number }
   /** Der Schleimkoenig erwacht. */
   | { art: 'boss'; takt: number; wer: number }
   | { art: 'tod'; takt: number; wer: number; q: number; r: number; gross: boolean; boss?: boolean; schleimArt?: SchleimArt }
@@ -202,6 +243,18 @@ export type Abenteuer = {
   ereignisse: Ereignis[];
   /** Die Wege der Schleime in diesem Zug (mit Startfeld) - fuer ihre Pfeile. */
   spuren: Record<number, Hex[]>;
+  /** Legendaere Funde, in der Reihenfolge des Findens. */
+  legendaer?: string[];
+  /** Solo-Leveling: Level und Erfahrung - fehlt, solange man es nicht hat. */
+  stufe?: { lv: number; ep: number } | null;
+  /** Dauerhafte Staerkung aus Leveln. */
+  bonus?: { leben: number; angriff: number; abwehr: number };
+  /** Leere Herzcontainer: so viele Herzen mehr. */
+  extraHerzen?: number;
+  /** Der Ladebalken der Waffe (0 bis ihre Ladung). */
+  ladung?: number;
+  /** Eine geladene Faehigkeit, die auf den naechsten Treffer wartet. */
+  bereit?: Faehigkeit | null;
   /** In diesem Zug schon durch Warten geheilt. */
   geruht: boolean;
 };
@@ -274,6 +327,8 @@ export function fundAuf(a: Pick<Abenteuer, 'seed' | 'genommen'>, q: number, r: n
   if (a.genommen.includes(hexKey(q, r))) return null;
   const t = gelaende(a.seed, q, r);
   if (!begehbar(t)) return null;
+  // Ganz selten eine goldene Schatztruhe mit einem legendaeren Fund.
+  if (hash3i(a.seed, q, r, SALT_FUND + 7) % 300 === 0) return 'schatz';
   const h = hash3i(a.seed, q, r, SALT_FUND) % 100;
   if (h < 3) return 'truhe';
   if (h < 7 && (t === 'forest' || t === 'pasture' || t === 'field')) return 'kraut';
@@ -287,9 +342,9 @@ export function fundAuf(a: Pick<Abenteuer, 'seed' | 'genommen'>, q: number, r: n
 
 const summe = (a: Abenteuer, f: (g: Gegenstand) => number | undefined): number =>
   SLOTS.reduce((n, s) => n + (f(gegenstand(a.ausruestung[s] ?? '') ?? ({} as Gegenstand)) ?? 0), 0);
-export const angriffVon = (a: Abenteuer) => summe(a, (g) => g.angriff);
-export const abwehrVon = (a: Abenteuer) => summe(a, (g) => g.abwehr);
-export const maxLebenVon = (a: Abenteuer) => GRUND_LEBEN + summe(a, (g) => g.leben);
+export const angriffVon = (a: Abenteuer) => summe(a, (g) => g.angriff) + (a.bonus?.angriff ?? 0);
+export const abwehrVon = (a: Abenteuer) => summe(a, (g) => g.abwehr) + (a.bonus?.abwehr ?? 0);
+export const maxLebenVon = (a: Abenteuer) => GRUND_LEBEN + summe(a, (g) => g.leben) + (a.bonus?.leben ?? 0) + (a.extraHerzen ?? 0);
 export const sichtVon = (a: Abenteuer) => GRUND_SICHT + summe(a, (g) => g.sicht);
 const schrittBonus = (a: Abenteuer) => summe(a, (g) => g.schritte);
 export const schrittBonusVon = schrittBonus;
@@ -450,6 +505,7 @@ export function taste(alt: Abenteuer, t: Taste): Abenteuer {
   a.pfad = [...a.pfad, ziel];
   sehen(a);
   aufheben(a);
+  laden(a, 0);
   // Ein Berg kostet zwei Ticks - die Schleime huepfen zweimal.
   for (let i = 1; i <= k && a.phase === 'ziehen'; i++) ticken(a, i);
   return nachDemSchritt(a);
@@ -496,30 +552,125 @@ function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
   const krit = gegenstand(a.ausruestung.waffe ?? '')?.krit ?? 2;
   // Der Panzer will einen kraeftigeren Hieb.
   const noetig = s.art === 'panzer' ? 5 : 4;
-  const schaden = summeWurf >= noetig ? (wurf === 6 ? krit : 1) : 0;
+  let schaden = summeWurf >= noetig ? (wurf === 6 ? krit : 1) : 0;
+  // Ein geladener Spalthieb legt beim naechsten Treffer zwei drauf.
+  const spalt = schaden > 0 && a.bereit === 'spalthieb';
+  if (spalt) {
+    schaden += 2;
+    a.bereit = null;
+  }
   a.ereignisse.push({ art: 'hieb', takt, wer: 'ritter', ziel: s.id, wurf, schaden });
   if (schaden === 0) {
     melde(a, `Wurf ${wurf}+${angriffVon(a)}: ${s.art === 'panzer' ? 'prallt am Steinpanzer ab (ab 5)' : 'daneben'}.`);
     return;
   }
+  const vorne = `Wurf ${wurf}+${angriffVon(a)}${spalt ? ', Spalthieb' : ''}`;
+  verwunde(a, s, schaden, takt, vorne);
+  // Ein Treffer laedt die Waffe.
+  if (a.phase === 'ziehen') laden(a, takt);
+}
+
+/** Schaden an einem Schleim - stirbt er, zerplatzt er (und der Koenig erwacht vielleicht). */
+function verwunde(a: Abenteuer, s: Schleim, schaden: number, takt: number, vorne: string): void {
   s.leben -= schaden;
   if (s.leben > 0) {
-    melde(a, `Wurf ${wurf}+${angriffVon(a)}: Treffer${schaden > 1 ? ` (${schaden}fach)` : ''} - der ${schleimName(s)} wankt.`);
+    melde(a, `${vorne}: Treffer${schaden > 1 ? ` (${schaden} Schaden)` : ''} - der ${schleimName(s)} wankt.`);
     return;
   }
   a.schleime = a.schleime.filter((x) => x.id !== s.id);
   a.ereignisse.push({ art: 'tod', takt, wer: s.id, q: s.q, r: s.r, gross: s.gross, ...(s.boss ? { boss: true } : {}), ...(s.art ? { schleimArt: s.art } : {}) });
+  erfahrung(a, s.boss ? 10 : s.gross || s.art ? 2 : 1, takt);
   if (s.boss) {
     a.phase = 'sieg';
-    melde(a, `Wurf ${wurf}+${angriffVon(a)}: der Schleimkoenig zerplatzt! Das Land atmet auf - Sieg!`);
+    melde(a, `${vorne}: der Schleimkoenig zerplatzt! Das Land atmet auf - Sieg!`);
     return;
   }
   a.erschlagen += 1;
   const gelee = s.gross || s.art === 'panzer' ? 2 : 1;
   a.inventar = { ...a.inventar, gelee: (a.inventar['gelee'] ?? 0) + gelee };
   const bisKoenig = a.bossErwacht ? '' : ` (${Math.min(a.erschlagen, BOSS_NACH)}/${BOSS_NACH})`;
-  melde(a, `Wurf ${wurf}+${angriffVon(a)}: der ${schleimName(s)} zerplatzt! +${gelee} Gelee${bisKoenig}.`);
+  melde(a, `${vorne}: der ${schleimName(s)} zerplatzt! +${gelee} Gelee${bisKoenig}.`);
   if (!a.bossErwacht && a.erschlagen >= BOSS_NACH) bossErwacht(a, takt);
+}
+
+/** Legendaer: gleich beim Aufheben wirkt der Fund. */
+export function legendaerAnwenden(a: Abenteuer, id: string, takt: number): void {
+  a.legendaer = [...(a.legendaer ?? []), id];
+  a.ereignisse.push({ art: 'legende', takt, id });
+  if (id === 'sololeveling') {
+    if (!a.stufe) a.stufe = { lv: 1, ep: 0 };
+    melde(a, 'Legendaer: Solo-Leveling! Du hast jetzt Level - jeder Gegner gibt Erfahrung.');
+  } else if (id === 'herzcontainer') {
+    a.extraHerzen = (a.extraHerzen ?? 0) + 1;
+    melde(a, 'Legendaer: ein leerer Herzcontainer - ein Herz mehr.');
+  }
+}
+
+/** Erfahrung bis zum naechsten Level. */
+export const epFuer = (lv: number): number => 2 + lv;
+/** Was jeder Aufstieg bringt - im Wechsel. */
+const STUFEN_BONUS: readonly ('leben' | 'angriff' | 'abwehr')[] = ['leben', 'angriff', 'leben', 'abwehr'];
+
+/** Solo-Leveling: Erfahrung sammeln und aufsteigen. */
+function erfahrung(a: Abenteuer, ep: number, takt: number): void {
+  if (!a.stufe) return;
+  a.stufe = { ...a.stufe, ep: a.stufe.ep + ep };
+  while (a.stufe.ep >= epFuer(a.stufe.lv)) {
+    const lv: number = a.stufe.lv + 1;
+    a.stufe = { lv, ep: a.stufe.ep - epFuer(a.stufe.lv) };
+    const art = STUFEN_BONUS[(lv - 2) % STUFEN_BONUS.length]!;
+    const b = a.bonus ?? { leben: 0, angriff: 0, abwehr: 0 };
+    a.bonus = { ...b, [art]: b[art] + 1 };
+    if (art === 'leben') a.leben += 1;
+    const text = art === 'leben' ? '+1 Leben' : art === 'angriff' ? '+1 Angriff' : '+1 Abwehr';
+    a.ereignisse.push({ art: 'stufe', takt, lv, bonus: text });
+    melde(a, `Level ${lv}! ${text}.`);
+  }
+}
+
+/** Die Ladung der Waffe - fuer Anzeige und Debug. */
+export function ladungVon(a: Abenteuer): { ist: number; voll: number; faehigkeit: Faehigkeit | null } {
+  const g = gegenstand(a.ausruestung.waffe ?? '');
+  return { ist: a.ladung ?? 0, voll: g?.ladung ?? 0, faehigkeit: g?.faehigkeit ?? null };
+}
+
+/** Ein Schritt oder Treffer laedt die Waffe; ist sie voll, wirkt ihre Faehigkeit. */
+function laden(a: Abenteuer, takt: number): void {
+  const { voll, faehigkeit } = ladungVon(a);
+  if (!voll || !faehigkeit || a.bereit === faehigkeit) return;
+  a.ladung = (a.ladung ?? 0) + 1;
+  if (a.ladung >= voll) {
+    a.ladung = 0;
+    entfessle(a, faehigkeit, takt);
+  }
+}
+
+/** Die Faehigkeit der Waffe wirkt. */
+export function entfessle(a: Abenteuer, f: Faehigkeit, takt: number): void {
+  if (f === 'feuerkreis') {
+    const felder = HEX_DIRS.map(([dq, dr]) => ({ q: a.pos.q + dq, r: a.pos.r + dr }));
+    a.ereignisse.push({ art: 'faehigkeit', takt, name: f, felder });
+    const opfer = a.schleime.filter((s) => hexDistance(s, a.pos) === 1);
+    melde(a, opfer.length ? `Feuerkreis! Flammen schlagen um dich herum.` : 'Feuerkreis! - doch niemand steht nah genug.');
+    for (const s of opfer) verwunde(a, s, 2, takt, 'Feuerkreis');
+    return;
+  }
+  if (f === 'runenblitz') {
+    const ziel = a.schleime
+      .filter((s) => hexDistance(s, a.pos) <= 3)
+      .sort((x, y) => hexDistance(x, a.pos) - hexDistance(y, a.pos) || x.leben - y.leben)[0];
+    a.ereignisse.push({ art: 'faehigkeit', takt, name: f, ...(ziel ? { ziel: ziel.id, felder: [{ q: ziel.q, r: ziel.r }] } : {}) });
+    if (!ziel) {
+      melde(a, 'Runenblitz! - doch kein Gegner in Reichweite.');
+      return;
+    }
+    verwunde(a, ziel, 2, takt, 'Runenblitz');
+    return;
+  }
+  // Spalthieb und Schutzwall warten auf den naechsten Treffer.
+  a.bereit = f;
+  a.ereignisse.push({ art: 'faehigkeit', takt, name: f });
+  melde(a, f === 'spalthieb' ? 'Spalthieb bereit: der naechste Treffer macht 2 Schaden mehr.' : 'Schutzwall bereit: der naechste Treffer gegen dich wird abgefangen.');
 }
 
 /** Der Schleimkoenig erwacht, ein Stueck entfernt, und sucht den Ritter. */
@@ -567,6 +718,14 @@ function aufheben(a: Abenteuer): void {
   }
   a.genommen = [...a.genommen, hexKey(a.pos.q, a.pos.r)];
   a.ereignisse.push({ art: 'fund', takt: 0, id: fund });
+  if (fund === 'schatz') {
+    // Solo-Leveling gibt es einmal; danach (oder bei ungerader Zahl) ein Herzcontainer.
+    const hat = (a.legendaer ?? []).includes('sololeveling');
+    const id = !hat && hash3i(a.seed, a.pos.q, a.pos.r, SALT_FUND + 8) % 2 === 0 ? 'sololeveling' : 'herzcontainer';
+    melde(a, 'Eine goldene Schatztruhe!');
+    legendaerAnwenden(a, id, 0);
+    return;
+  }
   if (fund === 'truhe') {
     const inhalt = TRUHENINHALT[hash3i(a.seed, a.pos.q, a.pos.r, SALT_FUND + 1) % TRUHENINHALT.length]!;
     const g = gegenstand(inhalt)!;
@@ -578,6 +737,8 @@ function aufheben(a: Abenteuer): void {
       // Eine bessere Waffe nimmt der Ritter gleich in die Hand.
       const alt = a.ausruestung.waffe!;
       a.ausruestung = { ...a.ausruestung, waffe: inhalt };
+      a.ladung = 0;
+      a.bereit = null;
       a.inventar = { ...a.inventar, [alt]: (a.inventar[alt] ?? 0) + 1 };
       melde(a, `Eine Truhe! Darin: ${g.name} - gleich in der Hand, ${gegenstand(alt)?.name ?? alt} ins Inventar.`);
     } else {
@@ -598,9 +759,19 @@ export function lebenText(n: number): string {
   return ganz === 0 && halb ? '½' : `${ganz}${halb ? '½' : ''}`;
 }
 
+/** Ein geladener Schutzwall faengt einen Treffer ab - einmal. */
+function schutzwall(a: Abenteuer, s: Schleim, feld: Hex, takt: number, wurf: number): boolean {
+  if (a.bereit !== 'schutzwall') return false;
+  a.bereit = null;
+  a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: 'ritter', feld, wurf, schaden: 0 });
+  melde(a, `Der Schutzwall faengt den ${schleimName(s)} ab!`);
+  return true;
+}
+
 /** Ein Hieb eines Schleims auf den Ritter: trifft, oder das Schild faengt ihn ab. */
 function schleimTrifft(a: Abenteuer, s: Schleim, feld: Hex, takt: number, rng: Rng): void {
   const wurf = 1 + rng.int(6);
+  if (schutzwall(a, s, feld, takt, wurf)) return;
   const schaden = wurf <= abwehrVon(a) * 2 ? 0 : s.gross ? 2 : 1;
   a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: 'ritter', feld, wurf, schaden });
   if (schaden > 0) {
@@ -731,6 +902,7 @@ function koenigTrifft(a: Abenteuer, s: Schleim, felder: readonly Hex[], takt: nu
     melde(a, 'Ausgewichen! Der Schleimkoenig schlaegt ins Leere.');
     return;
   }
+  if (schutzwall(a, s, feld, takt, wurf)) return;
   const schaden = wurf <= abwehrVon(a) * 2 ? 0 : BOSS_SCHADEN;
   a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: 'ritter', feld, wurf, schaden });
   if (schaden > 0) {
@@ -885,9 +1057,80 @@ export function benutzen(alt: Abenteuer, id: string): Abenteuer {
     weg();
     if (vorher) a.inventar = { ...a.inventar, [vorher]: (a.inventar[vorher] ?? 0) + 1 };
     a.ausruestung = { ...a.ausruestung, [g.slot]: id };
+    if (g.slot === 'waffe') {
+      a.ladung = 0;
+      a.bereit = null;
+    }
     a.leben = Math.min(maxLebenVon(a), a.leben + (g.leben ?? 0));
     melde(a, `${g.name} angelegt${vorher ? `, ${gegenstand(vorher)?.name} ins Inventar` : ''}.`);
     return a;
   }
   return alt;
+}
+
+// --- Debug ------------------------------------------------------------------
+
+/** Was das Debugfenster kann - zum Ausprobieren im laufenden Spiel. */
+export type DebugAktion =
+  | { t: 'waffe'; id: string }
+  | { t: 'ladung' }
+  | { t: 'schleim'; art: SchleimArt | 'normal' | 'gross' | 'koenig' }
+  | { t: 'heilen' }
+  | { t: 'legendaer'; id: string }
+  | { t: 'ep' }
+  | { t: 'schritte' };
+
+export function debugAktion(alt: Abenteuer, d: DebugAktion): Abenteuer {
+  const a = structuredClone(alt);
+  a.ereignisse = [];
+  if (d.t === 'waffe') {
+    if (!gegenstand(d.id)?.slot) return alt;
+    a.ausruestung = { ...a.ausruestung, waffe: d.id };
+    a.ladung = 0;
+    a.bereit = null;
+    melde(a, `Debug: ${gegenstand(d.id)!.name} in der Hand.`);
+  } else if (d.t === 'ladung') {
+    const { faehigkeit } = ladungVon(a);
+    if (!faehigkeit) {
+      melde(a, 'Debug: diese Waffe hat keinen Ladebalken.');
+      return a;
+    }
+    a.ladung = 0;
+    entfessle(a, faehigkeit, 0);
+  } else if (d.t === 'legendaer') {
+    legendaerAnwenden(a, d.id, 0);
+  } else if (d.t === 'ep') {
+    if (!a.stufe) {
+      melde(a, 'Debug: erst Solo-Leveling einsammeln.');
+      return a;
+    }
+    erfahrung(a, epFuer(a.stufe.lv) - a.stufe.ep, 0);
+  } else if (d.t === 'heilen') {
+    a.leben = maxLebenVon(a);
+    melde(a, 'Debug: volles Leben.');
+  } else if (d.t === 'schritte') {
+    a.phase = 'ziehen';
+    a.wurf = 6;
+    a.schritte = 6;
+    melde(a, 'Debug: 6 Schritte.');
+  } else if (d.t === 'schleim') {
+    if (d.art === 'koenig') {
+      if (a.schleime.some((s) => s.boss)) return alt;
+      bossErwacht(a, 0);
+      return a;
+    }
+    // Zwei Felder weit, damit man sein Verhalten sieht - zur Not daneben.
+    const frei = (h: Hex) => begehbar(gelaende(a.seed, h.q, h.r)) && !(h.q === a.pos.q && h.r === a.pos.r) && !a.schleime.some((s) => s.q === h.q && s.r === h.r);
+    const ort = hexesInRange(a.pos, 3)
+      .filter((h) => frei(h) && hexDistance(h, a.pos) >= 1)
+      .sort((x, y) => Math.abs(hexDistance(x, a.pos) - 2) - Math.abs(hexDistance(y, a.pos) - 2))[0];
+    if (!ort) return alt;
+    const id = a.naechsteId++;
+    const art = d.art === 'normal' || d.art === 'gross' ? undefined : d.art;
+    const gross = d.art === 'gross';
+    a.schleime.push({ id, q: ort.q, r: ort.r, leben: art === 'panzer' ? 3 : gross ? 4 : 2, gross, ...(art ? { art } : {}) });
+    a.ereignisse.push({ art: 'neu', takt: 0, wer: id });
+    melde(a, `Debug: ein ${art ? SCHLEIM_NAME[art] : gross ? 'grosser Schleim' : 'Schleim'} erscheint.`);
+  }
+  return a;
 }

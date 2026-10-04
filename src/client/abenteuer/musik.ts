@@ -233,7 +233,7 @@ function gleit(c: AudioContext, t: number, art: OscillatorType, von: number, bis
   o.stop(t + dauer + 0.02);
 }
 
-export type Klang = 'schritt' | 'huepf' | 'hieb' | 'treffer' | 'platsch' | 'geblockt' | 'leer' | 'warnung' | 'zerplatzt' | 'beben' | 'probe' | 'wuerfelKlack' | 'wuerfelLand' | 'spuck';
+export type Klang = 'schritt' | 'huepf' | 'hieb' | 'treffer' | 'platsch' | 'geblockt' | 'leer' | 'warnung' | 'zerplatzt' | 'beben' | 'probe' | 'wuerfelKlack' | 'wuerfelLand' | 'spuck' | 'feuer' | 'blitz' | 'bereit' | 'legende' | 'stufe';
 
 /** Ein kurzer Klang - nur, wenn der Ton an ist. */
 export function klang(art: Klang): void {
@@ -296,6 +296,26 @@ export function klang(art: Klang): void {
       // Ein nasses "Ptoo".
       gleit(c, t, 'sine', 900, 300, 0.12, 0.12);
       stoss(c, t, 0.1, 0.3, 'bandpass', 1200, 500, 3);
+      break;
+    case 'feuer':
+      // Ein Fauchen, das aufsteigt.
+      stoss(c, t, 0.5, 0.5, 'bandpass', 300, 1800, 1.2);
+      gleit(c, t, 'sawtooth', 90, 60, 0.4, 0.06);
+      break;
+    case 'blitz':
+      stoss(c, t, 0.08, 0.6, 'highpass', 4000, 2000);
+      stoss(c, t + 0.05, 0.3, 0.4, 'lowpass', 900, 120);
+      break;
+    case 'bereit':
+      gleit(c, t, 'triangle', 520, 780, 0.12, 0.12);
+      gleit(c, t + 0.1, 'triangle', 780, 1040, 0.16, 0.1);
+      break;
+    case 'legende':
+      // Ein Akkord, der aufsteigt.
+      [523, 659, 784, 1046].forEach((hz, i) => gleit(c, t + i * 0.09, 'triangle', hz, hz, 0.6, 0.09));
+      break;
+    case 'stufe':
+      [440, 554, 659, 880].forEach((hz, i) => gleit(c, t + i * 0.06, 'square', hz, hz * 1.01, 0.18, 0.05));
       break;
     case 'probe':
       gleit(c, t, 'triangle', 660, 660, 0.12, 0.2);

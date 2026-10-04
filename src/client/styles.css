@@ -8313,3 +8313,148 @@ em.off {
     transform: none;
   }
 }
+
+/* --- Abenteuer: Ladebalken der Waffe ------------------------------------ */
+.ab-ladung-balken {
+  display: flex;
+  gap: 2px;
+}
+.ab-ladung-balken i {
+  width: 10px;
+  height: 8px;
+  background: #3a2a22;
+  border: 1px solid #120d08;
+}
+.ab-ladung-balken i.an {
+  background: #f2c94c;
+}
+.ab-ladung-balken.feuerkreis i.an {
+  background: #e8641e;
+}
+.ab-ladung-balken.runenblitz i.an {
+  background: #5aa0d8;
+}
+.ab-ladung-balken.bereit i.an {
+  animation: ab-bereit 0.8s ease-in-out infinite alternate;
+}
+@keyframes ab-bereit {
+  to {
+    filter: brightness(1.6);
+    box-shadow: 0 0 6px currentColor;
+  }
+}
+
+/* --- Abenteuer: Debugfenster ------------------------------------------- */
+.ab-debug-zu {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 10px;
+  font-family: var(--pixel);
+  font-size: 9px;
+  opacity: 0.7;
+}
+.ab-debug {
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  width: min(760px, calc(100% - 420px));
+  max-height: 46vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 5;
+}
+.ab-debug-kopf {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.ab-debug-zeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.ab-debug-zeile > small {
+  min-width: 52px;
+  font-family: var(--pixel);
+  font-size: 8px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.ab-debug-wahl {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 0;
+  padding: 3px 6px;
+  font-size: 11px;
+}
+.ab-debug-wahl em {
+  font-style: normal;
+  font-size: 9px;
+  color: var(--accent);
+}
+.ab-debug-wahl.an {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.ab-debug-bild {
+  width: 44px;
+  height: 48px;
+  image-rendering: pixelated;
+  background: #6fad42;
+}
+@media (max-width: 700px) {
+  .ab-debug {
+    left: 6px;
+    right: 6px;
+    width: auto;
+    transform: none;
+    bottom: 6px;
+  }
+}
+
+/* --- Abenteuer: Level (Solo-Leveling) und legendaere Funde ---------------- */
+.ab-level {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.ab-level b {
+  font-family: var(--pixel);
+  font-size: 10px;
+  color: #9ad8ff;
+  text-shadow: 0 0 6px #327297;
+}
+.ab-ep {
+  flex: 1;
+  height: 6px;
+  background: #1a2433;
+  border: 1px solid #120d08;
+}
+.ab-ep i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #327297, #9ad8ff);
+  transition: width 0.3s ease-out;
+}
+.ab-legendaer-reihe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.ab-legendaer-ding {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  background: #241a10;
+  border: 2px solid #d9a441;
+  box-shadow: 0 0 6px rgba(242, 201, 76, 0.5);
+}

@@ -24,6 +24,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
   BOSS_LEBEN,
+  FAEHIGKEIT_NAME,
   SLOTS,
   SLOT_NAME,
   TASTEN,
@@ -38,6 +39,9 @@ import {
   maxLebenVon,
   neuesAbenteuer,
   normalisiere,
+  debugAktion,
+  epFuer,
+  ladungVon,
   richtungFuer,
   schleimMaxLeben,
   schrittBonusVon,
@@ -49,7 +53,7 @@ import {
   wuerfeln,
   zugBeenden,
 } from '../../abenteuer/regeln';
-import type { Abenteuer as Zustand, Ereignis, SchleimArt, Slot, Taste, Wer } from '../../abenteuer/regeln';
+import type { Abenteuer as Zustand, DebugAktion, Ereignis, SchleimArt, Slot, Taste, Wer } from '../../abenteuer/regeln';
 import { HEX_DIRS, hexDistance, hexKey, hexesInRange } from '../../core/coords';
 import type { Hex } from '../../core/coords';
 import { tileAt } from '../../core/world';
@@ -58,6 +62,9 @@ import { HEX_CX, HEX_CY, IMG_H, IMG_W, kachelEcke, preloadTiles, tileImage, tile
 import { preloadUnitSprites } from '../units';
 import { PIX, Px } from '../ui/KartenPixel';
 import { musikAn, setzeMusik, starteMusik, stoppeMusik } from './musik';
+import { FIGUREN, malKachelFigur } from './symbole';
+import type { BeinBild, Haltung } from './symbole';
+import { DebugFenster, FIGUR_KEY, leseFigur } from './DebugFenster';
 import { RITTER_HAND, RITTER_KOERPER, RITTER_SCHRITT, SCHLEIMKOENIG, SCHLEIM_BILD, SYMBOL, WAFFE, WAFFE_GRIFF, zeichnePixel } from './symbole';
 import { LAUT_STUFEN, klang, lautstaerke, setzeLautstaerke } from './musik';
 import type { Klang } from './musik';
@@ -320,6 +327,9 @@ function spieleKlaenge(a: Zustand): void {
     } else if (e.art === 'ansage') spaeter(e.takt + 0.2, 'warnung');
     else if (e.art === 'stampf') spaeter(e.takt + 0.5, 'beben');
     else if (e.art === 'spuck') spaeter(e.takt + 0.1, 'spuck');
+    else if (e.art === 'legende') spaeter(e.takt, 'legende');
+    else if (e.art === 'stufe') spaeter(e.takt + 0.3, 'stufe');
+    else if (e.art === 'faehigkeit') spaeter(e.takt + 0.1, e.name === 'feuerkreis' ? 'feuer' : e.name === 'runenblitz' ? 'blitz' : 'bereit');
     else if (e.art === 'boss') spaeter(e.takt, 'beben');
     else if (e.art === 'tod') spaeter(e.takt + 0.5, 'zerplatzt');
   }
@@ -339,6 +349,10 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const [rollt, setRollt] = useState(false);
   const [musik, setMusik] = useState(musikAn);
   const [laut, setLaut] = useState(lautstaerke);
+  // Welche Figur der Spieler fuehrt (Debugfenster) - 'klassik' ist der bisherige Ritter.
+  const [figur, setFigur] = useState(leseFigur);
+  const figurRef = useRef(figur);
+  figurRef.current = figur;
   // Autoroll: wer laufen will, waehrend der Wurf noch aussteht, wuerfelt gleich mit.
   const [autoroll, setAutoroll] = useState(leseAutoroll);
   const autorollRef = useRef(autoroll);
@@ -377,12 +391,21 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const blick = useRef<1 | -1>(1);
   /** Seit wann das Banner "Der Schleimkoenig erwacht" steht. */
   const banner = useRef(0);
+  const bannerText = useRef('Der Schleimkoenig erwacht!');
 
   const setze = useCallback((neu: Zustand) => {
     aktuell.current = neu;
     if (neu.ereignisse.length > 0) {
       anim.current = { start: performance.now(), ev: neu.ereignisse };
-      if (neu.ereignisse.some((e) => e.art === 'boss')) banner.current = performance.now();
+      if (neu.ereignisse.some((e) => e.art === 'boss')) {
+        banner.current = performance.now();
+        bannerText.current = 'Der Schleimkoenig erwacht!';
+      }
+      const leg = neu.ereignisse.find((e): e is Extract<Ereignis, { art: 'legende' }> => e.art === 'legende');
+      if (leg) {
+        banner.current = performance.now();
+        bannerText.current = `Legendaer: ${gegenstand(leg.id)?.name ?? leg.id}`;
+      }
       spieleKlaenge(neu);
     }
     setA(neu);
@@ -933,9 +956,20 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       const waffe = WAFFE[a.ausruestung.waffe ?? ''];
       // Besondere Klingen leuchten: die Runenklinge blau, das Flammenschwert gluehend.
       const glut = a.ausruestung.waffe === 'runenklinge' ? '#5aa0d8' : a.ausruestung.waffe === 'flammenschwert' ? '#e8641e' : null;
+      const design = FIGUREN.find((d) => d.id === figurRef.current);
+      const laeuft = lauf0 !== undefined && p >= lauf0.takt && p < lauf0.takt + 1;
+      const haltung: Haltung = schwung >= 0 && schwung < 0.8 ? (schwung < 0.18 ? 'aus' : schwung < 0.45 ? 'hieb' : 'nach') : 'ruhe';
       figuren.push({
         y: ro.y,
         mal: () => {
+          if (design) {
+            // Die Figur im Kachelstil, mit echten Einzelbildern.
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+            ctx.fillRect(sx(ro.x) - 4 * f, sy(ro.y) + 3 * f, 8 * f, f);
+            const beine: BeinBild = laeuft ? (imSchritt ? 'lauf1' : 'lauf2') : 'steh';
+            malKachelFigur(ctx, sx(ro.x) + ws.dx * f, sy(ro.y) + 4 * f - Math.round(ritter.hoch + atmet) * f, f, design, beine, haltung, a.ausruestung.waffe, blick.current, ws.blitz, glut);
+            return;
+          }
           const bild = imSchritt ? RITTER_SCHRITT : RITTER_KOERPER;
           const bw = bild[0]!.length;
           const X = sx(ro.x) + ws.dx * f;
@@ -984,6 +1018,27 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       });
       figuren.sort((x, y) => x.y - y.y).forEach((fi) => fi.mal());
 
+      // Der Ladebalken der Waffe unter dem Ritter - und eine Aura, wenn eine Faehigkeit wartet.
+      const lad = ladungVon(a);
+      if (lad.voll > 0) {
+        const bx = sx(ritter.x) - Math.round((lad.voll * 2 * f) / 2);
+        const by = sy(ritter.y) + 6 * f;
+        ctx.fillStyle = 'rgba(18, 13, 8, 0.8)';
+        ctx.fillRect(bx - f, by - f, lad.voll * 2 * f + f, 3 * f);
+        for (let i = 0; i < lad.voll; i++) {
+          ctx.fillStyle = i < lad.ist ? (lad.faehigkeit === 'feuerkreis' ? '#e8641e' : lad.faehigkeit === 'runenblitz' ? '#5aa0d8' : '#f2c94c') : '#3a2a22';
+          ctx.fillRect(bx + i * 2 * f, by, f, f);
+        }
+      }
+      if (a.bereit) {
+        const puls = 0.5 + 0.5 * Math.sin(sek * 6);
+        ctx.strokeStyle = a.bereit === 'schutzwall' ? `rgba(120, 190, 255, ${0.4 + 0.4 * puls})` : `rgba(242, 201, 76, ${0.4 + 0.4 * puls})`;
+        ctx.lineWidth = f;
+        ctx.beginPath();
+        ctx.ellipse(sx(ritter.x), sy(ritter.y) + 3 * f, (7 + puls) * f, (3 + puls / 2) * f, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
       // Wirkungen obenauf: Hiebspuren, Zahlen, Splitter, Funde, Ruhe.
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -1016,6 +1071,72 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             schrift(text, X, Y - 6 * f - k * 10 * f, farbe, 1.4 - k * 1.4, e.schaden > 0 ? 7 : 5);
           }
           if (e.ziel === 'ritter' && e.schaden > 0 && u > 0.45 && u < 1.3) rot = Math.max(rot, 1 - (u - 0.45) / 0.85);
+        } else if (e.art === 'stufe') {
+          // Eine Saeule aus goldenem Licht, dann die Zahl.
+          if (u < 1.6) {
+            const k = u / 1.6;
+            ctx.globalAlpha = 1 - k;
+            ctx.fillStyle = '#f2c94c';
+            const bw = (6 - k * 4) * f;
+            ctx.fillRect(sx(ritter.x) - bw / 2, 0, bw, sy(ritter.y) + 3 * f);
+            ctx.globalAlpha = 1;
+          }
+          if (u < 3) schrift(`Level ${e.lv}! ${e.bonus}`, sx(ritter.x), sy(ritter.y) - (24 + u * 4) * f, '#f2c94c', 1.8 - u * 0.6, 6);
+        } else if (e.art === 'legende') {
+          if (u < 2) {
+            const k = u / 2;
+            ctx.strokeStyle = `rgba(150, 200, 255, ${1 - k})`;
+            ctx.lineWidth = 2 * f;
+            ctx.beginPath();
+            ctx.arc(sx(ritter.x), sy(ritter.y) - 6 * f, (6 + k * 30) * f, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        } else if (e.art === 'faehigkeit') {
+          if (e.name === 'feuerkreis' && u < 1.4) {
+            // Ein Flammenring breitet sich aus, die Nachbarfelder lodern.
+            const k = Math.min(1, u / 0.6);
+            ctx.strokeStyle = `rgba(232, 100, 30, ${1 - u / 1.4})`;
+            ctx.lineWidth = 2 * f;
+            ctx.beginPath();
+            ctx.ellipse(sx(ritter.x), sy(ritter.y), 26 * f * k, 18 * f * k, 0, 0, Math.PI * 2);
+            ctx.stroke();
+            for (const h of e.felder ?? []) {
+              const m = mitte(h.q, h.r);
+              for (let i = 0; i < 5; i++) {
+                const fl = (u * 3 + i * 0.37) % 1;
+                ctx.globalAlpha = Math.max(0, 1 - u / 1.4) * (1 - fl);
+                ctx.fillStyle = i % 2 ? '#f6c04a' : '#e8641e';
+                ctx.fillRect(sx(m.x + (i - 2) * 3) - f, sy(m.y - fl * 10), 2 * f, 2 * f);
+              }
+            }
+            ctx.globalAlpha = 1;
+          }
+          if (e.name === 'runenblitz' && u < 0.7 && e.felder?.[0]) {
+            // Ein Blitz im Zickzack vom Ritter zum Ziel.
+            const z = mitte(e.felder[0].q, e.felder[0].r);
+            const x0 = ritter.x;
+            const y0 = ritter.y - 8;
+            ctx.strokeStyle = Math.floor(u * 20) % 2 ? '#d8f0ff' : '#5aa0d8';
+            ctx.lineWidth = f;
+            ctx.beginPath();
+            ctx.moveTo(sx(x0), sy(y0));
+            for (let i = 1; i <= 6; i++) {
+              const t = i / 6;
+              const wack = i === 6 ? 0 : (((i * 7 + Math.floor(u * 12)) % 5) - 2) * 2;
+              ctx.lineTo(sx(x0 + (z.x - x0) * t + wack), sy(y0 + (z.y - 4 - y0) * t - wack));
+            }
+            ctx.stroke();
+          }
+          if ((e.name === 'spalthieb' || e.name === 'schutzwall') && u < 0.9) {
+            // Kurzes Aufleuchten: die Faehigkeit ist geladen.
+            const k = u / 0.9;
+            ctx.strokeStyle = e.name === 'schutzwall' ? `rgba(120, 190, 255, ${1 - k})` : `rgba(242, 201, 76, ${1 - k})`;
+            ctx.lineWidth = 2 * f;
+            ctx.beginPath();
+            ctx.arc(sx(ritter.x), sy(ritter.y) - 6 * f, (4 + k * 14) * f, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          if (u < 2) schrift(FAEHIGKEIT_NAME[e.name], sx(ritter.x), sy(ritter.y) - (22 + u * 4) * f, '#f2c94c', 1.6 - u * 0.8, 6);
         } else if (e.art === 'spuck') {
           // Ein blauer Batzen fliegt die Linie entlang - bis zum Ritter oder ans Ende.
           if (u > 0.1 && u < 0.6) {
@@ -1100,7 +1221,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         ctx.fillStyle = '#120d08';
         ctx.fillRect(0, c.height * 0.36, c.width, c.height * 0.14);
         ctx.globalAlpha = 1;
-        schrift('Der Schleimkoenig erwacht!', c.width / 2, c.height * 0.43, '#f2c94c', al, w < 700 ? 7 : 9);
+        schrift(bannerText.current, c.width / 2, c.height * 0.43, '#f2c94c', al, w < 700 ? 7 : 9);
       }
       // Ein roter Rand, wenn der Ritter getroffen wird.
       if (rot > 0) {
@@ -1248,6 +1369,15 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       <div className="ab-links">
         <div className="ab-fenster ab-werte">
           <span className="ab-titel">Werte</span>
+          {/* Solo-Leveling: Level und Erfahrung. */}
+          {a.stufe && (
+            <div className="ab-level" title={`Level ${a.stufe.lv}: ${a.stufe.ep} von ${epFuer(a.stufe.lv)} Erfahrung bis zum naechsten`}>
+              <b>Lv {a.stufe.lv}</b>
+              <span className="ab-ep">
+                <i style={{ width: `${(100 * a.stufe.ep) / epFuer(a.stufe.lv)}%` }} />
+              </span>
+            </div>
+          )}
           <div className="ab-werte-gitter">
             {[
               { id: 'schwert', wert: `+${angriffVon(a)}`, titel: 'Angriff: so viel kommt auf jeden Angriffswurf' },
@@ -1263,6 +1393,32 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             ))}
           </div>
         </div>
+        {(() => {
+          const lad = ladungVon(a);
+          if (!lad.voll || !lad.faehigkeit) return null;
+          return (
+            <div className="ab-fenster ab-ladung" title={`${FAEHIGKEIT_NAME[lad.faehigkeit]}: jeder Schritt und jeder Treffer laedt eins`}>
+              <span className="ab-titel">{FAEHIGKEIT_NAME[lad.faehigkeit]}</span>
+              <div className={`ab-ladung-balken ${lad.faehigkeit}${a.bereit ? ' bereit' : ''}`}>
+                {Array.from({ length: lad.voll }, (_, i) => (
+                  <i key={i} className={a.bereit || i < lad.ist ? 'an' : ''} />
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+        {(a.legendaer?.length ?? 0) > 0 && (
+          <div className="ab-fenster ab-legendaer">
+            <span className="ab-titel">Legendaer</span>
+            <div className="ab-legendaer-reihe">
+              {(a.legendaer ?? []).map((id, i) => (
+                <span key={i} className="ab-legendaer-ding" title={`${gegenstand(id)?.name}: ${gegenstand(id)?.text}`}>
+                  <Icon id={id} groesse={22} />
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="ab-fenster ab-ausruestung">
           <span className="ab-titel">Ausruestung</span>
           <div className="ab-slots">
@@ -1372,6 +1528,20 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           )}
         </div>
       </div>
+
+      <DebugFenster
+        figur={figur}
+        onFigur={(id) => {
+          setFigur(id);
+          try {
+            localStorage.setItem(FIGUR_KEY, id);
+          } catch {
+            // nur fuer jetzt
+          }
+        }}
+        waffe={a.ausruestung.waffe}
+        onAktion={(d: DebugAktion) => setze(debugAktion(aktuell.current, d))}
+      />
 
       {/* Was zuletzt geschah. */}
       <div className="ab-log" role="log">

@@ -291,6 +291,30 @@ const BREITSCHWERT: Pixelkarte = [
   'kgk......',
 ];
 
+/** Solo-Leveling: ein blaues Systemfenster mit leuchtendem Pfeil nach oben. */
+const SOLO_LEVELING: Pixelkarte = [
+  '.kkkkkkk.',
+  'kUUUuUUUk',
+  'kUUuwuUUk',
+  'kUuwwwuUk',
+  'kUUUwUUUk',
+  'kUUUwUUUk',
+  'kUuuwuuUk',
+  'kUUUUUUUk',
+  '.kkkkkkk.',
+];
+
+/** Der leere Herzcontainer: roter Rand, dunkles Inneres. */
+const HERZCONTAINER: Pixelkarte = [
+  '.kk.kk.',
+  'krrkrrk',
+  'krKKKrk',
+  'krKKKrk',
+  '.krKrk.',
+  '..krk..',
+  '...k...',
+];
+
 export const SYMBOL: Record<string, Pixelkarte> = {
   schwert: SCHWERT,
   breitschwert: BREITSCHWERT,
@@ -308,6 +332,9 @@ export const SYMBOL: Record<string, Pixelkarte> = {
   gold: SACK,
   gelee: GELEE,
   truhe: TRUHE,
+  schatz: umfaerben(TRUHE, { b: 'y', B: 'G', g: 'R', y: 'w' }),
+  sololeveling: SOLO_LEVELING,
+  herzcontainer: HERZCONTAINER,
   auge: AUGE,
 };
 
@@ -322,3 +349,226 @@ export function zeichnePixel(ctx: CanvasRenderingContext2D, karte: Pixelkarte, x
     }
   });
 }
+
+// --- Figuren im Stil der Kacheln (Debugfenster: Figur) ----------------------
+//
+// Spieltest: "Die Animation gefaellt mir nicht ... passend zu den Tiles?"
+// Die Kacheln (hexmap von Astropulse) sind fein: ein Baum ist 4 bis 6 Pixel
+// breit, die Farben sind gedeckt, Umrisse gibt es kaum, Licht von links oben.
+// Diese Figuren halten sich daran: 11 x 14 Pixel, nur Farben der Kacheln,
+// Umriss im dunkelsten Kachelton, und echte Einzelbilder statt gedrehter Waffe.
+
+/** Die Palette der Kacheln - und ein paar Toene fuer Haut, Haar, Feuer. */
+export const KACHEL_PIX: Record<string, string> = {
+  o: '#172323',
+  L: '#d4e8f3',
+  l: '#b9c3cc',
+  m: '#7d7c82',
+  n: '#474b56',
+  B: '#4d919e',
+  b: '#327297',
+  Y: '#e0c26d',
+  y: '#b6a444',
+  R: '#b0483a',
+  r: '#6c2f2a',
+  W: '#8a6048',
+  w: '#5f4036',
+  d: '#2b211a',
+  G: '#6fad42',
+  g: '#3d6a45',
+  h: '#254b3c',
+  s: '#d79a6e',
+  S: '#9a6d4f',
+  q: '#2b2f36',
+  Q: '#3e434d',
+  O: '#c8743a',
+  F: '#e8641e',
+  f: '#f6c04a',
+  ',': 'rgba(230, 240, 255, 0.55)',
+};
+
+export type Haltung = 'ruhe' | 'aus' | 'hieb' | 'nach';
+export type BeinBild = 'steh' | 'lauf1' | 'lauf2';
+
+/** Klingen je Haltung; '@' ist der Griff. Waffen faerben L und l um. */
+const KLINGE: Record<Haltung, Pixelkarte> = {
+  ruhe: ['.L.', '.l.', '.l.', '.l.', 'yYy', '.@.'],
+  aus: ['L...', '.l..', '..l.', '..yY', '...@'],
+  hieb: ['....,,.', '@yLlll.', '..,,,,,'],
+  nach: ['@y...', '.Yl..', '..l..', '...l.', '....L'],
+};
+const AXT_HALTUNG: Record<Haltung, Pixelkarte> = {
+  ruhe: ['mml', '.Wm', '.W.', '.W.', '.W.', '.@.'],
+  aus: ['mm..', 'mW..', '..W.', '...W', '...@'],
+  hieb: ['....,mm', '@WWWWml', '..,,,mm'],
+  nach: ['@W...', '..W..', '...W.', '...mm', '...ml'],
+};
+const KLINGEN_FARBE: Record<string, Record<string, string>> = {
+  schwert: {},
+  breitschwert: { L: 'l', l: 'm' },
+  runenklinge: { L: 'B', l: 'b', Y: 'B', y: 'b' },
+  flammenschwert: { L: 'f', l: 'F', y: 'r', Y: 'R' },
+};
+
+/** Die Waffe in einer Haltung, als Pixelkarte mit Griff '@'. */
+export function waffeInHaltung(id: string | null, h: Haltung): Pixelkarte {
+  if (id === 'axt') return AXT_HALTUNG[h];
+  const farben = KLINGEN_FARBE[id ?? 'schwert'] ?? {};
+  return KLINGE[h].map((z) => [...z].map((c) => farben[c] ?? c).join(''));
+}
+
+export type FigurDesign = {
+  id: string;
+  name: string;
+  koerper: Pixelkarte;
+  /** Schild [x, y, Bild] - oder keiner. */
+  schild: [number, number, Pixelkarte] | null;
+  /** Umhang hinter dem Koerper: stehend, laufend. */
+  umhang?: [[number, number, Pixelkarte], [number, number, Pixelkarte]];
+  beine: Record<BeinBild, Pixelkarte>;
+  /** Wo die Hand mit dem Griff sitzt, je Haltung. */
+  hand: Record<Haltung, [number, number]>;
+  /** Farbe der Hand (Handschuh oder Haut). */
+  handFarbe: string;
+};
+
+const STAHLBEINE: Record<BeinBild, Pixelkarte> = {
+  steh: ['....mn.mn..', '....ww.ww..'],
+  lauf1: ['...mn...mn.', '...ww...ww.'],
+  lauf2: ['....mnmn...', '....wwww...'],
+};
+const LEDERBEINE: Record<BeinBild, Pixelkarte> = {
+  steh: ['....WW.WW..', '....dd.dd..'],
+  lauf1: ['...WW...WW.', '...dd...dd.'],
+  lauf2: ['....WWWW...', '....dddd...'],
+};
+const HAND: Record<Haltung, [number, number]> = { ruhe: [10, 9], aus: [9, 6], hieb: [10, 8], nach: [10, 9] };
+
+export const FIGUREN: readonly FigurDesign[] = [
+  {
+    id: 'kachel',
+    name: 'Kachel-Ritter',
+    koerper: ['.....rR....', '....rR.....', '....oLLlo..', '...oLlllmo.', '...olnnnno.', '...omllmmo.', '....ommmo..', '...oBBYBbo.', '..oBBYYYbbo', '..omBBYBbmo', '...owwYwwo.', '...oBbbbbo.'],
+    schild: [0, 7, ['.oo.', 'oRRo', 'RYYr', 'oRro', '.oo.']],
+    beine: STAHLBEINE,
+    hand: HAND,
+    handFarbe: 'm',
+  },
+  {
+    id: 'waldlaeufer',
+    name: 'Waldlaeufer',
+    koerper: ['...........', '.....gG....', '....gGGg...', '...gGGGgg..', '...gsssgh..', '...gsSSsh..', '....hSSh...', '...owWWwo..', '..oWWyWwwo.', '..osWWWwso.', '...odYddo..', '...oWwwwo..'],
+    schild: null,
+    umhang: [
+      [2, 6, ['..gg', '.ghh', 'gghh', 'ghhh', 'ghh.', 'gh..']],
+      [1, 6, ['...gg', '..ghh', '.gghh', 'gghh.', 'ghh..', 'hh...']],
+    ],
+    beine: LEDERBEINE,
+    hand: HAND,
+    handFarbe: 's',
+  },
+  {
+    id: 'schwarz',
+    name: 'Schwarzer Ritter',
+    koerper: ['.....RR....', '....oRo....', '....oQQqo..', '...oQQQqqo.', '...oqRqRqo.', '...oQQQqqo.', '....oqqqo..', '...oRRYRro.', '..oRRRYRrro', '..oQRRYRrQo', '...oddYddo.', '...oRrrrro.'],
+    schild: [0, 7, ['.oo.', 'oQQo', 'QRRq', 'oQqo', '.oo.']],
+    beine: STAHLBEINE,
+    hand: HAND,
+    handFarbe: 'q',
+  },
+  {
+    id: 'paladin',
+    name: 'Weisser Paladin',
+    koerper: ['.....YY....', '....oYo....', '....oLLlo..', '...oLLLllo.', '...oLnnnlo.', '...oLLLllo.', '....olllo..', '...oLLYLlo.', '..oLLYYYllo', '..olLLYLlmo', '...oyyYyyo.', '...oLlllLo.'],
+    schild: [0, 7, ['.oo.', 'oBBo', 'BYYb', 'oBbo', '.oo.']],
+    beine: STAHLBEINE,
+    hand: HAND,
+    handFarbe: 'l',
+  },
+  {
+    id: 'zwerg',
+    name: 'Zwergenkrieger',
+    koerper: ['...........', '..L......L.', '..ml.oo.lm.', '...ollllmo.', '...osqsqso.', '...oOOOOOo.', '..oOOOOOOOo', '..omOOOOOmo', '..ommOOOmmo', '...oddYddo.', '...omnmnmo.', '...ommmmmo.'],
+    schild: [0, 7, ['.oo.', 'oWWo', 'WyyW', 'oWwo', '.oo.']],
+    beine: { steh: ['....nm.nm..', '....dd.dd..'], lauf1: ['...nm...nm.', '...dd...dd.'], lauf2: ['....nmnm...', '....dddd...'] },
+    hand: { ruhe: [10, 9], aus: [9, 7], hieb: [10, 9], nach: [10, 9] },
+    handFarbe: 's',
+  },
+  {
+    id: 'soeldnerin',
+    name: 'Soeldnerin',
+    koerper: ['...........', '....rRRr...', '...rRRRRr..', '...Rsssssr.', '...Rsqsqsr.', '..rRsSSSs..', '.rr..sSs...', '...oBBBBo..', '..oWWBWWwo.', '..osWWWwso.', '...odYddo..', '...oWwwwo..'],
+    schild: null,
+    beine: LEDERBEINE,
+    hand: HAND,
+    handFarbe: 's',
+  },
+];
+
+/**
+ * Eine Figur im Stil der Kacheln zeichnen (symbole.ts, FIGUREN): Umhang,
+ * Beine, Koerper, Schild, Waffe in ihrer Haltung, Hand. (x, fuss) ist die
+ * Mitte unter den Fuessen; blick -1 spiegelt.
+ */
+export function malKachelFigur(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  fuss: number,
+  f: number,
+  d: FigurDesign,
+  beine: BeinBild,
+  haltung: Haltung,
+  waffe: string | null,
+  blick: 1 | -1,
+  blitz: boolean,
+  glut: string | null,
+): void {
+  const breite = 11;
+  const hoehe = 14;
+  const mal = () => {
+    const lauf = beine !== 'steh';
+    if (d.umhang) {
+      const [ux, uy, k] = d.umhang[lauf ? 1 : 0];
+      zeichnePixel(ctx, k, ux * f, uy * f, f, KACHEL_PIX);
+    }
+    zeichnePixel(ctx, d.beine[beine], 0, 12 * f, f, KACHEL_PIX);
+    zeichnePixel(ctx, d.koerper, 0, 0, f, KACHEL_PIX);
+    if (d.schild) zeichnePixel(ctx, d.schild[2], d.schild[0] * f, d.schild[1] * f, f, KACHEL_PIX);
+  };
+  ctx.save();
+  ctx.translate(x, fuss - hoehe * f);
+  ctx.scale(blick, 1);
+  ctx.translate(-Math.floor(breite / 2) * f - f / 2, 0);
+  mal();
+  if (blitz) {
+    ctx.save();
+    ctx.filter = 'brightness(4) saturate(0)';
+    ctx.globalAlpha = 0.7;
+    mal();
+    ctx.restore();
+  }
+  if (waffe) {
+    const k = waffeInHaltung(waffe, haltung);
+    let ax = 0;
+    let ay = 0;
+    k.forEach((z, y) => {
+      const i = z.indexOf('@');
+      if (i >= 0) {
+        ax = i;
+        ay = y;
+      }
+    });
+    const [hx, hy] = d.hand[haltung];
+    ctx.save();
+    if (glut) {
+      ctx.shadowColor = glut;
+      ctx.shadowBlur = 3 * f;
+    }
+    zeichnePixel(ctx, k, (hx - ax) * f, (hy - ay) * f, f, KACHEL_PIX);
+    ctx.restore();
+    ctx.fillStyle = KACHEL_PIX[d.handFarbe] ?? '#7d7c82';
+    ctx.fillRect(hx * f, hy * f, f, f);
+  }
+  ctx.restore();
+}
+
