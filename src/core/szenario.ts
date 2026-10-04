@@ -43,7 +43,7 @@ export const SZENARIEN: readonly Szenario[] = [
   {
     id: 'gruendung',
     name: 'Die Gruendung',
-    text: 'Eine Handvoll Siedler, volle Speicher und ein ruhiger Fruehling. Aus Doerfern sollen Staedte werden - bevor die Banden kommen.',
+    text: 'Eine Handvoll Siedler, volle Speicher und ein ruhiger Fruehling. Wuerfeln, ernten, bauen, handeln - aus Doerfern sollen Staedte werden.',
     aufgabe: 'Besitze 4 Staedte.',
     ziel: { t: 'staedte', n: 4 },
     runden: 45,

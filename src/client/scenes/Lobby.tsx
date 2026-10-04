@@ -20,7 +20,7 @@ import { omenById } from '../../core/omen';
 import { leseProfil } from '../profil';
 import { KOOP_ZIEL_JE } from '../../core/rules/reducer';
 import { szenarioById } from '../../core/szenario';
-import { SYSTEME, neuesSystem } from '../../core/systeme';
+import { EINSTIEG_ZIEL, SYSTEME, neuesSystem } from '../../core/systeme';
 
 
 /** Wie ein Bot spielt - in der Lobby, damit man weiss, gegen wen. */
@@ -33,6 +33,9 @@ export function Lobby() {
   if (!room) return null;
 
   const isHost = room.hostId === you;
+  // Ohne Akte (die ersten Partien, core/systeme.ts) gibt es weder Laenge noch Punkteziel zu waehlen.
+  const mitAkten = !room.systeme || room.systeme.includes('akte');
+  const mitKarten = !room.systeme || room.systeme.includes('karten');
   const canStart = isHost && room.members.length >= MIN_PLAYERS;
   const tages = room.tagesDatum;
   /*
@@ -142,11 +145,14 @@ export function Lobby() {
           </div>
         )}
 
+        {/* Omen kommen mit der Kartenwahl - die erste Partie ist ohne (worker/room.ts). */}
+        {mitKarten && (
         <label>
           Omen
           <OmenListe omens={omenMitStufe(room.omens, room.stufe)} />
         </label>
-        {!tages && !room.szenario && isHost && (
+        )}
+        {mitKarten && !tages && !room.szenario && isHost && (
           <div className="choices">
             <button onClick={() => send({ t: 'setOptions', omens: 'neu' })}>Neu wuerfeln</button>
             <button
@@ -179,7 +185,11 @@ export function Lobby() {
             )}
 
             {/* Mit drei Akten gibt es kein Punkteziel - am Ende zaehlt die Wertung (core/akte.ts). */}
-            {!room.koop && room.rundenLimit !== AKTE_ZUEGE && (
+            {/* Die ersten Partien haben keine Akte: zehn Siegpunkte, wie bei Catan (worker/room.ts). */}
+            {!mitAkten && !room.szenario && (
+              <p className="note">Wer zuerst {EINSTIEG_ZIEL} Siegpunkte hat, gewinnt - wuerfeln, ernten, bauen, handeln. Mehr kommt mit den naechsten Partien.</p>
+            )}
+            {mitAkten && !room.koop && room.rundenLimit !== AKTE_ZUEGE && (
             <label>
               Siegpunkte
               <div className="choices">
@@ -235,7 +245,7 @@ export function Lobby() {
               </p>
             )}
 
-            {!room.koop && (
+            {mitAkten && !room.koop && (
             <label>
               Laenge
               <div className="choices">
@@ -252,7 +262,7 @@ export function Lobby() {
               </div>
             </label>
             )}
-            {room.rundenLimit !== null && (
+            {mitAkten && room.rundenLimit !== null && (
               <p className="note">
                 {/* Jede Partie mit Rundengrenze hat Akte (worker/room.ts) - auch mit 60 Runden (Spieltest 10). */}
                 {room.rundenLimit === AKTE_ZUEGE
@@ -268,7 +278,7 @@ export function Lobby() {
               <div className="lobby-systeme">
                 <b>Diese Partie</b>
                 <ul>
-                  <li className="an">Doerfer, Strassen, Staedte, Kartenwahl, drei Akte</li>
+                  <li className="an">Doerfer, Strassen, Staedte, Handel</li>
                   {SYSTEME.map((x) => {
                     const an = room.systeme === null || room.systeme!.includes(x.id);
                     const neu = an && room.systeme !== null && neuesSystem(leseProfil().partien)?.id === x.id;

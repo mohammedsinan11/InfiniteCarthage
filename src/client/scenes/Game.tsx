@@ -1550,9 +1550,9 @@ export function Game() {
           onSchmieden={(card, art) => act({ t: 'schmieden', card, art })}
           mitHeld={hatSystem(state, 'held')}
           mitReich={hatSystem(state, 'reich')}
-          sippe={state.ereignisseAn ? (me?.sippe ?? {}) : undefined}
+          sippe={state.ereignisseAn && hatSystem(state, 'karten') ? (me?.sippe ?? {}) : undefined}
           sippeSeit={me?.sippeSeit}
-          onKarten={() => setTafel('karten')}
+          onKarten={hatSystem(state, 'karten') ? () => setTafel('karten') : undefined}
           onRat={
             you && isMine && world
               ? () => {

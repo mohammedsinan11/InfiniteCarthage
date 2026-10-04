@@ -839,7 +839,7 @@ function gruendung(s: GameState, actor: PlayerId, stadt: boolean, events: GameEv
     events.push({ t: 'wahlGedeckelt', player: actor });
     return;
   }
-  if (gesperrt(m, 'gruendungswahl')) return;
+  if (gesperrt(m, 'gruendungswahl') || !hatSystem(s, 'karten')) return;
   wahlZaehlen(s);
   enterDraft(s, 'gruendung', events);
 }
@@ -1092,7 +1092,8 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
         const wkWerfer = wirkungenVon(s, actor);
         // Ohne Fund geht es gleich in die Bauphase - sonst blieb die Partie im
         // Wurf stehen, und ein Bot wuerfelte dieselbe 7 endlos (Spieltest 15).
-        if (!gesperrt(wkWerfer, 'fund')) enterDraft(s, 'fund', events);
+        // Ohne Kartenwahl (die erste Partie) bringt die 7 nichts - wie bei Catan.
+        if (!gesperrt(wkWerfer, 'fund') && hatSystem(s, 'karten')) enterDraft(s, 'fund', events);
         else s.phase = { t: 'main' };
         if (wkWerfer.siebenLiefert) siebenLiefert(s, world, actor, events);
         // Glueckliche Sieben (core/omen.ts) fuer den Werfer, Siebenergaben
@@ -1441,7 +1442,7 @@ export function applyAction(game: Game, action: Action, actor: PlayerId): Result
     case 'visitMarket': {
       // Der Markt: drei Karten vom groessten Stapel gegen eine Kartenwahl, einmal
       // je Zug. So hat Ueberschuss einen Zweck, der mehr ist als 4:1 (Spieltest).
-      if (!s.ereignisseAn) return fail('Einen Markt gibt es in dieser Partie nicht.');
+      if (!s.ereignisseAn || !hatSystem(s, 'karten')) return fail('Einen Markt gibt es in dieser Partie nicht.');
       if (phase.t !== 'main') return fail('Der Markt hat nur in der Bauphase offen.');
       if (s.marktZug?.[actor] === s.turn) return fail('Auf dem Markt warst du in diesem Zug schon.');
       if (gesperrt(wirkungenVon(s, actor), 'markt')) return fail('Deine Krone verbietet den Markt.');

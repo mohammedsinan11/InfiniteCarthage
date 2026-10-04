@@ -12,6 +12,7 @@
  * dauerhaft Platz zu belegen. Symbole sind PLATZHALTER (ASSETS.md).
  */
 
+import { hatSystem } from '../../core/systeme';
 import { wirkungenVon } from '../../core/cards/wirkung';
 import { gesperrt } from '../../core/cards/effects';
 import { kannBezahlen } from '../../core/rules/kosten';
@@ -715,7 +716,7 @@ export function Aktionsleiste({
               : undefined
           }
           markt={
-            state.ereignisseAn
+            state.ereignisseAn && hatSystem(state, 'karten')
               ? {
                   darf: bauen && me?.id !== undefined && state.marktZug[me.id] !== state.turn && RESOURCES.reduce((n, r) => n + hand[r], 0) >= marktPreisFuer(state, me.id),
                   preis: me ? marktPreisFuer(state, me.id) : 3,

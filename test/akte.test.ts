@@ -1,5 +1,7 @@
 /** Drei Akte mit Bossen (core/akte.ts, rules/akt.ts) und Systeme ueber die Partien (core/systeme.ts). */
 
+import { botsSpielen } from '../src/core/bot';
+import { totalPoints } from '../src/core/state';
 import { describe, it, expect } from 'vitest';
 import { applyAction, createGame } from '../src/core/rules/reducer';
 import type { GameEvent } from '../src/core/rules/reducer';
@@ -280,12 +282,27 @@ describe('Akte', () => {
 
 describe('Systeme', () => {
   it('kommen nacheinander mit den Partien', () => {
+    // Die erste Partie ist schlicht wie Catan; dann Karten, Akte, Raub, Held ...
     expect(systemeFuer(0)).toEqual([]);
-    expect(systemeFuer(1)).toEqual(['raub']);
-    expect(systemeFuer(2)).toEqual(['raub', 'held']);
-    expect(systemeFuer(9)).toEqual(['raub', 'held', 'ereignisse', 'reich']);
-    expect(neuesSystem(2)?.id).toBe('held');
+    expect(systemeFuer(1)).toEqual(['karten']);
+    expect(systemeFuer(2)).toEqual(['karten', 'akte']);
+    expect(systemeFuer(4)).toEqual(['karten', 'akte', 'raub', 'held']);
+    expect(systemeFuer(9)).toEqual(['karten', 'akte', 'raub', 'held', 'ereignisse', 'reich']);
+    expect(neuesSystem(4)?.id).toBe('held');
     expect(neuesSystem(0)).toBeNull();
+  });
+
+  it('ohne Kartenwahl bringen neue Staedte und die 7 keine Karten', () => {
+    const ruhig = createGame([{ id: 'p0', name: 'S' }, { id: 'p1', name: 'T' }], 7, 11, 10, { ereignisse: true, systeme: [] }).state;
+    expect(hatSystem(ruhig, 'karten')).toBe(false);
+    expect(ruhig.akte ?? null).toBeNull();
+    // Zwei Bots spielen die erste Partie: keine einzige Kartenwahl, und wer
+    // zuerst zehn Siegpunkte hat, gewinnt.
+    const g = createGame([{ id: 'b1', name: 'Hanno' }, { id: 'b2', name: 'Dido' }], 7, 11, 10, { haeuser: true, ereignisse: true, systeme: [] });
+    const ereignisse = botsSpielen(g, () => true, 20000).flat();
+    expect(ereignisse.some((e) => e.t === 'draftOffered')).toBe(false);
+    expect(g.state.phase.t).toBe('finished');
+    expect(Math.max(...g.state.order.map((id) => totalPoints(g.state, id)))).toBeGreaterThanOrEqual(10);
   });
 
   it('ohne Liste gilt alles; Siegwege gehoeren zum Reich', () => {

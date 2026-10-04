@@ -115,6 +115,9 @@ export function neuFrei(vorher: { partien: number; bosse: number }, nachher: { p
  * der ersten Partie, als es noch keinen Helden gab).
  */
 export const SYSTEM_KARTEN: Record<SystemId, readonly string[]> = {
+  // Ohne Kartenwahl kommt ohnehin keine Karte; die Akte brauchen keine eigenen.
+  karten: [],
+  akte: [],
   // Kampf, Lager, Pluenderer - und alle Taktiken.
   raub: [
     'wehrhafte_doerfer', 'trophaeenhalle', 'kriegsbeute', 'feldscher', 'schildwall', 'sammeln', 'schlachtruf',

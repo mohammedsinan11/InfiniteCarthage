@@ -55,7 +55,7 @@ import { istStufe } from '../core/stufe';
 import { botsSpielen } from '../core/bot';
 import { szenarioById } from '../core/szenario';
 import { totalPoints } from '../core/state';
-import { systemeFuer } from '../core/systeme';
+import { EINSTIEG_ZIEL, SYSTEME, systemeFuer } from '../core/systeme';
 import { gesperrteKarten } from '../core/freischalt';
 import type { SystemId } from '../core/systeme';
 
@@ -437,6 +437,10 @@ export class GameRoom implements DurableObject {
         const weltSeed = tages
           ? tagesWeltSeed(tages)
           : (room.weltSeed ?? mitWeltArt(randomSeed(), room.weltArt ?? 'kernland'));
+        // Ohne Akte (die ersten Partien, core/systeme.ts): wer zuerst zehn
+        // Siegpunkte hat, gewinnt - ohne Rundengrenze, wie bei Catan.
+        const systeme = this.systemeFuer(room);
+        const mitAkten = !systeme || systeme.includes('akte');
         const geheimSeed = tages ? await this.tagesGeheimSeed(tages) : randomSeed();
         this.game = createGame(
           room.members.map((m) => ({
@@ -447,12 +451,13 @@ export class GameRoom implements DurableObject {
           })),
           weltSeed,
           geheimSeed,
-          room.koop && !tages ? 0 : room.targetPoints,
+          room.koop && !tages ? 0 : mitAkten || room.szenario ? room.targetPoints : EINSTIEG_ZIEL,
           {
             omens: this.omenFuer(room),
-            rundenLimit: room.koop && !tages ? (room.rundenLimit ?? 60) : this.rundenFuer(room),
+            rundenLimit: room.koop && !tages ? (room.rundenLimit ?? 60) : mitAkten || room.szenario ? this.rundenFuer(room) : null,
             tagesDatum: tages,
-            haeuser: true,
+            // Haeuser kommen mit der Kartenwahl - die erste Partie beginnt ohne Wahl.
+            haeuser: !systeme || systeme.includes('karten'),
             ereignisse: true,
             // Erbstuecke nur in gewoehnlichen Partien (core/erbe.ts) - createGame prueft auch "allein".
             erbeAn: !tages && !room.szenario,
@@ -461,8 +466,8 @@ export class GameRoom implements DurableObject {
             stufe: tages ? 0 : (room.stufe ?? 0),
             koop: !tages && !room.szenario && (room.koop ?? false),
             szenario: room.szenario ?? null,
-            ...(this.systemeFuer(room) ? { systeme: this.systemeFuer(room)! } : {}),
-            akte: true,
+            ...(systeme ? { systeme } : {}),
+            akte: mitAkten,
             gesperrt: this.gesperrtFuer(room),
           },
         );
@@ -800,6 +805,9 @@ export class GameRoom implements DurableObject {
    * "Leere Taschen" machte den Einstieg zur haertesten Partie).
    */
   private omenFuer(room: RoomData): string[] {
+    // Ohne Kartenwahl keine Omen - die erste Partie ist so schlicht wie Catan.
+    const systeme = this.systemeFuer(room);
+    if (systeme && !systeme.includes('karten')) return [];
     const omen = gueltigeOmen(room.omens ?? []);
     const menschen = room.members.filter((m) => !m.bot);
     const erste = !room.alleSysteme && !room.tagesDatum && !room.szenario && menschen.length === 1 && room.partien?.[menschen[0]!.id] === 0;
@@ -818,13 +826,15 @@ export class GameRoom implements DurableObject {
   }
 
   private systemeFuer(room: RoomData): SystemId[] | null {
+    // Die Gruendung ist die Lernpartie fuer Neue: nur das Herz des Spiels.
+    if (room.szenario === 'gruendung') return [];
     if (room.alleSysteme || room.tagesDatum || room.szenario || room.koop) return null;
     const menschen = room.members.filter((m) => !m.bot);
     if (menschen.length !== 1) return null;
     const n = room.partien?.[menschen[0]!.id];
     if (n === undefined) return null;
     const liste = systemeFuer(n);
-    return liste.length >= 4 ? null : liste;
+    return liste.length >= SYSTEME.length ? null : liste;
   }
 
   private broadcastRoom(): void {
