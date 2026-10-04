@@ -83,6 +83,27 @@ const GELEE: Pixelkarte = [
   '..kkkk...',
 ];
 
+const HERZ: Pixelkarte = [
+  '.kk.kk.',
+  'krrkrrk',
+  'krwrrrk',
+  'krrrrrk',
+  '.krrrk.',
+  '..krk..',
+  '...k...',
+];
+
+/** Die linke Haelfte eines Herzens, rechts nur der Umriss. */
+const HALBHERZ: Pixelkarte = [
+  '.kk.kk.',
+  'krrk..k',
+  'krwk..k',
+  'krrk..k',
+  '.krk.k.',
+  '..kkk..',
+  '...k...',
+];
+
 export const SYMBOL: Record<string, Pixelkarte> = {
   schwert: SCHWERT,
   axt: AXT,
@@ -92,6 +113,8 @@ export const SYMBOL: Record<string, Pixelkarte> = {
   stiefel: STIEFEL,
   laterne: FLAMME,
   kraut: KRAUT,
+  herz: HERZ,
+  halbherz: HALBHERZ,
   gold: SACK,
   gelee: GELEE,
   truhe: TRUHE,

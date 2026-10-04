@@ -7713,6 +7713,17 @@ em.off {
 .ab-herz.voll {
   background: #c8402f;
 }
+.ab-herz.halb {
+  background: linear-gradient(90deg, #c8402f 50%, #3a2a22 50%);
+}
+.ab-ton {
+  display: inline-flex;
+  align-items: center;
+  color: var(--accent);
+}
+.ab-ton.aus {
+  color: var(--muted);
+}
 .ab-mini {
   top: 10px;
   right: 10px;
@@ -7772,12 +7783,22 @@ em.off {
   bottom: 10px;
 }
 .ab-tasten {
-  display: grid;
-  grid-template-columns: repeat(3, 44px);
+  --ab-t: 44px;
+  display: flex;
+  flex-direction: column;
   gap: 4px;
 }
+/* Versetzt wie die Tastenreihen - und wie die Nachbarn eines Sechsecks. */
+.ab-reihe {
+  display: flex;
+  gap: 4px;
+}
+.ab-reihe.versetzt {
+  padding-left: calc(var(--ab-t) / 2 + 2px);
+}
 .ab-taste {
-  height: 44px;
+  width: var(--ab-t);
+  height: var(--ab-t);
   padding: 2px;
   display: flex;
   flex-direction: column;
@@ -7792,6 +7813,11 @@ em.off {
 .ab-taste span {
   font-size: 14px;
   color: var(--accent);
+}
+.ab-taste.mitte span {
+  font-family: var(--pixel);
+  font-size: 10px;
+  color: #d8e8ff;
 }
 .ab-taste.gedrueckt {
   animation: ab-druck 0.35s ease-out;
@@ -7839,17 +7865,26 @@ em.off {
   position: static;
 }
 .ab-gegenstaende {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 3px;
 }
-.ab-gegenstand {
+/* Das Inventar steht immer da: leere Faecher als dunkle Mulden. */
+.ab-fach {
   position: relative;
-  width: 40px;
-  height: 40px;
-  padding: 4px;
+  aspect-ratio: 1;
+  min-width: 0;
+  padding: 3px;
   display: grid;
   place-items: center;
+  background: #120d08;
+  border: 1px solid var(--line);
+  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.6);
+}
+.ab-fach.ab-gegenstand {
+  border-color: var(--line-bright);
+  background: #241a10;
+  cursor: pointer;
 }
 .ab-anzahl {
   position: absolute;
@@ -7877,20 +7912,159 @@ em.off {
   border: 3px solid #3f2818;
   box-shadow: inset 0 0 0 2px #8a5a2b, 0 0 0 2px var(--bg);
 }
-.ab-wuerfel {
+.ab-wuerfel-platz {
+  position: relative;
   width: 60px;
   height: 60px;
   grid-row: span 2;
 }
-.ab-wuerfel.rollt {
-  animation: ab-rollen 0.45s steps(6);
+.ab-wuerfel {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
 }
-@keyframes ab-rollen {
+.ab-wuerfel-schatten {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: -4px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+}
+.ab-wuerfel-platz.matt .ab-wuerfel {
+  filter: saturate(0.4) brightness(0.8);
+}
+/* Rollen: von oben hereingeworfen, zweimal aufgeschlagen, ausgetrudelt. */
+.ab-wuerfel-platz.rollt .ab-wuerfel {
+  animation: ab-taumeln 0.85s cubic-bezier(0.3, 0.7, 0.4, 1) both;
+}
+.ab-wuerfel-platz.rollt .ab-wuerfel-schatten {
+  animation: ab-schatten 0.85s cubic-bezier(0.3, 0.7, 0.4, 1) both;
+}
+@keyframes ab-taumeln {
   0% {
-    transform: rotate(0) scale(0.7);
+    transform: translate(-46px, -52px) rotate(-260deg) scale(0.75);
+  }
+  30% {
+    transform: translate(-12px, 0) rotate(-70deg) scale(1);
+  }
+  45% {
+    transform: translate(-6px, -16px) rotate(10deg) scale(1);
+  }
+  62% {
+    transform: translate(-1px, 0) rotate(-12deg);
+  }
+  76% {
+    transform: translate(0, -4px) rotate(5deg);
+  }
+  88% {
+    transform: translate(0, 0) rotate(-2deg);
   }
   100% {
-    transform: rotate(360deg) scale(1);
+    transform: translate(0, 0) rotate(0);
+  }
+}
+@keyframes ab-schatten {
+  0% {
+    transform: translateX(-40px) scale(0.3);
+    opacity: 0.2;
+  }
+  30% {
+    transform: translateX(-12px) scale(1);
+    opacity: 1;
+  }
+  45% {
+    transform: translateX(-6px) scale(0.7);
+  }
+  62%,
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+/* Gelandet: ein Ruck, ein goldener Schein, zwei Staubwoelkchen. */
+.ab-wuerfel-platz.landet .ab-wuerfel {
+  animation: ab-landen 0.6s ease-out;
+}
+@keyframes ab-landen {
+  0% {
+    transform: scale(1.18, 0.86);
+    filter: drop-shadow(0 0 0 #f2c94c);
+  }
+  35% {
+    transform: scale(0.96, 1.06);
+    filter: drop-shadow(0 0 10px #f2c94c);
+  }
+  100% {
+    transform: none;
+    filter: drop-shadow(0 0 0 rgba(242, 201, 76, 0));
+  }
+}
+.ab-staub {
+  position: absolute;
+  bottom: 0;
+  width: 6px;
+  height: 6px;
+  background: #d8c8a8;
+  opacity: 0;
+  pointer-events: none;
+}
+.ab-staub.l {
+  left: 2px;
+}
+.ab-staub.r {
+  right: 2px;
+}
+.ab-wuerfel-platz.landet .ab-staub.l {
+  animation: ab-staub-l 0.55s ease-out;
+}
+.ab-wuerfel-platz.landet .ab-staub.r {
+  animation: ab-staub-r 0.55s ease-out;
+}
+@keyframes ab-staub-l {
+  0% {
+    opacity: 0.9;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-14px, -6px) scale(2);
+  }
+}
+@keyframes ab-staub-r {
+  0% {
+    opacity: 0.9;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(14px, -6px) scale(2);
+  }
+}
+/* Die Schritte als Kerben: volle sind noch zu gehen. */
+.ab-schritte {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin: 2px 0;
+}
+.ab-schritte i {
+  width: 8px;
+  height: 8px;
+  background: #3f2818;
+  border: 1px solid #2a1f16;
+}
+.ab-schritte i.voll {
+  background: #f2c94c;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ab-wuerfel-platz .ab-wuerfel,
+  .ab-wuerfel-platz .ab-wuerfel-schatten,
+  .ab-staub {
+    animation: none !important;
   }
 }
 .ab-tisch-text {
@@ -7959,10 +8133,7 @@ em.off {
     padding: 1px;
   }
   .ab-tasten {
-    grid-template-columns: repeat(3, 40px);
-  }
-  .ab-taste {
-    height: 40px;
+    --ab-t: 40px;
   }
   .ab-verlauf {
     display: none;
@@ -7974,7 +8145,7 @@ em.off {
     grid-template-columns: 44px 1fr;
     padding: 8px;
   }
-  .ab-wuerfel {
+  .ab-wuerfel-platz {
     width: 44px;
     height: 44px;
   }

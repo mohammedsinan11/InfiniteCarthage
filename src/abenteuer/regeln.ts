@@ -7,10 +7,13 @@
  * reine Seite laeuft (GitHub Pages) und sich testen laesst.
  *
  * DER ZUG. Zu Beginn wird gewuerfelt; die Augenzahl sind die Schritte. Jeder
- * Schritt geht auf ein Nachbarfeld (sechs Richtungen, dazu "gerade hinauf"
- * und "gerade hinab" im Zickzack). Wasser ist nicht zu betreten, Berge kosten
- * zwei Schritte. Ein Schritt auf einen Schleim ist ein Angriff. Sind die
- * Schritte verbraucht - oder rastet man -, ziehen die Schleime.
+ * Schritt geht auf ein Nachbarfeld (sechs Richtungen: W E / A D / Z X um S
+ * herum, wie die Tasten liegen). Wasser ist nicht zu betreten, Berge kosten
+ * zwei Schritte. Ein Schritt auf einen Schleim ist ein Angriff, S wartet.
+ *
+ * DIE SPIELUHR. Jeder Schritt ist ein Tick, und in jedem Tick huepfen die
+ * Schleime mit: naeher heran, wenn sie den Ritter wittern, und neben ihm
+ * springen sie ihn an. Wer zieht, laesst die Welt ziehen.
  *
  * SAMMELN. Auf manchen Feldern liegt etwas: Kraeuter, Gold, Truhen mit
  * Ausruestung. Wer das Feld betritt, nimmt es mit. Erschlagene Schleime
@@ -62,6 +65,8 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
   { id: 'stiefel', name: 'Reitstiefel', slot: 'fuesse', schritte: 1, text: '+1 Schritt je Wurf.' },
   { id: 'laterne', name: 'Laterne', slot: 'zubehoer', sicht: 1, text: 'Du siehst ein Feld weiter.' },
   { id: 'kraut', name: 'Heilkraut', heilt: 2, text: 'Antippen: 2 Leben zurueck.' },
+  { id: 'herz', name: 'Herz', heilt: 1, text: 'Ein ganzes Leben. Verletzt heilt es sofort beim Aufheben, sonst wandert es ins Inventar.' },
+  { id: 'halbherz', name: 'Halbes Herz', heilt: 0.5, text: 'Ein halbes Leben. Verletzt heilt es sofort beim Aufheben, sonst wandert es ins Inventar.' },
   { id: 'gold', name: 'Gold', text: 'Glaenzt. Noch kauft hier niemand etwas.' },
   { id: 'gelee', name: 'Schleimgelee', text: 'Was ein Schleim zuruecklaesst - der Beweis deiner Taten.' },
 ];
@@ -71,15 +76,47 @@ export const gegenstand = (id: string): Gegenstand | undefined => GEGENSTAENDE.f
 /** Was in Truhen liegen kann - das Schwert traegt der Ritter schon. */
 const TRUHENINHALT = ['axt', 'schild', 'helm', 'ruestung', 'stiefel', 'laterne'];
 
-export type Schleim = { id: number; q: number; r: number; leben: number; gross: boolean };
+export type Schleim = {
+  id: number;
+  q: number;
+  r: number;
+  leben: number;
+  gross: boolean;
+  /** Angesagter Angriff: dieses Feld trifft er in seinem naechsten Takt. */
+  angriff?: Hex | null;
+};
 
 export type Phase = 'wuerfeln' | 'ziehen' | 'tot' | 'sieg';
+
+/** Wer handelt: der Ritter oder ein Schleim (seine id). */
+export type Wer = 'ritter' | number;
+
+/**
+ * Was in einer Aktion geschah, Takt fuer Takt - fuer die Bewegung im Bild.
+ * Takt 0 ist der Ritter, jeder weitere Takt ein Tick der Spieluhr.
+ */
+export type Ereignis =
+  | { art: 'gehen'; takt: number; wer: Wer; von: Hex; nach: Hex }
+  /** Ein Hieb; ziel null heisst: ins Leere, der Ritter ist ausgewichen. */
+  | { art: 'hieb'; takt: number; wer: Wer; ziel: Wer | null; feld?: Hex; wurf: number; schaden: number }
+  /** Ein Schleim holt aus: im naechsten Takt trifft er dieses Feld. */
+  | { art: 'ansage'; takt: number; wer: number; feld: Hex }
+  | { art: 'tod'; takt: number; wer: number; q: number; r: number; gross: boolean }
+  | { art: 'neu'; takt: number; wer: number }
+  | { art: 'heil'; takt: number; leben: number }
+  | { art: 'warten'; takt: number }
+  | { art: 'fund'; takt: number; id: string };
 
 export type Abenteuer = {
   seed: number;
   /** Zustand des Zufalls - Wuerfel und Kampf. */
   rng: number;
   zug: number;
+  /**
+   * Die Spieluhr: jeder Schritt des Ritters ist ein Tick, und in jedem Tick
+   * huepfen auch die Schleime. Berge kosten zwei Ticks.
+   */
+  zeit: number;
   phase: Phase;
   pos: Hex;
   wurf: number | null;
@@ -98,6 +135,12 @@ export type Abenteuer = {
   erschlagen: number;
   /** Was zuletzt geschah, neueste zuletzt. */
   log: string[];
+  /** Die Ereignisse der letzten Aktion - nur fuers Bild. */
+  ereignisse: Ereignis[];
+  /** Die Wege der Schleime in diesem Zug (mit Startfeld) - fuer ihre Pfeile. */
+  spuren: Record<number, Hex[]>;
+  /** In diesem Zug schon durch Warten geheilt. */
+  geruht: boolean;
 };
 
 /** So viele Schleime muss man erschlagen. */
@@ -106,24 +149,28 @@ export const GRUND_LEBEN = 6;
 const GRUND_SICHT = 3;
 /** Wie weit Schleime den Ritter wittern. */
 const WITTERUNG = 6;
+/** Alle so viele Ticks kriecht ein neuer Schleim aus dem Unbekannten. */
+const NACHSCHUB = 15;
 const SALT_FUND = 77;
 const SALT_SCHLEIM = 78;
 
-/** Tasten: drei mal drei, wie sie auf der Tastatur liegen. */
-export type Taste = 'q' | 'w' | 'e' | 'a' | 's' | 'd' | 'z' | 'x' | 'c';
-export const TASTEN: readonly Taste[] = ['q', 'w', 'e', 'a', 's', 'd', 'z', 'x', 'c'];
+/**
+ * Tasten: die sechs Nachbarn von S auf der Tastatur. Die Tastenreihen sind
+ * versetzt wie Sechsecke - W und E liegen ueber S, A und D daneben, Z und X
+ * darunter. So zeigt jede Taste genau in ihre Richtung; S selbst wartet.
+ */
+export type Taste = 'w' | 'e' | 'a' | 's' | 'd' | 'z' | 'x';
+export const TASTEN: readonly Taste[] = ['w', 'e', 'a', 's', 'd', 'z', 'x'];
 /** Richtung je Taste (Index in HEX_DIRS: 0 NO, 1 O, 2 SO, 3 SW, 4 W, 5 NW). */
-const RICHTUNG: Partial<Record<Taste, number>> = { e: 0, d: 1, c: 2, z: 3, a: 4, q: 5 };
+const RICHTUNG: Partial<Record<Taste, number>> = { e: 0, d: 1, x: 2, z: 3, a: 4, w: 5 };
 export const TASTE_NAME: Record<Taste, string> = {
-  q: 'Nordwest',
-  w: 'Norden',
+  w: 'Nordwest',
   e: 'Nordost',
   a: 'West',
-  s: 'Rasten',
+  s: 'Warten',
   d: 'Ost',
   z: 'Suedwest',
-  x: 'Sueden',
-  c: 'Suedost',
+  x: 'Suedost',
 };
 
 // --- Welt ----------------------------------------------------------------
@@ -157,6 +204,8 @@ export function fundAuf(a: Pick<Abenteuer, 'seed' | 'genommen'>, q: number, r: n
   if (h < 3) return 'truhe';
   if (h < 7 && (t === 'forest' || t === 'pasture' || t === 'field')) return 'kraut';
   if (h < 10) return 'gold';
+  if (h < 11) return 'halbherz';
+  if (h < 12) return 'herz';
   return null;
 }
 
@@ -187,6 +236,7 @@ export function neuesAbenteuer(seed: number): Abenteuer {
     seed,
     rng: seed ^ 0x5bd1e995,
     zug: 1,
+    zeit: 0,
     phase: 'wuerfeln',
     pos: start,
     wurf: null,
@@ -201,6 +251,9 @@ export function neuesAbenteuer(seed: number): Abenteuer {
     erkundet: [],
     erschlagen: 0,
     log: ['Ein Ritter bricht auf. Wuerfle, um loszuziehen.'],
+    ereignisse: [],
+    spuren: {},
+    geruht: false,
   };
   // Schleime in der Umgebung - nie zu nah am Start.
   for (const h of hexesInRange(start, 14)) {
@@ -245,39 +298,55 @@ export function wuerfeln(alt: Abenteuer): Abenteuer {
   a.schritte = a.wurf + schrittBonus(a);
   a.pfad = [a.pos];
   a.phase = 'ziehen';
+  a.ereignisse = [];
+  a.spuren = {};
   melde(a, `Gewuerfelt: ${a.wurf}${schrittBonus(a) > 0 ? ` (+${schrittBonus(a)} Stiefel)` : ''} - ${a.schritte} Schritte.`);
   return a;
 }
 
-/** Wohin eine Taste fuehrt; w und x gehen im Zickzack gerade hinauf und hinab. */
-export function richtungFuer(taste: Taste, pos: Hex): number | null {
-  if (taste === 'w') return pos.r % 2 === 0 ? 0 : 5;
-  if (taste === 'x') return pos.r % 2 === 0 ? 2 : 3;
+/** Wohin eine Taste fuehrt (Index in HEX_DIRS); S fuehrt nirgends hin. */
+export function richtungFuer(taste: Taste): number | null {
   return RICHTUNG[taste] ?? null;
 }
 
-/** Eine Taste im Zug: gehen, angreifen oder rasten. */
+/** Die Taste, die auf ein Nachbarfeld fuehrt - fuer Tippen und Klicken. */
+export function tasteZu(von: Hex, nach: Hex): Taste | null {
+  if (von.q === nach.q && von.r === nach.r) return 's';
+  const i = HEX_DIRS.findIndex(([dq, dr]) => von.q + dq === nach.q && von.r + dr === nach.r);
+  if (i < 0) return null;
+  return (Object.entries(RICHTUNG).find(([, d]) => d === i)?.[0] as Taste | undefined) ?? null;
+}
+
+/** Ob der Ritter ein Feld betreten kann (ohne Schleim darauf). */
+export function betretbar(a: Abenteuer, q: number, r: number): boolean {
+  return begehbar(gelaende(a.seed, q, r));
+}
+export const schrittKosten = (a: Abenteuer, q: number, r: number): number => kosten(gelaende(a.seed, q, r));
+
+/**
+ * Eine Taste im Zug: gehen, angreifen oder warten. Jeder Schritt ist ein Tick
+ * der Spieluhr - danach huepfen die Schleime.
+ */
 export function taste(alt: Abenteuer, t: Taste): Abenteuer {
   if (alt.phase !== 'ziehen') return alt;
   const a = structuredClone(alt);
+  a.ereignisse = [];
   if (t === 's') {
-    // Rasten beendet den Zug; ohne Schleim in der Naehe heilt es ein Leben.
-    const ruhig = !a.schleime.some((s) => hexDistance(s, a.pos) <= 2);
-    if (ruhig && a.leben < maxLebenVon(a)) {
-      a.leben += 1;
-      melde(a, 'Du rastest und kommst zu Kraeften: +1 Leben.');
-    } else melde(a, ruhig ? 'Du rastest.' : 'Zu unruhig zum Rasten - Schleime sind nah.');
-    return zugEnde(a);
+    warten(a, 0);
+    a.schritte -= 1;
+    ticken(a, 1);
+    return nachDemSchritt(a);
   }
-  const dir = richtungFuer(t, a.pos);
+  const dir = richtungFuer(t);
   if (dir === null) return alt;
   const d = HEX_DIRS[dir]!;
   const ziel = { q: a.pos.q + d[0], r: a.pos.r + d[1] };
   const feind = schleimAuf(a, ziel.q, ziel.r);
   if (feind) {
-    angreifen(a, feind);
+    angreifen(a, feind, 0);
     a.schritte -= 1;
-    return a.schritte <= 0 && a.phase === 'ziehen' ? zugEnde(a) : a;
+    if (a.phase === 'ziehen') ticken(a, 1);
+    return nachDemSchritt(a);
   }
   const g = gelaende(a.seed, ziel.q, ziel.r);
   if (!begehbar(g)) {
@@ -289,38 +358,83 @@ export function taste(alt: Abenteuer, t: Taste): Abenteuer {
     melde(a, 'Fuer den Berg fehlen dir Schritte.');
     return a;
   }
+  a.ereignisse.push({ art: 'gehen', takt: 0, wer: 'ritter', von: a.pos, nach: ziel });
   a.pos = ziel;
   a.schritte -= k;
   a.pfad = [...a.pfad, ziel];
   sehen(a);
   aufheben(a);
-  return a.schritte <= 0 ? zugEnde(a) : a;
+  // Ein Berg kostet zwei Ticks - die Schleime huepfen zweimal.
+  for (let i = 1; i <= k && a.phase === 'ziehen'; i++) ticken(a, i);
+  return nachDemSchritt(a);
 }
 
-function angreifen(a: Abenteuer, s: Schleim): void {
+/** Die restlichen Schritte abwarten: jeder ist ein Tick. */
+export function zugBeenden(alt: Abenteuer): Abenteuer {
+  if (alt.phase !== 'ziehen') return alt;
+  const a = structuredClone(alt);
+  a.ereignisse = [];
+  warten(a, 0);
+  for (let i = 1; a.schritte > 0 && a.phase === 'ziehen'; i++) {
+    a.schritte -= 1;
+    ticken(a, i);
+  }
+  return nachDemSchritt(a);
+}
+
+/** Warten: einmal je Zug heilt es ein Leben, wenn kein Schleim nah ist. */
+function warten(a: Abenteuer, takt: number): void {
+  a.ereignisse.push({ art: 'warten', takt });
+  const ruhig = !a.schleime.some((s) => hexDistance(s, a.pos) <= 2);
+  if (ruhig && !a.geruht && a.leben < maxLebenVon(a)) {
+    a.leben += 1;
+    a.geruht = true;
+    a.ereignisse.push({ art: 'heil', takt, leben: 1 });
+    melde(a, 'Du verschnaufst: +1 Leben.');
+  } else if (!ruhig) melde(a, 'Du wartest - zu unruhig zum Verschnaufen, Schleime sind nah.');
+}
+
+function nachDemSchritt(a: Abenteuer): Abenteuer {
+  if (a.phase !== 'ziehen' || a.schritte > 0) return a;
+  a.schritte = 0;
+  a.phase = 'wuerfeln';
+  a.zug += 1;
+  a.wurf = null;
+  a.geruht = false;
+  return a;
+}
+
+function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
   const wurf = w6(a);
   const summeWurf = wurf + angriffVon(a);
-  if (summeWurf >= 4) {
-    const schaden = wurf === 6 ? 2 : 1;
-    s.leben -= schaden;
-    if (s.leben <= 0) {
-      a.schleime = a.schleime.filter((x) => x.id !== s.id);
-      a.erschlagen += 1;
-      const gelee = s.gross ? 2 : 1;
-      a.inventar = { ...a.inventar, gelee: (a.inventar['gelee'] ?? 0) + gelee };
-      melde(a, `Wurf ${wurf}+${angriffVon(a)}: der ${s.gross ? 'grosse ' : ''}Schleim zerplatzt! +${gelee} Gelee (${a.erschlagen}/${ZIEL_SCHLEIME}).`);
-      if (a.erschlagen >= ZIEL_SCHLEIME) {
-        a.phase = 'sieg';
-        melde(a, 'Zehn Schleime erschlagen - das Land atmet auf. Sieg!');
-      }
-    } else melde(a, `Wurf ${wurf}+${angriffVon(a)}: Treffer${schaden > 1 ? ' (doppelt)' : ''} - der Schleim wankt.`);
-  } else melde(a, `Wurf ${wurf}+${angriffVon(a)}: daneben.`);
+  const schaden = summeWurf >= 4 ? (wurf === 6 ? 2 : 1) : 0;
+  a.ereignisse.push({ art: 'hieb', takt, wer: 'ritter', ziel: s.id, wurf, schaden });
+  if (schaden === 0) {
+    melde(a, `Wurf ${wurf}+${angriffVon(a)}: daneben.`);
+    return;
+  }
+  s.leben -= schaden;
+  if (s.leben > 0) {
+    melde(a, `Wurf ${wurf}+${angriffVon(a)}: Treffer${schaden > 1 ? ' (doppelt)' : ''} - der Schleim wankt.`);
+    return;
+  }
+  a.schleime = a.schleime.filter((x) => x.id !== s.id);
+  a.ereignisse.push({ art: 'tod', takt, wer: s.id, q: s.q, r: s.r, gross: s.gross });
+  a.erschlagen += 1;
+  const gelee = s.gross ? 2 : 1;
+  a.inventar = { ...a.inventar, gelee: (a.inventar['gelee'] ?? 0) + gelee };
+  melde(a, `Wurf ${wurf}+${angriffVon(a)}: der ${s.gross ? 'grosse ' : ''}Schleim zerplatzt! +${gelee} Gelee (${a.erschlagen}/${ZIEL_SCHLEIME}).`);
+  if (a.erschlagen >= ZIEL_SCHLEIME) {
+    a.phase = 'sieg';
+    melde(a, 'Zehn Schleime erschlagen - das Land atmet auf. Sieg!');
+  }
 }
 
 function aufheben(a: Abenteuer): void {
   const fund = fundAuf(a, a.pos.q, a.pos.r);
   if (!fund) return;
   a.genommen = [...a.genommen, hexKey(a.pos.q, a.pos.r)];
+  a.ereignisse.push({ art: 'fund', takt: 0, id: fund });
   if (fund === 'truhe') {
     const inhalt = TRUHENINHALT[hash3i(a.seed, a.pos.q, a.pos.r, SALT_FUND + 1) % TRUHENINHALT.length]!;
     const g = gegenstand(inhalt)!;
@@ -334,49 +448,85 @@ function aufheben(a: Abenteuer): void {
     }
     return;
   }
+  // Herzen heilen gleich, wenn der Ritter verletzt ist.
+  const g = gegenstand(fund);
+  if ((fund === 'herz' || fund === 'halbherz') && g?.heilt && a.leben < maxLebenVon(a)) {
+    const plus = Math.min(g.heilt, maxLebenVon(a) - a.leben);
+    a.leben += plus;
+    a.ereignisse.push({ art: 'heil', takt: 0, leben: plus });
+    melde(a, `${g.name} aufgehoben: +${lebenText(plus)} Leben.`);
+    return;
+  }
   a.inventar = { ...a.inventar, [fund]: (a.inventar[fund] ?? 0) + 1 };
-  melde(a, `Gefunden: ${gegenstand(fund)?.name ?? fund}.`);
+  melde(a, `Gefunden: ${g?.name ?? fund}.`);
 }
 
-/** Die Schritte sind um: die Schleime ziehen, dann wird wieder gewuerfelt. */
-function zugEnde(a: Abenteuer): Abenteuer {
-  a.schritte = 0;
-  const besetzt = (q: number, r: number) => a.schleime.some((s) => s.q === q && s.r === r);
+/** Leben mit halben Herzen: 1, 0.5 -> "1", "½", 1.5 -> "1½". */
+export function lebenText(n: number): string {
+  const ganz = Math.floor(n);
+  const halb = n - ganz >= 0.5;
+  return ganz === 0 && halb ? '½' : `${ganz}${halb ? '½' : ''}`;
+}
+
+/**
+ * Ein Tick der Spieluhr. Jeder Schleim tut eines: neben dem Ritter springt er
+ * ihn an, in Witterung huepft er naeher, sonst huepft er mal hierhin, mal
+ * dorthin. Grosse Schleime sind traege und handeln nur jeden zweiten Tick.
+ */
+function ticken(a: Abenteuer, takt: number): void {
+  a.zeit += 1;
+  const rng = new Rng(a.rng);
+  const besetzt = (q: number, r: number) => (q === a.pos.q && r === a.pos.r) || a.schleime.some((s) => s.q === q && s.r === r);
   for (const s of a.schleime) {
+    if (s.gross && a.zeit % 2 === 1) continue;
     const d = hexDistance(s, a.pos);
-    if (d > WITTERUNG) continue;
-    if (d > 1) {
-      // Einen Schritt naeher heran, nie ins Wasser und nicht auf einen anderen.
-      let best: Hex | null = null;
-      for (const [dq, dr] of HEX_DIRS) {
-        const n = { q: s.q + dq, r: s.r + dr };
-        if (n.q === a.pos.q && n.r === a.pos.r) continue;
-        if (!begehbar(gelaende(a.seed, n.q, n.r)) || besetzt(n.q, n.r)) continue;
-        if (hexDistance(n, a.pos) < hexDistance(best ?? s, a.pos)) best = n;
+    // Ein angesagter Angriff trifft sein Feld - steht der Ritter nicht mehr
+    // darauf, geht er ins Leere. Ein Schild faengt jeden dritten Hieb ab.
+    if (s.angriff) {
+      const feld = s.angriff;
+      s.angriff = null;
+      const wurf = 1 + rng.int(6);
+      if (feld.q !== a.pos.q || feld.r !== a.pos.r) {
+        a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: null, feld, wurf, schaden: 0 });
+        melde(a, 'Ausgewichen! Der Schleim klatscht ins Leere.');
+        continue;
       }
-      if (best) {
-        s.q = best.q;
-        s.r = best.r;
-      }
-    }
-    if (hexDistance(s, a.pos) === 1) {
-      const wurf = w6(a);
-      if (wurf >= 4 + abwehrVon(a)) {
-        const schaden = s.gross ? 2 : 1;
+      const schaden = wurf <= abwehrVon(a) * 2 ? 0 : s.gross ? 2 : 1;
+      a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: 'ritter', feld, wurf, schaden });
+      if (schaden > 0) {
         a.leben -= schaden;
         melde(a, `Ein ${s.gross ? 'grosser ' : ''}Schleim trifft dich: -${schaden} Leben.`);
-      } else melde(a, `Ein Schleim springt dich an - abgewehrt (Wurf ${wurf}).`);
+      } else melde(a, 'Dein Schild faengt den Schleim ab.');
+      continue;
+    }
+    // Neben dem Ritter holt er aus und sagt das Feld an - wer weggeht, entkommt.
+    if (d === 1) {
+      s.angriff = { q: a.pos.q, r: a.pos.r };
+      a.ereignisse.push({ art: 'ansage', takt, wer: s.id, feld: s.angriff });
+      melde(a, `Ein ${s.gross ? 'grosser ' : ''}Schleim holt aus - weich aus oder schlag zu!`);
+      continue;
+    }
+    let ziel: Hex | null = null;
+    if (d <= WITTERUNG) {
+      // Einen Hops naeher heran, nie ins Wasser und nicht auf einen anderen.
+      for (const [dq, dr] of HEX_DIRS) {
+        const n = { q: s.q + dq, r: s.r + dr };
+        if (!begehbar(gelaende(a.seed, n.q, n.r)) || besetzt(n.q, n.r)) continue;
+        if (hexDistance(n, a.pos) < hexDistance(ziel ?? s, a.pos)) ziel = n;
+      }
+    } else if (rng.int(3) === 0) {
+      const [dq, dr] = HEX_DIRS[rng.int(6)]!;
+      const n = { q: s.q + dq, r: s.r + dr };
+      if (begehbar(gelaende(a.seed, n.q, n.r)) && !besetzt(n.q, n.r)) ziel = n;
+    }
+    if (ziel) {
+      a.ereignisse.push({ art: 'gehen', takt, wer: s.id, von: { q: s.q, r: s.r }, nach: ziel });
+      a.spuren = { ...a.spuren, [s.id]: [...(a.spuren[s.id] ?? [{ q: s.q, r: s.r }]), ziel] };
+      s.q = ziel.q;
+      s.r = ziel.r;
     }
   }
-  if (a.leben <= 0) {
-    a.leben = 0;
-    a.phase = 'tot';
-    melde(a, 'Der Ritter faellt. Das Abenteuer ist zu Ende.');
-    return a;
-  }
-  // Alle drei Zuege kriecht ein neuer Schleim aus dem Unbekannten.
-  if (a.zug % 3 === 0) {
-    const rng = new Rng(a.rng);
+  if (a.zeit % NACHSCHUB === 0) {
     for (let versuch = 0; versuch < 12; versuch++) {
       const dir = HEX_DIRS[rng.int(6)]!;
       const weit = 6 + rng.int(3);
@@ -384,14 +534,26 @@ function zugEnde(a: Abenteuer): Abenteuer {
       const r = a.pos.r + dir[1] * weit + (rng.int(3) - 1);
       if (!begehbar(gelaende(a.seed, q, r)) || besetzt(q, r)) continue;
       const gross = rng.int(4) === 0;
-      a.schleime.push({ id: a.naechsteId++, q, r, leben: gross ? 4 : 2, gross });
+      const id = a.naechsteId++;
+      a.schleime.push({ id, q, r, leben: gross ? 4 : 2, gross });
+      a.ereignisse.push({ art: 'neu', takt, wer: id });
       break;
     }
-    a.rng = rng.getState();
   }
-  if (a.phase === 'ziehen') a.phase = 'wuerfeln';
-  a.zug += 1;
-  a.wurf = null;
+  a.rng = rng.getState();
+  if (a.leben <= 0) {
+    a.leben = 0;
+    a.phase = 'tot';
+    melde(a, 'Der Ritter faellt. Das Abenteuer ist zu Ende.');
+  }
+}
+
+/** Alte Spielstaende (vor der Spieluhr) auf den heutigen Stand bringen. */
+export function normalisiere(a: Abenteuer): Abenteuer {
+  a.zeit ??= 0;
+  a.ereignisse ??= [];
+  a.geruht ??= false;
+  a.spuren ??= {};
   return a;
 }
 
@@ -410,9 +572,11 @@ export function benutzen(alt: Abenteuer, id: string): Abenteuer {
   };
   if (g.heilt) {
     if (a.leben >= maxLebenVon(a)) return alt;
-    a.leben = Math.min(maxLebenVon(a), a.leben + g.heilt);
+    const plus = Math.min(g.heilt, maxLebenVon(a) - a.leben);
+    a.leben += plus;
     weg();
-    melde(a, `${g.name}: +${g.heilt} Leben.`);
+    a.ereignisse = [{ art: 'heil', takt: 0, leben: plus }];
+    melde(a, `${g.name}: +${lebenText(plus)} Leben.`);
     return a;
   }
   if (g.slot) {
