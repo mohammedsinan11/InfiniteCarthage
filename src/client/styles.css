@@ -8458,3 +8458,140 @@ em.off {
   border: 2px solid #d9a441;
   box-shadow: 0 0 6px rgba(242, 201, 76, 0.5);
 }
+
+/* --- Abenteuer: Tooltip der Gegenstaende ---------------------------------- */
+.ab-tipp {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  pointer-events: none;
+  background: rgba(23, 18, 12, 0.96);
+  border: 2px solid var(--line-bright);
+  box-shadow: 0 0 0 2px var(--bg), 4px 4px 0 rgba(0, 0, 0, 0.4);
+  font-size: 12px;
+}
+.ab-tipp b {
+  font-family: var(--pixel);
+  font-size: 11px;
+  color: #f2e7d0;
+}
+.ab-tipp.legendaer {
+  border-color: #d9a441;
+  box-shadow: 0 0 0 2px var(--bg), 0 0 12px rgba(242, 201, 76, 0.45);
+}
+.ab-tipp.legendaer b {
+  color: #f2c94c;
+}
+.ab-tipp small {
+  margin-bottom: 4px;
+  font-family: var(--pixel);
+  font-size: 8px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.ab-tipp span {
+  font-family: var(--pixel);
+  font-size: 9px;
+}
+.ab-tipp span.gut {
+  color: #7fd05a;
+}
+.ab-tipp span.schlecht {
+  color: #e8604a;
+}
+.ab-tipp p {
+  margin: 4px 0 0;
+  line-height: 1.35;
+  color: #d8c8a8;
+}
+
+/* --- Abenteuer: Muenzen, Musikstueck, Angeln, Debug-Items ------------------ */
+.ab-muenzen {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  padding: 3px 8px;
+  background: rgba(23, 18, 12, 0.92);
+  border: 2px solid var(--line);
+}
+.ab-muenzen b {
+  font-family: var(--pixel);
+  font-size: 11px;
+  color: #f2c94c;
+}
+.ab-track {
+  max-width: 120px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--pixel);
+  font-size: 7px;
+  color: var(--muted);
+}
+.ab-angeln {
+  grid-column: 1 / -1;
+  min-height: 30px;
+  border-color: #5aa0d8;
+  color: #9ad8ff;
+}
+.ab-fach.legendaer {
+  border-color: #d9a441;
+}
+.ab-debug-reiter {
+  display: flex;
+  gap: 4px;
+  margin-right: auto;
+  margin-left: 12px;
+}
+.ab-debug-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 6px;
+}
+.ab-debug-item {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  background: #120d08;
+  border: 1px solid var(--line);
+}
+.ab-debug-item.legendaer {
+  border-color: #d9a441;
+}
+.ab-debug-item-bild {
+  display: grid;
+  place-items: center;
+}
+.ab-debug-item-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.ab-debug-item-text b {
+  font-size: 12px;
+}
+.ab-debug-item.legendaer b {
+  color: #f2c94c;
+}
+.ab-debug-item-text small {
+  font-family: var(--pixel);
+  font-size: 7px;
+  color: var(--muted);
+}
+.ab-debug-item-text em {
+  font-style: normal;
+  font-family: var(--pixel);
+  font-size: 8px;
+}
+.ab-debug-item-text em.gut {
+  color: #7fd05a;
+}
+.ab-debug-item-text em.schlecht {
+  color: #e8604a;
+}

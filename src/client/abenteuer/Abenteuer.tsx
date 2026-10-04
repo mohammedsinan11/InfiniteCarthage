@@ -39,7 +39,9 @@ import {
   maxLebenVon,
   neuesAbenteuer,
   normalisiere,
+  angeln,
   debugAktion,
+  kannAngeln,
   epFuer,
   ladungVon,
   richtungFuer,
@@ -62,11 +64,16 @@ import { HEX_CX, HEX_CY, IMG_H, IMG_W, kachelEcke, preloadTiles, tileImage, tile
 import { preloadUnitSprites } from '../units';
 import { PIX, Px } from '../ui/KartenPixel';
 import { musikAn, setzeMusik, starteMusik, stoppeMusik } from './musik';
-import { FIGUREN, malKachelFigur } from './symbole';
+import { DEKO, FIGUREN, KACHEL_PIX, malKachelFigur } from './symbole';
+import { hash3i } from '../../core/hash';
 import type { BeinBild, Haltung } from './symbole';
 import { DebugFenster, FIGUR_KEY, leseFigur } from './DebugFenster';
 import { RITTER_HAND, RITTER_KOERPER, RITTER_SCHRITT, SCHLEIMKOENIG, SCHLEIM_BILD, SYMBOL, WAFFE, WAFFE_GRIFF, zeichnePixel } from './symbole';
-import { LAUT_STUFEN, klang, lautstaerke, setzeLautstaerke } from './musik';
+import { LAUT_STUFEN, beiTrack, klang, laufenderTrack, lautstaerke, setzeBiom, setzeLautstaerke } from './musik';
+import { BIOM_NAME } from './musik';
+import type { Biom } from './musik';
+import { ItemTipp, tippHandler } from './ItemTipp';
+import type { Tipp } from './ItemTipp';
 import type { Klang } from './musik';
 
 const SPEICHER = 'infinitecarthage.abenteuer';
@@ -108,7 +115,15 @@ function speichere(a: Zustand): void {
 const neuerSeed = () => (Math.random() * 2 ** 31) | 0;
 
 /** Pfeil je Taste fuer die Steuerung. */
-const PFEIL: Record<Taste, string> = { q: '↖', e: '↗', a: '←', s: 'z', d: '→', z: '↙', x: '↘' };
+const PFEIL: Record<Taste, string> = {
+  q: '↖',
+  e: '↗',
+  a: '←',
+  s: 'z',
+  d: '→',
+  z: '↙',
+  x: '↘',
+};
 /** Die Steuerung als Sechseck: Q E oben, A S D in der Mitte, Z X unten. */
 const REIHEN: Taste[][] = [
   ['q', 'e'],
@@ -238,11 +253,36 @@ function TonSymbol({ aus }: { aus: boolean }) {
 
 const AUGEN: Record<number, [number, number][]> = {
   1: [[1, 1]],
-  2: [[0, 0], [2, 2]],
-  3: [[0, 0], [1, 1], [2, 2]],
-  4: [[0, 0], [2, 0], [0, 2], [2, 2]],
-  5: [[0, 0], [2, 0], [1, 1], [0, 2], [2, 2]],
-  6: [[0, 0], [2, 0], [0, 1], [2, 1], [0, 2], [2, 2]],
+  2: [
+    [0, 0],
+    [2, 2],
+  ],
+  3: [
+    [0, 0],
+    [1, 1],
+    [2, 2],
+  ],
+  4: [
+    [0, 0],
+    [2, 0],
+    [0, 2],
+    [2, 2],
+  ],
+  5: [
+    [0, 0],
+    [2, 0],
+    [1, 1],
+    [0, 2],
+    [2, 2],
+  ],
+  6: [
+    [0, 0],
+    [2, 0],
+    [0, 1],
+    [2, 1],
+    [0, 2],
+    [2, 2],
+  ],
 };
 
 /**
@@ -323,12 +363,18 @@ function spieleKlaenge(a: Zustand): void {
         if (e.schaden > 0) spaeter(e.takt + 0.45, 'treffer');
       } else {
         spaeter(e.takt + 0.45, e.ziel === null ? 'leer' : e.schaden > 0 ? 'platsch' : 'geblockt');
+        // Der Ritter nimmt Schaden: ein eigener Laut.
+        if (e.ziel === 'ritter' && e.schaden > 0) spaeter(e.takt + 0.5, 'autsch');
       }
     } else if (e.art === 'ansage') spaeter(e.takt + 0.2, 'warnung');
     else if (e.art === 'stampf') spaeter(e.takt + 0.5, 'beben');
     else if (e.art === 'spuck') spaeter(e.takt + 0.1, 'spuck');
-    else if (e.art === 'legende') spaeter(e.takt, 'legende');
-    else if (e.art === 'stufe') spaeter(e.takt + 0.3, 'stufe');
+    else if (e.art === 'legende' || e.art === 'wiederbelebt') spaeter(e.takt, 'legende');
+    else if (e.art === 'angeln') {
+      spaeter(e.takt, 'hieb');
+      spaeter(e.takt + 0.4, 'leer');
+      if (e.fang) spaeter(e.takt + 1, 'bereit');
+    } else if (e.art === 'stufe') spaeter(e.takt + 0.3, 'stufe');
     else if (e.art === 'faehigkeit') spaeter(e.takt + 0.1, e.name === 'feuerkreis' ? 'feuer' : e.name === 'runenblitz' ? 'blitz' : 'bereit');
     else if (e.art === 'boss') spaeter(e.takt, 'beben');
     else if (e.art === 'tod') spaeter(e.takt + 0.5, 'zerplatzt');
@@ -338,17 +384,30 @@ function spieleKlaenge(a: Zustand): void {
 // --- Das Spiel -------------------------------------------------------------
 
 type Anim = { start: number; ev: Ereignis[] };
-type Ansicht = { camX: number; camY: number; f: number; dpr: number; w: number; h: number };
+type Ansicht = {
+  camX: number;
+  camY: number;
+  f: number;
+  dpr: number;
+  w: number;
+  h: number;
+};
 
 export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const [a, setA] = useState<Zustand>(() => lade() ?? neuesAbenteuer(neuerSeed()));
   const [geladen, setGeladen] = useState(false);
-  const [gedrueckt, setGedrueckt] = useState<{ taste: Taste; n: number } | null>(null);
+  const [gedrueckt, setGedrueckt] = useState<{
+    taste: Taste;
+    n: number;
+  } | null>(null);
   const [zugTasten, setZugTasten] = useState<Taste[]>([]);
   const [wurfNr, setWurfNr] = useState(0);
   const [rollt, setRollt] = useState(false);
   const [musik, setMusik] = useState(musikAn);
   const [laut, setLaut] = useState(lautstaerke);
+  const [tipp, setTipp] = useState<Tipp>(null);
+  const [track, setTrack] = useState(laufenderTrack);
+  useEffect(() => beiTrack(setTrack), []);
   // Welche Figur der Spieler fuehrt (Debugfenster) - 'klassik' ist der bisherige Ritter.
   const [figur, setFigur] = useState(leseFigur);
   const figurRef = useRef(figur);
@@ -377,6 +436,21 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   }, []);
   // Die Welt rund um den Ritter erzeugen, bevor gezeichnet wird.
   useMemo(() => weltVon(a.seed, a.pos, 14), [a.seed, a.pos]);
+  // Die Landschaft fuer die Musik: was rund um den Ritter ueberwiegt - und der Koenig, wenn er nah ist.
+  const koenigNah = a.schleime.some((x) => x.boss && hexDistance(x, a.pos) <= 8);
+  useEffect(() => {
+    if (koenigNah) return setzeBiom('boss');
+    const zaehl: Record<string, number> = {};
+    for (const h of hexesInRange(a.pos, 2)) {
+      const t = tileAt(weltVon(a.seed), h.q, h.r)?.terrain;
+      if (t) zaehl[t] = (zaehl[t] ?? 0) + 1;
+    }
+    const wueste = zaehl['desert'] ?? 0;
+    const wald = zaehl['forest'] ?? 0;
+    const berg = (zaehl['mountain'] ?? 0) + (zaehl['hill'] ?? 0);
+    const b: Biom = wueste >= 7 ? 'wueste' : wald >= 7 ? 'wald' : berg >= 7 ? 'berg' : 'wiese';
+    setzeBiom(b);
+  }, [a.seed, a.pos, koenigNah]);
 
   // Der aktuelle Stand fuer Tasten, Knoepfe und das Zeichnen - ohne Nebenwirkungen in setA.
   const aktuell = useRef(a);
@@ -400,6 +474,10 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       if (neu.ereignisse.some((e) => e.art === 'boss')) {
         banner.current = performance.now();
         bannerText.current = 'Der Schleimkoenig erwacht!';
+      }
+      if (neu.ereignisse.some((e) => e.art === 'wiederbelebt')) {
+        banner.current = performance.now();
+        bannerText.current = 'Zweites Leben!';
       }
       const leg = neu.ereignisse.find((e): e is Extract<Ereignis, { art: 'legende' }> => e.art === 'legende');
       if (leg) {
@@ -517,6 +595,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       if ((TASTEN as readonly string[]).includes(k)) {
         e.preventDefault();
         drueck(k as Taste);
+      } else if (k === 'f') {
+        e.preventDefault();
+        halt();
+        const alt = aktuell.current;
+        if (!rolltRef.current) setze(angeln(alt));
       } else if (k === ' ' || k === 'enter') {
         e.preventDefault();
         wirf();
@@ -581,8 +664,12 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               const u = sanft(klemme(p - g.takt));
               const m0 = mitte(g.von.q, g.von.r);
               const m1 = mitte(g.nach.q, g.nach.r);
-              const hoch = wer === 'ritter' ? Math.abs(Math.sin(u * Math.PI * 2)) * 1.5 : Math.sin(u * Math.PI) * (g.sprung ? 18 : 7);
-              return { x: m0.x + (m1.x - m0.x) * u, y: m0.y + (m1.y - m0.y) * u, hoch };
+              const hoch = wer === 'ritter' && !g.sprung ? Math.abs(Math.sin(u * Math.PI * 2)) * 1.5 : Math.sin(u * Math.PI) * (g.sprung ? 18 : 7);
+              return {
+                x: m0.x + (m1.x - m0.x) * u,
+                y: m0.y + (m1.y - m0.y) * u,
+                hoch,
+              };
             }
             pos = g.nach;
           }
@@ -609,7 +696,10 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           if (e.art !== 'hieb' || e.ziel !== wer) continue;
           const u = p - e.takt;
           if (u < 0.45 || u > 1) continue;
-          return { dx: e.schaden > 0 ? Math.round(Math.sin(u * 60) * 1.2) : 0, blitz: e.schaden > 0 && u < 0.8 };
+          return {
+            dx: e.schaden > 0 ? Math.round(Math.sin(u * 60) * 1.2) : 0,
+            blitz: e.schaden > 0 && u < 0.8,
+          };
         }
         return { dx: 0, blitz: false };
       };
@@ -643,6 +733,26 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         const m = mitte(q, r);
         return { x: sx(m.x), y: sy(m.y) };
       };
+      // Deko: Kakteen in der Wueste, Blumen auf Wiesen, Pilze im Wald - je Feld aus dem Seed.
+      for (const hx of felder) {
+        if (!erkundet.has(hexKey(hx.q, hx.r))) continue;
+        const t = tileAt(welt, hx.q, hx.r)?.terrain;
+        const art = t === 'desert' ? 'kaktus' : t === 'pasture' ? 'blume' : t === 'forest' ? 'pilz' : null;
+        if (!art) continue;
+        const h = hash3i(a.seed, hx.q, hx.r, 91) % 100;
+        const anzahl = art === 'kaktus' ? (h < 35 ? 1 : h < 50 ? 2 : 0) : h < 18 ? (art === 'blume' ? 2 : 1) : 0;
+        if (anzahl === 0) continue;
+        const nah = hexDistance(hx, a.pos) <= sicht;
+        ctx.globalAlpha = nah ? 1 : 0.45;
+        const m = mitte(hx.q, hx.r);
+        for (let i = 0; i < anzahl; i++) {
+          const ox = ((hash3i(a.seed, hx.q, hx.r, 92 + i) % 13) - 6) * 1;
+          const oy = ((hash3i(a.seed, hx.q, hx.r, 95 + i) % 7) - 3) * 1;
+          const k = DEKO[art];
+          zeichnePixel(ctx, k, sx(m.x + ox - k[0]!.length / 2), sy(m.y + oy - k.length + 2), f, KACHEL_PIX);
+        }
+        ctx.globalAlpha = 1;
+      }
       // Funde in Sichtweite - sie schweben sacht.
       for (const hx of felder) {
         if (hexDistance(hx, a.pos) > sicht) continue;
@@ -750,7 +860,10 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         ctx.stroke();
         const von = ort(s.id);
         const nach = mitte(s.angriff.q, s.angriff.r);
-        const ende = { x: von.x + (nach.x - von.x) * wachs, y: von.y + (nach.y - von.y) * wachs };
+        const ende = {
+          x: von.x + (nach.x - von.x) * wachs,
+          y: von.y + (nach.y - von.y) * wachs,
+        };
         const p0 = { x: sx(von.x), y: sy(von.y) };
         const p1 = { x: sx(ende.x), y: sy(ende.y) };
         const dx = p1.x - p0.x;
@@ -810,11 +923,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         ctx.globalAlpha = o.alpha ?? 1;
         ctx.translate(x, y);
         ctx.scale(o.sx ?? 1, o.sy ?? 1);
-        zeichnePixel(ctx, bild, links, -bild.length * fs, fs, PIX);
+        zeichnePixel(ctx, bild, links, -bild.length * fs, fs, KACHEL_PIX);
         if (o.blitz) {
           ctx.filter = 'brightness(4) saturate(0)';
           ctx.globalAlpha = (o.alpha ?? 1) * 0.7;
-          zeichnePixel(ctx, bild, links, -bild.length * fs, fs, PIX);
+          zeichnePixel(ctx, bild, links, -bild.length * fs, fs, KACHEL_PIX);
         }
         ctx.restore();
       };
@@ -835,9 +948,27 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       const lebende = new Set(a.schleime.map((s) => s.id));
       let beben = 0;
       const schleimeImBild = [
-        ...a.schleime.map((s) => ({ id: s.id, gross: s.gross, boss: !!s.boss, art: s.art, leben: s.leben, tot: null as number | null })),
+        ...a.schleime.map((s) => ({
+          id: s.id,
+          gross: s.gross,
+          boss: !!s.boss,
+          art: s.art,
+          leben: s.leben,
+          tot: null as number | null,
+        })),
         ...ev.flatMap((e) =>
-          e.art === 'tod' && !lebende.has(e.wer) ? [{ id: e.wer, gross: e.gross, boss: !!e.boss, art: e.schleimArt, leben: 0, tot: e.takt }] : [],
+          e.art === 'tod' && !lebende.has(e.wer)
+            ? [
+                {
+                  id: e.wer,
+                  gross: e.gross,
+                  boss: !!e.boss,
+                  art: e.schleimArt,
+                  leben: 0,
+                  tot: e.takt,
+                },
+              ]
+            : [],
         ),
       ];
       for (const s of schleimeImBild) {
@@ -854,8 +985,25 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         let sky = 1 + atem * 0.08;
         let alpha = 1;
         let hoch = o0.hoch;
+        // Jede Art hat ihr eigenes Gebaren.
+        if (s.art === 'spuck') {
+          // Blaest die Backen auf und laesst die Luft wieder raus.
+          const backe = Math.max(0, Math.sin(sek * 2.4 + s.id));
+          skx = 1 + backe * 0.12;
+          sky = 1 - backe * 0.04;
+        } else if (s.art === 'spring') {
+          // Huepft unruhig auf der Feder.
+          const hops = Math.abs(Math.sin(sek * 4.5 + s.id));
+          hoch += hops * 2.5;
+          skx = hops > 0.3 ? 0.94 : 1.1;
+          sky = hops > 0.3 ? 1.08 : 0.85;
+        } else if (s.art === 'panzer') {
+          // Liegt schwer da - nur ein leises Heben des Panzers.
+          skx = 1;
+          sky = 1 + Math.sin(sek * 1.3 + s.id) * 0.02;
+        }
         // Beim Huepfen: vorher ducken, in der Luft strecken.
-        if (hoch > 0.5) {
+        if (o0.hoch > 0.5) {
           skx = 0.9;
           sky = 1.15;
         }
@@ -871,9 +1019,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         }
         let zittern = 0;
         if (holtAus && o0.hoch === 0) {
-          skx = 1.18;
-          sky = 0.8;
-          zittern = Math.round(Math.sin(sek * 40) * 0.6);
+          // Vor dem Angriff: der Spucker blaest sich auf, der Springer drueckt die Feder, der Panzer rasselt.
+          skx = s.art === 'spuck' ? 1.3 : s.art === 'panzer' ? 1.05 : 1.18;
+          sky = s.art === 'spuck' ? 0.92 : s.art === 'spring' ? 0.7 : 0.8;
+          if (s.art === 'spring') hoch = 0;
+          zittern = Math.round(Math.sin(sek * 40) * (s.art === 'panzer' ? 1 : 0.6));
         }
         // Neu aus dem Unbekannten: faellt herab und plumpst auf.
         const neu = ev.find((e) => e.art === 'neu' && e.wer === s.id);
@@ -922,7 +1072,12 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               if (holtAus && alpha > 0.3) schrift('!', X + 12 * kf, Y - 10 * kf, '#ff4a3a', 1, 8);
               return;
             }
-            malSchleim(s.art, X, Y + f, fs, { sx: skx, sy: sky, alpha, blitz: wu.blitz });
+            malSchleim(s.art, X, Y + f, fs, {
+              sx: skx,
+              sy: sky,
+              alpha,
+              blitz: wu.blitz,
+            });
             if (alpha > 0.3 && lebenJetzt > 0) balken(X, Y - (hoehe + 2) * fs, lebenJetzt, max);
             if (holtAus && alpha > 0.3) schrift('!', X + 9 * f, Y - (hoehe + 2) * fs, '#ff4a3a', 1, 7);
           },
@@ -967,7 +1122,19 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
             ctx.fillRect(sx(ro.x) - 4 * f, sy(ro.y) + 3 * f, 8 * f, f);
             const beine: BeinBild = laeuft ? (imSchritt ? 'lauf1' : 'lauf2') : 'steh';
-            malKachelFigur(ctx, sx(ro.x) + ws.dx * f, sy(ro.y) + 4 * f - Math.round(ritter.hoch + atmet) * f, f, design, beine, haltung, a.ausruestung.waffe, blick.current, ws.blitz, glut);
+            malKachelFigur(
+              ctx,
+              sx(ro.x) + ws.dx * f,
+              sy(ro.y) + 4 * f - Math.round(ritter.hoch + atmet) * f,
+              f,
+              design,
+              beine,
+              haltung,
+              a.ausruestung.waffe,
+              blick.current,
+              ws.blitz,
+              glut,
+            );
             return;
           }
           const bild = imSchritt ? RITTER_SCHRITT : RITTER_KOERPER;
@@ -1066,11 +1233,65 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           }
           if (u > 0.45 && u < 0.45 + NACHKLANG) {
             const k = (u - 0.45) / NACHKLANG;
-            const text = e.schaden > 0 ? `-${e.schaden}${e.schaden > 1 ? '!' : ''}` : e.ziel === null ? 'ausgewichen!' : e.wer === 'ritter' ? 'daneben' : 'geblockt';
-            const farbe = e.ziel === null ? '#9ad8ff' : e.ziel === 'ritter' ? (e.schaden > 0 ? '#ff5a4a' : '#c8c0b0') : e.schaden > 1 ? '#f2c94c' : e.schaden > 0 ? '#fffaf0' : '#a8a090';
+            const text =
+              e.schaden > 0 ? `-${e.schaden}${e.schaden > 1 ? '!' : ''}` : e.ziel === null ? 'ausgewichen!' : e.wer === 'ritter' ? 'daneben' : 'geblockt';
+            const farbe =
+              e.ziel === null
+                ? '#9ad8ff'
+                : e.ziel === 'ritter'
+                  ? e.schaden > 0
+                    ? '#ff5a4a'
+                    : '#c8c0b0'
+                  : e.schaden > 1
+                    ? '#f2c94c'
+                    : e.schaden > 0
+                      ? '#fffaf0'
+                      : '#a8a090';
             schrift(text, X, Y - 6 * f - k * 10 * f, farbe, 1.4 - k * 1.4, e.schaden > 0 ? 7 : 5);
           }
           if (e.ziel === 'ritter' && e.schaden > 0 && u > 0.45 && u < 1.3) rot = Math.max(rot, 1 - (u - 0.45) / 0.85);
+        } else if (e.art === 'angeln') {
+          // Die Schnur fliegt zum Wasser, der Schwimmer tanzt - und vielleicht kommt ein Fisch.
+          const z = mitte(e.feld.q, e.feld.r);
+          const x0 = ritter.x + 5 * blick.current;
+          const y0 = ritter.y - 10;
+          const k = Math.min(1, u / 0.4);
+          if (u < 1.4) {
+            const bx = x0 + (z.x - x0) * k;
+            const by = y0 + (z.y - y0) * k - Math.sin(k * Math.PI) * 10 + (u > 0.4 ? Math.round(Math.sin(u * 14)) : 0);
+            ctx.strokeStyle = 'rgba(240, 240, 230, 0.8)';
+            ctx.lineWidth = Math.max(1, f / 2);
+            ctx.beginPath();
+            ctx.moveTo(sx(x0), sy(y0));
+            ctx.quadraticCurveTo(sx((x0 + bx) / 2), sy(Math.min(y0, by) - 6), sx(bx), sy(by));
+            ctx.stroke();
+            ctx.fillStyle = '#e8604a';
+            ctx.fillRect(sx(bx) - f, sy(by) - f, 2 * f, 2 * f);
+          }
+          if (e.fang && u > 1 && u < 1.7) {
+            const kk = (u - 1) / 0.7;
+            const fx = z.x + (ritter.x - z.x) * kk;
+            const fy = z.y + (ritter.y - 14 - z.y) * kk - Math.sin(kk * Math.PI) * 14;
+            const karte = SYMBOL['fisch']!;
+            zeichnePixel(ctx, karte, sx(fx) - Math.floor((karte[0]!.length * f) / 2), sy(fy), f, PIX);
+          }
+          if (u > 1 && u < 3.2)
+            schrift(
+              e.fang ? '+1 Fisch' : 'nichts',
+              sx(ritter.x),
+              sy(ritter.y) - (22 + (u - 1) * 4) * f,
+              e.fang ? '#9ad8ff' : '#a8a090',
+              1.8 - (u - 1) * 0.8,
+              6,
+            );
+        } else if (e.art === 'wiederbelebt') {
+          if (u < 2) {
+            const k = u / 2;
+            ctx.globalAlpha = 1 - k;
+            ctx.fillStyle = '#fff6c8';
+            ctx.fillRect(0, 0, c.width, c.height);
+            ctx.globalAlpha = 1;
+          }
         } else if (e.art === 'stufe') {
           // Eine Saeule aus goldenem Licht, dann die Zahl.
           if (u < 1.6) {
@@ -1205,7 +1426,14 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         ctx.fillStyle = '#f2e7d0';
         ctx.fillRect(X - g / 2, Y - g / 2, g, g);
         ctx.fillStyle = '#2a1f16';
-        for (const [ax, ay] of [[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]] as const) ctx.fillRect(X + ax * 3 * f - f, Y + ay * 3 * f - f, 2 * f, 2 * f);
+        for (const [ax, ay] of [
+          [-1, -1],
+          [1, -1],
+          [0, 0],
+          [-1, 1],
+          [1, 1],
+        ] as const)
+          ctx.fillRect(X + ax * 3 * f - f, Y + ay * 3 * f - f, 2 * f, 2 * f);
         schrift(w < 700 ? 'Tippen: wuerfeln' : 'Enter: wuerfeln', X, Y - g - 2 * f, '#f2c94c', 1, 5);
       }
       // Der Stampfer laesst das Bild beben.
@@ -1225,7 +1453,14 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       }
       // Ein roter Rand, wenn der Ritter getroffen wird.
       if (rot > 0) {
-        const g = ctx.createRadialGradient(c.width / 2, c.height / 2, Math.min(c.width, c.height) * 0.3, c.width / 2, c.height / 2, Math.max(c.width, c.height) * 0.7);
+        const g = ctx.createRadialGradient(
+          c.width / 2,
+          c.height / 2,
+          Math.min(c.width, c.height) * 0.3,
+          c.width / 2,
+          c.height / 2,
+          Math.max(c.width, c.height) * 0.7,
+        );
         g.addColorStop(0, 'rgba(200, 30, 20, 0)');
         g.addColorStop(1, `rgba(200, 30, 20, ${0.45 * rot})`);
         ctx.fillStyle = g;
@@ -1283,7 +1518,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   };
 
   const maxLeben = maxLebenVon(a);
-  const vorrat = Object.entries(a.inventar).filter(([, n]) => n > 0);
+  // Gold steht als Muenzen ueber dem Inventar, nicht in einem Fach.
+  const vorrat = Object.entries(a.inventar).filter(([id, n]) => n > 0 && id !== 'gold');
+  const gold = a.inventar['gold'] ?? 0;
   const neu = () => {
     halt();
     setZugTasten([]);
@@ -1318,8 +1555,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         <button className="klein" onClick={onZurueck} title="Zur Wahl des Modus">
           ‹ Modus
         </button>
-<div className="ab-ton-gruppe">
-                  <button className={musik ? 'klein ab-ton' : 'klein ab-ton aus'} onClick={tonUmschalten} title={musik ? 'Musik ausschalten' : 'Musik einschalten'}>
+        <div className="ab-ton-gruppe">
+          <button className={musik ? 'klein ab-ton' : 'klein ab-ton aus'} onClick={tonUmschalten} title={musik ? 'Musik ausschalten' : 'Musik einschalten'}>
             <TonSymbol aus={!musik} />
           </button>
           {/* Darunter die Lautstaerke: leiser, Stufe, lauter. */}
@@ -1335,6 +1572,10 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             <button className="ab-laut-knopf" aria-label="Lauter" disabled={laut >= LAUT_STUFEN} onClick={() => setLaut(setzeLautstaerke(laut + 1))}>
               +
             </button>
+          </div>
+          {/* Das laufende Stueck: Nummer und Name - wechselt mit der Landschaft. */}
+          <div className="ab-track" title={track ? `Stueck ${track.id}: ${track.name} (${BIOM_NAME[track.biom]})` : 'Musik aus'}>
+            {track ? `#${track.id} ${track.name}` : musik ? '...' : 'Musik aus'}
           </div>
         </div>
         <span className="ab-schild" title={`Leben ${lebenText(a.leben)} von ${maxLeben}`}>
@@ -1374,17 +1615,37 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             <div className="ab-level" title={`Level ${a.stufe.lv}: ${a.stufe.ep} von ${epFuer(a.stufe.lv)} Erfahrung bis zum naechsten`}>
               <b>Lv {a.stufe.lv}</b>
               <span className="ab-ep">
-                <i style={{ width: `${(100 * a.stufe.ep) / epFuer(a.stufe.lv)}%` }} />
+                <i
+                  style={{
+                    width: `${(100 * a.stufe.ep) / epFuer(a.stufe.lv)}%`,
+                  }}
+                />
               </span>
             </div>
           )}
           <div className="ab-werte-gitter">
             {[
-              { id: 'schwert', wert: `+${angriffVon(a)}`, titel: 'Angriff: so viel kommt auf jeden Angriffswurf' },
-              { id: 'schild', wert: `+${abwehrVon(a)}`, titel: 'Abwehr: jeder Punkt faengt jeden dritten Schleim-Hieb ab' },
+              {
+                id: 'schwert',
+                wert: `+${angriffVon(a)}`,
+                titel: 'Angriff: so viel kommt auf jeden Angriffswurf',
+              },
+              {
+                id: 'schild',
+                wert: `+${abwehrVon(a)}`,
+                titel: 'Abwehr: jeder Punkt faengt jeden dritten Schleim-Hieb ab',
+              },
               { id: 'herz', wert: `${maxLeben}`, titel: 'Hoechstes Leben' },
-              { id: 'auge', wert: `${sichtVon(a)}`, titel: 'Sicht: so viele Felder weit' },
-              { id: 'stiefel', wert: `+${schrittBonusVon(a)}`, titel: 'Schritte zusaetzlich je Wurf' },
+              {
+                id: 'auge',
+                wert: `${sichtVon(a)}`,
+                titel: 'Sicht: so viele Felder weit',
+              },
+              {
+                id: 'stiefel',
+                wert: `+${schrittBonusVon(a)}`,
+                titel: 'Schritte zusaetzlich je Wurf',
+              },
             ].map((w) => (
               <span key={w.id} className="ab-wert" title={w.titel}>
                 <Icon id={w.id} groesse={18} />
@@ -1412,7 +1673,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             <span className="ab-titel">Legendaer</span>
             <div className="ab-legendaer-reihe">
               {(a.legendaer ?? []).map((id, i) => (
-                <span key={i} className="ab-legendaer-ding" title={`${gegenstand(id)?.name}: ${gegenstand(id)?.text}`}>
+                <span key={i} className="ab-legendaer-ding" {...tippHandler(id, setTipp)}>
                   <Icon id={id} groesse={22} />
                 </span>
               ))}
@@ -1425,7 +1686,12 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             {SLOTS.map((s) => {
               const g = gegenstand(a.ausruestung[s] ?? '');
               return (
-                <div key={s} className={`ab-slot ab-slot-${s}${g ? ' voll' : ''}`} title={g ? `${SLOT_NAME[s]}: ${g.name} - ${g.text}` : `${SLOT_NAME[s]}: leer`}>
+                <div
+                  key={s}
+                  className={`ab-slot ab-slot-${s}${g ? ' voll' : ''}`}
+                  title={g ? undefined : `${SLOT_NAME[s]}: leer`}
+                  {...(g ? tippHandler(g.id, setTipp) : {})}
+                >
                   {/* Leer zeigt der Slot blass, was hineingehoert. */}
                   <Icon id={g?.id ?? SLOT_BILD[s]} groesse={26} />
                 </div>
@@ -1481,6 +1747,10 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
 
       {/* Rechts unten: Inventar ueber dem Spieltisch. */}
       <div className="ab-rechts-unten">
+        <div className="ab-muenzen" title={`${gold} Goldmuenzen`}>
+          <Icon id="muenze" groesse={16} />
+          <b>{gold}</b>
+        </div>
         <div className="ab-fenster ab-inventar">
           <span className="ab-titel">Inventar</span>
           <div className="ab-gegenstaende">
@@ -1490,7 +1760,13 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               const [id, n] = eintrag;
               const g = gegenstand(id);
               return (
-                <button key={id} className="ab-fach ab-gegenstand" title={`${g?.name ?? id}: ${g?.text ?? ''}`} onClick={() => setze(benutzen(aktuell.current, id))}>
+                <button
+                  key={id}
+                  className={g?.legendaer ? 'ab-fach ab-gegenstand legendaer' : 'ab-fach ab-gegenstand'}
+                  aria-label={g?.name ?? id}
+                  {...tippHandler(id, setTipp)}
+                  onClick={() => setze(benutzen(aktuell.current, id))}
+                >
                   <Icon id={id} groesse={24} />
                   {n > 1 && <span className="ab-anzahl">{n}</span>}
                 </button>
@@ -1517,6 +1793,16 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             )}
             {a.phase !== 'ziehen' && <small>Enter, Knopf oder Karte antippen</small>}
           </div>
+          {a.phase === 'ziehen' && kannAngeln(a) && (
+            <button
+              className="ab-wurf ab-angeln"
+              disabled={rollt}
+              onClick={() => setze(angeln(aktuell.current))}
+              title="Die Angel ins Wasser werfen (F) - ein Schritt"
+            >
+              Angeln (F)
+            </button>
+          )}
           {a.phase === 'ziehen' ? (
             <button className="ab-wurf" disabled={rollt} onClick={beenden} title="Die restlichen Schritte abwarten - jeder ist ein Tick">
               Zug beenden
@@ -1540,8 +1826,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           }
         }}
         waffe={a.ausruestung.waffe}
+        setTipp={setTipp}
         onAktion={(d: DebugAktion) => setze(debugAktion(aktuell.current, d))}
       />
+
+      <ItemTipp tipp={tipp} />
 
       {/* Was zuletzt geschah. */}
       <div className="ab-log" role="log">

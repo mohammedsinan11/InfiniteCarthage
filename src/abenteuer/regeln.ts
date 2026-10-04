@@ -103,19 +103,33 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
     text: 'Legendaer. Du bekommst Level: jeder erschlagene Gegner gibt Erfahrung, jeder Aufstieg macht dich staerker (Leben, Angriff, Abwehr im Wechsel).',
   },
   {
+    id: 'extraleben',
+    name: 'Extra-Leben',
+    legendaer: true,
+    text: 'Legendaer. Faellt der Ritter, steht er mit vollem Leben wieder auf - einmal.',
+  },
+  {
+    id: 'hermes',
+    name: 'Hermes-Stiefel',
+    legendaer: true,
+    text: 'Legendaer. Jeder Schritt huepft bis zu drei Felder weit, wenn das Feld frei ist - auch uebers Wasser.',
+  },
+  {
     id: 'herzcontainer',
     name: 'Leerer Herzcontainer',
     legendaer: true,
     text: 'Legendaer. Ein Herz mehr - leer, es will erst gefuellt werden.',
   },
-  { id: 'gold', name: 'Gold', text: 'Glaenzt. Noch kauft hier niemand etwas.' },
+  { id: 'angel', name: 'Angel', text: 'Am Wasser: in Richtung Wasser gehen (oder F) wirft die Angel aus - ein Schritt. Mit Glueck beisst ein Fisch.' },
+  { id: 'fisch', name: 'Fisch', heilt: 1, text: 'Antippen: 1 Leben zurueck. Stapelt sich.' },
+  { id: 'gold', name: 'Gold', text: 'Muenzen - sie stehen ueber dem Inventar. Noch kauft hier niemand etwas.' },
   { id: 'gelee', name: 'Schleimgelee', text: 'Was ein Schleim zuruecklaesst - der Beweis deiner Taten.' },
 ];
 
 export const gegenstand = (id: string): Gegenstand | undefined => GEGENSTAENDE.find((g) => g.id === id);
 
 /** Was in Truhen liegen kann - das Schwert traegt der Ritter schon. */
-const TRUHENINHALT = ['axt', 'breitschwert', 'runenklinge', 'flammenschwert', 'schild', 'helm', 'ruestung', 'stiefel', 'laterne'];
+const TRUHENINHALT = ['axt', 'breitschwert', 'runenklinge', 'flammenschwert', 'schild', 'helm', 'ruestung', 'stiefel', 'laterne', 'angel'];
 
 /** Wie gut eine Waffe ist - fuer "die bessere gleich in die Hand". */
 const waffenWert = (id: string | null): number => {
@@ -193,6 +207,10 @@ export type Ereignis =
   | { art: 'hieb'; takt: number; wer: Wer; ziel: Wer | null; feld?: Hex; wurf: number; schaden: number }
   /** Ein Schleim holt aus: im naechsten Takt trifft er dieses Feld (der Koenig auch mehrere). */
   | { art: 'ansage'; takt: number; wer: number; feld: Hex; felder?: Hex[] }
+  /** Die Angel wird ausgeworfen - mit oder ohne Fang. */
+  | { art: 'angeln'; takt: number; feld: Hex; fang: boolean }
+  /** Das Extra-Leben: der Ritter steht wieder auf. */
+  | { art: 'wiederbelebt'; takt: number }
   /** Ein legendaerer Fund wirkt. */
   | { art: 'legende'; takt: number; id: string }
   /** Solo-Leveling: ein Levelaufstieg. */
@@ -249,6 +267,8 @@ export type Abenteuer = {
   stufe?: { lv: number; ep: number } | null;
   /** Dauerhafte Staerkung aus Leveln. */
   bonus?: { leben: number; angriff: number; abwehr: number };
+  /** Extra-Leben, die noch nicht verbraucht sind. */
+  extraLeben?: number;
   /** Leere Herzcontainer: so viele Herzen mehr. */
   extraHerzen?: number;
   /** Der Ladebalken der Waffe (0 bis ihre Ladung). */
@@ -461,8 +481,12 @@ export function tasteZu(von: Hex, nach: Hex): Taste | null {
 
 /** Ob der Ritter ein Feld betreten kann (ohne Schleim darauf). */
 export function betretbar(a: Abenteuer, q: number, r: number): boolean {
-  return begehbar(gelaende(a.seed, q, r));
+  const t = gelaende(a.seed, q, r);
+  return begehbar(t) || (t === 'water' && hatLegende(a, 'hermes'));
 }
+
+/** Traegt der Ritter diesen legendaeren Fund? */
+export const hatLegende = (a: Pick<Abenteuer, 'legendaer'>, id: string): boolean => (a.legendaer ?? []).includes(id);
 export const schrittKosten = (a: Abenteuer, q: number, r: number): number => kosten(gelaende(a.seed, q, r));
 
 /**
@@ -491,6 +515,33 @@ export function taste(alt: Abenteuer, t: Taste): Abenteuer {
     return nachDemSchritt(a);
   }
   const g = gelaende(a.seed, ziel.q, ziel.r);
+  const hermes = hatLegende(a, 'hermes');
+  // Mit der Angel: in Richtung Wasser wirft man sie aus (ohne Hermes-Stiefel).
+  if (g === 'water' && !hermes && (a.inventar['angel'] ?? 0) > 0) {
+    auswerfen(a, ziel);
+    return nachDemSchritt(a);
+  }
+  // Hermes-Stiefel: bis zu drei Felder weit huepfen, wo es frei ist - auch aufs Wasser.
+  if (hermes) {
+    let landung: Hex | null = null;
+    for (let k = 3; k >= 1 && !landung; k--) {
+      const h = { q: a.pos.q + d[0] * k, r: a.pos.r + d[1] * k };
+      if (betretbar(a, h.q, h.r) && !schleimAuf(a, h.q, h.r)) landung = h;
+    }
+    if (!landung) {
+      melde(a, 'Kein freies Feld zum Huepfen.');
+      return a;
+    }
+    a.ereignisse.push({ art: 'gehen', takt: 0, wer: 'ritter', von: a.pos, nach: landung, sprung: hexDistance(a.pos, landung) > 1 });
+    a.pos = landung;
+    a.schritte -= 1;
+    a.pfad = [...a.pfad, landung];
+    sehen(a);
+    aufheben(a);
+    laden(a, 0);
+    ticken(a, 1);
+    return nachDemSchritt(a);
+  }
   if (!begehbar(g)) {
     melde(a, 'Dort ist Wasser - kein Weg hinueber.');
     return a;
@@ -510,6 +561,34 @@ export function taste(alt: Abenteuer, t: Taste): Abenteuer {
   for (let i = 1; i <= k && a.phase === 'ziehen'; i++) ticken(a, i);
   return nachDemSchritt(a);
 }
+
+/** Die Angel auswerfen: ein Schritt, ein Tick - bei 4 bis 6 beisst ein Fisch. */
+function auswerfen(a: Abenteuer, feld: Hex): void {
+  const wurf = w6(a);
+  const fang = wurf >= 4;
+  a.ereignisse.push({ art: 'angeln', takt: 0, feld, fang });
+  if (fang) {
+    a.inventar = { ...a.inventar, fisch: (a.inventar['fisch'] ?? 0) + 1 };
+    melde(a, `Angel ausgeworfen (Wurf ${wurf}) - ein Fisch beisst an!`);
+  } else melde(a, `Angel ausgeworfen (Wurf ${wurf}) - nichts beisst.`);
+  a.schritte -= 1;
+  ticken(a, 1);
+}
+
+/** Die Angel ins naechste Wasser werfen (Taste F oder Knopf). */
+export function angeln(alt: Abenteuer): Abenteuer {
+  if (alt.phase !== 'ziehen' || !(alt.inventar['angel'] ?? 0)) return alt;
+  const feld = HEX_DIRS.map(([dq, dr]) => ({ q: alt.pos.q + dq, r: alt.pos.r + dr })).find((h) => gelaende(alt.seed, h.q, h.r) === 'water');
+  if (!feld) return alt;
+  const a = structuredClone(alt);
+  a.ereignisse = [];
+  auswerfen(a, feld);
+  return nachDemSchritt(a);
+}
+
+/** Steht der Ritter am Wasser (und hat eine Angel)? */
+export const kannAngeln = (a: Abenteuer): boolean =>
+  a.phase === 'ziehen' && (a.inventar['angel'] ?? 0) > 0 && HEX_DIRS.some(([dq, dr]) => gelaende(a.seed, a.pos.q + dq, a.pos.r + dr) === 'water');
 
 /** Die restlichen Schritte abwarten: jeder ist ein Tick. */
 export function zugBeenden(alt: Abenteuer): Abenteuer {
@@ -603,6 +682,11 @@ export function legendaerAnwenden(a: Abenteuer, id: string, takt: number): void 
   } else if (id === 'herzcontainer') {
     a.extraHerzen = (a.extraHerzen ?? 0) + 1;
     melde(a, 'Legendaer: ein leerer Herzcontainer - ein Herz mehr.');
+  } else if (id === 'extraleben') {
+    a.extraLeben = (a.extraLeben ?? 0) + 1;
+    melde(a, 'Legendaer: ein Extra-Leben! Faellst du, stehst du wieder auf.');
+  } else if (id === 'hermes') {
+    melde(a, 'Legendaer: Hermes-Stiefel! Jeder Schritt huepft bis zu drei Felder - auch uebers Wasser.');
   }
 }
 
@@ -720,8 +804,9 @@ function aufheben(a: Abenteuer): void {
   a.ereignisse.push({ art: 'fund', takt: 0, id: fund });
   if (fund === 'schatz') {
     // Solo-Leveling gibt es einmal; danach (oder bei ungerader Zahl) ein Herzcontainer.
-    const hat = (a.legendaer ?? []).includes('sololeveling');
-    const id = !hat && hash3i(a.seed, a.pos.q, a.pos.r, SALT_FUND + 8) % 2 === 0 ? 'sololeveling' : 'herzcontainer';
+    // Solo-Leveling und Hermes gibt es je einmal; Herzcontainer und Extra-Leben oefter.
+    const moeglich = ['sololeveling', 'hermes', 'extraleben', 'herzcontainer'].filter((x) => !((x === 'sololeveling' || x === 'hermes') && hatLegende(a, x)));
+    const id = moeglich[hash3i(a.seed, a.pos.q, a.pos.r, SALT_FUND + 8) % moeglich.length]!;
     melde(a, 'Eine goldene Schatztruhe!');
     legendaerAnwenden(a, id, 0);
     return;
@@ -748,6 +833,13 @@ function aufheben(a: Abenteuer): void {
     return;
   }
   const g = gegenstand(fund);
+  // Gold sind Muenzen - eins bis drei auf einmal.
+  if (fund === 'gold') {
+    const n = 1 + (hash3i(a.seed, a.pos.q, a.pos.r, SALT_FUND + 9) % 3);
+    a.inventar = { ...a.inventar, gold: (a.inventar['gold'] ?? 0) + n };
+    melde(a, `${n} ${n === 1 ? 'Goldmuenze' : 'Goldmuenzen'} gefunden.`);
+    return;
+  }
   a.inventar = { ...a.inventar, [fund]: (a.inventar[fund] ?? 0) + 1 };
   melde(a, `Gefunden: ${g?.name ?? fund}.`);
 }
@@ -1005,6 +1097,16 @@ function ticken(a: Abenteuer, takt: number): void {
   }
   a.rng = rng.getState();
   if (a.leben <= 0) {
+    // Das Extra-Leben: einmal steht der Ritter wieder auf.
+    if ((a.extraLeben ?? 0) > 0) {
+      a.extraLeben = (a.extraLeben ?? 0) - 1;
+      const i = (a.legendaer ?? []).indexOf('extraleben');
+      if (i >= 0) a.legendaer = (a.legendaer ?? []).filter((_, j) => j !== i);
+      a.leben = maxLebenVon(a);
+      a.ereignisse.push({ art: 'wiederbelebt', takt });
+      melde(a, 'Der Ritter faellt - und steht wieder auf! Das Extra-Leben ist verbraucht.');
+      return;
+    }
     a.leben = 0;
     a.phase = 'tot';
     melde(a, 'Der Ritter faellt. Das Abenteuer ist zu Ende.');
@@ -1077,6 +1179,7 @@ export type DebugAktion =
   | { t: 'schleim'; art: SchleimArt | 'normal' | 'gross' | 'koenig' }
   | { t: 'heilen' }
   | { t: 'legendaer'; id: string }
+  | { t: 'item'; id: string }
   | { t: 'ep' }
   | { t: 'schritte' };
 
@@ -1097,6 +1200,23 @@ export function debugAktion(alt: Abenteuer, d: DebugAktion): Abenteuer {
     }
     a.ladung = 0;
     entfessle(a, faehigkeit, 0);
+  } else if (d.t === 'item') {
+    // Anprobieren: Ausruestung anlegen, Legendaeres anwenden, sonst ins Inventar.
+    const g = gegenstand(d.id);
+    if (!g) return alt;
+    if (g.legendaer) legendaerAnwenden(a, d.id, 0);
+    else if (g.slot) {
+      a.ausruestung = { ...a.ausruestung, [g.slot]: d.id };
+      if (g.slot === 'waffe') {
+        a.ladung = 0;
+        a.bereit = null;
+      }
+      a.leben = Math.min(maxLebenVon(a), a.leben + (g.leben ?? 0));
+      melde(a, `Debug: ${g.name} angelegt.`);
+    } else {
+      a.inventar = { ...a.inventar, [d.id]: (a.inventar[d.id] ?? 0) + 1 };
+      melde(a, `Debug: ${g.name} ins Inventar.`);
+    }
   } else if (d.t === 'legendaer') {
     legendaerAnwenden(a, d.id, 0);
   } else if (d.t === 'ep') {

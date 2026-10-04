@@ -1,7 +1,7 @@
 /** Abenteuer (src/abenteuer/regeln.ts): wuerfeln, gehen, kaempfen, sammeln - im Takt der Spieluhr. */
 
 import { describe, it, expect } from 'vitest';
-import { BOSS_LEBEN, BOSS_NACH, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden } from '../src/abenteuer/regeln';
+import { angeln, betretbar, kannAngeln, BOSS_LEBEN, BOSS_NACH, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden } from '../src/abenteuer/regeln';
 import type { Abenteuer, Taste } from '../src/abenteuer/regeln';
 import { HEX_DIRS, hexDistance } from '../src/core/coords';
 
@@ -314,6 +314,45 @@ describe('Abenteuer', () => {
     a = debugAktion(a, { t: 'ep' });
     expect(angriffVon(a)).toBe(angriff + 1);
     expect(a.legendaer).toEqual(['herzcontainer', 'sololeveling']);
+  });
+
+  it('Angel: am Wasser auswerfen kostet einen Schritt, Fische stapeln sich und heilen 1', () => {
+    // Einen Start am Wasser suchen.
+    for (let seed = 1; seed < 300; seed++) {
+      const a0 = neuesAbenteuer(seed);
+      if (!HEX_DIRS.some(([dq, dr]) => gelaende(seed, a0.pos.q + dq, a0.pos.r + dr) === 'water')) continue;
+      let a = debugAktion(imZug(seed, [], 30), { t: 'item', id: 'angel' });
+      expect(kannAngeln(a)).toBe(true);
+      for (let i = 0; i < 12; i++) a = angeln(a);
+      expect(a.schritte).toBe(18);
+      expect(a.inventar['fisch'] ?? 0).toBeGreaterThan(0);
+      a.leben = 3;
+      a = benutzen(a, 'fisch');
+      expect(a.leben).toBe(4);
+      return;
+    }
+    throw new Error('kein Start am Wasser');
+  });
+
+  it('Extra-Leben: der Ritter steht einmal wieder auf', () => {
+    const a0 = neuesAbenteuer(13);
+    let a = debugAktion(imZug(13, [{ id: 5, q: a0.pos.q, r: a0.pos.r - 1, leben: 2, gross: false, angriff: { ...a0.pos } }], 10), { t: 'legendaer', id: 'extraleben' });
+    a.leben = 1;
+    a = taste(a, 's');
+    expect(a.phase).toBe('ziehen');
+    expect(a.leben).toBe(maxLebenVon(a));
+    expect(a.ereignisse.some((e) => e.art === 'wiederbelebt')).toBe(true);
+    expect(a.extraLeben).toBe(0);
+  });
+
+  it('Hermes-Stiefel: ein Schritt huepft bis zu drei Felder, auch uebers Wasser', () => {
+    let a = debugAktion(imZug(21, [], 10), { t: 'legendaer', id: 'hermes' });
+    const vorher = a.pos;
+    const t = freieTaste(a);
+    a = taste(a, t);
+    expect(hexDistance(vorher, a.pos)).toBeGreaterThanOrEqual(1);
+    expect(a.schritte).toBe(9);
+    expect(betretbar(a, a.pos.q, a.pos.r)).toBe(true);
   });
 
   it('Herzen werden gleich verbraucht - bei vollem Leben bleiben sie liegen', () => {

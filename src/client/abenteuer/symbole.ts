@@ -254,10 +254,21 @@ export const WAFFE_GRIFF = { x: 3.5, y: 10.5 };
  * mit Fuehlern, Panzerschleim grau mit Steinplatten.
  */
 export const SCHLEIM_BILD: Record<'schleim' | 'spuck' | 'spring' | 'panzer', Pixelkarte> = {
-  schleim: ['...kkk...', '..keeek..', '.keeeeEk.', 'kewcewcEk', 'keeeeeeEk', 'kEeeeeEEk', '.kkkkkkk.'],
-  spuck: ['...kkk...', '..kuuuk..', '.kuuuuUk.', 'kuwcuwcUk', 'kuuukuuUk', 'kUuuuuUUk', '.kkkkkkk.'],
-  spring: ['..k...k..', '..yk.ky..', '..kkkkk..', '.kyyyygk.', 'kywcywcgk', 'kyyyyyygk', 'kgyyyyggk', '.kkkkkkk.'],
-  panzer: ['...kkk...', '..kmMmk..', '.kmmMmMk.', 'kmwcmwcMk', 'kMmmKmmMk', 'kMMmmmMMk', '.kkkkkkk.'],
+  // Gewoehnlich: ein runder Klumpen, der quillt und sackt.
+  schleim: ['...ooo...', '..oGGGo..', '.oGLGGGo.', 'oGoGGoGgo', 'oGGGGGGgo', 'ogGGGGggo', '.ooooooo.'],
+  // Spuckschleim: tropfenfoermig, mit rundem Maul zur Seite - blaest die Backen auf.
+  spuck: ['....o.....', '...oBo....', '..oBLBo...', '.oBLBBBo..', 'oBoBBoBboo', 'oBBBBBBbon', 'obBBBBbboo', '.oooooooo.'],
+  // Springschleim: gelb, mit Fuehlern, auf einer Sprungfeder - huepft auf der Stelle.
+  spring: ['..o...o..', '..Y...Y..', '..ooooo..', '.oYfYYyo.', 'oYoYYoYyo', 'oYYYYYyyo', '.ooooooo.', '...omo...', '...mom...', '..ooooo..'],
+  // Panzerschleim: flach und breit unter einem Steinpanzer - lugt nur hervor.
+  panzer: ['...ooooo...', '..olLlmlo..', '.olmlmmlmo.', 'omlmmlmmlmo', 'oGGoGGoGGgo', 'ogGGGGGGggo', '.ooooooooo.'],
+};
+
+/** Deko auf der Karte: Kakteen in der Wueste, Blumen auf Wiesen, Pilze im Wald. */
+export const DEKO: Record<'kaktus' | 'blume' | 'pilz', Pixelkarte> = {
+  kaktus: ['..g..', 'g.G..', 'gGG.g', '.gGGg', '..Gg.', '..Gg.'],
+  blume: ['.R.', 'RYR', '.g.'],
+  pilz: ['RLR', 'RRR', '.l.'],
 };
 
 /** Der Schleimkoenig: ein breiter Klumpen mit goldener Krone und rotem Stein. */
@@ -315,6 +326,29 @@ const HERZCONTAINER: Pixelkarte = [
   '...k...',
 ];
 
+const ANGEL: Pixelkarte = [
+  '........k',
+  '.......kb',
+  '......kbw',
+  '.....kb.w',
+  '....kb..w',
+  '...kb...w',
+  '..kb....w',
+  '.kb....kw',
+  'kb......k',
+];
+
+const FISCH: Pixelkarte = ['..kkkk..k', '.kuuuukkk', 'kwcuuuuUk', '.kUUUUkkk', '..kkkk..k'];
+
+/** Extra-Leben: ein goldenes Herz. */
+const EXTRALEBEN: Pixelkarte = ['.kk.kk.', 'kyykyyk', 'kywyyyk', 'kyyyyyk', '.kyyyk.', '..kyk..', '...k...'];
+
+/** Hermes-Stiefel: ein goldener Stiefel mit weissem Fluegel. */
+const HERMES: Pixelkarte = ['ww.kkk...', '.wwkyk...', '..wkyk...', '...kyykk.', '..kyyyyyk', '..kggggGk', '...kkkkk.'];
+
+/** Eine Goldmuenze - fuer den Zaehler ueber dem Inventar. */
+export const MUENZE: Pixelkarte = ['.kkkk.', 'kyyygk', 'kywygk', 'kyyygk', 'kggggk', '.kkkk.'];
+
 export const SYMBOL: Record<string, Pixelkarte> = {
   schwert: SCHWERT,
   breitschwert: BREITSCHWERT,
@@ -334,6 +368,11 @@ export const SYMBOL: Record<string, Pixelkarte> = {
   truhe: TRUHE,
   schatz: umfaerben(TRUHE, { b: 'y', B: 'G', g: 'R', y: 'w' }),
   sololeveling: SOLO_LEVELING,
+  angel: ANGEL,
+  fisch: FISCH,
+  extraleben: EXTRALEBEN,
+  hermes: HERMES,
+  muenze: MUENZE,
   herzcontainer: HERZCONTAINER,
   auge: AUGE,
 };
