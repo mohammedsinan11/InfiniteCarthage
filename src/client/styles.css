@@ -7590,3 +7590,23 @@ em.off {
   max-height: calc(100vh - 160px);
   overflow-y: auto;
 }
+
+/* Tippen statt Darueberfahren (ui/Erklaerung.tsx). */
+.erklaerung {
+  position: fixed;
+  z-index: 60;
+  width: 260px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #f2e7d0;
+  background: rgba(18, 14, 9, 0.96);
+  border: 2px solid var(--line-bright);
+}
+
+/* Eine Tafel zur Zeit: solange eine Wahl oder Tafel offen ist, schweigen
+   Tipps und Meldungen (Handy-Spieltest: alles stapelte sich). */
+.game:has(.draft-overlay, .boss-tafel, .pfad-tafel, .ereignis-huelle) .tipp,
+.game:has(.draft-overlay, .ereignis-huelle) .meldungen {
+  display: none;
+}

@@ -3,6 +3,7 @@ import { useStore } from './net/store';
 import { Home } from './scenes/Home';
 import { Lobby } from './scenes/Lobby';
 import { Game } from './scenes/Game';
+import { Erklaerung } from './ui/Erklaerung';
 
 export function App() {
   const status = useStore((s) => s.status);
@@ -27,6 +28,7 @@ export function App() {
       ) : (
         <Home />
       )}
+      <Erklaerung />
       {wieder && (
         <div className="wieder-banner" role="status">
           Verbindung unterbrochen - wird wiederhergestellt...
