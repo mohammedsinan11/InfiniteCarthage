@@ -7610,3 +7610,386 @@ em.off {
 .game:has(.draft-overlay, .ereignis-huelle) .meldungen {
   display: none;
 }
+
+/* === Modus-Wahl (scenes/ModusWahl.tsx) =================================== */
+.modus-karte {
+  width: min(620px, 100%);
+}
+.modus-wahl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 14px;
+}
+.modus-knopf {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 14px;
+  text-align: center;
+  line-height: 1.4;
+}
+.modus-knopf b {
+  font-size: 16px;
+  color: var(--accent);
+}
+.modus-knopf span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.modus-knopf:hover b {
+  color: #f2c94c;
+}
+.modus-zurueck {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 20;
+}
+@media (max-width: 600px) {
+  .modus-wahl {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* === Abenteuer (client/abenteuer/Abenteuer.tsx) ========================== */
+.abenteuer {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #0d0a07;
+}
+.ab-karte {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+.ab-fenster {
+  position: absolute;
+  padding: 8px;
+  background: rgba(23, 18, 12, 0.92);
+  border: 2px solid var(--line);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.ab-titel {
+  display: block;
+  margin-bottom: 6px;
+  font-family: var(--pixel);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.ab-kopf {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  max-width: calc(100% - 220px);
+}
+.ab-schild {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 8px;
+  font-family: var(--pixel);
+  font-size: 10px;
+  background: rgba(23, 18, 12, 0.92);
+  border: 2px solid var(--line);
+}
+.ab-herz {
+  display: inline-block;
+  width: 10px;
+  height: 9px;
+  background: #3a2a22;
+  clip-path: polygon(50% 100%, 0 40%, 0 10%, 25% 0, 50% 20%, 75% 0, 100% 10%, 100% 40%);
+}
+.ab-herz.voll {
+  background: #c8402f;
+}
+.ab-mini {
+  top: 10px;
+  right: 10px;
+}
+.ab-mini canvas {
+  display: block;
+  width: 170px;
+  height: 130px;
+  image-rendering: pixelated;
+}
+.ab-ausruestung {
+  top: 50%;
+  left: 10px;
+  transform: translateY(-50%);
+  width: 170px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ab-platz {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  opacity: 0.55;
+  font-size: 12px;
+}
+.ab-platz.voll {
+  opacity: 1;
+  border-color: var(--line-bright);
+}
+.ab-platz-bild {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  background: #120d08;
+}
+.ab-platz-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.ab-platz-text small {
+  font-family: var(--pixel);
+  font-size: 7px;
+  color: var(--muted);
+}
+.ab-werte {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.ab-steuerung {
+  left: 10px;
+  bottom: 10px;
+}
+.ab-tasten {
+  display: grid;
+  grid-template-columns: repeat(3, 44px);
+  gap: 4px;
+}
+.ab-taste {
+  height: 44px;
+  padding: 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  line-height: 1;
+}
+.ab-taste b {
+  font-size: 12px;
+}
+.ab-taste span {
+  font-size: 14px;
+  color: var(--accent);
+}
+.ab-taste.gedrueckt {
+  animation: ab-druck 0.35s ease-out;
+  border-color: #f2c94c;
+}
+@keyframes ab-druck {
+  0% {
+    background: #f2c94c;
+    transform: scale(0.92);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.ab-verlauf {
+  margin-top: 6px;
+  max-width: 140px;
+  min-height: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+.ab-verlauf kbd {
+  padding: 1px 4px;
+  font-family: var(--pixel);
+  font-size: 9px;
+  border: 1px solid var(--line-bright);
+  background: #120d08;
+}
+.ab-verlauf small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.ab-rechts-unten {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: 250px;
+}
+.ab-rechts-unten .ab-fenster {
+  position: static;
+}
+.ab-gegenstaende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.ab-gegenstand {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  padding: 4px;
+  display: grid;
+  place-items: center;
+}
+.ab-anzahl {
+  position: absolute;
+  right: 1px;
+  bottom: 0;
+  font-family: var(--pixel);
+  font-size: 9px;
+  color: #f2c94c;
+}
+.ab-leer {
+  font-size: 11px;
+  color: var(--muted);
+}
+/* Der Spieltisch: Holz, darauf der Wuerfel. */
+.ab-tisch {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  grid-template-rows: auto auto;
+  gap: 8px 10px;
+  align-items: center;
+  padding: 12px;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.12) 0 2px, transparent 2px 9px),
+    #6b4420;
+  border: 3px solid #3f2818;
+  box-shadow: inset 0 0 0 2px #8a5a2b, 0 0 0 2px var(--bg);
+}
+.ab-wuerfel {
+  width: 60px;
+  height: 60px;
+  grid-row: span 2;
+}
+.ab-wuerfel.rollt {
+  animation: ab-rollen 0.45s steps(6);
+}
+@keyframes ab-rollen {
+  0% {
+    transform: rotate(0) scale(0.7);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+.ab-tisch-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: #f2e7d0;
+}
+.ab-tisch-text b {
+  font-size: 15px;
+}
+.ab-tisch-text small {
+  font-size: 10px;
+  color: #e0c9a0;
+}
+.ab-wurf {
+  min-height: 40px;
+}
+.ab-log {
+  position: absolute;
+  top: 54px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(520px, calc(100% - 400px));
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+  background: rgba(23, 18, 12, 0.8);
+  border: 1px solid var(--line);
+  pointer-events: none;
+}
+.ab-ende {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.55);
+}
+.ab-ende .ab-fenster {
+  position: static;
+  padding: 20px 24px;
+  text-align: center;
+}
+/* Handy: Ausruestung schmal oben links, Fenster kleiner, Log ueber dem Tisch. */
+@media (max-width: 700px) {
+  .ab-kopf {
+    max-width: calc(100% - 130px);
+  }
+  .ab-mini canvas {
+    width: 110px;
+    height: 84px;
+  }
+  .ab-ausruestung {
+    top: 92px;
+    transform: none;
+    width: 46px;
+    padding: 4px;
+  }
+  .ab-ausruestung .ab-titel,
+  .ab-platz-text,
+  .ab-werte {
+    display: none;
+  }
+  .ab-platz {
+    padding: 1px;
+  }
+  .ab-tasten {
+    grid-template-columns: repeat(3, 40px);
+  }
+  .ab-taste {
+    height: 40px;
+  }
+  .ab-verlauf {
+    display: none;
+  }
+  .ab-rechts-unten {
+    width: 160px;
+  }
+  .ab-tisch {
+    grid-template-columns: 44px 1fr;
+    padding: 8px;
+  }
+  .ab-wuerfel {
+    width: 44px;
+    height: 44px;
+  }
+  .ab-log {
+    top: 142px;
+    left: 64px;
+    right: 10px;
+    transform: none;
+    max-width: none;
+    font-size: 11px;
+  }
+  .ab-tisch-text b {
+    font-size: 12px;
+  }
+  .ab-tisch-text small {
+    display: none;
+  }
+}
