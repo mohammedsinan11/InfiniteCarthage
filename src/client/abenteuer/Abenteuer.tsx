@@ -58,7 +58,7 @@ import { preloadUnitSprites, zeichneFigur } from '../units';
 import { PIX, Px } from '../ui/KartenPixel';
 import { musikAn, setzeMusik, starteMusik, stoppeMusik } from './musik';
 import { RITTER_HAND, RITTER_KOERPER, RITTER_SCHRITT, SCHLEIMKOENIG, SYMBOL, WAFFE, WAFFE_GRIFF, zeichnePixel } from './symbole';
-import { klang } from './musik';
+import { LAUT_STUFEN, klang, lautstaerke, setzeLautstaerke } from './musik';
 import type { Klang } from './musik';
 
 const SPEICHER = 'infinitecarthage.abenteuer';
@@ -333,6 +333,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const [wurfNr, setWurfNr] = useState(0);
   const [rollt, setRollt] = useState(false);
   const [musik, setMusik] = useState(musikAn);
+  const [laut, setLaut] = useState(lautstaerke);
   // Autoroll: wer laufen will, waehrend der Wurf noch aussteht, wuerfelt gleich mit.
   const [autoroll, setAutoroll] = useState(leseAutoroll);
   const autorollRef = useRef(autoroll);
@@ -919,6 +920,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         }
       }
       const waffe = WAFFE[a.ausruestung.waffe ?? ''];
+      // Besondere Klingen leuchten: die Runenklinge blau, das Flammenschwert gluehend.
+      const glut = a.ausruestung.waffe === 'runenklinge' ? '#5aa0d8' : a.ausruestung.waffe === 'flammenschwert' ? '#e8641e' : null;
       figuren.push({
         y: ro.y,
         mal: () => {
@@ -947,6 +950,10 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             ctx.save();
             ctx.translate(hand.x, hand.y);
             ctx.rotate((winkel * Math.PI) / 180);
+            if (glut) {
+              ctx.shadowColor = glut;
+              ctx.shadowBlur = (3 + Math.sin(sek * 6)) * f;
+            }
             zeichnePixel(ctx, waffe, -WAFFE_GRIFF.x * f, -WAFFE_GRIFF.y * f, f, PIX);
             ctx.restore();
           };
@@ -1157,9 +1164,25 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         <button className="klein" onClick={onZurueck} title="Zur Wahl des Modus">
           ‹ Modus
         </button>
-        <button className={musik ? 'klein ab-ton' : 'klein ab-ton aus'} onClick={tonUmschalten} title={musik ? 'Musik ausschalten' : 'Musik einschalten'}>
-          <TonSymbol aus={!musik} />
-        </button>
+<div className="ab-ton-gruppe">
+                  <button className={musik ? 'klein ab-ton' : 'klein ab-ton aus'} onClick={tonUmschalten} title={musik ? 'Musik ausschalten' : 'Musik einschalten'}>
+            <TonSymbol aus={!musik} />
+          </button>
+          {/* Darunter die Lautstaerke: leiser, Stufe, lauter. */}
+          <div className="ab-laut" title={`Lautstaerke ${laut} von ${LAUT_STUFEN}`}>
+            <button className="ab-laut-knopf" aria-label="Leiser" disabled={laut <= 0} onClick={() => setLaut(setzeLautstaerke(laut - 1))}>
+              −
+            </button>
+            <span className="ab-laut-stufe" aria-hidden>
+              {Array.from({ length: LAUT_STUFEN }, (_, i) => (
+                <i key={i} className={i < laut ? 'an' : ''} />
+              ))}
+            </span>
+            <button className="ab-laut-knopf" aria-label="Lauter" disabled={laut >= LAUT_STUFEN} onClick={() => setLaut(setzeLautstaerke(laut + 1))}>
+              +
+            </button>
+          </div>
+        </div>
         <span className="ab-schild" title={`Leben ${lebenText(a.leben)} von ${maxLeben}`}>
           {Array.from({ length: maxLeben }, (_, i) => (
             <i key={i} className={a.leben >= i + 1 ? 'ab-herz voll' : a.leben >= i + 0.5 ? 'ab-herz halb' : 'ab-herz'} />

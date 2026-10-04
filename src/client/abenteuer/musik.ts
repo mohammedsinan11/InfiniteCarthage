@@ -9,6 +9,9 @@
  */
 
 const SPEICHER = 'infinitecarthage.abenteuer.musik';
+const LAUT = 'infinitecarthage.abenteuer.laut';
+/** Lautstaerke in Stufen von 0 bis LAUT_STUFEN. */
+export const LAUT_STUFEN = 10;
 const TEMPO = 92;
 const ACHTEL = 60 / TEMPO / 2;
 
@@ -84,6 +87,44 @@ function weiter(): void {
   }
 }
 
+/** Die eingestellte Lautstaerke (Stufe 0 bis LAUT_STUFEN, voreingestellt 7). */
+export function lautstaerke(): number {
+  try {
+    const n = Number(localStorage.getItem(LAUT));
+    return localStorage.getItem(LAUT) !== null && Number.isFinite(n) ? Math.max(0, Math.min(LAUT_STUFEN, Math.round(n))) : 7;
+  } catch {
+    return 7;
+  }
+}
+
+/** Stufe -> Verstaerkung: quadratisch, wie das Ohr hoert; Stufe 7 ist etwa wie bisher. */
+const verstaerkung = (stufe: number) => 1.8 * (stufe / LAUT_STUFEN) ** 2;
+
+/** Der gemeinsame Ausgang: Musik und Klaenge laufen hier durch die Lautstaerke. */
+let gesamt: GainNode | null = null;
+function gesamtAusgang(c: AudioContext): GainNode {
+  if (!gesamt) {
+    gesamt = c.createGain();
+    gesamt.gain.value = verstaerkung(lautstaerke());
+    gesamt.connect(c.destination);
+  }
+  return gesamt;
+}
+
+/** Lautstaerke setzen - und ein kurzer Ton, damit man hoert, wie laut es ist. */
+export function setzeLautstaerke(stufe: number): number {
+  const n = Math.max(0, Math.min(LAUT_STUFEN, Math.round(stufe)));
+  try {
+    localStorage.setItem(LAUT, String(n));
+  } catch {
+    // ohne Speicher nur fuer jetzt
+  }
+  const c = kontext();
+  if (c) gesamtAusgang(c).gain.setTargetAtTime(verstaerkung(n), c.currentTime, 0.03);
+  klang('probe');
+  return n;
+}
+
 function kontext(): AudioContext | null {
   if (ctx) return ctx;
   try {
@@ -104,7 +145,7 @@ export function starteMusik(): void {
     if (!haupt) {
       haupt = ctx.createGain();
       haupt.gain.value = 0.5;
-      haupt.connect(ctx.destination);
+      haupt.connect(gesamtAusgang(ctx));
     }
     void ctx.resume();
     naechsterTakt = ctx.currentTime + 0.1;
@@ -155,7 +196,7 @@ function ausgang(c: AudioContext): GainNode {
   if (!klangAusgang) {
     klangAusgang = c.createGain();
     klangAusgang.gain.value = 0.6;
-    klangAusgang.connect(c.destination);
+    klangAusgang.connect(gesamtAusgang(c));
   }
   return klangAusgang;
 }
@@ -192,7 +233,7 @@ function gleit(c: AudioContext, t: number, art: OscillatorType, von: number, bis
   o.stop(t + dauer + 0.02);
 }
 
-export type Klang = 'schritt' | 'huepf' | 'hieb' | 'treffer' | 'platsch' | 'geblockt' | 'leer' | 'warnung' | 'zerplatzt' | 'beben';
+export type Klang = 'schritt' | 'huepf' | 'hieb' | 'treffer' | 'platsch' | 'geblockt' | 'leer' | 'warnung' | 'zerplatzt' | 'beben' | 'probe';
 
 /** Ein kurzer Klang - nur, wenn der Ton an ist. */
 export function klang(art: Klang): void {
@@ -237,6 +278,9 @@ export function klang(art: Klang): void {
       // Der Koenig: ein tiefes Grollen.
       gleit(c, t, 'sine', 70, 38, 0.6, 0.35);
       stoss(c, t, 0.5, 0.5, 'lowpass', 250, 60);
+      break;
+    case 'probe':
+      gleit(c, t, 'triangle', 660, 660, 0.12, 0.2);
       break;
     case 'zerplatzt':
       gleit(c, t, 'sine', 600, 160, 0.18, 0.14);

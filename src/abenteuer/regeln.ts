@@ -55,11 +55,16 @@ export type Gegenstand = {
   sicht?: number;
   /** Vorrat, der sich benutzen laesst: so viele Leben zurueck. */
   heilt?: number;
+  /** Waffen: so viel Schaden bei einer gewuerfelten 6 (sonst 2). */
+  krit?: number;
 };
 
 export const GEGENSTAENDE: readonly Gegenstand[] = [
   { id: 'schwert', name: 'Schwert', slot: 'waffe', angriff: 1, text: '+1 auf jeden Angriffswurf.' },
   { id: 'axt', name: 'Streitaxt', slot: 'waffe', angriff: 2, text: '+2 auf jeden Angriffswurf.' },
+  { id: 'breitschwert', name: 'Breitschwert', slot: 'waffe', angriff: 2, text: '+2 auf jeden Angriffswurf.' },
+  { id: 'runenklinge', name: 'Runenklinge', slot: 'waffe', angriff: 2, krit: 3, text: '+2 auf jeden Angriffswurf; eine 6 trifft dreifach.' },
+  { id: 'flammenschwert', name: 'Flammenschwert', slot: 'waffe', angriff: 3, text: '+3 auf jeden Angriffswurf.' },
   { id: 'schild', name: 'Schild', slot: 'schild', abwehr: 1, text: 'Schleime brauchen eine Augenzahl mehr, um zu treffen.' },
   { id: 'helm', name: 'Helm', slot: 'kopf', leben: 1, text: '+1 Leben.' },
   { id: 'ruestung', name: 'Kettenhemd', slot: 'koerper', leben: 2, text: '+2 Leben.' },
@@ -75,7 +80,13 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
 export const gegenstand = (id: string): Gegenstand | undefined => GEGENSTAENDE.find((g) => g.id === id);
 
 /** Was in Truhen liegen kann - das Schwert traegt der Ritter schon. */
-const TRUHENINHALT = ['axt', 'schild', 'helm', 'ruestung', 'stiefel', 'laterne'];
+const TRUHENINHALT = ['axt', 'breitschwert', 'runenklinge', 'flammenschwert', 'schild', 'helm', 'ruestung', 'stiefel', 'laterne'];
+
+/** Wie gut eine Waffe ist - fuer "die bessere gleich in die Hand". */
+const waffenWert = (id: string | null): number => {
+  const g = gegenstand(id ?? '');
+  return g ? (g.angriff ?? 0) * 2 + ((g.krit ?? 2) - 2) : -1;
+};
 
 export type Schleim = {
   id: number;
@@ -252,8 +263,7 @@ export const schrittBonusVon = schrittBonus;
  * Suche waechst Ring um Ring (Spieltest: bei einem von zwanzig Seeds lag im
  * Umkreis von sechs Feldern kein Land, und der Ritter stand im Wasser).
  */
-function startFeld(seed: number): Hex {
-  const o = { q: 0, r: 0 };
+function startFeld(seed: number, o: Hex = { q: 0, r: 0 }): Hex {
   let notfall: Hex | null = null;
   for (let ring = 0; ring <= 60; ring++) {
     weltVon(seed, o, ring + 2);
@@ -445,7 +455,8 @@ function nachDemSchritt(a: Abenteuer): Abenteuer {
 function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
   const wurf = w6(a);
   const summeWurf = wurf + angriffVon(a);
-  const schaden = summeWurf >= 4 ? (wurf === 6 ? 2 : 1) : 0;
+  const krit = gegenstand(a.ausruestung.waffe ?? '')?.krit ?? 2;
+  const schaden = summeWurf >= 4 ? (wurf === 6 ? krit : 1) : 0;
   a.ereignisse.push({ art: 'hieb', takt, wer: 'ritter', ziel: s.id, wurf, schaden });
   if (schaden === 0) {
     melde(a, `Wurf ${wurf}+${angriffVon(a)}: daneben.`);
@@ -523,6 +534,12 @@ function aufheben(a: Abenteuer): void {
       a.ausruestung = { ...a.ausruestung, [g.slot]: inhalt };
       if (g.leben) a.leben += g.leben;
       melde(a, `Eine Truhe! Darin: ${g.name} - sofort angelegt.`);
+    } else if (g.slot === 'waffe' && waffenWert(inhalt) > waffenWert(a.ausruestung.waffe)) {
+      // Eine bessere Waffe nimmt der Ritter gleich in die Hand.
+      const alt = a.ausruestung.waffe!;
+      a.ausruestung = { ...a.ausruestung, waffe: inhalt };
+      a.inventar = { ...a.inventar, [alt]: (a.inventar[alt] ?? 0) + 1 };
+      melde(a, `Eine Truhe! Darin: ${g.name} - gleich in der Hand, ${gegenstand(alt)?.name ?? alt} ins Inventar.`);
     } else {
       a.inventar = { ...a.inventar, [inhalt]: (a.inventar[inhalt] ?? 0) + 1 };
       melde(a, `Eine Truhe! Darin: ${g.name} - ins Inventar.`);
@@ -711,6 +728,16 @@ export function normalisiere(a: Abenteuer): Abenteuer {
   a.ereignisse ??= [];
   a.geruht ??= false;
   a.spuren ??= {};
+  // Ein Spielstand von vor der Landsuche kann den Ritter im Wasser haben
+  // (Spieltest: "Ich starte immer noch im Wasser" - der alte Stand wurde
+  // geladen). Dann auf das naechste Land setzen.
+  if (!begehbar(gelaende(a.seed, a.pos.q, a.pos.r))) {
+    a.pos = startFeld(a.seed, a.pos);
+    a.pfad = [a.pos];
+    a.genommen = [...a.genommen, hexKey(a.pos.q, a.pos.r)];
+    a.schleime = a.schleime.filter((s) => hexDistance(s, a.pos) >= 2);
+    sehen(a);
+  }
   return a;
 }
 

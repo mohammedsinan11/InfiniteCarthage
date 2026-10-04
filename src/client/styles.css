@@ -7690,7 +7690,7 @@ em.off {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  align-items: center;
+  align-items: flex-start;
   max-width: calc(100% - 220px);
 }
 .ab-schild {
@@ -7715,6 +7715,46 @@ em.off {
 }
 .ab-herz.halb {
   background: linear-gradient(90deg, #c8402f 50%, #3a2a22 50%);
+}
+/* Ton-Knopf mit Lautstaerke darunter: klein, minus - Stufe - plus. */
+.ab-ton-gruppe {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.ab-laut {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.ab-laut-knopf {
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+}
+.ab-laut-stufe {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 12px;
+}
+.ab-laut-stufe i {
+  width: 2px;
+  height: 4px;
+  background: #3a2a22;
+}
+.ab-laut-stufe i:nth-child(n + 4) {
+  height: 7px;
+}
+.ab-laut-stufe i:nth-child(n + 8) {
+  height: 10px;
+}
+.ab-laut-stufe i.an {
+  background: var(--accent);
 }
 .ab-ton {
   display: inline-flex;

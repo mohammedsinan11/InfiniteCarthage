@@ -181,6 +181,54 @@ export const WAFFE: Record<string, Pixelkarte> = {
     '..kyk..',
     '...k...',
   ],
+  breitschwert: [
+    '...kk..',
+    '..kwsk.',
+    '..kwsSk',
+    '..kwsSk',
+    '..kwsSk',
+    '..kwsSk',
+    '..kwsSk',
+    '..kwsSk',
+    'kkgyygk',
+    'kGGgGGk',
+    '..kbk..',
+    '..kbk..',
+    '..kyk..',
+    '...k...',
+  ],
+  runenklinge: [
+    '...k...',
+    '..kwk..',
+    '..kwUk.',
+    '..kuUk.',
+    '..kwyk.',
+    '..kuUk.',
+    '..kwUk.',
+    '..kuyk.',
+    'kkVvvkk',
+    'kVVvVVk',
+    '..kbk..',
+    '..kbk..',
+    '..kvk..',
+    '...k...',
+  ],
+  flammenschwert: [
+    '...y...',
+    '..kyk..',
+    '..kyok.',
+    '..koyk.',
+    '..kyok.',
+    '..koRk.',
+    '..kyok.',
+    '..korRk',
+    'kkNnnkk',
+    'kNNnNNk',
+    '..kbk..',
+    '..kbk..',
+    '..kok..',
+    '...k...',
+  ],
   axt: [
     '...kkkk',
     '..kssSk',
@@ -215,8 +263,27 @@ export const SCHLEIMKOENIG: Pixelkarte = [
   '.kkkkkkkkkkkkk.',
 ];
 
+/** Eine Pixelkarte mit anderen Farben - fuer Klingen aus anderem Stoff. */
+const umfaerben = (karte: Pixelkarte, farben: Record<string, string>): Pixelkarte =>
+  karte.map((z) => [...z].map((c) => farben[c] ?? c).join(''));
+
+const BREITSCHWERT: Pixelkarte = [
+  '......kkk',
+  '.....kwsk',
+  '....kwssk',
+  '...kwssk.',
+  '.k.kssk..',
+  '.kkssk...',
+  '..kgk....',
+  '.kgkk....',
+  'kgk......',
+];
+
 export const SYMBOL: Record<string, Pixelkarte> = {
   schwert: SCHWERT,
+  breitschwert: BREITSCHWERT,
+  runenklinge: umfaerben(SCHWERT, { s: 'u', g: 'v' }),
+  flammenschwert: umfaerben(SCHWERT, { s: 'o', g: 'N' }),
   axt: AXT,
   schild: SCHILD,
   helm: HELM,

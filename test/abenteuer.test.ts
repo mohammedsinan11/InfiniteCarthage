@@ -1,7 +1,7 @@
 /** Abenteuer (src/abenteuer/regeln.ts): wuerfeln, gehen, kaempfen, sammeln - im Takt der Spieluhr. */
 
 import { describe, it, expect } from 'vitest';
-import { BOSS_LEBEN, BOSS_NACH, benutzen, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden } from '../src/abenteuer/regeln';
+import { BOSS_LEBEN, BOSS_NACH, benutzen, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden } from '../src/abenteuer/regeln';
 import type { Abenteuer, Taste } from '../src/abenteuer/regeln';
 import { HEX_DIRS, hexDistance } from '../src/core/coords';
 
@@ -40,6 +40,38 @@ describe('Abenteuer', () => {
       expect(t).not.toBe('water');
       expect(t).not.toBeNull();
     }
+  });
+
+  it('ein alter Spielstand mit dem Ritter im Wasser setzt ihn beim Laden an Land', () => {
+    const a = structuredClone(neuesAbenteuer(774553834));
+    // Ein Wasserfeld in der Naehe suchen und den Ritter darauf stellen (wie ein alter Stand).
+    let wasser: { q: number; r: number } | null = null;
+    for (let q = -6; q <= 6 && !wasser; q++) for (let r = -6; r <= 6 && !wasser; r++) if (gelaende(a.seed, q, r) === 'water') wasser = { q, r };
+    expect(wasser).not.toBeNull();
+    a.pos = wasser!;
+    const b = normalisiere(a);
+    expect(gelaende(b.seed, b.pos.q, b.pos.r)).not.toBe('water');
+  });
+
+  it('Schwerter liegen in Truhen; eine bessere Waffe kommt gleich in die Hand', () => {
+    expect(gegenstand('runenklinge')?.krit).toBe(3);
+    expect(gegenstand('flammenschwert')?.angriff).toBe(3);
+    // Eine Truhe mit einem Schwert finden und hinlaufen.
+    for (let seed = 1; seed < 3000; seed++) {
+      const a0 = neuesAbenteuer(seed);
+      for (const k of ['d', 'e', 'x', 'z', 'a', 'q'] as Taste[]) {
+        const [dq, dr] = HEX_DIRS[['e', 'd', 'x', 'z', 'a', 'q'].indexOf(k)]!;
+        const h = { q: a0.pos.q + dq, r: a0.pos.r + dr };
+        if (fundAuf(a0, h.q, h.r) !== 'truhe' || gelaende(seed, h.q, h.r) === 'mountain') continue;
+        const b = taste(imZug(seed), k);
+        const waffe = b.ausruestung.waffe!;
+        if (waffe === 'schwert') continue;
+        expect(['axt', 'breitschwert', 'runenklinge', 'flammenschwert']).toContain(waffe);
+        expect(b.inventar['schwert']).toBe(1);
+        return;
+      }
+    }
+    throw new Error('keine Truhe mit Waffe gefunden');
   });
 
   it('die Tasten liegen wie die Nachbarn eines Sechsecks um S', () => {
