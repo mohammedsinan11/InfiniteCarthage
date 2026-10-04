@@ -631,7 +631,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       if (a.phase === 'ziehen' && plan && still) {
         let rest = a.schritte;
         for (const hx of wegZu(a, plan)) {
-          rest -= a.schleime.some((s) => s.q === hx.q && s.r === hx.r) ? 1 : schrittKosten(a, hx.q, hx.r);
+          const kost = a.schleime.some((s) => s.q === hx.q && s.r === hx.r) ? 1 : schrittKosten(a, hx.q, hx.r);
+          // Der letzte Schritt reicht immer auf einen Berg (regeln.ts).
+          rest -= rest > 0 ? Math.min(kost, rest) : kost;
           const pz = zentrum(hx.q, hx.r);
           ctx.fillStyle = rest >= 0 ? 'rgba(242, 201, 76, 0.9)' : 'rgba(150, 140, 120, 0.55)';
           ctx.fillRect(pz.x - f, pz.y - f, 2 * f, 2 * f);

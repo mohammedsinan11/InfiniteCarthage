@@ -8,8 +8,8 @@
  *
  * DER ZUG. Zu Beginn wird gewuerfelt; die Augenzahl sind die Schritte. Jeder
  * Schritt geht auf ein Nachbarfeld (sechs Richtungen: Q E / A D / Z X um S
- * herum). Wasser ist nicht zu betreten, Berge kosten
- * zwei Schritte. Ein Schritt auf einen Schleim ist ein Angriff, S wartet.
+ * herum). Wasser ist nicht zu betreten, Berge kosten zwei Schritte (der
+ * letzte reicht aber immer zum Hinaufklettern). Ein Schritt auf einen Schleim ist ein Angriff, S wartet.
  *
  * DIE SPIELUHR. Jeder Schritt ist ein Tick, und in jedem Tick huepfen die
  * Schleime mit: naeher heran, wenn sie den Ritter wittern, und neben ihm
@@ -354,11 +354,10 @@ export function taste(alt: Abenteuer, t: Taste): Abenteuer {
     melde(a, 'Dort ist Wasser - kein Weg hinueber.');
     return a;
   }
-  const k = kosten(g);
-  if (k > a.schritte) {
-    melde(a, 'Fuer den Berg fehlen dir Schritte.');
-    return a;
-  }
+  // Ein Berg kostet zwei Schritte - fehlt einer, reicht der letzte trotzdem
+  // zum Hinaufklettern. Sonst sass man zwischen Bergen fest, sobald nur
+  // eine 1 fiel.
+  const k = Math.min(kosten(g), a.schritte);
   a.ereignisse.push({ art: 'gehen', takt: 0, wer: 'ritter', von: a.pos, nach: ziel });
   a.pos = ziel;
   a.schritte -= k;

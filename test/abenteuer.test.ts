@@ -128,6 +128,22 @@ describe('Abenteuer', () => {
     expect(herzen).toBeGreaterThan(0);
   });
 
+  it('mit dem letzten Schritt kommt man immer auf einen Berg - niemand sitzt fest', () => {
+    // Einen Start neben einem Berg suchen.
+    for (let seed = 1; seed < 300; seed++) {
+      const a0 = neuesAbenteuer(seed);
+      const i = HEX_DIRS.findIndex(([dq, dr]) => gelaende(seed, a0.pos.q + dq, a0.pos.r + dr) === 'mountain');
+      if (i < 0) continue;
+      const t = (['e', 'd', 'x', 'z', 'a', 'q'] as Taste[])[i]!;
+      const a = imZug(seed, [], 1);
+      const b = taste(a, t);
+      expect(hexDistance(a.pos, b.pos)).toBe(1);
+      expect(b.phase).toBe('wuerfeln');
+      return;
+    }
+    throw new Error('kein Start neben einem Berg');
+  });
+
   it('Herzen werden gleich verbraucht - bei vollem Leben bleiben sie liegen', () => {
     // Ein Herz direkt neben den Start legen: das Feld suchen, auf dem eines liegt.
     let seed = 0;
