@@ -246,17 +246,31 @@ export const schrittBonusVon = schrittBonus;
 
 // --- Beginn ---------------------------------------------------------------
 
-export function neuesAbenteuer(seed: number): Abenteuer {
-  // Der Ritter beginnt auf Land, so nah am Ursprung wie moeglich.
-  const welt = weltVon(seed, { q: 0, r: 0 }, 12);
-  let start: Hex = { q: 0, r: 0 };
-  for (const h of hexesInRange({ q: 0, r: 0 }, 6).sort((x, y) => hexDistance(x, { q: 0, r: 0 }) - hexDistance(y, { q: 0, r: 0 }))) {
-    const t = tileAt(welt, h.q, h.r)?.terrain ?? null;
-    if (begehbar(t) && t !== 'mountain') {
-      start = h;
-      break;
+/**
+ * Wo der Ritter beginnt: auf flachem Land, so nah am Ursprung wie moeglich,
+ * und nicht auf einem Inselchen - mindestens drei begehbare Nachbarn. Die
+ * Suche waechst Ring um Ring (Spieltest: bei einem von zwanzig Seeds lag im
+ * Umkreis von sechs Feldern kein Land, und der Ritter stand im Wasser).
+ */
+function startFeld(seed: number): Hex {
+  const o = { q: 0, r: 0 };
+  let notfall: Hex | null = null;
+  for (let ring = 0; ring <= 60; ring++) {
+    weltVon(seed, o, ring + 2);
+    for (const h of hexesInRange(o, ring)) {
+      if (hexDistance(h, o) !== ring) continue;
+      const t = gelaende(seed, h.q, h.r);
+      if (!begehbar(t) || t === 'mountain') continue;
+      notfall ??= h;
+      const nachbarn = HEX_DIRS.filter(([dq, dr]) => begehbar(gelaende(seed, h.q + dq, h.r + dr))).length;
+      if (nachbarn >= 3) return h;
     }
   }
+  return notfall ?? o;
+}
+
+export function neuesAbenteuer(seed: number): Abenteuer {
+  const start = startFeld(seed);
   const a: Abenteuer = {
     seed,
     rng: seed ^ 0x5bd1e995,

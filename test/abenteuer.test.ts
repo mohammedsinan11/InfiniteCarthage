@@ -32,6 +32,16 @@ describe('Abenteuer', () => {
     expect(a.erkundet.length).toBeGreaterThan(6);
   });
 
+  it('der Ritter beginnt nie im Wasser - auch nicht, wenn um den Ursprung nur Meer ist', () => {
+    // 774553834: im Umkreis von sechs Feldern lag nur ein Berg (Spieltest).
+    for (const seed of [774553834, 1844960718, 978983017, -1288175827, 2049389901, 1, 2, 3]) {
+      const a = neuesAbenteuer(seed);
+      const t = gelaende(seed, a.pos.q, a.pos.r);
+      expect(t).not.toBe('water');
+      expect(t).not.toBeNull();
+    }
+  });
+
   it('die Tasten liegen wie die Nachbarn eines Sechsecks um S', () => {
     const o = { q: 0, r: 0 };
     expect(tasteZu(o, { q: 1, r: -1 })).toBe('e');

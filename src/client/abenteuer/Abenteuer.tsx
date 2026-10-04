@@ -57,11 +57,20 @@ import { HEX_CX, HEX_CY, IMG_H, IMG_W, kachelEcke, preloadTiles, tileImage, tile
 import { preloadUnitSprites, zeichneFigur } from '../units';
 import { PIX, Px } from '../ui/KartenPixel';
 import { musikAn, setzeMusik, starteMusik, stoppeMusik } from './musik';
-import { RITTER_GEHT, RITTER_STEHT, SCHLEIMKOENIG, SYMBOL, zeichnePixel } from './symbole';
+import { RITTER_HAND, RITTER_KOERPER, RITTER_SCHRITT, SCHLEIMKOENIG, SYMBOL, WAFFE, WAFFE_GRIFF, zeichnePixel } from './symbole';
 import { klang } from './musik';
 import type { Klang } from './musik';
 
 const SPEICHER = 'infinitecarthage.abenteuer';
+const AUTOROLL = 'infinitecarthage.abenteuer.autoroll';
+
+function leseAutoroll(): boolean {
+  try {
+    return localStorage.getItem(AUTOROLL) === 'an';
+  } catch {
+    return false;
+  }
+}
 /** So lange dauert ein Tick der Spieluhr im Bild. */
 const TAKT_MS = 170;
 /** So lange steigen Zahlen noch nach ihrem Takt auf (in Takten). */
@@ -324,6 +333,10 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const [wurfNr, setWurfNr] = useState(0);
   const [rollt, setRollt] = useState(false);
   const [musik, setMusik] = useState(musikAn);
+  // Autoroll: wer laufen will, waehrend der Wurf noch aussteht, wuerfelt gleich mit.
+  const [autoroll, setAutoroll] = useState(leseAutoroll);
+  const autorollRef = useRef(autoroll);
+  autorollRef.current = autoroll;
   const canvas = useRef<HTMLCanvasElement>(null);
   const mini = useRef<HTMLCanvasElement>(null);
 
@@ -353,6 +366,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const zeiger = useRef<Hex | null>(null);
   const lauf = useRef<{ ziel: Hex; timer: number } | null>(null);
   const rolltRef = useRef(false);
+  const wirfRef = useRef<() => void>(() => undefined);
+  const tippeRef = useRef<(h: Hex) => void>(() => undefined);
   const blick = useRef<1 | -1>(1);
   /** Seit wann das Banner "Der Schleimkoenig erwacht" steht. */
   const banner = useRef(0);
@@ -388,11 +403,18 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const drueck = useCallback(
     (t: Taste) => {
       halt();
+      // Autoroll: steht noch der Wurf an, erst wuerfeln, dann (wenn der
+      // Wuerfel liegt) den Schritt gehen.
+      if (autorollRef.current && aktuell.current.phase === 'wuerfeln' && !rolltRef.current) {
+        wirfRef.current();
+        window.setTimeout(() => schritt(t), ROLL_MS + 120);
+        return;
+      }
       schritt(t);
     },
     [halt, schritt],
   );
-  const wirf = useCallback(() => {
+  const wirf: () => void = useCallback(() => {
     const alt = aktuell.current;
     if (alt.phase !== 'wuerfeln' || rolltRef.current) return;
     halt();
@@ -406,6 +428,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     setZugTasten([]);
     setze(wuerfeln(alt));
   }, [halt, setze]);
+  wirfRef.current = wirf;
   const beenden = useCallback(() => {
     halt();
     const alt = aktuell.current;
@@ -438,7 +461,12 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     (h: Hex) => {
       const a0 = aktuell.current;
       halt();
-      if (a0.phase === 'wuerfeln') return wirf();
+      if (a0.phase === 'wuerfeln') {
+        wirf();
+        // Mit Autoroll geht es nach dem Wurf gleich zum angetippten Feld.
+        if (autorollRef.current) window.setTimeout(() => tippeRef.current(h), ROLL_MS + 120);
+        return;
+      }
       if (a0.phase !== 'ziehen' || rolltRef.current) return;
       const nah = tasteZu(a0.pos, h);
       if (nah) return void schritt(nah);
@@ -448,6 +476,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     },
     [geheWeiter, halt, schritt, wirf],
   );
+  tippeRef.current = tippe;
 
   // Tastatur: W E / A S D / Z X wie die Nachbarn eines Sechsecks, Leertaste wuerfelt.
   useEffect(() => {
@@ -872,10 +901,28 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       const lauf0 = ev.find((e): e is Extract<Ereignis, { art: 'gehen' }> => e.art === 'gehen' && e.wer === 'ritter');
       if (lauf0) blick.current = mitte(lauf0.nach.q, lauf0.nach.r).x < mitte(lauf0.von.q, lauf0.von.r).x ? -1 : 1;
       const imSchritt = lauf0 !== undefined && p >= lauf0.takt && p < lauf0.takt + 1 && (p - lauf0.takt) % 0.5 < 0.25;
+      // Der Hieb des Ritters: er dreht sich zum Ziel, holt aus, schwingt durch.
+      const hieb0 = ev.find((e): e is Extract<Ereignis, { art: 'hieb' }> => e.art === 'hieb' && e.wer === 'ritter');
+      if (hieb0 && hieb0.ziel !== null && p >= hieb0.takt - 0.05) blick.current = ort(hieb0.ziel).x < ritter.x ? -1 : 1;
+      const schwung = hieb0 ? p - hieb0.takt : -1;
+      // Winkel der Klinge in Grad: 0 = senkrecht, positiv = nach vorn.
+      let winkel = 22 + Math.sin(sek * 2.2) * 3 + (imSchritt ? 8 : 0);
+      let spurVon: number | null = null;
+      if (schwung >= 0 && schwung < 0.95) {
+        if (schwung < 0.25) winkel = 22 + (-85 - 22) * sanft(schwung / 0.25);
+        else if (schwung < 0.45) {
+          winkel = -85 + (130 + 85) * sanft((schwung - 0.25) / 0.2);
+          spurVon = -85;
+        } else {
+          winkel = 130 + (22 - 130) * sanft((schwung - 0.45) / 0.5);
+          if (schwung < 0.6) spurVon = Math.max(-85, winkel - 160);
+        }
+      }
+      const waffe = WAFFE[a.ausruestung.waffe ?? ''];
       figuren.push({
         y: ro.y,
         mal: () => {
-          const bild = imSchritt ? RITTER_GEHT : RITTER_STEHT;
+          const bild = imSchritt ? RITTER_SCHRITT : RITTER_KOERPER;
           const bw = bild[0]!.length;
           const X = sx(ro.x) + ws.dx * f;
           const fuss = sy(ro.y) + 3 * f - Math.round(ritter.hoch + atmet) * f;
@@ -884,12 +931,36 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           ctx.save();
           ctx.translate(X, fuss - bild.length * f);
           ctx.scale(blick.current, 1);
-          zeichnePixel(ctx, bild, -Math.floor(bw / 2) * f, 0, f, PIX);
+          const links = -Math.floor(bw / 2) * f;
+          const hand = { x: links + RITTER_HAND.x * f, y: RITTER_HAND.y * f };
+          const malWaffe = () => {
+            if (!waffe) return;
+            // Die Spur des Schwungs: ein heller Bogen, wo die Klinge eben war.
+            if (spurVon !== null) {
+              const r = (WAFFE_GRIFF.y - 0.5) * f;
+              ctx.strokeStyle = 'rgba(255, 250, 235, 0.55)';
+              ctx.lineWidth = 3 * f;
+              ctx.beginPath();
+              ctx.arc(hand.x, hand.y, r, ((spurVon - 90) * Math.PI) / 180, ((winkel - 90) * Math.PI) / 180);
+              ctx.stroke();
+            }
+            ctx.save();
+            ctx.translate(hand.x, hand.y);
+            ctx.rotate((winkel * Math.PI) / 180);
+            zeichnePixel(ctx, waffe, -WAFFE_GRIFF.x * f, -WAFFE_GRIFF.y * f, f, PIX);
+            ctx.restore();
+          };
+          // Beim Ausholen liegt die Klinge hinter dem Ritter, sonst davor.
+          if (winkel < -30) malWaffe();
+          zeichnePixel(ctx, bild, links, 0, f, PIX);
           if (ws.blitz) {
+            ctx.save();
             ctx.filter = 'brightness(4) saturate(0)';
             ctx.globalAlpha = 0.7;
-            zeichnePixel(ctx, bild, -Math.floor(bw / 2) * f, 0, f, PIX);
+            zeichnePixel(ctx, bild, links, 0, f, PIX);
+            ctx.restore();
           }
+          if (winkel >= -30) malWaffe();
           ctx.restore();
         },
       });
@@ -906,15 +977,19 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           const z = e.ziel === null && e.feld ? mitte(e.feld.q, e.feld.r) : ort(e.ziel ?? 'ritter');
           const X = sx(z.x);
           const Y = sy(z.y) - 4 * f;
-          // Die Klinge: ein heller Strich schraeg ueber das Ziel.
-          if (e.wer === 'ritter' && u > 0.35 && u < 0.75) {
-            const k = (u - 0.35) / 0.4;
-            ctx.strokeStyle = e.schaden > 0 ? '#fffaf0' : 'rgba(255, 250, 240, 0.4)';
-            ctx.lineWidth = f;
-            ctx.beginPath();
-            ctx.moveTo(X - 6 * f, Y - 6 * f);
-            ctx.lineTo(X - 6 * f + 12 * f * k, Y - 6 * f + 12 * f * k);
-            ctx.stroke();
+          // Trifft die Klinge, blitzt ein Funkenstern auf dem Ziel.
+          if (e.wer === 'ritter' && e.schaden > 0 && u > 0.38 && u < 0.62) {
+            const k = (u - 0.38) / 0.24;
+            const r = (2 + k * 6) * f;
+            ctx.globalAlpha = 1 - k;
+            ctx.fillStyle = '#fffaf0';
+            ctx.fillRect(X - r, Y - f / 2, 2 * r, f);
+            ctx.fillRect(X - f / 2, Y - r, f, 2 * r);
+            ctx.fillRect(X - r * 0.6, Y - r * 0.6, f, f);
+            ctx.fillRect(X + r * 0.6 - f, Y + r * 0.6 - f, f, f);
+            ctx.fillRect(X + r * 0.6 - f, Y - r * 0.6, f, f);
+            ctx.fillRect(X - r * 0.6, Y + r * 0.6 - f, f, f);
+            ctx.globalAlpha = 1;
           }
           if (u > 0.45 && u < 0.45 + NACHKLANG) {
             const k = (u - 0.45) / NACHKLANG;
@@ -1150,6 +1225,24 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
 
       {/* Links unten: die Steuerung - versetzt wie die Tastatur, zugleich zum Tippen. */}
       <div className="ab-fenster ab-steuerung">
+        {/* Autoroll: Laufen, waehrend der Wurf aussteht, wuerfelt gleich mit. */}
+        <button
+          className={autoroll ? 'ab-autoroll an' : 'ab-autoroll'}
+          aria-pressed={autoroll}
+          title="Autoroll: wer laufen will, waehrend der Wurf noch aussteht, wuerfelt automatisch"
+          onClick={() => {
+            const neu = !autoroll;
+            setAutoroll(neu);
+            try {
+              localStorage.setItem(AUTOROLL, neu ? 'an' : 'aus');
+            } catch {
+              // ohne Speicher nur fuer jetzt
+            }
+          }}
+        >
+          <i />
+          Autoroll {autoroll ? 'an' : 'aus'}
+        </button>
         <span className="ab-titel">Steuerung</span>
         <div className="ab-tasten">
           {REIHEN.map((reihe, i) => (
@@ -1158,7 +1251,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                 <button
                   key={`${t}${gedrueckt?.taste === t ? gedrueckt.n : ''}`}
                   className={['ab-taste', gedrueckt?.taste === t ? 'gedrueckt' : '', t === 's' ? 'mitte' : ''].filter(Boolean).join(' ')}
-                  disabled={!zeigtSchritte}
+                  disabled={!zeigtSchritte && !(autoroll && a.phase === 'wuerfeln' && !rollt)}
                   title={t === 's' ? 'Warten: ein Schritt, die Schleime ziehen. Einmal je Zug +1 Leben, wenn keiner nah ist.' : TASTE_NAME[t]}
                   onClick={() => drueck(t)}
                 >

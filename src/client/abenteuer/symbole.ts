@@ -120,45 +120,85 @@ const AUGE: Pixelkarte = [
 
 /**
  * Der Ritter des Abenteuers: Helm mit rotem Busch, blauer Waffenrock mit
- * goldenem Kreuz, Schild links, Schwert rechts. Zwei Bilder: stehend und im
- * Schritt. Eigen fuers Abenteuer - die Strategie behaelt ihre Figuren.
+ * goldenem Kreuz, Schild links, die rechte Hand frei - die Waffe ist ein
+ * eigenes Bild (WAFFE), das in der Hand sitzt und sich dreht: so sieht man
+ * sie, und spaeter traegt er andere. Zwei Bilder: stehend und im Schritt.
  */
-export const RITTER_STEHT: Pixelkarte = [
+export const RITTER_KOERPER: Pixelkarte = [
   '......rr......',
   '.....rRrr.....',
   '.....kkkkk....',
   '....kwsssSk...',
-  '....kskkkSk.k.',
-  '....ksssSSkksk',
-  '.....kSSSk.ksk',
-  '...kkkuyukkksk',
-  'kkkkuuyuuSkgyg',
-  'kuyukuyyyukbk.',
-  'kyyykuuyuukk..',
-  'kuyukbbybbk...',
+  '....kskkkSk...',
+  '....ksssSSk...',
+  '.....kSSSk....',
+  '...kkkuyukkk..',
+  'kkkkuuyuuSsk..',
+  'kuyukuyyyuksk.',
+  'kyyykuuyuukbbk',
+  'kuyukbbybbkkk.',
   '.kuk.kuUuUk...',
   '..k..kSkSk....',
   '.....kSkSk....',
   '....kBBkBBk...',
 ];
-export const RITTER_GEHT: Pixelkarte = [
+export const RITTER_SCHRITT: Pixelkarte = [
   '......rr......',
   '.....rRrr.....',
   '.....kkkkk....',
   '....kwsssSk...',
-  '....kskkkSk.k.',
-  '....ksssSSkksk',
-  '.....kSSSk.ksk',
-  '...kkkuyukkksk',
-  'kkkkuuyuuSkgyg',
-  'kuyukuyyyukbk.',
-  'kyyykuuyuukk..',
-  'kuyukbbybbk...',
+  '....kskkkSk...',
+  '....ksssSSk...',
+  '.....kSSSk....',
+  '...kkkuyukkk..',
+  'kkkkuuyuuSsk..',
+  'kuyukuyyyuksk.',
+  'kyyykuuyuukbbk',
+  'kuyukbbybbkkk.',
   '.kuk.kuUuUk...',
   '..k.kSk.kSk...',
   '....kSk..kSk..',
   '...kBBk..kBBk.',
 ];
+/** Wo im Ritterbild die Hand sitzt (Kunstpixel, Mitte des Handschuhs). */
+export const RITTER_HAND = { x: 12.5, y: 10.5 };
+
+/** Waffen in der Hand, Klinge nach oben. Der Griff sitzt bei WAFFE_GRIFF. */
+export const WAFFE: Record<string, Pixelkarte> = {
+  schwert: [
+    '...k...',
+    '..kwk..',
+    '..kwSk.',
+    '..kwSk.',
+    '..kwSk.',
+    '..kwSk.',
+    '..kwSk.',
+    '..kwSk.',
+    'kkgyykk',
+    'kGGgGGk',
+    '..kbk..',
+    '..kbk..',
+    '..kyk..',
+    '...k...',
+  ],
+  axt: [
+    '...kkkk',
+    '..kssSk',
+    '..kbsSk',
+    '..kbkkk',
+    '..kbk..',
+    '..kbk..',
+    '..kbk..',
+    '..kbk..',
+    '..kbk..',
+    '..kbk..',
+    '..kbk..',
+    '..kbk..',
+    '..kBk..',
+    '...k...',
+  ],
+};
+export const WAFFE_GRIFF = { x: 3.5, y: 10.5 };
 
 /** Der Schleimkoenig: ein breiter Klumpen mit goldener Krone und rotem Stein. */
 export const SCHLEIMKOENIG: Pixelkarte = [

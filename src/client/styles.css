@@ -7841,6 +7841,32 @@ em.off {
 .ab-slot-fuesse {
   grid-area: fuesse;
 }
+/* Der Autoroll-Schalter ueber der Steuerung: ein kleines Laempchen. */
+.ab-autoroll {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  font-family: var(--pixel);
+  font-size: 9px;
+  color: var(--muted);
+}
+.ab-autoroll i {
+  width: 10px;
+  height: 10px;
+  background: #3a2a22;
+  border: 2px solid #120d08;
+}
+.ab-autoroll.an {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.ab-autoroll.an i {
+  background: #7fd05a;
+  box-shadow: 0 0 6px #7fd05a;
+}
 .ab-steuerung {
   left: 10px;
   bottom: 10px;
