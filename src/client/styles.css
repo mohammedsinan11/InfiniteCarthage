@@ -7734,49 +7734,83 @@ em.off {
   height: 130px;
   image-rendering: pixelated;
 }
-.ab-ausruestung {
+.ab-links {
+  position: absolute;
   top: 50%;
   left: 10px;
   transform: translateY(-50%);
-  width: 170px;
   display: flex;
   flex-direction: column;
+  gap: 8px;
+}
+.ab-links .ab-fenster {
+  position: static;
+}
+/* Werte mit Bildern: Angriff, Abwehr, Leben, Sicht, Schritte. */
+.ab-werte-gitter {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 4px 10px;
+}
+.ab-wert {
+  display: inline-flex;
+  align-items: center;
   gap: 4px;
 }
-.ab-platz {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px;
-  border: 1px solid var(--line);
-  opacity: 0.55;
-  font-size: 12px;
+.ab-wert b {
+  font-family: var(--pixel);
+  font-size: 10px;
+  color: var(--text);
 }
-.ab-platz.voll {
-  opacity: 1;
-  border-color: var(--line-bright);
+/* Die Ausruestung wie ein Rollenspiel-Inventar: Kopf oben, Waffe - Koerper -
+   Schild in der Mitte, Fuesse unten, das Zubehoer daneben. */
+.ab-slots {
+  --ab-slot: 40px;
+  display: grid;
+  grid-template-columns: repeat(3, var(--ab-slot));
+  grid-template-rows: repeat(3, var(--ab-slot));
+  grid-template-areas:
+    '. kopf zubehoer'
+    'waffe koerper schild'
+    '. fuesse .';
+  gap: 4px;
 }
-.ab-platz-bild {
-  width: 26px;
-  height: 26px;
+.ab-slot {
   display: grid;
   place-items: center;
   background: #120d08;
+  border: 2px solid var(--line);
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.6);
 }
-.ab-platz-text {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.2;
+.ab-slot svg {
+  opacity: 0.18;
+  filter: grayscale(1);
 }
-.ab-platz-text small {
-  font-family: var(--pixel);
-  font-size: 7px;
-  color: var(--muted);
+.ab-slot.voll {
+  background: #241a10;
+  border-color: var(--line-bright);
 }
-.ab-werte {
-  margin-top: 4px;
-  font-size: 11px;
-  color: var(--muted);
+.ab-slot.voll svg {
+  opacity: 1;
+  filter: none;
+}
+.ab-slot-kopf {
+  grid-area: kopf;
+}
+.ab-slot-zubehoer {
+  grid-area: zubehoer;
+}
+.ab-slot-waffe {
+  grid-area: waffe;
+}
+.ab-slot-koerper {
+  grid-area: koerper;
+}
+.ab-slot-schild {
+  grid-area: schild;
+}
+.ab-slot-fuesse {
+  grid-area: fuesse;
 }
 .ab-steuerung {
   left: 10px;
@@ -8118,19 +8152,28 @@ em.off {
     width: 110px;
     height: 84px;
   }
-  .ab-ausruestung {
+  .ab-links {
     top: 92px;
     transform: none;
-    width: 46px;
+    gap: 6px;
+  }
+  .ab-links .ab-fenster {
     padding: 4px;
   }
-  .ab-ausruestung .ab-titel,
-  .ab-platz-text,
-  .ab-werte {
+  .ab-links .ab-titel {
     display: none;
   }
-  .ab-platz {
-    padding: 1px;
+  .ab-werte-gitter {
+    grid-template-columns: repeat(2, auto);
+    gap: 2px 6px;
+  }
+  .ab-slots {
+    --ab-slot: 28px;
+    gap: 2px;
+  }
+  .ab-slot svg {
+    width: 18px;
+    height: 18px;
   }
   .ab-tasten {
     --ab-t: 40px;
@@ -8151,7 +8194,7 @@ em.off {
   }
   .ab-log {
     top: 142px;
-    left: 64px;
+    left: 122px;
     right: 10px;
     transform: none;
     max-width: none;

@@ -7,8 +7,8 @@
  * reine Seite laeuft (GitHub Pages) und sich testen laesst.
  *
  * DER ZUG. Zu Beginn wird gewuerfelt; die Augenzahl sind die Schritte. Jeder
- * Schritt geht auf ein Nachbarfeld (sechs Richtungen: W E / A D / Z X um S
- * herum, wie die Tasten liegen). Wasser ist nicht zu betreten, Berge kosten
+ * Schritt geht auf ein Nachbarfeld (sechs Richtungen: Q E / A D / Z X um S
+ * herum). Wasser ist nicht zu betreten, Berge kosten
  * zwei Schritte. Ein Schritt auf einen Schleim ist ein Angriff, S wartet.
  *
  * DIE SPIELUHR. Jeder Schritt ist ein Tick, und in jedem Tick huepfen die
@@ -65,8 +65,8 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
   { id: 'stiefel', name: 'Reitstiefel', slot: 'fuesse', schritte: 1, text: '+1 Schritt je Wurf.' },
   { id: 'laterne', name: 'Laterne', slot: 'zubehoer', sicht: 1, text: 'Du siehst ein Feld weiter.' },
   { id: 'kraut', name: 'Heilkraut', heilt: 2, text: 'Antippen: 2 Leben zurueck.' },
-  { id: 'herz', name: 'Herz', heilt: 1, text: 'Ein ganzes Leben. Verletzt heilt es sofort beim Aufheben, sonst wandert es ins Inventar.' },
-  { id: 'halbherz', name: 'Halbes Herz', heilt: 0.5, text: 'Ein halbes Leben. Verletzt heilt es sofort beim Aufheben, sonst wandert es ins Inventar.' },
+  { id: 'herz', name: 'Herz', heilt: 1, text: 'Ein ganzes Leben, gleich beim Aufheben. Bei vollem Leben bleibt es liegen.' },
+  { id: 'halbherz', name: 'Halbes Herz', heilt: 0.5, text: 'Ein halbes Leben, gleich beim Aufheben. Bei vollem Leben bleibt es liegen.' },
   { id: 'gold', name: 'Gold', text: 'Glaenzt. Noch kauft hier niemand etwas.' },
   { id: 'gelee', name: 'Schleimgelee', text: 'Was ein Schleim zuruecklaesst - der Beweis deiner Taten.' },
 ];
@@ -155,16 +155,16 @@ const SALT_FUND = 77;
 const SALT_SCHLEIM = 78;
 
 /**
- * Tasten: die sechs Nachbarn von S auf der Tastatur. Die Tastenreihen sind
- * versetzt wie Sechsecke - W und E liegen ueber S, A und D daneben, Z und X
- * darunter. So zeigt jede Taste genau in ihre Richtung; S selbst wartet.
+ * Tasten: die sechs Nachbarn eines Sechsecks um S herum. Q und E fuehren nach
+ * links und rechts oben, A und D zur Seite, Z und X nach links und rechts
+ * unten; S selbst wartet.
  */
-export type Taste = 'w' | 'e' | 'a' | 's' | 'd' | 'z' | 'x';
-export const TASTEN: readonly Taste[] = ['w', 'e', 'a', 's', 'd', 'z', 'x'];
+export type Taste = 'q' | 'e' | 'a' | 's' | 'd' | 'z' | 'x';
+export const TASTEN: readonly Taste[] = ['q', 'e', 'a', 's', 'd', 'z', 'x'];
 /** Richtung je Taste (Index in HEX_DIRS: 0 NO, 1 O, 2 SO, 3 SW, 4 W, 5 NW). */
-const RICHTUNG: Partial<Record<Taste, number>> = { e: 0, d: 1, x: 2, z: 3, a: 4, w: 5 };
+const RICHTUNG: Partial<Record<Taste, number>> = { e: 0, d: 1, x: 2, z: 3, a: 4, q: 5 };
 export const TASTE_NAME: Record<Taste, string> = {
-  w: 'Nordwest',
+  q: 'Nordwest',
   e: 'Nordost',
   a: 'West',
   s: 'Warten',
@@ -218,6 +218,7 @@ export const abwehrVon = (a: Abenteuer) => summe(a, (g) => g.abwehr);
 export const maxLebenVon = (a: Abenteuer) => GRUND_LEBEN + summe(a, (g) => g.leben);
 export const sichtVon = (a: Abenteuer) => GRUND_SICHT + summe(a, (g) => g.sicht);
 const schrittBonus = (a: Abenteuer) => summe(a, (g) => g.schritte);
+export const schrittBonusVon = schrittBonus;
 
 // --- Beginn ---------------------------------------------------------------
 
@@ -433,6 +434,21 @@ function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
 function aufheben(a: Abenteuer): void {
   const fund = fundAuf(a, a.pos.q, a.pos.r);
   if (!fund) return;
+  // Herzen werden beim Aufheben gleich verbraucht. Bei vollem Leben bleiben
+  // sie liegen, fuer spaeter - nichts geht verloren.
+  const herz = gegenstand(fund);
+  if ((fund === 'herz' || fund === 'halbherz') && herz?.heilt) {
+    if (a.leben >= maxLebenVon(a)) {
+      melde(a, `Volles Leben - das ${herz.name} bleibt liegen.`);
+      return;
+    }
+    a.genommen = [...a.genommen, hexKey(a.pos.q, a.pos.r)];
+    const plus = Math.min(herz.heilt, maxLebenVon(a) - a.leben);
+    a.leben += plus;
+    a.ereignisse.push({ art: 'heil', takt: 0, leben: plus });
+    melde(a, `${herz.name}: +${lebenText(plus)} Leben.`);
+    return;
+  }
   a.genommen = [...a.genommen, hexKey(a.pos.q, a.pos.r)];
   a.ereignisse.push({ art: 'fund', takt: 0, id: fund });
   if (fund === 'truhe') {
@@ -448,15 +464,7 @@ function aufheben(a: Abenteuer): void {
     }
     return;
   }
-  // Herzen heilen gleich, wenn der Ritter verletzt ist.
   const g = gegenstand(fund);
-  if ((fund === 'herz' || fund === 'halbherz') && g?.heilt && a.leben < maxLebenVon(a)) {
-    const plus = Math.min(g.heilt, maxLebenVon(a) - a.leben);
-    a.leben += plus;
-    a.ereignisse.push({ art: 'heil', takt: 0, leben: plus });
-    melde(a, `${g.name} aufgehoben: +${lebenText(plus)} Leben.`);
-    return;
-  }
   a.inventar = { ...a.inventar, [fund]: (a.inventar[fund] ?? 0) + 1 };
   melde(a, `Gefunden: ${g?.name ?? fund}.`);
 }

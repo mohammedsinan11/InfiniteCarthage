@@ -15,8 +15,8 @@ function imZug(seed: number, schleime: Abenteuer['schleime'] = [], schritte = 6)
 
 /** Eine Taste, die vom Start auf begehbares, flaches Land fuehrt. */
 function freieTaste(a: Abenteuer): Taste {
-  for (const t of ['d', 'e', 'x', 'z', 'a', 'w'] as Taste[]) {
-    const ziel = HEX_DIRS[['e', 'd', 'x', 'z', 'a', 'w'].indexOf(t)]!;
+  for (const t of ['d', 'e', 'x', 'z', 'a', 'q'] as Taste[]) {
+    const ziel = HEX_DIRS[['e', 'd', 'x', 'z', 'a', 'q'].indexOf(t)]!;
     const g = gelaende(a.seed, a.pos.q + ziel[0], a.pos.r + ziel[1]);
     if (g && g !== 'water' && g !== 'mountain') return t;
   }
@@ -39,7 +39,7 @@ describe('Abenteuer', () => {
     expect(tasteZu(o, { q: 0, r: 1 })).toBe('x');
     expect(tasteZu(o, { q: -1, r: 1 })).toBe('z');
     expect(tasteZu(o, { q: -1, r: 0 })).toBe('a');
-    expect(tasteZu(o, { q: 0, r: -1 })).toBe('w');
+    expect(tasteZu(o, { q: 0, r: -1 })).toBe('q');
     expect(tasteZu(o, o)).toBe('s');
     expect(tasteZu(o, { q: 2, r: 0 })).toBeNull();
   });
@@ -103,7 +103,7 @@ describe('Abenteuer', () => {
     let a = imZug(21, []);
     const t = freieTaste(a);
     // Der Schleim steht auf der Gegenseite der freien Richtung.
-    const ri = ['e', 'd', 'x', 'z', 'a', 'w'].indexOf(t);
+    const ri = ['e', 'd', 'x', 'z', 'a', 'q'].indexOf(t);
     const gegen = HEX_DIRS[(ri + 3) % 6]!;
     a.schleime = [{ id: 7, q: a0.pos.q + gegen[0], r: a0.pos.r + gegen[1], leben: 2, gross: false, angriff: { ...a0.pos } }];
     const leben = a.leben;
@@ -126,6 +126,36 @@ describe('Abenteuer', () => {
     let herzen = 0;
     for (let q = -30; q < 30; q++) for (let r = -30; r < 30; r++) if (fundAuf(a, q, r)?.endsWith('herz')) herzen++;
     expect(herzen).toBeGreaterThan(0);
+  });
+
+  it('Herzen werden gleich verbraucht - bei vollem Leben bleiben sie liegen', () => {
+    // Ein Herz direkt neben den Start legen: das Feld suchen, auf dem eines liegt.
+    let seed = 0;
+    let ziel: { q: number; r: number } | null = null;
+    let t: Taste | null = null;
+    for (seed = 1; seed < 400 && !ziel; seed++) {
+      const a0 = neuesAbenteuer(seed);
+      for (const k of ['d', 'e', 'x', 'z', 'a', 'q'] as Taste[]) {
+        const [dq, dr] = HEX_DIRS[['e', 'd', 'x', 'z', 'a', 'q'].indexOf(k)]!;
+        const h = { q: a0.pos.q + dq, r: a0.pos.r + dr };
+        if (fundAuf(a0, h.q, h.r) === 'herz' && gelaende(seed, h.q, h.r) !== 'mountain') {
+          ziel = h;
+          t = k;
+          break;
+        }
+      }
+    }
+    seed -= 1;
+    expect(ziel).not.toBeNull();
+    const voll = taste(imZug(seed), t!);
+    expect(voll.inventar['herz']).toBeUndefined();
+    expect(fundAuf(voll, ziel!.q, ziel!.r)).toBe('herz');
+    const wund = structuredClone(imZug(seed));
+    wund.leben = 3;
+    const b = taste(wund, t!);
+    expect(b.leben).toBe(4);
+    expect(b.inventar['herz']).toBeUndefined();
+    expect(fundAuf(b, ziel!.q, ziel!.r)).toBeNull();
   });
 
   it('Kraut heilt, Ausruestung wird angelegt, halbe Herzen zaehlen halb', () => {

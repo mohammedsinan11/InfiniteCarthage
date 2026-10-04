@@ -38,6 +38,7 @@ import {
   neuesAbenteuer,
   normalisiere,
   richtungFuer,
+  schrittBonusVon,
   schrittKosten,
   sichtVon,
   taste,
@@ -46,7 +47,7 @@ import {
   wuerfeln,
   zugBeenden,
 } from '../../abenteuer/regeln';
-import type { Abenteuer as Zustand, Ereignis, Taste, Wer } from '../../abenteuer/regeln';
+import type { Abenteuer as Zustand, Ereignis, Slot, Taste, Wer } from '../../abenteuer/regeln';
 import { HEX_DIRS, hexDistance, hexKey, hexesInRange } from '../../core/coords';
 import type { Hex } from '../../core/coords';
 import { tileAt } from '../../core/world';
@@ -55,7 +56,9 @@ import { HEX_CX, HEX_CY, IMG_H, IMG_W, kachelEcke, preloadTiles, tileImage, tile
 import { preloadUnitSprites, zeichneFigur } from '../units';
 import { PIX, Px } from '../ui/KartenPixel';
 import { musikAn, setzeMusik, starteMusik, stoppeMusik } from './musik';
-import { SYMBOL, zeichnePixel } from './symbole';
+import { RITTER_GEHT, RITTER_STEHT, SYMBOL, zeichnePixel } from './symbole';
+import { klang } from './musik';
+import type { Klang } from './musik';
 
 const SPEICHER = 'infinitecarthage.abenteuer';
 /** So lange dauert ein Tick der Spieluhr im Bild. */
@@ -87,13 +90,23 @@ function speichere(a: Zustand): void {
 const neuerSeed = () => (Math.random() * 2 ** 31) | 0;
 
 /** Pfeil je Taste fuer die Steuerung. */
-const PFEIL: Record<Taste, string> = { w: '↖', e: '↗', a: '←', s: 'z', d: '→', z: '↙', x: '↘' };
-/** Die Steuerung wie auf der Tastatur: versetzte Reihen, S in der Mitte. */
+const PFEIL: Record<Taste, string> = { q: '↖', e: '↗', a: '←', s: 'z', d: '→', z: '↙', x: '↘' };
+/** Die Steuerung als Sechseck: Q E oben, A S D in der Mitte, Z X unten. */
 const REIHEN: Taste[][] = [
-  ['w', 'e'],
+  ['q', 'e'],
   ['a', 's', 'd'],
   ['z', 'x'],
 ];
+
+/** Was in einen leeren Slot gehoert - blass gezeigt. */
+const SLOT_BILD: Record<Slot, string> = {
+  waffe: 'schwert',
+  schild: 'schild',
+  kopf: 'helm',
+  koerper: 'ruestung',
+  fuesse: 'stiefel',
+  zubehoer: 'laterne',
+};
 
 const MINI_FARBE: Record<Terrain, string> = {
   forest: '#3f6b32',
@@ -266,6 +279,35 @@ function Wuerfel({ n, wurfNr, matt }: { n: number | null; wurfNr: number; matt: 
   );
 }
 
+/**
+ * Die Klaenge einer Aktion, im Takt der Bilder: Schritte, Huepfer der
+ * Schleime in Sicht (einer je Takt genuegt), Hiebe, Treffer, Platscher.
+ */
+function spieleKlaenge(a: Zustand): void {
+  const sicht = sichtVon(a);
+  const huepfer = new Set<number>();
+  const spaeter = (takt: number, art: Klang) => window.setTimeout(() => klang(art), Math.max(0, takt * TAKT_MS));
+  for (const e of a.ereignisse) {
+    if (e.art === 'gehen') {
+      if (e.wer === 'ritter') {
+        spaeter(e.takt + 0.1, 'schritt');
+        spaeter(e.takt + 0.6, 'schritt');
+      } else if (!huepfer.has(e.takt) && hexDistance(e.nach, a.pos) <= sicht) {
+        huepfer.add(e.takt);
+        spaeter(e.takt + 0.1, 'huepf');
+      }
+    } else if (e.art === 'hieb') {
+      if (e.wer === 'ritter') {
+        spaeter(e.takt + 0.2, 'hieb');
+        if (e.schaden > 0) spaeter(e.takt + 0.45, 'treffer');
+      } else {
+        spaeter(e.takt + 0.45, e.ziel === null ? 'leer' : e.schaden > 0 ? 'platsch' : 'geblockt');
+      }
+    } else if (e.art === 'ansage') spaeter(e.takt + 0.2, 'warnung');
+    else if (e.art === 'tod') spaeter(e.takt + 0.5, 'zerplatzt');
+  }
+}
+
 // --- Das Spiel -------------------------------------------------------------
 
 type Anim = { start: number; ev: Ereignis[] };
@@ -308,10 +350,14 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const zeiger = useRef<Hex | null>(null);
   const lauf = useRef<{ ziel: Hex; timer: number } | null>(null);
   const rolltRef = useRef(false);
+  const blick = useRef<1 | -1>(1);
 
   const setze = useCallback((neu: Zustand) => {
     aktuell.current = neu;
-    if (neu.ereignisse.length > 0) anim.current = { start: performance.now(), ev: neu.ereignisse };
+    if (neu.ereignisse.length > 0) {
+      anim.current = { start: performance.now(), ev: neu.ereignisse };
+      spieleKlaenge(neu);
+    }
     setA(neu);
   }, []);
 
@@ -430,6 +476,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       const p = (jetzt - start) / TAKT_MS;
       const ende = letzterTakt(ev) + 1 + NACHKLANG;
       const bewegt = p < ende;
+      // Steht alles wieder still (nur Zahlen steigen noch), zeigen sich Tasten und Wege.
+      const still = p >= letzterTakt(ev) + 1;
       // In Ruhe genuegen zwoelf Bilder je Sekunde fuers Atmen.
       if (!bewegt && jetzt - zuletzt < 80) return;
       zuletzt = jetzt;
@@ -580,7 +628,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       pfeile(a.pfad, '#f2c94c', Math.max(2, f));
       // Der geplante Weg (Maus oder laufender Weg): Punkte, so weit die Schritte reichen.
       const plan = lauf.current?.ziel ?? zeiger.current;
-      if (a.phase === 'ziehen' && plan && !bewegt) {
+      if (a.phase === 'ziehen' && plan && still) {
         let rest = a.schritte;
         for (const hx of wegZu(a, plan)) {
           rest -= a.schleime.some((s) => s.q === hx.q && s.r === hx.r) ? 1 : schrittKosten(a, hx.q, hx.r);
@@ -644,7 +692,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       }
 
       // Die Nachbarfelder tragen im Zug ihre Taste - so sieht man, welche wohin fuehrt.
-      if (a.phase === 'ziehen' && !bewegt) {
+      if (a.phase === 'ziehen' && still) {
         ctx.font = `${5 * f}px monospace`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -672,7 +720,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       // Figuren von hinten nach vorn: Schleime (auch die eben zerplatzten) und der Ritter.
       type Figur = { y: number; mal: () => void };
       const figuren: Figur[] = [];
-      const malFigur = (art: 'ritter' | 'schleim', x: number, y: number, fs: number, o: { sx?: number; sy?: number; alpha?: number; blitz?: boolean; farbe?: string }) => {
+      const malFigur = (art: 'schleim', x: number, y: number, fs: number, o: { sx?: number; sy?: number; alpha?: number; blitz?: boolean; farbe?: string }) => {
         ctx.save();
         ctx.globalAlpha = o.alpha ?? 1;
         ctx.translate(x, y);
@@ -768,13 +816,30 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       const ro = stoss('ritter', ritter.x, ritter.y);
       // Ruhig atmet der Ritter: alle paar Augenblicke hebt sich die Brust.
       const atmet = ritter.hoch === 0 && Math.sin(sek * 2.2) > 0.4 ? 1 : 0;
+      // Blickrichtung: wohin er zuletzt ging; im Schritt das zweite Bild.
+      const lauf0 = ev.find((e): e is Extract<Ereignis, { art: 'gehen' }> => e.art === 'gehen' && e.wer === 'ritter');
+      if (lauf0) blick.current = mitte(lauf0.nach.q, lauf0.nach.r).x < mitte(lauf0.von.q, lauf0.von.r).x ? -1 : 1;
+      const imSchritt = lauf0 !== undefined && p >= lauf0.takt && p < lauf0.takt + 1 && (p - lauf0.takt) % 0.5 < 0.25;
       figuren.push({
         y: ro.y,
-        mal: () =>
-          malFigur('ritter', sx(ro.x) + ws.dx * f, sy(ro.y) + 3 * f - Math.round(ritter.hoch + atmet) * f, f, {
-            farbe: '#3a6ab0',
-            blitz: ws.blitz,
-          }),
+        mal: () => {
+          const bild = imSchritt ? RITTER_GEHT : RITTER_STEHT;
+          const bw = bild[0]!.length;
+          const X = sx(ro.x) + ws.dx * f;
+          const fuss = sy(ro.y) + 3 * f - Math.round(ritter.hoch + atmet) * f;
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+          ctx.fillRect(sx(ro.x) - 5 * f, sy(ro.y) + 3 * f, 10 * f, f);
+          ctx.save();
+          ctx.translate(X, fuss - bild.length * f);
+          ctx.scale(blick.current, 1);
+          zeichnePixel(ctx, bild, -Math.floor(bw / 2) * f, 0, f, PIX);
+          if (ws.blitz) {
+            ctx.filter = 'brightness(4) saturate(0)';
+            ctx.globalAlpha = 0.7;
+            zeichnePixel(ctx, bild, -Math.floor(bw / 2) * f, 0, f, PIX);
+          }
+          ctx.restore();
+        },
       });
       figuren.sort((x, y) => x.y - y.y).forEach((fi) => fi.mal());
 
@@ -842,7 +907,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         }
       }
       // Ist Wuerfeln dran, huepft ein Wuerfel ueber dem Ritter.
-      if (a.phase === 'wuerfeln' && !bewegt) {
+      if (a.phase === 'wuerfeln' && still) {
         const hops = Math.abs(Math.sin(sek * 3.2)) * 4;
         const X = sx(ritter.x);
         const Y = sy(ritter.y) - Math.round(26 + hops) * f;
@@ -959,23 +1024,38 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         <canvas ref={mini} width={170} height={130} />
       </div>
 
-      {/* Links: die Ausruestung. */}
-      <div className="ab-fenster ab-ausruestung">
-        <span className="ab-titel">Ausruestung</span>
-        {SLOTS.map((s) => {
-          const g = gegenstand(a.ausruestung[s] ?? '');
-          return (
-            <div key={s} className={g ? 'ab-platz voll' : 'ab-platz'} title={g ? `${g.name}: ${g.text}` : SLOT_NAME[s]}>
-              <span className="ab-platz-bild">{g ? <Icon id={g.id} /> : null}</span>
-              <span className="ab-platz-text">
-                <small>{SLOT_NAME[s]}</small>
-                {g?.name ?? '-'}
+      {/* Links: die Werte (mit Bildern statt Text), darunter die Ausruestung als Slots. */}
+      <div className="ab-links">
+        <div className="ab-fenster ab-werte">
+          <span className="ab-titel">Werte</span>
+          <div className="ab-werte-gitter">
+            {[
+              { id: 'schwert', wert: `+${angriffVon(a)}`, titel: 'Angriff: so viel kommt auf jeden Angriffswurf' },
+              { id: 'schild', wert: `+${abwehrVon(a)}`, titel: 'Abwehr: jeder Punkt faengt jeden dritten Schleim-Hieb ab' },
+              { id: 'herz', wert: `${maxLeben}`, titel: 'Hoechstes Leben' },
+              { id: 'auge', wert: `${sichtVon(a)}`, titel: 'Sicht: so viele Felder weit' },
+              { id: 'stiefel', wert: `+${schrittBonusVon(a)}`, titel: 'Schritte zusaetzlich je Wurf' },
+            ].map((w) => (
+              <span key={w.id} className="ab-wert" title={w.titel}>
+                <Icon id={w.id} groesse={18} />
+                <b>{w.wert}</b>
               </span>
-            </div>
-          );
-        })}
-        <div className="ab-werte">
-          Angriff +{angriffVon(a)} · Abwehr +{abwehrVon(a)} · Sicht {sichtVon(a)}
+            ))}
+          </div>
+        </div>
+        <div className="ab-fenster ab-ausruestung">
+          <span className="ab-titel">Ausruestung</span>
+          <div className="ab-slots">
+            {SLOTS.map((s) => {
+              const g = gegenstand(a.ausruestung[s] ?? '');
+              return (
+                <div key={s} className={`ab-slot ab-slot-${s}${g ? ' voll' : ''}`} title={g ? `${SLOT_NAME[s]}: ${g.name} - ${g.text}` : `${SLOT_NAME[s]}: leer`}>
+                  {/* Leer zeigt der Slot blass, was hineingehoert. */}
+                  <Icon id={g?.id ?? SLOT_BILD[s]} groesse={26} />
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -1041,7 +1121,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                 </span>
               </>
             )}
-            <small>{a.phase === 'ziehen' ? 'Jeder Schritt: die Schleime huepfen mit' : 'Leertaste, Knopf oder Karte antippen'}</small>
+            {a.phase !== 'ziehen' && <small>Enter, Knopf oder Karte antippen</small>}
           </div>
           {a.phase === 'ziehen' ? (
             <button className="ab-wurf" disabled={rollt} onClick={beenden} title="Die restlichen Schritte abwarten - jeder ist ein Tick">

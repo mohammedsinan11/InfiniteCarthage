@@ -1,5 +1,6 @@
 /**
- * Musik des Abenteuers - eigen, nichts aus der Strategie (client/audio.ts).
+ * Musik und Klaenge des Abenteuers - eigen, nichts aus der Strategie
+ * (client/audio.ts). Ein Knopf schaltet beides.
  *
  * Eine kleine Wanderweise in d-Dorisch, im Browser erzeugt: Laute (Dreieck)
  * zupft Akkorde, darueber eine Floete, darunter ein weicher Bass. Jede zweite
@@ -83,14 +84,23 @@ function weiter(): void {
   }
 }
 
+function kontext(): AudioContext | null {
+  if (ctx) return ctx;
+  try {
+    const Ctor: typeof AudioContext | undefined =
+      window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    ctx = Ctor ? new Ctor() : null;
+  } catch {
+    ctx = null;
+  }
+  return ctx;
+}
+
 /** Musik starten - erst nach einer Geste (Tippen, Taste), sonst schweigt der Browser. */
 export function starteMusik(): void {
   if (!musikAn() || uhr !== null) return;
   try {
-    const Ctor: typeof AudioContext | undefined =
-      window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctor) return;
-    ctx ??= new Ctor();
+    if (!kontext() || !ctx) return;
     if (!haupt) {
       haupt = ctx.createGain();
       haupt.gain.value = 0.5;
@@ -125,4 +135,107 @@ export function setzeMusik(an: boolean): void {
   }
   if (an) starteMusik();
   else stoppeMusik();
+}
+
+// --- Klaenge --------------------------------------------------------------
+
+let rauschen: AudioBuffer | null = null;
+let klangAusgang: GainNode | null = null;
+
+function rauschBuffer(c: AudioContext): AudioBuffer {
+  if (rauschen) return rauschen;
+  const b = c.createBuffer(1, Math.floor(c.sampleRate * 0.5), c.sampleRate);
+  const d = b.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  rauschen = b;
+  return b;
+}
+
+function ausgang(c: AudioContext): GainNode {
+  if (!klangAusgang) {
+    klangAusgang = c.createGain();
+    klangAusgang.gain.value = 0.6;
+    klangAusgang.connect(c.destination);
+  }
+  return klangAusgang;
+}
+
+/** Ein Rauschstoss durch einen Filter - Schritte, Hiebe, Platscher. */
+function stoss(c: AudioContext, t: number, dauer: number, laut: number, filter: BiquadFilterType, von: number, bis = von, q = 1): void {
+  const src = c.createBufferSource();
+  src.buffer = rauschBuffer(c);
+  const f = c.createBiquadFilter();
+  f.type = filter;
+  f.Q.value = q;
+  f.frequency.setValueAtTime(von, t);
+  f.frequency.exponentialRampToValueAtTime(bis, t + dauer);
+  const g = c.createGain();
+  g.gain.setValueAtTime(laut, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dauer);
+  src.connect(f).connect(g).connect(ausgang(c));
+  src.start(t, Math.random() * 0.3);
+  src.stop(t + dauer + 0.02);
+}
+
+/** Ein Ton, der in der Hoehe gleitet - Huepfer, Plopp, Warnung. */
+function gleit(c: AudioContext, t: number, art: OscillatorType, von: number, bis: number, dauer: number, laut: number): void {
+  const o = c.createOscillator();
+  o.type = art;
+  o.frequency.setValueAtTime(von, t);
+  o.frequency.exponentialRampToValueAtTime(bis, t + dauer);
+  const g = c.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(laut, t + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dauer);
+  o.connect(g).connect(ausgang(c));
+  o.start(t);
+  o.stop(t + dauer + 0.02);
+}
+
+export type Klang = 'schritt' | 'huepf' | 'hieb' | 'treffer' | 'platsch' | 'geblockt' | 'leer' | 'warnung' | 'zerplatzt';
+
+/** Ein kurzer Klang - nur, wenn der Ton an ist. */
+export function klang(art: Klang): void {
+  if (!musikAn()) return;
+  const c = kontext();
+  if (!c) return;
+  if (c.state === 'suspended') void c.resume();
+  const t = c.currentTime + 0.005;
+  switch (art) {
+    case 'schritt':
+      // Ein dumpfer Tritt auf Erde.
+      stoss(c, t, 0.08, 0.5, 'lowpass', 900, 300);
+      break;
+    case 'huepf':
+      gleit(c, t, 'sine', 260, 560, 0.09, 0.05);
+      break;
+    case 'hieb':
+      // Die Klinge pfeift durch die Luft.
+      stoss(c, t, 0.16, 0.35, 'bandpass', 3200, 700, 2);
+      break;
+    case 'treffer':
+      gleit(c, t, 'square', 150, 55, 0.12, 0.12);
+      stoss(c, t, 0.06, 0.4, 'lowpass', 1800, 400);
+      break;
+    case 'platsch':
+      // Ein Schleim klatscht auf den Ritter.
+      stoss(c, t, 0.18, 0.5, 'lowpass', 600, 150);
+      gleit(c, t, 'sine', 200, 80, 0.16, 0.15);
+      break;
+    case 'geblockt':
+      gleit(c, t, 'triangle', 1400, 1100, 0.12, 0.1);
+      stoss(c, t, 0.05, 0.25, 'highpass', 3000);
+      break;
+    case 'leer':
+      stoss(c, t, 0.14, 0.2, 'lowpass', 500, 200);
+      break;
+    case 'warnung':
+      gleit(c, t, 'triangle', 330, 300, 0.07, 0.08);
+      gleit(c, t + 0.09, 'triangle', 250, 220, 0.09, 0.08);
+      break;
+    case 'zerplatzt':
+      gleit(c, t, 'sine', 600, 160, 0.18, 0.14);
+      stoss(c, t, 0.2, 0.4, 'bandpass', 900, 300, 1.5);
+      break;
+  }
 }

@@ -51,15 +51,18 @@ const RUESTUNG: Pixelkarte = [
   '..kkkkkk.',
 ];
 
+/** Reitstiefel: Stulpe, Schnalle, Absatz, ein Glanzlicht auf dem Leder. */
 const STIEFEL: Pixelkarte = [
-  '..kkk....',
-  '..kbk....',
-  '..kbk....',
-  '..kbk....',
-  '..kbbkk..',
-  '.kbbbbbk.',
-  '.kBBBBBk.',
-  '..kkkkk..',
+  '..kkkkkk..',
+  '..kddddk..',
+  '..kbbbBk..',
+  '..kbwbBk..',
+  '..kyybBk..',
+  '..kbbbBkk.',
+  '.kbwbbbbBk',
+  'kbbbbbbbBk',
+  'kBBBBBBBBk',
+  'kkkkkkkkk.',
 ];
 
 const KRAUT: Pixelkarte = [
@@ -104,6 +107,59 @@ const HALBHERZ: Pixelkarte = [
   '...k...',
 ];
 
+/** Das Auge fuer die Sicht im Wertefenster. */
+const AUGE: Pixelkarte = [
+  '..kkkkk..',
+  '.kwwwwwk.',
+  'kwwuUuwwk',
+  'kwuUcUuwk',
+  'kwwuUuwwk',
+  '.kwwwwwk.',
+  '..kkkkk..',
+];
+
+/**
+ * Der Ritter des Abenteuers: Helm mit rotem Busch, blauer Waffenrock mit
+ * goldenem Kreuz, Schild links, Schwert rechts. Zwei Bilder: stehend und im
+ * Schritt. Eigen fuers Abenteuer - die Strategie behaelt ihre Figuren.
+ */
+export const RITTER_STEHT: Pixelkarte = [
+  '......rr......',
+  '.....rRrr.....',
+  '.....kkkkk....',
+  '....kwsssSk...',
+  '....kskkkSk.k.',
+  '....ksssSSkksk',
+  '.....kSSSk.ksk',
+  '...kkkuyukkksk',
+  'kkkkuuyuuSkgyg',
+  'kuyukuyyyukbk.',
+  'kyyykuuyuukk..',
+  'kuyukbbybbk...',
+  '.kuk.kuUuUk...',
+  '..k..kSkSk....',
+  '.....kSkSk....',
+  '....kBBkBBk...',
+];
+export const RITTER_GEHT: Pixelkarte = [
+  '......rr......',
+  '.....rRrr.....',
+  '.....kkkkk....',
+  '....kwsssSk...',
+  '....kskkkSk.k.',
+  '....ksssSSkksk',
+  '.....kSSSk.ksk',
+  '...kkkuyukkksk',
+  'kkkkuuyuuSkgyg',
+  'kuyukuyyyukbk.',
+  'kyyykuuyuukk..',
+  'kuyukbbybbk...',
+  '.kuk.kuUuUk...',
+  '..k.kSk.kSk...',
+  '....kSk..kSk..',
+  '...kBBk..kBBk.',
+];
+
 export const SYMBOL: Record<string, Pixelkarte> = {
   schwert: SCHWERT,
   axt: AXT,
@@ -118,6 +174,7 @@ export const SYMBOL: Record<string, Pixelkarte> = {
   gold: SACK,
   gelee: GELEE,
   truhe: TRUHE,
+  auge: AUGE,
 };
 
 /** Eine Pixelkarte auf ein Canvas - fuer Funde auf der Karte. */
