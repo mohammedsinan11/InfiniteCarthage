@@ -248,6 +248,18 @@ export const WAFFE: Record<string, Pixelkarte> = {
 };
 export const WAFFE_GRIFF = { x: 3.5, y: 10.5 };
 
+/**
+ * Die Schleime, je nach Art in eigener Farbe und Form:
+ * gewoehnlich gruen, Spuckschleim blau mit rundem Maul, Springschleim gelb
+ * mit Fuehlern, Panzerschleim grau mit Steinplatten.
+ */
+export const SCHLEIM_BILD: Record<'schleim' | 'spuck' | 'spring' | 'panzer', Pixelkarte> = {
+  schleim: ['...kkk...', '..keeek..', '.keeeeEk.', 'kewcewcEk', 'keeeeeeEk', 'kEeeeeEEk', '.kkkkkkk.'],
+  spuck: ['...kkk...', '..kuuuk..', '.kuuuuUk.', 'kuwcuwcUk', 'kuuukuuUk', 'kUuuuuUUk', '.kkkkkkk.'],
+  spring: ['..k...k..', '..yk.ky..', '..kkkkk..', '.kyyyygk.', 'kywcywcgk', 'kyyyyyygk', 'kgyyyyggk', '.kkkkkkk.'],
+  panzer: ['...kkk...', '..kmMmk..', '.kmmMmMk.', 'kmwcmwcMk', 'kMmmKmmMk', 'kMMmmmMMk', '.kkkkkkk.'],
+};
+
 /** Der Schleimkoenig: ein breiter Klumpen mit goldener Krone und rotem Stein. */
 export const SCHLEIMKOENIG: Pixelkarte = [
   '....y..r..y....',

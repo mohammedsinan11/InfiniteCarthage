@@ -221,6 +221,55 @@ describe('Abenteuer', () => {
     for (const z of ansagen) expect(z % 2).toBe(0);
   });
 
+  it('der Spuckschleim sagt eine Linie an und trifft, wer darin stehen bleibt', () => {
+    const a0 = neuesAbenteuer(13);
+    let a = imZug(13, [{ id: 7, q: a0.pos.q + 2, r: a0.pos.r, leben: 2, gross: false, art: 'spuck' }], 10);
+    a.leben = 99;
+    a = taste(a, 's');
+    const linie = a.schleime[0]!.flaeche;
+    expect(linie).toHaveLength(3);
+    expect(linie!.some((h) => h.q === a.pos.q && h.r === a.pos.r)).toBe(true);
+    const leben = a.leben;
+    a = taste(a, 's');
+    expect(a.ereignisse.some((e) => e.art === 'spuck')).toBe(true);
+    expect(a.leben).toBe(leben - 1);
+  });
+
+  it('der Springschleim sagt sein Landefeld an - wer ausweicht, unter dem landet er nicht', () => {
+    const a0 = neuesAbenteuer(21);
+    let a = imZug(21, [], 10);
+    const t = freieTaste(a);
+    const ri = ['e', 'd', 'x', 'z', 'a', 'q'].indexOf(t);
+    const gegen = HEX_DIRS[(ri + 3) % 6]!;
+    // Drei Felder entfernt auf der Gegenseite - wenn das Land ist.
+    const sp = { q: a0.pos.q + gegen[0] * 3, r: a0.pos.r + gegen[1] * 3 };
+    a.schleime = [{ id: 8, q: sp.q, r: sp.r, leben: 2, gross: false, art: 'spring' }];
+    a.leben = 99;
+    a = taste(a, 's');
+    expect(a.schleime[0]!.angriff).toEqual(a.pos);
+    const leben = a.leben;
+    const start = a.pos;
+    a = taste(a, t);
+    expect(a.leben).toBe(leben);
+    // Er ist gesprungen - auf das leere Feld, wenn es Land ist.
+    if (gelaende(21, start.q, start.r) !== 'water') expect(a.schleime[0]).toMatchObject({ q: start.q, r: start.r });
+  });
+
+  it('der Panzerschleim braucht einen Wurf ab 5', () => {
+    const a0 = neuesAbenteuer(11);
+    let b = imZug(11, [{ id: 9, q: a0.pos.q + 1, r: a0.pos.r, leben: 3, gross: false, art: 'panzer' }], 30);
+    b.leben = 99;
+    let treffer = 0;
+    for (let i = 0; i < 30 && b.phase === 'ziehen' && b.schleime.length; i++) {
+      b = taste(b, 'd');
+      for (const e of b.ereignisse) if (e.art === 'hieb' && e.wer === 'ritter') {
+        expect(e.schaden > 0).toBe(e.wurf + 1 >= 5);
+        if (e.schaden > 0) treffer++;
+      }
+    }
+    expect(treffer).toBeGreaterThan(0);
+  });
+
   it('Herzen werden gleich verbraucht - bei vollem Leben bleiben sie liegen', () => {
     // Ein Herz direkt neben den Start legen: das Feld suchen, auf dem eines liegt.
     let seed = 0;

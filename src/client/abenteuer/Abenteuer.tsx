@@ -39,6 +39,7 @@ import {
   neuesAbenteuer,
   normalisiere,
   richtungFuer,
+  schleimMaxLeben,
   schrittBonusVon,
   schrittKosten,
   sichtVon,
@@ -48,16 +49,16 @@ import {
   wuerfeln,
   zugBeenden,
 } from '../../abenteuer/regeln';
-import type { Abenteuer as Zustand, Ereignis, Slot, Taste, Wer } from '../../abenteuer/regeln';
+import type { Abenteuer as Zustand, Ereignis, SchleimArt, Slot, Taste, Wer } from '../../abenteuer/regeln';
 import { HEX_DIRS, hexDistance, hexKey, hexesInRange } from '../../core/coords';
 import type { Hex } from '../../core/coords';
 import { tileAt } from '../../core/world';
 import type { Terrain } from '../../core/types';
 import { HEX_CX, HEX_CY, IMG_H, IMG_W, kachelEcke, preloadTiles, tileImage, tileImageFog, tileUrl } from '../tiles';
-import { preloadUnitSprites, zeichneFigur } from '../units';
+import { preloadUnitSprites } from '../units';
 import { PIX, Px } from '../ui/KartenPixel';
 import { musikAn, setzeMusik, starteMusik, stoppeMusik } from './musik';
-import { RITTER_HAND, RITTER_KOERPER, RITTER_SCHRITT, SCHLEIMKOENIG, SYMBOL, WAFFE, WAFFE_GRIFF, zeichnePixel } from './symbole';
+import { RITTER_HAND, RITTER_KOERPER, RITTER_SCHRITT, SCHLEIMKOENIG, SCHLEIM_BILD, SYMBOL, WAFFE, WAFFE_GRIFF, zeichnePixel } from './symbole';
 import { LAUT_STUFEN, klang, lautstaerke, setzeLautstaerke } from './musik';
 import type { Klang } from './musik';
 
@@ -318,6 +319,7 @@ function spieleKlaenge(a: Zustand): void {
       }
     } else if (e.art === 'ansage') spaeter(e.takt + 0.2, 'warnung');
     else if (e.art === 'stampf') spaeter(e.takt + 0.5, 'beben');
+    else if (e.art === 'spuck') spaeter(e.takt + 0.1, 'spuck');
     else if (e.art === 'boss') spaeter(e.takt, 'beben');
     else if (e.art === 'tod') spaeter(e.takt + 0.5, 'zerplatzt');
   }
@@ -543,6 +545,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       for (const e of ev) if (e.art === 'tod') schleimEnde.set(e.wer, { q: e.q, r: e.r });
       const endeVon = (wer: Wer): Hex => (wer === 'ritter' ? a.pos : (schleimEnde.get(wer) ?? a.pos));
       const ort = (wer: Wer): { x: number; y: number; hoch: number } => {
+        // Springschleime fliegen hoch, alle anderen huepfen.
         const gehen = ev.filter((e): e is Extract<Ereignis, { art: 'gehen' }> => e.art === 'gehen' && e.wer === wer);
         let pos = endeVon(wer);
         if (gehen.length > 0 && p < gehen[gehen.length - 1]!.takt + 1) {
@@ -555,7 +558,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               const u = sanft(klemme(p - g.takt));
               const m0 = mitte(g.von.q, g.von.r);
               const m1 = mitte(g.nach.q, g.nach.r);
-              const hoch = wer === 'ritter' ? Math.abs(Math.sin(u * Math.PI * 2)) * 1.5 : Math.sin(u * Math.PI) * 7;
+              const hoch = wer === 'ritter' ? Math.abs(Math.sin(u * Math.PI * 2)) * 1.5 : Math.sin(u * Math.PI) * (g.sprung ? 18 : 7);
               return { x: m0.x + (m1.x - m0.x) * u, y: m0.y + (m1.y - m0.y) * u, hoch };
             }
             pos = g.nach;
@@ -777,16 +780,18 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       // Figuren von hinten nach vorn: Schleime (auch die eben zerplatzten) und der Ritter.
       type Figur = { y: number; mal: () => void };
       const figuren: Figur[] = [];
-      const malFigur = (art: 'schleim', x: number, y: number, fs: number, o: { sx?: number; sy?: number; alpha?: number; blitz?: boolean; farbe?: string }) => {
+      const malSchleim = (art: SchleimArt | undefined, x: number, y: number, fs: number, o: { sx?: number; sy?: number; alpha?: number; blitz?: boolean }) => {
+        const bild = SCHLEIM_BILD[art ?? 'schleim'];
+        const links = -Math.floor(bild[0]!.length / 2) * fs;
         ctx.save();
         ctx.globalAlpha = o.alpha ?? 1;
         ctx.translate(x, y);
         ctx.scale(o.sx ?? 1, o.sy ?? 1);
-        zeichneFigur(ctx, art, 0, 0, fs, o.farbe);
+        zeichnePixel(ctx, bild, links, -bild.length * fs, fs, PIX);
         if (o.blitz) {
           ctx.filter = 'brightness(4) saturate(0)';
           ctx.globalAlpha = (o.alpha ?? 1) * 0.7;
-          zeichneFigur(ctx, art, 0, 0, fs, o.farbe);
+          zeichnePixel(ctx, bild, links, -bild.length * fs, fs, PIX);
         }
         ctx.restore();
       };
@@ -807,8 +812,10 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       const lebende = new Set(a.schleime.map((s) => s.id));
       let beben = 0;
       const schleimeImBild = [
-        ...a.schleime.map((s) => ({ id: s.id, gross: s.gross, boss: !!s.boss, leben: s.leben, tot: null as number | null })),
-        ...ev.flatMap((e) => (e.art === 'tod' && !lebende.has(e.wer) ? [{ id: e.wer, gross: e.gross, boss: !!e.boss, leben: 0, tot: e.takt }] : [])),
+        ...a.schleime.map((s) => ({ id: s.id, gross: s.gross, boss: !!s.boss, art: s.art, leben: s.leben, tot: null as number | null })),
+        ...ev.flatMap((e) =>
+          e.art === 'tod' && !lebende.has(e.wer) ? [{ id: e.wer, gross: e.gross, boss: !!e.boss, art: e.schleimArt, leben: 0, tot: e.takt }] : [],
+        ),
       ];
       for (const s of schleimeImBild) {
         const o0 = ort(s.id);
@@ -816,7 +823,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         const o = stoss(s.id, o0.x, o0.y);
         const wu = wucht(s.id);
         const fs = s.gross ? f + Math.max(1, Math.round(f / 2)) : f;
-        const max = s.boss ? BOSS_LEBEN : s.gross ? 4 : 2;
+        const max = schleimMaxLeben(s);
+        const hoehe = SCHLEIM_BILD[s.art ?? 'schleim'].length;
         // Atmen: ein Schleim quillt und sackt, jeder in seinem Takt.
         const atem = Math.sin(sek * 3.1 + s.id * 1.7);
         let skx = 1 - atem * 0.06;
@@ -891,9 +899,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               if (holtAus && alpha > 0.3) schrift('!', X + 12 * kf, Y - 10 * kf, '#ff4a3a', 1, 8);
               return;
             }
-            malFigur('schleim', X, Y, fs, { sx: skx, sy: sky, alpha, blitz: wu.blitz });
-            if (alpha > 0.3 && lebenJetzt > 0) balken(X, Y - 9 * fs, lebenJetzt, max);
-            if (holtAus && alpha > 0.3) schrift('!', X + 9 * f, Y - 9 * fs, '#ff4a3a', 1, 7);
+            malSchleim(s.art, X, Y + f, fs, { sx: skx, sy: sky, alpha, blitz: wu.blitz });
+            if (alpha > 0.3 && lebenJetzt > 0) balken(X, Y - (hoehe + 2) * fs, lebenJetzt, max);
+            if (holtAus && alpha > 0.3) schrift('!', X + 9 * f, Y - (hoehe + 2) * fs, '#ff4a3a', 1, 7);
           },
         });
       }
@@ -1008,6 +1016,28 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             schrift(text, X, Y - 6 * f - k * 10 * f, farbe, 1.4 - k * 1.4, e.schaden > 0 ? 7 : 5);
           }
           if (e.ziel === 'ritter' && e.schaden > 0 && u > 0.45 && u < 1.3) rot = Math.max(rot, 1 - (u - 0.45) / 0.85);
+        } else if (e.art === 'spuck') {
+          // Ein blauer Batzen fliegt die Linie entlang - bis zum Ritter oder ans Ende.
+          if (u > 0.1 && u < 0.6) {
+            const k = (u - 0.1) / 0.5;
+            const von = ort(e.wer);
+            const treffer = e.felder.find((h) => h.q === a.pos.q && h.r === a.pos.r);
+            const ende = treffer ?? e.felder[e.felder.length - 1]!;
+            const bis = mitte(ende.q, ende.r);
+            const x = von.x + (bis.x - von.x) * k;
+            const y = von.y + (bis.y - von.y) * k - Math.sin(k * Math.PI) * 6 - 4;
+            for (let i = 3; i >= 0; i--) {
+              const kk = Math.max(0, k - i * 0.06);
+              const tx = von.x + (bis.x - von.x) * kk;
+              const ty = von.y + (bis.y - von.y) * kk - Math.sin(kk * Math.PI) * 6 - 4;
+              ctx.globalAlpha = i === 0 ? 1 : 0.35 - i * 0.08;
+              ctx.fillStyle = i === 0 ? '#5aa0d8' : '#9ad8ff';
+              ctx.fillRect(sx(tx) - f * 1.5, sy(ty) - f * 1.5, 3 * f, 3 * f);
+            }
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = '#d8f0ff';
+            ctx.fillRect(sx(x) - f / 2, sy(y) - f, f, f);
+          }
         } else if (e.art === 'tod') {
           // Zerplatzen: gruene Tropfen fliegen nach allen Seiten.
           const k = u - 0.45;

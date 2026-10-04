@@ -233,7 +233,7 @@ function gleit(c: AudioContext, t: number, art: OscillatorType, von: number, bis
   o.stop(t + dauer + 0.02);
 }
 
-export type Klang = 'schritt' | 'huepf' | 'hieb' | 'treffer' | 'platsch' | 'geblockt' | 'leer' | 'warnung' | 'zerplatzt' | 'beben' | 'probe' | 'wuerfelKlack' | 'wuerfelLand';
+export type Klang = 'schritt' | 'huepf' | 'hieb' | 'treffer' | 'platsch' | 'geblockt' | 'leer' | 'warnung' | 'zerplatzt' | 'beben' | 'probe' | 'wuerfelKlack' | 'wuerfelLand' | 'spuck';
 
 /** Ein kurzer Klang - nur, wenn der Ton an ist. */
 export function klang(art: Klang): void {
@@ -291,6 +291,11 @@ export function klang(art: Klang): void {
       gleit(c, t, 'sine', 220, 110, 0.12, 0.25);
       stoss(c, t, 0.05, 0.45, 'bandpass', 1500, 900, 4);
       stoss(c, t + 0.06, 0.025, 0.2, 'bandpass', 2400, 2000, 6);
+      break;
+    case 'spuck':
+      // Ein nasses "Ptoo".
+      gleit(c, t, 'sine', 900, 300, 0.12, 0.12);
+      stoss(c, t, 0.1, 0.3, 'bandpass', 1200, 500, 3);
       break;
     case 'probe':
       gleit(c, t, 'triangle', 660, 660, 0.12, 0.2);

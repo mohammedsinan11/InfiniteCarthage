@@ -98,6 +98,8 @@ export type Schleim = {
   angriff?: Hex | null;
   /** Der Schleimkoenig (BOSS): ein Boss statt eines gewoehnlichen Schleims. */
   boss?: boolean;
+  /** Besondere Schleime (SCHLEIMARTEN); ohne Art ein gewoehnlicher. */
+  art?: SchleimArt;
   /** Angesagter Flaechenschlag des Koenigs: alle diese Felder trifft er. */
   flaeche?: Hex[] | null;
   /** Wie oft der Koenig schon gehandelt hat - fuer seinen Rhythmus. */
@@ -105,6 +107,41 @@ export type Schleim = {
 };
 
 export type Phase = 'wuerfeln' | 'ziehen' | 'tot' | 'sieg';
+
+/**
+ * SCHLEIMARTEN - jede verlangt eine andere Antwort:
+ *   spuck   Spuckschleim: spuckt aus zwei, drei Feldern Abstand in gerader
+ *           Linie; die Linie gluet vorher rot - seitlich heraustreten.
+ *   spring  Springschleim: springt zwei Felder weit und sagt sein Landefeld
+ *           an; wer darauf stehen bleibt, wird getroffen, sonst landet er dort.
+ *   panzer  Panzerschleim: Steinpanzer - getroffen erst ab 5 statt 4, drei
+ *           Leben, traege (jeder zweite Tick); gibt zwei Gelee.
+ */
+export type SchleimArt = 'spuck' | 'spring' | 'panzer';
+export const SCHLEIM_NAME: Record<SchleimArt, string> = { spuck: 'Spuckschleim', spring: 'Springschleim', panzer: 'Panzerschleim' };
+
+/** Ein neuer Schleim: die Art aus einer Zahl 0..99 - gut die Haelfte gewoehnlich. */
+function neuerSchleim(id: number, q: number, r: number, zahl: number, fern: boolean): Schleim {
+  if (zahl < 16) return { id, q, r, leben: 2, gross: false, art: 'spuck' };
+  if (zahl < 32) return { id, q, r, leben: 2, gross: false, art: 'spring' };
+  if (zahl < 45) return { id, q, r, leben: 3, gross: false, art: 'panzer' };
+  const gross = fern && zahl % 3 === 0;
+  return { id, q, r, leben: gross ? 4 : 2, gross };
+}
+
+/** Wie man ihn nennt - mit "Der" davor. */
+export function schleimName(s: Pick<Schleim, 'boss' | 'art' | 'gross'>): string {
+  if (s.boss) return 'Schleimkoenig';
+  if (s.art) return SCHLEIM_NAME[s.art];
+  return s.gross ? 'grosse Schleim' : 'Schleim';
+}
+
+/** Hoechstes Leben eines Schleims - fuer die Lebensbalken. */
+export function schleimMaxLeben(s: Pick<Schleim, 'boss' | 'art' | 'gross'>): number {
+  if (s.boss) return BOSS_LEBEN;
+  if (s.art === 'panzer') return 3;
+  return s.gross ? 4 : 2;
+}
 
 /** Wer handelt: der Ritter oder ein Schleim (seine id). */
 export type Wer = 'ritter' | number;
@@ -114,7 +151,9 @@ export type Wer = 'ritter' | number;
  * Takt 0 ist der Ritter, jeder weitere Takt ein Tick der Spieluhr.
  */
 export type Ereignis =
-  | { art: 'gehen'; takt: number; wer: Wer; von: Hex; nach: Hex }
+  | { art: 'gehen'; takt: number; wer: Wer; von: Hex; nach: Hex; sprung?: boolean }
+  /** Ein Spuckschleim spuckt seine Linie entlang. */
+  | { art: 'spuck'; takt: number; wer: number; felder: Hex[] }
   /** Ein Hieb; ziel null heisst: ins Leere, der Ritter ist ausgewichen. */
   | { art: 'hieb'; takt: number; wer: Wer; ziel: Wer | null; feld?: Hex; wurf: number; schaden: number }
   /** Ein Schleim holt aus: im naechsten Takt trifft er dieses Feld (der Koenig auch mehrere). */
@@ -123,7 +162,7 @@ export type Ereignis =
   | { art: 'stampf'; takt: number; wer: number; felder: Hex[] }
   /** Der Schleimkoenig erwacht. */
   | { art: 'boss'; takt: number; wer: number }
-  | { art: 'tod'; takt: number; wer: number; q: number; r: number; gross: boolean; boss?: boolean }
+  | { art: 'tod'; takt: number; wer: number; q: number; r: number; gross: boolean; boss?: boolean; schleimArt?: SchleimArt }
   | { art: 'neu'; takt: number; wer: number }
   | { art: 'heil'; takt: number; leben: number }
   | { art: 'warten'; takt: number }
@@ -310,8 +349,7 @@ export function neuesAbenteuer(seed: number): Abenteuer {
     if (d < 4) continue;
     if (hash3i(seed, h.q, h.r, SALT_SCHLEIM) % 29 !== 0) continue;
     if (!begehbar(gelaende(seed, h.q, h.r))) continue;
-    const gross = d > 8 && hash3i(seed, h.q, h.r, SALT_SCHLEIM + 1) % 3 === 0;
-    a.schleime.push({ id: a.naechsteId++, q: h.q, r: h.r, leben: gross ? 4 : 2, gross });
+    a.schleime.push(neuerSchleim(a.naechsteId++, h.q, h.r, hash3i(seed, h.q, h.r, SALT_SCHLEIM + 1) % 100, d > 8));
   }
   sehen(a);
   return a;
@@ -456,29 +494,31 @@ function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
   const wurf = w6(a);
   const summeWurf = wurf + angriffVon(a);
   const krit = gegenstand(a.ausruestung.waffe ?? '')?.krit ?? 2;
-  const schaden = summeWurf >= 4 ? (wurf === 6 ? krit : 1) : 0;
+  // Der Panzer will einen kraeftigeren Hieb.
+  const noetig = s.art === 'panzer' ? 5 : 4;
+  const schaden = summeWurf >= noetig ? (wurf === 6 ? krit : 1) : 0;
   a.ereignisse.push({ art: 'hieb', takt, wer: 'ritter', ziel: s.id, wurf, schaden });
   if (schaden === 0) {
-    melde(a, `Wurf ${wurf}+${angriffVon(a)}: daneben.`);
+    melde(a, `Wurf ${wurf}+${angriffVon(a)}: ${s.art === 'panzer' ? 'prallt am Steinpanzer ab (ab 5)' : 'daneben'}.`);
     return;
   }
   s.leben -= schaden;
   if (s.leben > 0) {
-    melde(a, `Wurf ${wurf}+${angriffVon(a)}: Treffer${schaden > 1 ? ' (doppelt)' : ''} - der Schleim wankt.`);
+    melde(a, `Wurf ${wurf}+${angriffVon(a)}: Treffer${schaden > 1 ? ` (${schaden}fach)` : ''} - der ${schleimName(s)} wankt.`);
     return;
   }
   a.schleime = a.schleime.filter((x) => x.id !== s.id);
-  a.ereignisse.push({ art: 'tod', takt, wer: s.id, q: s.q, r: s.r, gross: s.gross, ...(s.boss ? { boss: true } : {}) });
+  a.ereignisse.push({ art: 'tod', takt, wer: s.id, q: s.q, r: s.r, gross: s.gross, ...(s.boss ? { boss: true } : {}), ...(s.art ? { schleimArt: s.art } : {}) });
   if (s.boss) {
     a.phase = 'sieg';
     melde(a, `Wurf ${wurf}+${angriffVon(a)}: der Schleimkoenig zerplatzt! Das Land atmet auf - Sieg!`);
     return;
   }
   a.erschlagen += 1;
-  const gelee = s.gross ? 2 : 1;
+  const gelee = s.gross || s.art === 'panzer' ? 2 : 1;
   a.inventar = { ...a.inventar, gelee: (a.inventar['gelee'] ?? 0) + gelee };
   const bisKoenig = a.bossErwacht ? '' : ` (${Math.min(a.erschlagen, BOSS_NACH)}/${BOSS_NACH})`;
-  melde(a, `Wurf ${wurf}+${angriffVon(a)}: der ${s.gross ? 'grosse ' : ''}Schleim zerplatzt! +${gelee} Gelee${bisKoenig}.`);
+  melde(a, `Wurf ${wurf}+${angriffVon(a)}: der ${schleimName(s)} zerplatzt! +${gelee} Gelee${bisKoenig}.`);
   if (!a.bossErwacht && a.erschlagen >= BOSS_NACH) bossErwacht(a, takt);
 }
 
@@ -556,6 +596,129 @@ export function lebenText(n: number): string {
   const ganz = Math.floor(n);
   const halb = n - ganz >= 0.5;
   return ganz === 0 && halb ? '½' : `${ganz}${halb ? '½' : ''}`;
+}
+
+/** Ein Hieb eines Schleims auf den Ritter: trifft, oder das Schild faengt ihn ab. */
+function schleimTrifft(a: Abenteuer, s: Schleim, feld: Hex, takt: number, rng: Rng): void {
+  const wurf = 1 + rng.int(6);
+  const schaden = wurf <= abwehrVon(a) * 2 ? 0 : s.gross ? 2 : 1;
+  a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: 'ritter', feld, wurf, schaden });
+  if (schaden > 0) {
+    a.leben -= schaden;
+    melde(a, `Der ${schleimName(s)} trifft dich: -${schaden} Leben.`);
+  } else melde(a, `Dein Schild faengt den ${schleimName(s)} ab.`);
+}
+
+/** Liegt der Ritter in gerader Linie, 2 bis 3 Felder weit? Dann die Richtung. */
+function linieZum(s: Hex, ziel: Hex): number | null {
+  for (let i = 0; i < 6; i++) {
+    const [dq, dr] = HEX_DIRS[i]!;
+    for (let k = 2; k <= 3; k++) if (s.q + dq * k === ziel.q && s.r + dr * k === ziel.r) return i;
+  }
+  return null;
+}
+
+/** Einen Schritt (oder Sprung) gehen - mit Spur und Ereignis. */
+function zieheSchleim(a: Abenteuer, s: Schleim, ziel: Hex, takt: number, sprung = false): void {
+  a.ereignisse.push({ art: 'gehen', takt, wer: s.id, von: { q: s.q, r: s.r }, nach: ziel, ...(sprung ? { sprung: true } : {}) });
+  a.spuren = { ...a.spuren, [s.id]: [...(a.spuren[s.id] ?? [{ q: s.q, r: s.r }]), ziel] };
+  s.q = ziel.q;
+  s.r = ziel.r;
+}
+
+/** Ein gewoehnlicher, grosser oder besonderer Schleim in seinem Tick. */
+function schleimHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetzt: (q: number, r: number) => boolean): void {
+  const frei = (h: Hex) => begehbar(gelaende(a.seed, h.q, h.r)) && !besetzt(h.q, h.r);
+  const d = hexDistance(s, a.pos);
+  // Der Spuckschleim spuckt seine angesagte Linie entlang.
+  if (s.flaeche) {
+    const felder = s.flaeche;
+    s.flaeche = null;
+    a.ereignisse.push({ art: 'spuck', takt, wer: s.id, felder });
+    const drauf = felder.find((h) => h.q === a.pos.q && h.r === a.pos.r);
+    if (drauf) schleimTrifft(a, s, drauf, takt, rng);
+    else {
+      a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: null, feld: felder[felder.length - 1]!, wurf: 0, schaden: 0 });
+      melde(a, 'Ausgewichen! Der Spuckschleim trifft nur Erde.');
+    }
+    return;
+  }
+  // Ein angesagter Angriff trifft sein Feld - steht der Ritter nicht mehr
+  // darauf, geht er ins Leere. Der Springschleim landet dann dort.
+  if (s.angriff) {
+    const feld = s.angriff;
+    s.angriff = null;
+    const getroffen = feld.q === a.pos.q && feld.r === a.pos.r;
+    if (s.art === 'spring') {
+      if (getroffen) {
+        schleimTrifft(a, s, feld, takt, rng);
+        // Er landet neben dem Ritter, so nah an seinem Absprung wie moeglich.
+        const neben = HEX_DIRS.map(([dq, dr]) => ({ q: feld.q + dq, r: feld.r + dr }))
+          .filter(frei)
+          .sort((x, y) => hexDistance(x, s) - hexDistance(y, s))[0];
+        if (neben && hexDistance(neben, s) > 0) zieheSchleim(a, s, neben, takt, true);
+      } else if (frei(feld)) {
+        a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: null, feld, wurf: 0, schaden: 0 });
+        zieheSchleim(a, s, feld, takt, true);
+        melde(a, 'Ausgewichen! Der Springschleim landet ins Leere.');
+      }
+      return;
+    }
+    if (!getroffen) {
+      a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: null, feld, wurf: 0, schaden: 0 });
+      melde(a, `Ausgewichen! Der ${schleimName(s)} klatscht ins Leere.`);
+      return;
+    }
+    schleimTrifft(a, s, feld, takt, rng);
+    return;
+  }
+  // Der Spuckschleim: in Linie und mit Abstand spuckt er.
+  if (s.art === 'spuck' && d >= 2 && d <= 3) {
+    const dir = linieZum(s, a.pos);
+    if (dir !== null) {
+      const [dq, dr] = HEX_DIRS[dir]!;
+      s.flaeche = [1, 2, 3].map((k) => ({ q: s.q + dq * k, r: s.r + dr * k }));
+      a.ereignisse.push({ art: 'ansage', takt, wer: s.id, feld: { q: a.pos.q, r: a.pos.r }, felder: s.flaeche });
+      melde(a, 'Der Spuckschleim zielt - tritt seitlich aus der Linie!');
+      return;
+    }
+  }
+  // Der Springschleim: bis drei Felder weit sagt er sein Landefeld an.
+  if ((s.art === 'spring' && d <= 3) || d === 1) {
+    s.angriff = { q: a.pos.q, r: a.pos.r };
+    a.ereignisse.push({ art: 'ansage', takt, wer: s.id, feld: s.angriff });
+    melde(a, s.art === 'spring' ? 'Der Springschleim duckt sich zum Sprung - weg vom roten Feld!' : `Der ${schleimName(s)} holt aus - weich aus oder schlag zu!`);
+    return;
+  }
+  let ziel: Hex | null = null;
+  let sprung = false;
+  if (d <= WITTERUNG) {
+    if (s.art === 'spring') {
+      // Zwei Felder weit auf einmal.
+      const weit = hexesInRange(s, 2).filter((h) => hexDistance(h, s) === 2 && frei(h) && hexDistance(h, a.pos) >= 1);
+      ziel = weit.sort((x, y) => hexDistance(x, a.pos) - hexDistance(y, a.pos))[0] ?? null;
+      sprung = ziel !== null;
+    } else if (s.art === 'spuck') {
+      // Ein Feld suchen, von dem aus der Ritter in Linie liegt - sonst naeher heran.
+      const nachbarn = HEX_DIRS.map(([dq, dr]) => ({ q: s.q + dq, r: s.r + dr })).filter(frei);
+      ziel =
+        nachbarn.find((h) => linieZum(h, a.pos) !== null) ??
+        (d > 3 ? (nachbarn.sort((x, y) => hexDistance(x, a.pos) - hexDistance(y, a.pos))[0] ?? null) : null);
+    }
+    if (!ziel && !sprung && s.art !== 'spuck') {
+      // Einen Hops naeher heran, nie ins Wasser und nicht auf einen anderen.
+      for (const [dq, dr] of HEX_DIRS) {
+        const n = { q: s.q + dq, r: s.r + dr };
+        if (!frei(n)) continue;
+        if (hexDistance(n, a.pos) < hexDistance(ziel ?? s, a.pos)) ziel = n;
+      }
+    }
+  } else if (rng.int(3) === 0) {
+    const [dq, dr] = HEX_DIRS[rng.int(6)]!;
+    const n = { q: s.q + dq, r: s.r + dr };
+    if (frei(n)) ziel = n;
+  }
+  if (ziel) zieheSchleim(a, s, ziel, takt, sprung);
 }
 
 /** Ein Schlag des Koenigs auf ein Feld (oder einen Ring) - trifft den Ritter, wenn er darauf steht. */
@@ -647,57 +810,12 @@ function ticken(a: Abenteuer, takt: number): void {
   const besetzt = (q: number, r: number) => (q === a.pos.q && r === a.pos.r) || a.schleime.some((s) => s.q === q && s.r === r);
   const neue: Schleim[] = [];
   for (const s of a.schleime) {
-    if (s.gross && a.zeit % 2 === 1) continue;
+    if ((s.gross || s.art === 'panzer') && a.zeit % 2 === 1) continue;
     if (s.boss) {
       koenigHandelt(a, s, takt, rng, besetzt, neue);
       continue;
     }
-    const d = hexDistance(s, a.pos);
-    // Ein angesagter Angriff trifft sein Feld - steht der Ritter nicht mehr
-    // darauf, geht er ins Leere. Ein Schild faengt jeden dritten Hieb ab.
-    if (s.angriff) {
-      const feld = s.angriff;
-      s.angriff = null;
-      const wurf = 1 + rng.int(6);
-      if (feld.q !== a.pos.q || feld.r !== a.pos.r) {
-        a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: null, feld, wurf, schaden: 0 });
-        melde(a, 'Ausgewichen! Der Schleim klatscht ins Leere.');
-        continue;
-      }
-      const schaden = wurf <= abwehrVon(a) * 2 ? 0 : s.gross ? 2 : 1;
-      a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: 'ritter', feld, wurf, schaden });
-      if (schaden > 0) {
-        a.leben -= schaden;
-        melde(a, `Ein ${s.gross ? 'grosser ' : ''}Schleim trifft dich: -${schaden} Leben.`);
-      } else melde(a, 'Dein Schild faengt den Schleim ab.');
-      continue;
-    }
-    // Neben dem Ritter holt er aus und sagt das Feld an - wer weggeht, entkommt.
-    if (d === 1) {
-      s.angriff = { q: a.pos.q, r: a.pos.r };
-      a.ereignisse.push({ art: 'ansage', takt, wer: s.id, feld: s.angriff });
-      melde(a, `Ein ${s.gross ? 'grosser ' : ''}Schleim holt aus - weich aus oder schlag zu!`);
-      continue;
-    }
-    let ziel: Hex | null = null;
-    if (d <= WITTERUNG) {
-      // Einen Hops naeher heran, nie ins Wasser und nicht auf einen anderen.
-      for (const [dq, dr] of HEX_DIRS) {
-        const n = { q: s.q + dq, r: s.r + dr };
-        if (!begehbar(gelaende(a.seed, n.q, n.r)) || besetzt(n.q, n.r)) continue;
-        if (hexDistance(n, a.pos) < hexDistance(ziel ?? s, a.pos)) ziel = n;
-      }
-    } else if (rng.int(3) === 0) {
-      const [dq, dr] = HEX_DIRS[rng.int(6)]!;
-      const n = { q: s.q + dq, r: s.r + dr };
-      if (begehbar(gelaende(a.seed, n.q, n.r)) && !besetzt(n.q, n.r)) ziel = n;
-    }
-    if (ziel) {
-      a.ereignisse.push({ art: 'gehen', takt, wer: s.id, von: { q: s.q, r: s.r }, nach: ziel });
-      a.spuren = { ...a.spuren, [s.id]: [...(a.spuren[s.id] ?? [{ q: s.q, r: s.r }]), ziel] };
-      s.q = ziel.q;
-      s.r = ziel.r;
-    }
+    schleimHandelt(a, s, takt, rng, besetzt);
   }
   a.schleime.push(...neue);
   if (a.zeit % NACHSCHUB === 0) {
@@ -707,9 +825,8 @@ function ticken(a: Abenteuer, takt: number): void {
       const q = a.pos.q + dir[0] * weit + (rng.int(3) - 1);
       const r = a.pos.r + dir[1] * weit + (rng.int(3) - 1);
       if (!begehbar(gelaende(a.seed, q, r)) || besetzt(q, r)) continue;
-      const gross = rng.int(4) === 0;
       const id = a.naechsteId++;
-      a.schleime.push({ id, q, r, leben: gross ? 4 : 2, gross });
+      a.schleime.push(neuerSchleim(id, q, r, rng.int(100), true));
       a.ereignisse.push({ art: 'neu', takt, wer: id });
       break;
     }
