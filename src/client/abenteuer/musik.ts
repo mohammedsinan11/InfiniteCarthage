@@ -192,7 +192,7 @@ function gleit(c: AudioContext, t: number, art: OscillatorType, von: number, bis
   o.stop(t + dauer + 0.02);
 }
 
-export type Klang = 'schritt' | 'huepf' | 'hieb' | 'treffer' | 'platsch' | 'geblockt' | 'leer' | 'warnung' | 'zerplatzt';
+export type Klang = 'schritt' | 'huepf' | 'hieb' | 'treffer' | 'platsch' | 'geblockt' | 'leer' | 'warnung' | 'zerplatzt' | 'beben';
 
 /** Ein kurzer Klang - nur, wenn der Ton an ist. */
 export function klang(art: Klang): void {
@@ -232,6 +232,11 @@ export function klang(art: Klang): void {
     case 'warnung':
       gleit(c, t, 'triangle', 330, 300, 0.07, 0.08);
       gleit(c, t + 0.09, 'triangle', 250, 220, 0.09, 0.08);
+      break;
+    case 'beben':
+      // Der Koenig: ein tiefes Grollen.
+      gleit(c, t, 'sine', 70, 38, 0.6, 0.35);
+      stoss(c, t, 0.5, 0.5, 'lowpass', 250, 60);
       break;
     case 'zerplatzt':
       gleit(c, t, 'sine', 600, 160, 0.18, 0.14);

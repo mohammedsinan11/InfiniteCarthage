@@ -1,7 +1,7 @@
 /** Abenteuer (src/abenteuer/regeln.ts): wuerfeln, gehen, kaempfen, sammeln - im Takt der Spieluhr. */
 
 import { describe, it, expect } from 'vitest';
-import { benutzen, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden } from '../src/abenteuer/regeln';
+import { BOSS_LEBEN, BOSS_NACH, benutzen, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden } from '../src/abenteuer/regeln';
 import type { Abenteuer, Taste } from '../src/abenteuer/regeln';
 import { HEX_DIRS, hexDistance } from '../src/core/coords';
 
@@ -142,6 +142,41 @@ describe('Abenteuer', () => {
       return;
     }
     throw new Error('kein Start neben einem Berg');
+  });
+
+  it('nach acht Schleimen erwacht der Schleimkoenig - wer ihn bezwingt, gewinnt', () => {
+    const a0 = neuesAbenteuer(11);
+    let b = imZug(11, [{ id: 99, q: a0.pos.q + 1, r: a0.pos.r, leben: 1, gross: false }], 20);
+    b.erschlagen = BOSS_NACH - 1;
+    for (let i = 0; i < 20 && b.schleime.some((x) => x.id === 99) && b.phase === 'ziehen'; i++) b = taste(b, 'd');
+    expect(b.erschlagen).toBe(BOSS_NACH);
+    const koenig = b.schleime.find((x) => x.boss);
+    expect(koenig?.leben).toBe(BOSS_LEBEN);
+    expect(b.bossErwacht).toBe(true);
+    expect(b.phase).not.toBe('sieg');
+    // Der Koenig faellt: Sieg.
+    const c = structuredClone(b);
+    c.phase = 'ziehen';
+    c.schritte = 30;
+    c.leben = 99;
+    c.schleime = [{ ...koenig!, q: c.pos.q + 1, r: c.pos.r, leben: 1, angriff: null, flaeche: null }];
+    let d = c;
+    for (let i = 0; i < 30 && d.phase === 'ziehen'; i++) d = taste(d, 'd');
+    expect(d.phase).toBe('sieg');
+  });
+
+  it('der Koenig sagt Schlag oder Ring an und handelt nur jeden zweiten Tick', () => {
+    const a0 = neuesAbenteuer(13);
+    let a = imZug(13, [{ id: 50, q: a0.pos.q, r: a0.pos.r - 1, leben: BOSS_LEBEN, gross: true, boss: true, zaehler: 0 }], 10);
+    a.leben = 99;
+    const ansagen: number[] = [];
+    for (let i = 0; i < 8; i++) {
+      a = taste(a, 's');
+      for (const e of a.ereignisse) if (e.art === 'ansage' && e.wer === 50) ansagen.push(a.zeit);
+    }
+    expect(ansagen.length).toBeGreaterThan(0);
+    // Nur an geraden Ticks.
+    for (const z of ansagen) expect(z % 2).toBe(0);
   });
 
   it('Herzen werden gleich verbraucht - bei vollem Leben bleiben sie liegen', () => {

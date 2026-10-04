@@ -23,6 +23,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
+  BOSS_LEBEN,
   SLOTS,
   SLOT_NAME,
   TASTEN,
@@ -56,7 +57,7 @@ import { HEX_CX, HEX_CY, IMG_H, IMG_W, kachelEcke, preloadTiles, tileImage, tile
 import { preloadUnitSprites, zeichneFigur } from '../units';
 import { PIX, Px } from '../ui/KartenPixel';
 import { musikAn, setzeMusik, starteMusik, stoppeMusik } from './musik';
-import { RITTER_GEHT, RITTER_STEHT, SYMBOL, zeichnePixel } from './symbole';
+import { RITTER_GEHT, RITTER_STEHT, SCHLEIMKOENIG, SYMBOL, zeichnePixel } from './symbole';
 import { klang } from './musik';
 import type { Klang } from './musik';
 
@@ -304,6 +305,8 @@ function spieleKlaenge(a: Zustand): void {
         spaeter(e.takt + 0.45, e.ziel === null ? 'leer' : e.schaden > 0 ? 'platsch' : 'geblockt');
       }
     } else if (e.art === 'ansage') spaeter(e.takt + 0.2, 'warnung');
+    else if (e.art === 'stampf') spaeter(e.takt + 0.5, 'beben');
+    else if (e.art === 'boss') spaeter(e.takt, 'beben');
     else if (e.art === 'tod') spaeter(e.takt + 0.5, 'zerplatzt');
   }
 }
@@ -351,11 +354,14 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const lauf = useRef<{ ziel: Hex; timer: number } | null>(null);
   const rolltRef = useRef(false);
   const blick = useRef<1 | -1>(1);
+  /** Seit wann das Banner "Der Schleimkoenig erwacht" steht. */
+  const banner = useRef(0);
 
   const setze = useCallback((neu: Zustand) => {
     aktuell.current = neu;
     if (neu.ereignisse.length > 0) {
       anim.current = { start: performance.now(), ev: neu.ereignisse };
+      if (neu.ereignisse.some((e) => e.art === 'boss')) banner.current = performance.now();
       spieleKlaenge(neu);
     }
     setA(neu);
@@ -655,6 +661,22 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         ecken.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(sx(m.x + x!), sy(m.y + y!)) : ctx.lineTo(sx(m.x + x!), sy(m.y + y!))));
         ctx.closePath();
       };
+      // Der Ring des Koenigs: alle Felder um ihn gluehen rot.
+      for (const s of a.schleime) {
+        if (!s.flaeche) continue;
+        const ansage = ev.find((e) => e.art === 'ansage' && e.wer === s.id);
+        const wachs = ansage ? klemme((p - ansage.takt) / 0.8) : 1;
+        if (wachs <= 0) continue;
+        const puls = 0.5 + 0.5 * Math.sin(sek * 8);
+        for (const h of s.flaeche) {
+          feldUmriss(h.q, h.r);
+          ctx.fillStyle = `rgba(220, 40, 30, ${(0.2 + 0.2 * puls) * wachs})`;
+          ctx.fill();
+          ctx.strokeStyle = `rgba(255, 80, 60, ${0.9 * wachs})`;
+          ctx.lineWidth = Math.max(2, f);
+          ctx.stroke();
+        }
+      }
       for (const s of a.schleime) {
         if (!s.angriff || hexDistance(s, a.pos) > sicht) continue;
         const ansage = ev.find((e) => e.art === 'ansage' && e.wer === s.id);
@@ -750,9 +772,10 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         ctx.fillRect(x - bw / 2, y, Math.round((bw * anteil) / f) * f, bh);
       };
       const lebende = new Set(a.schleime.map((s) => s.id));
+      let beben = 0;
       const schleimeImBild = [
-        ...a.schleime.map((s) => ({ id: s.id, gross: s.gross, leben: s.leben, tot: null as number | null })),
-        ...ev.flatMap((e) => (e.art === 'tod' && !lebende.has(e.wer) ? [{ id: e.wer, gross: e.gross, leben: 0, tot: e.takt }] : [])),
+        ...a.schleime.map((s) => ({ id: s.id, gross: s.gross, boss: !!s.boss, leben: s.leben, tot: null as number | null })),
+        ...ev.flatMap((e) => (e.art === 'tod' && !lebende.has(e.wer) ? [{ id: e.wer, gross: e.gross, boss: !!e.boss, leben: 0, tot: e.takt }] : [])),
       ];
       for (const s of schleimeImBild) {
         const o0 = ort(s.id);
@@ -760,7 +783,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         const o = stoss(s.id, o0.x, o0.y);
         const wu = wucht(s.id);
         const fs = s.gross ? f + Math.max(1, Math.round(f / 2)) : f;
-        const max = s.gross ? 4 : 2;
+        const max = s.boss ? BOSS_LEBEN : s.gross ? 4 : 2;
         // Atmen: ein Schleim quillt und sackt, jeder in seinem Takt.
         const atem = Math.sin(sek * 3.1 + s.id * 1.7);
         let skx = 1 - atem * 0.06;
@@ -773,7 +796,15 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           sky = 1.15;
         }
         // Holt er aus, duckt er sich zitternd zusammen.
-        const holtAus = a.schleime.find((x) => x.id === s.id)?.angriff;
+        const lebend = a.schleime.find((x) => x.id === s.id);
+        const holtAus = lebend?.angriff ?? lebend?.flaeche;
+        // Der Stampfer: der Koenig springt hoch und schlaegt auf.
+        const stampf = ev.find((e) => e.art === 'stampf' && e.wer === s.id);
+        if (stampf) {
+          const u = p - stampf.takt;
+          if (u >= 0 && u < 0.5) hoch += Math.sin((u / 0.5) * Math.PI) * 16;
+          if (u >= 0.5 && u < 0.9) beben = Math.max(beben, 1 - (u - 0.5) / 0.4);
+        }
         let zittern = 0;
         if (holtAus && o0.hoch === 0) {
           skx = 1.18;
@@ -807,7 +838,26 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             const Y = sy(o.y) + 3 * f - Math.round(hoch) * f;
             // Schatten bleibt am Boden, auch wenn der Schleim springt.
             ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
-            ctx.fillRect(sx(o.x) - 3 * fs, sy(o.y) + 3 * f, 6 * fs, f);
+            const sw = s.boss ? 10 * f : 3 * fs;
+            ctx.fillRect(sx(o.x) - sw, sy(o.y) + 3 * f, 2 * sw, f);
+            if (s.boss) {
+              // Der Koenig: eigenes Bild, deutlich groesser als ein Feld-Schleim.
+              const kf = Math.round(f * 1.6);
+              const kb = SCHLEIMKOENIG[0]!.length;
+              ctx.save();
+              ctx.globalAlpha = alpha;
+              ctx.translate(X, Y);
+              ctx.scale(skx, sky);
+              zeichnePixel(ctx, SCHLEIMKOENIG, -Math.floor(kb / 2) * kf, -SCHLEIMKOENIG.length * kf, kf, PIX);
+              if (wu.blitz) {
+                ctx.filter = 'brightness(4) saturate(0)';
+                ctx.globalAlpha = alpha * 0.7;
+                zeichnePixel(ctx, SCHLEIMKOENIG, -Math.floor(kb / 2) * kf, -SCHLEIMKOENIG.length * kf, kf, PIX);
+              }
+              ctx.restore();
+              if (holtAus && alpha > 0.3) schrift('!', X + 12 * kf, Y - 10 * kf, '#ff4a3a', 1, 8);
+              return;
+            }
             malFigur('schleim', X, Y, fs, { sx: skx, sy: sky, alpha, blitz: wu.blitz });
             if (alpha > 0.3 && lebenJetzt > 0) balken(X, Y - 9 * fs, lebenJetzt, max);
             if (holtAus && alpha > 0.3) schrift('!', X + 9 * f, Y - 9 * fs, '#ff4a3a', 1, 7);
@@ -922,6 +972,21 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         for (const [ax, ay] of [[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]] as const) ctx.fillRect(X + ax * 3 * f - f, Y + ay * 3 * f - f, 2 * f, 2 * f);
         schrift(w < 700 ? 'Tippen: wuerfeln' : 'Enter: wuerfeln', X, Y - g - 2 * f, '#f2c94c', 1, 5);
       }
+      // Der Stampfer laesst das Bild beben.
+      if (beben > 0) {
+        const d = Math.round(Math.sin(sek * 70) * 2 * beben) * f;
+        ctx.drawImage(c, d, 0);
+      }
+      // Das Banner, wenn der Koenig erwacht.
+      const seitBanner = (jetzt - banner.current) / 1000;
+      if (banner.current > 0 && seitBanner < 3) {
+        const al = seitBanner < 0.3 ? seitBanner / 0.3 : seitBanner > 2.4 ? (3 - seitBanner) / 0.6 : 1;
+        ctx.globalAlpha = al * 0.75;
+        ctx.fillStyle = '#120d08';
+        ctx.fillRect(0, c.height * 0.36, c.width, c.height * 0.14);
+        ctx.globalAlpha = 1;
+        schrift('Der Schleimkoenig erwacht!', c.width / 2, c.height * 0.43, '#f2c94c', al, w < 700 ? 7 : 9);
+      }
       // Ein roter Rand, wenn der Ritter getroffen wird.
       if (rot > 0) {
         const g = ctx.createRadialGradient(c.width / 2, c.height / 2, Math.min(c.width, c.height) * 0.3, c.width / 2, c.height / 2, Math.max(c.width, c.height) * 0.7);
@@ -953,6 +1018,14 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           const y = (s.r - a.pos.r) * z * 1.7 + m.height / 2;
           mctx.fillStyle = '#b6f07a';
           mctx.fillRect(Math.round(x), Math.round(y), z * 2, z * 2);
+        }
+        // Der Koenig steht immer auf der Karte - man soll ihn finden koennen.
+        for (const s of a.schleime) {
+          if (!s.boss) continue;
+          const x = Math.max(2, Math.min(m.width - 8, (s.q - a.pos.q + (s.r - a.pos.r) / 2) * z * 2 + m.width / 2));
+          const y = Math.max(2, Math.min(m.height - 8, (s.r - a.pos.r) * z * 1.7 + m.height / 2));
+          mctx.fillStyle = '#c8402f';
+          mctx.fillRect(Math.round(x) - 1, Math.round(y) - 1, z * 2 + 2, z * 2 + 2);
         }
         mctx.fillStyle = '#f2c94c';
         mctx.fillRect(m.width / 2 - 1, m.height / 2 - 1, z * 2 + 2, z * 2 + 2);
@@ -1019,6 +1092,20 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         </span>
         <span className="ab-schild">Zug {a.zug}</span>
       </div>
+
+      {/* Der Koenig ist erwacht: sein Leben oben in der Mitte, wie bei einem Boss. */}
+      {(() => {
+        const koenig = a.schleime.find((x) => x.boss);
+        if (!koenig) return null;
+        return (
+          <div className="ab-boss" title="Der Schleimkoenig - bezwinge ihn, um zu gewinnen">
+            <span>Schleimkoenig</span>
+            <div className="ab-boss-balken">
+              <i style={{ width: `${(100 * koenig.leben) / BOSS_LEBEN}%` }} />
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Rechts oben: die Uebersichtskarte. */}
       <div className="ab-fenster ab-mini">
@@ -1150,9 +1237,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         <div className="ab-ende">
           <div className="ab-fenster">
             <h2>{a.phase === 'sieg' ? 'Sieg!' : 'Der Ritter ist gefallen'}</h2>
-            <p>
-              {a.erschlagen} Schleime in {a.zug} Zuegen · {a.inventar['gold'] ?? 0} Gold · {a.erkundet.length} Felder erkundet
-            </p>
+            {a.phase === 'sieg' && <p>Der Schleimkoenig ist bezwungen.</p>}
             <button className="primary" onClick={neu}>
               Neues Abenteuer
             </button>

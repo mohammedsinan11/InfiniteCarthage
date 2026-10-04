@@ -7724,6 +7724,35 @@ em.off {
 .ab-ton.aus {
   color: var(--muted);
 }
+/* Der Lebensbalken des Schleimkoenigs, oben in der Mitte. */
+.ab-boss {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(340px, calc(100% - 660px));
+  text-align: center;
+  pointer-events: none;
+}
+.ab-boss span {
+  font-family: var(--pixel);
+  font-size: 10px;
+  color: #f2c94c;
+  text-shadow: 1px 1px 0 #120d08;
+}
+.ab-boss-balken {
+  height: 10px;
+  margin-top: 3px;
+  background: #3a1a14;
+  border: 2px solid #120d08;
+  box-shadow: 0 0 0 2px var(--line);
+}
+.ab-boss-balken i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(#e85a3a, #b8322a);
+  transition: width 0.3s ease-out;
+}
 .ab-mini {
   top: 10px;
   right: 10px;
@@ -8205,5 +8234,16 @@ em.off {
   }
   .ab-tisch-text small {
     display: none;
+  }
+}
+
+/* Handy: der Koenigsbalken unter dem Protokoll, neben dem Wertefenster. */
+@media (max-width: 700px) {
+  .ab-boss {
+    top: 210px;
+    left: 122px;
+    right: 10px;
+    width: auto;
+    transform: none;
   }
 }

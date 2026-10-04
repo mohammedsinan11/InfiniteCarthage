@@ -19,7 +19,8 @@
  * Ausruestung. Wer das Feld betritt, nimmt es mit. Erschlagene Schleime
  * lassen Gelee zurueck.
  *
- * ZIEL. Erschlage zehn Schleime. Faellt der Ritter, ist das Abenteuer vorbei.
+ * ZIEL. Nach BOSS_NACH Schleimen erwacht der Schleimkoenig; wer ihn
+ * bezwingt, gewinnt. Faellt der Ritter, ist das Abenteuer vorbei.
  */
 
 import { HEX_DIRS, hexDistance, hexKey, hexesInRange } from '../core/coords';
@@ -84,6 +85,12 @@ export type Schleim = {
   gross: boolean;
   /** Angesagter Angriff: dieses Feld trifft er in seinem naechsten Takt. */
   angriff?: Hex | null;
+  /** Der Schleimkoenig (BOSS): ein Boss statt eines gewoehnlichen Schleims. */
+  boss?: boolean;
+  /** Angesagter Flaechenschlag des Koenigs: alle diese Felder trifft er. */
+  flaeche?: Hex[] | null;
+  /** Wie oft der Koenig schon gehandelt hat - fuer seinen Rhythmus. */
+  zaehler?: number;
 };
 
 export type Phase = 'wuerfeln' | 'ziehen' | 'tot' | 'sieg';
@@ -99,9 +106,13 @@ export type Ereignis =
   | { art: 'gehen'; takt: number; wer: Wer; von: Hex; nach: Hex }
   /** Ein Hieb; ziel null heisst: ins Leere, der Ritter ist ausgewichen. */
   | { art: 'hieb'; takt: number; wer: Wer; ziel: Wer | null; feld?: Hex; wurf: number; schaden: number }
-  /** Ein Schleim holt aus: im naechsten Takt trifft er dieses Feld. */
-  | { art: 'ansage'; takt: number; wer: number; feld: Hex }
-  | { art: 'tod'; takt: number; wer: number; q: number; r: number; gross: boolean }
+  /** Ein Schleim holt aus: im naechsten Takt trifft er dieses Feld (der Koenig auch mehrere). */
+  | { art: 'ansage'; takt: number; wer: number; feld: Hex; felder?: Hex[] }
+  /** Der Koenig springt und schlaegt auf - alle angesagten Felder beben. */
+  | { art: 'stampf'; takt: number; wer: number; felder: Hex[] }
+  /** Der Schleimkoenig erwacht. */
+  | { art: 'boss'; takt: number; wer: number }
+  | { art: 'tod'; takt: number; wer: number; q: number; r: number; gross: boolean; boss?: boolean }
   | { art: 'neu'; takt: number; wer: number }
   | { art: 'heil'; takt: number; leben: number }
   | { art: 'warten'; takt: number }
@@ -133,6 +144,8 @@ export type Abenteuer = {
   /** Felder, die man je gesehen hat - fuer Nebel und Uebersichtskarte. */
   erkundet: string[];
   erschlagen: number;
+  /** Ist der Schleimkoenig schon erwacht? */
+  bossErwacht?: boolean;
   /** Was zuletzt geschah, neueste zuletzt. */
   log: string[];
   /** Die Ereignisse der letzten Aktion - nur fuers Bild. */
@@ -143,8 +156,19 @@ export type Abenteuer = {
   geruht: boolean;
 };
 
-/** So viele Schleime muss man erschlagen. */
-export const ZIEL_SCHLEIME = 10;
+/**
+ * DER SCHLEIMKOENIG. Nach BOSS_NACH erschlagenen Schleimen erwacht er und
+ * kommt auf den Ritter zu. Wer ihn bezwingt, gewinnt das Abenteuer. Er ist
+ * gross und traege - er handelt nur jeden zweiten Tick -, darum hat der Ritter
+ * zwischen Ansage und Schlag einen Zug fuer einen Hieb und einen zum
+ * Ausweichen. Sein Rhythmus: auf den Ritter zuwalzen, einen Schlag aufs Feld
+ * des Ritters ansagen (2 Schaden), jedes dritte Mal den ganzen Ring um sich
+ * (dann hilft nur ein Schritt weg), und jedes vierte Mal spaltet er einen
+ * kleinen Schleim ab.
+ */
+export const BOSS_NACH = 8;
+export const BOSS_LEBEN = 10;
+const BOSS_SCHADEN = 2;
 export const GRUND_LEBEN = 6;
 const GRUND_SICHT = 3;
 /** Wie weit Schleime den Ritter wittern. */
@@ -419,15 +443,43 @@ function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
     return;
   }
   a.schleime = a.schleime.filter((x) => x.id !== s.id);
-  a.ereignisse.push({ art: 'tod', takt, wer: s.id, q: s.q, r: s.r, gross: s.gross });
+  a.ereignisse.push({ art: 'tod', takt, wer: s.id, q: s.q, r: s.r, gross: s.gross, ...(s.boss ? { boss: true } : {}) });
+  if (s.boss) {
+    a.phase = 'sieg';
+    melde(a, `Wurf ${wurf}+${angriffVon(a)}: der Schleimkoenig zerplatzt! Das Land atmet auf - Sieg!`);
+    return;
+  }
   a.erschlagen += 1;
   const gelee = s.gross ? 2 : 1;
   a.inventar = { ...a.inventar, gelee: (a.inventar['gelee'] ?? 0) + gelee };
-  melde(a, `Wurf ${wurf}+${angriffVon(a)}: der ${s.gross ? 'grosse ' : ''}Schleim zerplatzt! +${gelee} Gelee (${a.erschlagen}/${ZIEL_SCHLEIME}).`);
-  if (a.erschlagen >= ZIEL_SCHLEIME) {
-    a.phase = 'sieg';
-    melde(a, 'Zehn Schleime erschlagen - das Land atmet auf. Sieg!');
+  const bisKoenig = a.bossErwacht ? '' : ` (${Math.min(a.erschlagen, BOSS_NACH)}/${BOSS_NACH})`;
+  melde(a, `Wurf ${wurf}+${angriffVon(a)}: der ${s.gross ? 'grosse ' : ''}Schleim zerplatzt! +${gelee} Gelee${bisKoenig}.`);
+  if (!a.bossErwacht && a.erschlagen >= BOSS_NACH) bossErwacht(a, takt);
+}
+
+/** Der Schleimkoenig erwacht, ein Stueck entfernt, und sucht den Ritter. */
+function bossErwacht(a: Abenteuer, takt: number): void {
+  const frei = (q: number, r: number) =>
+    begehbar(gelaende(a.seed, q, r)) && !(q === a.pos.q && r === a.pos.r) && !a.schleime.some((x) => x.q === q && x.r === r);
+  const rng = new Rng(a.rng);
+  let ort: Hex | null = null;
+  for (let versuch = 0; versuch < 40 && !ort; versuch++) {
+    const [dq, dr] = HEX_DIRS[rng.int(6)]!;
+    const weit = 5 + rng.int(2);
+    const h = { q: a.pos.q + dq * weit + rng.int(3) - 1, r: a.pos.r + dr * weit + rng.int(3) - 1 };
+    if (frei(h.q, h.r)) ort = h;
   }
+  // Zur Not das naechste freie Feld ab drei Schritten Abstand.
+  ort ??= hexesInRange(a.pos, 8)
+    .filter((h) => hexDistance(h, a.pos) >= 3 && frei(h.q, h.r))
+    .sort((x, y) => hexDistance(x, a.pos) - hexDistance(y, a.pos))[0] ?? null;
+  a.rng = rng.getState();
+  if (!ort) return;
+  const id = a.naechsteId++;
+  a.schleime.push({ id, q: ort.q, r: ort.r, leben: BOSS_LEBEN, gross: true, boss: true, zaehler: 0 });
+  a.bossErwacht = true;
+  a.ereignisse.push({ art: 'neu', takt, wer: id }, { art: 'boss', takt, wer: id });
+  melde(a, 'Der Boden bebt - der Schleimkoenig ist erwacht! Bezwinge ihn.');
 }
 
 function aufheben(a: Abenteuer): void {
@@ -475,6 +527,84 @@ export function lebenText(n: number): string {
   return ganz === 0 && halb ? '½' : `${ganz}${halb ? '½' : ''}`;
 }
 
+/** Ein Schlag des Koenigs auf ein Feld (oder einen Ring) - trifft den Ritter, wenn er darauf steht. */
+function koenigTrifft(a: Abenteuer, s: Schleim, felder: readonly Hex[], takt: number, rng: Rng): void {
+  const drauf = felder.some((h) => h.q === a.pos.q && h.r === a.pos.r);
+  const wurf = 1 + rng.int(6);
+  const feld = drauf ? { q: a.pos.q, r: a.pos.r } : felder[0]!;
+  if (!drauf) {
+    a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: null, feld, wurf, schaden: 0 });
+    melde(a, 'Ausgewichen! Der Schleimkoenig schlaegt ins Leere.');
+    return;
+  }
+  const schaden = wurf <= abwehrVon(a) * 2 ? 0 : BOSS_SCHADEN;
+  a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: 'ritter', feld, wurf, schaden });
+  if (schaden > 0) {
+    a.leben -= schaden;
+    melde(a, `Der Schleimkoenig trifft dich: -${schaden} Leben.`);
+  } else melde(a, 'Dein Schild faengt den Koenig ab.');
+}
+
+/** Der Koenig handelt (nur jeden zweiten Tick, wie alle grossen Schleime). */
+function koenigHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetzt: (q: number, r: number) => boolean, neue: Schleim[]): void {
+  // Erst die Ansage einloesen.
+  if (s.flaeche) {
+    const felder = s.flaeche;
+    s.flaeche = null;
+    a.ereignisse.push({ art: 'stampf', takt, wer: s.id, felder });
+    koenigTrifft(a, s, felder, takt, rng);
+    return;
+  }
+  if (s.angriff) {
+    const feld = s.angriff;
+    s.angriff = null;
+    koenigTrifft(a, s, [feld], takt, rng);
+    return;
+  }
+  s.zaehler = (s.zaehler ?? 0) + 1;
+  // Jedes vierte Mal spaltet er einen kleinen Schleim ab - hoechstens drei um ihn.
+  const kleine = a.schleime.filter((x) => !x.boss && hexDistance(x, s) <= 4).length + neue.length;
+  if (s.zaehler % 4 === 0 && kleine < 3) {
+    const platz = HEX_DIRS.map(([dq, dr]) => ({ q: s.q + dq, r: s.r + dr })).find(
+      (h) => begehbar(gelaende(a.seed, h.q, h.r)) && !besetzt(h.q, h.r) && !neue.some((x) => x.q === h.q && x.r === h.r),
+    );
+    if (platz) {
+      const id = a.naechsteId++;
+      neue.push({ id, q: platz.q, r: platz.r, leben: 2, gross: false });
+      a.ereignisse.push({ art: 'neu', takt, wer: id });
+      melde(a, 'Der Schleimkoenig spaltet einen kleinen Schleim ab.');
+      return;
+    }
+  }
+  const d = hexDistance(s, a.pos);
+  if (d === 1) {
+    if (s.zaehler % 3 === 0) {
+      // Der Ring: alle sechs Felder um ihn - nur ein Schritt weg rettet.
+      s.flaeche = HEX_DIRS.map(([dq, dr]) => ({ q: s.q + dq, r: s.r + dr }));
+      a.ereignisse.push({ art: 'ansage', takt, wer: s.id, feld: { q: a.pos.q, r: a.pos.r }, felder: s.flaeche });
+      melde(a, 'Der Schleimkoenig holt zum Stampfer aus - raus aus dem Ring!');
+    } else {
+      s.angriff = { q: a.pos.q, r: a.pos.r };
+      a.ereignisse.push({ art: 'ansage', takt, wer: s.id, feld: s.angriff });
+      melde(a, 'Der Schleimkoenig holt aus - weich aus oder schlag zu!');
+    }
+    return;
+  }
+  // Sonst walzt er heran - er wittert den Ritter ueberall.
+  let ziel: Hex | null = null;
+  for (const [dq, dr] of HEX_DIRS) {
+    const n = { q: s.q + dq, r: s.r + dr };
+    if (!begehbar(gelaende(a.seed, n.q, n.r)) || besetzt(n.q, n.r)) continue;
+    if (hexDistance(n, a.pos) < hexDistance(ziel ?? s, a.pos)) ziel = n;
+  }
+  if (ziel) {
+    a.ereignisse.push({ art: 'gehen', takt, wer: s.id, von: { q: s.q, r: s.r }, nach: ziel });
+    a.spuren = { ...a.spuren, [s.id]: [...(a.spuren[s.id] ?? [{ q: s.q, r: s.r }]), ziel] };
+    s.q = ziel.q;
+    s.r = ziel.r;
+  }
+}
+
 /**
  * Ein Tick der Spieluhr. Jeder Schleim tut eines: neben dem Ritter springt er
  * ihn an, in Witterung huepft er naeher, sonst huepft er mal hierhin, mal
@@ -484,8 +614,13 @@ function ticken(a: Abenteuer, takt: number): void {
   a.zeit += 1;
   const rng = new Rng(a.rng);
   const besetzt = (q: number, r: number) => (q === a.pos.q && r === a.pos.r) || a.schleime.some((s) => s.q === q && s.r === r);
+  const neue: Schleim[] = [];
   for (const s of a.schleime) {
     if (s.gross && a.zeit % 2 === 1) continue;
+    if (s.boss) {
+      koenigHandelt(a, s, takt, rng, besetzt, neue);
+      continue;
+    }
     const d = hexDistance(s, a.pos);
     // Ein angesagter Angriff trifft sein Feld - steht der Ritter nicht mehr
     // darauf, geht er ins Leere. Ein Schild faengt jeden dritten Hieb ab.
@@ -533,6 +668,7 @@ function ticken(a: Abenteuer, takt: number): void {
       s.r = ziel.r;
     }
   }
+  a.schleime.push(...neue);
   if (a.zeit % NACHSCHUB === 0) {
     for (let versuch = 0; versuch < 12; versuch++) {
       const dir = HEX_DIRS[rng.int(6)]!;

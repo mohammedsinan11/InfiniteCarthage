@@ -160,6 +160,21 @@ export const RITTER_GEHT: Pixelkarte = [
   '...kBBk..kBBk.',
 ];
 
+/** Der Schleimkoenig: ein breiter Klumpen mit goldener Krone und rotem Stein. */
+export const SCHLEIMKOENIG: Pixelkarte = [
+  '....y..r..y....',
+  '....yy.y.yy....',
+  '....yyyyyyy....',
+  '...kkkkkkkkk...',
+  '..keeeeeeeeEk..',
+  '.keweeeeeweeEk.',
+  '.kecceeeecceEk.',
+  'keeeeeeeeeeeeEk',
+  'keeeeccccceeeEk',
+  'kEeeeeeeeeeeEEk',
+  '.kkkkkkkkkkkkk.',
+];
+
 export const SYMBOL: Record<string, Pixelkarte> = {
   schwert: SCHWERT,
   axt: AXT,
