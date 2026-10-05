@@ -30,8 +30,8 @@ import { Rng } from '../core/rng';
 import { boden, istWasser } from './welt';
 import type { Boden } from './welt';
 
-export type Slot = 'waffe' | 'schild' | 'kopf' | 'koerper' | 'fuesse' | 'zubehoer';
-export const SLOTS: readonly Slot[] = ['waffe', 'schild', 'kopf', 'koerper', 'fuesse', 'zubehoer'];
+export type Slot = 'waffe' | 'schild' | 'kopf' | 'koerper' | 'fuesse' | 'zubehoer' | 'wuerfel';
+export const SLOTS: readonly Slot[] = ['waffe', 'schild', 'kopf', 'koerper', 'fuesse', 'zubehoer', 'wuerfel'];
 export const SLOT_NAME: Record<Slot, string> = {
   waffe: 'Waffe',
   schild: 'Schild',
@@ -39,6 +39,7 @@ export const SLOT_NAME: Record<Slot, string> = {
   koerper: 'Koerper',
   fuesse: 'Fuesse',
   zubehoer: 'Zubehoer',
+  wuerfel: 'Wuerfel',
 };
 
 /**
@@ -79,9 +80,29 @@ export type Gegenstand = {
    */
   ladung?: number;
   faehigkeit?: Faehigkeit;
+  /** Wuerfel: wie gut er fuer den Vergleich im Inventar ist (gruen/rot). */
+  wuerfelWert?: number;
 };
 
+/**
+ * WUERFEL ALS AUSRUESTUNG - ein eigener Platz. Ohne Wuerfel wirft der Ritter
+ * einen gewoehnlichen W6. Jeder Wuerfel wirft anders:
+ *   glueckswuerfel  W6 - einmal je Zug neu wuerfeln, solange man nicht ging
+ *   bleiwuerfel     W6, aber nie unter 3
+ *   zwillingswuerfel zwei W6, der hoehere zaehlt
+ *   wanderwuerfel   W8
+ *   fluchwuerfel    W10 - eine 1 kostet ein Leben
+ *   goldwuerfel     W6 - eine 6 bringt Gold
+ */
+export const WUERFEL_SEITEN: Record<string, number> = { wanderwuerfel: 8, fluchwuerfel: 10 };
+
 export const GEGENSTAENDE: readonly Gegenstand[] = [
+  { id: 'glueckswuerfel', name: 'Glueckswuerfel', slot: 'wuerfel', wuerfelWert: 3, text: 'Einmal je Zug darfst du neu wuerfeln (R) - solange du noch keinen Schritt gegangen bist.' },
+  { id: 'bleiwuerfel', name: 'Bleiwuerfel', slot: 'wuerfel', wuerfelWert: 3, text: 'Schwer und treu: wuerfelt nie unter 3.' },
+  { id: 'zwillingswuerfel', name: 'Zwillingswuerfel', slot: 'wuerfel', wuerfelWert: 4, text: 'Zwei Wuerfel auf einmal - der hoehere zaehlt.' },
+  { id: 'wanderwuerfel', name: 'Wanderwuerfel', slot: 'wuerfel', wuerfelWert: 3, text: 'Acht Seiten: 1 bis 8 Schritte.' },
+  { id: 'fluchwuerfel', name: 'Fluchwuerfel', slot: 'wuerfel', wuerfelWert: 2, text: 'Zehn Seiten: 1 bis 10 Schritte - aber eine 1 kostet dich ein Leben.' },
+  { id: 'goldwuerfel', name: 'Goldwuerfel', slot: 'wuerfel', wuerfelWert: 2, text: 'Ein gewoehnlicher W6 - aber jede 6 bringt 1 bis 3 Gold.' },
   { id: 'schwert', name: 'Schwert', slot: 'waffe', angriff: 1, text: '+1 auf jeden Angriffswurf.' },
   { id: 'axt', name: 'Streitaxt', slot: 'waffe', angriff: 2, ladung: 5, faehigkeit: 'spalthieb', text: '+2 auf jeden Angriffswurf. Ladung 5: Spalthieb - der naechste Treffer macht 2 Schaden mehr.' },
   { id: 'breitschwert', name: 'Breitschwert', slot: 'waffe', angriff: 2, ladung: 6, faehigkeit: 'schutzwall', text: '+2 auf jeden Angriffswurf. Ladung 6: Schutzwall - der naechste Treffer gegen dich wird abgefangen.' },
@@ -136,7 +157,24 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
 export const gegenstand = (id: string): Gegenstand | undefined => GEGENSTAENDE.find((g) => g.id === id);
 
 /** Was in Truhen liegen kann - das Schwert traegt der Ritter schon. */
-const TRUHENINHALT = ['axt', 'breitschwert', 'runenklinge', 'flammenschwert', 'schild', 'helm', 'ruestung', 'stiefel', 'laterne', 'angel'];
+const TRUHENINHALT = [
+  'axt',
+  'breitschwert',
+  'runenklinge',
+  'flammenschwert',
+  'schild',
+  'helm',
+  'ruestung',
+  'stiefel',
+  'laterne',
+  'angel',
+  'glueckswuerfel',
+  'bleiwuerfel',
+  'zwillingswuerfel',
+  'wanderwuerfel',
+  'fluchwuerfel',
+  'goldwuerfel',
+];
 
 /**
  * Wie gut ein Ausruestungsteil ist - fuer den Vergleich im Inventar (gruen
@@ -146,7 +184,14 @@ export function ausruestungsWert(id: string | null): number {
   const g = gegenstand(id ?? '');
   if (!g?.slot) return -1;
   return (
-    (g.angriff ?? 0) * 3 + ((g.krit ?? 2) - 2) * 2 + (g.ladung ? 2 : 0) + (g.abwehr ?? 0) * 3 + (g.leben ?? 0) * 2 + (g.schritte ?? 0) * 3 + (g.sicht ?? 0) * 2
+    (g.angriff ?? 0) * 3 +
+    ((g.krit ?? 2) - 2) * 2 +
+    (g.ladung ? 2 : 0) +
+    (g.abwehr ?? 0) * 3 +
+    (g.leben ?? 0) * 2 +
+    (g.schritte ?? 0) * 3 +
+    (g.sicht ?? 0) * 2 +
+    (g.wuerfelWert ?? 0)
   );
 }
 
@@ -276,6 +321,8 @@ export type Ereignis =
   | { art: 'treffen'; takt: number; ort: number }
   /** Stufe 2: ein bleibender Kreis wirkt (Schaden, Heilung, Bann, Schutz). */
   | { art: 'kreis'; takt: number; name: Zauber; ziele: number[]; felder?: Hex[] }
+  /** Der Fluchwuerfel zeigt eine 1: ein Leben weniger. */
+  | { art: 'fluch'; takt: number }
   /** Gift: der Ritter steht in einer Pfuetze. */
   | { art: 'gift'; takt: number }
   /** Ein legendaerer Fund wirkt. */
@@ -307,6 +354,10 @@ export type Abenteuer = {
   phase: Phase;
   pos: Hex;
   wurf: number | null;
+  /** Zwillingswuerfel: der zweite Wuerfel des letzten Wurfs. */
+  zweiterWurf?: number | null;
+  /** Glueckswuerfel: in diesem Zug schon neu gewuerfelt? */
+  neuGewuerfelt?: boolean;
   schritte: number;
   /** Der Weg dieses Zuges, mit dem Startfeld - fuer die Pfeile. */
   pfad: Hex[];
@@ -503,7 +554,7 @@ export function neuesAbenteuer(seed: number): Abenteuer {
     pfad: [start],
     leben: GRUND_LEBEN,
     inventar: {},
-    ausruestung: { waffe: 'schwert', schild: null, kopf: null, koerper: null, fuesse: null, zubehoer: null },
+    ausruestung: { waffe: 'schwert', schild: null, kopf: null, koerper: null, fuesse: null, zubehoer: null, wuerfel: null },
     schleime: [],
     naechsteId: 1,
     genommen: [hexKey(start.q, start.r)],
@@ -565,16 +616,64 @@ const schleimAuf = (a: Abenteuer, q: number, r: number) => a.schleime.find((s) =
 
 // --- Aktionen -------------------------------------------------------------
 
+/** Ein Wurf mit dem angelegten Wuerfel - mit seinen Eigenheiten. */
+function wuerfelWurf(a: Abenteuer): { wurf: number; zusatz: string } {
+  const id = a.ausruestung.wuerfel ?? '';
+  const rng = new Rng(a.rng);
+  const seite = (n: number) => 1 + rng.int(n);
+  let wurf = seite(WUERFEL_SEITEN[id] ?? 6);
+  let zusatz = '';
+  a.zweiterWurf = null;
+  if (id === 'bleiwuerfel' && wurf < 3) {
+    zusatz = ` (Blei: ${wurf} wird 3)`;
+    wurf = 3;
+  } else if (id === 'zwillingswuerfel') {
+    const zweiter = seite(6);
+    a.zweiterWurf = zweiter;
+    zusatz = ` (Zwillinge: ${wurf} und ${zweiter})`;
+    wurf = Math.max(wurf, zweiter);
+  } else if (id === 'fluchwuerfel' && wurf === 1) {
+    a.leben = Math.max(0.5, a.leben - 1);
+    a.ereignisse.push({ art: 'fluch', takt: 0 });
+    zusatz = ' - der Fluch beisst: -1 Leben';
+  } else if (id === 'goldwuerfel' && wurf === 6) {
+    const gold = seite(3);
+    a.inventar = { ...a.inventar, gold: (a.inventar['gold'] ?? 0) + gold };
+    zusatz = ` - der Goldwuerfel klimpert: +${gold} Gold`;
+  }
+  a.rng = rng.getState();
+  return { wurf, zusatz };
+}
+
 export function wuerfeln(alt: Abenteuer): Abenteuer {
   if (alt.phase !== 'wuerfeln') return alt;
   const a = structuredClone(alt);
-  a.wurf = w6(a);
+  a.ereignisse = [];
+  const { wurf, zusatz } = wuerfelWurf(a);
+  a.wurf = wurf;
   a.schritte = a.wurf + schrittBonus(a);
   a.pfad = [a.pos];
   a.phase = 'ziehen';
-  a.ereignisse = [];
   a.spuren = {};
-  melde(a, `Gewuerfelt: ${a.wurf}${schrittBonus(a) > 0 ? ` (+${schrittBonus(a)} Stiefel)` : ''} - ${a.schritte} Schritte.`);
+  a.neuGewuerfelt = false;
+  melde(a, `Gewuerfelt: ${a.wurf}${zusatz}${schrittBonus(a) > 0 ? ` (+${schrittBonus(a)} Stiefel)` : ''} - ${a.schritte} Schritte.`);
+  return a;
+}
+
+/** Glueckswuerfel: neu wuerfeln - einmal je Zug, solange noch kein Schritt getan ist. */
+export const kannNeuWuerfeln = (a: Abenteuer): boolean =>
+  a.phase === 'ziehen' && a.ausruestung.wuerfel === 'glueckswuerfel' && !a.neuGewuerfelt && a.wurf !== null && a.schritte === a.wurf + schrittBonus(a) && a.pfad.length === 1;
+
+export function neuWuerfeln(alt: Abenteuer): Abenteuer {
+  if (!kannNeuWuerfeln(alt)) return alt;
+  const a = structuredClone(alt);
+  a.ereignisse = [];
+  const vorher = a.wurf;
+  const { wurf } = wuerfelWurf(a);
+  a.wurf = wurf;
+  a.schritte = wurf + schrittBonus(a);
+  a.neuGewuerfelt = true;
+  melde(a, `Glueckswuerfel: ${vorher} verworfen - neu gewuerfelt: ${wurf}. ${a.schritte} Schritte.`);
   return a;
 }
 
@@ -1739,6 +1838,8 @@ export function verkaufsPreis(id: string): number {
 export const HAENDLER_WAREN: readonly { id: string; preis: number }[] = [
   { id: 'kraut', preis: 3 },
   { id: 'angel', preis: 6 },
+  { id: 'bleiwuerfel', preis: 10 },
+  { id: 'glueckswuerfel', preis: 14 },
 ];
 
 /** Die drei Angebote eines Werbers - fest aus Seed und Ort. */
@@ -2171,6 +2272,8 @@ export function normalisiere(a: Abenteuer): Abenteuer {
   a.ereignisse ??= [];
   a.geruht ??= false;
   a.spuren ??= {};
+  // Spielstaende von vor dem Wuerfel-Platz.
+  if (a.ausruestung.wuerfel === undefined) a.ausruestung.wuerfel = null;
   // Spielstaende von vor den Haendlern: einen Haendler und einen Werber dazustellen.
   if (!a.orte) {
     ortePlatzieren(a);

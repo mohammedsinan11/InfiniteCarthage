@@ -25,6 +25,9 @@ import type { CSSProperties } from 'react';
 import {
   FAEHIGKEIT_NAME,
   FRAKTION_FIGUR,
+  WUERFEL_SEITEN,
+  kannNeuWuerfeln,
+  neuWuerfeln,
   BEGLEITER_FUER,
   BESCHWOERUNG_VOLL,
   PENTA_STUFE3_NACH,
@@ -166,6 +169,7 @@ const SLOT_BILD: Record<Slot, string> = {
   koerper: 'ruestung',
   fuesse: 'stiefel',
   zubehoer: 'laterne',
+  wuerfel: 'wuerfel',
 };
 
 /** Farben der Zauberkreise (Pentagrammmeister Stufe 2). */
@@ -362,7 +366,41 @@ const AUGEN: Record<number, [number, number][]> = {
  * Der Wuerfel: er taumelt ueber den Tisch, die Augen flackern immer langsamer
  * durch, dann landet er mit einem Ruck, Staub und einem goldenen Schein.
  */
-function Wuerfel({ n, wurfNr, matt }: { n: number | null; wurfNr: number; matt: boolean }) {
+/** Farben der Wuerfel: Flaeche, Licht, Schatten, Augen. */
+const WUERFEL_FARBE: Record<string, [string, string, string, string]> = {
+  '': ['#f2e7d0', '#fffaf0', '#cdb68e', '#2a1f16'],
+  glueckswuerfel: ['#6aa85a', '#8fd07a', '#3f6b32', '#f2e7d0'],
+  bleiwuerfel: ['#9a958a', '#b9b3a6', '#6f695e', '#2a1f16'],
+  zwillingswuerfel: ['#5aa0d8', '#8ac4f0', '#3a6a9a', '#f2e7d0'],
+  wanderwuerfel: ['#d2a56a', '#e8c590', '#9a6b3a', '#2a1f16'],
+  fluchwuerfel: ['#8a2a20', '#b0483a', '#5a1a14', '#f2c94c'],
+  goldwuerfel: ['#f2c94c', '#fff0a0', '#a97c28', '#2a1f16'],
+};
+
+/** Die Flaeche eines Wuerfels: Augen bis sechs, darueber die Zahl. */
+function WuerfelFlaeche({ n, art, klein = false }: { n: number | null; art: string; klein?: boolean }) {
+  const [flaeche, licht, schatten, auge] = WUERFEL_FARBE[art] ?? WUERFEL_FARBE['']!;
+  const augen = n && n <= 6 ? AUGEN[n]! : [];
+  return (
+    <svg className={klein ? 'ab-wuerfel klein' : 'ab-wuerfel'} viewBox="0 0 32 32" shapeRendering="crispEdges" aria-label={n ? `Wurf ${n}` : 'Wuerfel'}>
+      {/* Koerper mit abgeschraegten Ecken, Licht oben links, Schatten unten rechts. */}
+      <path d="M5 2 H27 V3 H29 V5 H30 V27 H29 V29 H27 V30 H5 V29 H3 V27 H2 V5 H3 V3 H5 Z" fill="#2a1f16" />
+      <path d="M5 4 H27 V5 H28 V27 H27 V28 H5 V27 H4 V5 H5 Z" fill={flaeche} />
+      <path d="M5 4 H27 V6 H6 V27 H4 V5 H5 Z" fill={licht} />
+      <path d="M28 7 V27 H27 V28 H7 V26 H26 V7 Z" fill={schatten} />
+      {augen.map(([x, y], i) => (
+        <rect key={i} x={7 + x * 7} y={7 + y * 7} width="5" height="5" fill={n === 1 ? '#b8322a' : auge} />
+      ))}
+      {n !== null && n > 6 && (
+        <text x="16" y="17" textAnchor="middle" dominantBaseline="middle" fontFamily="monospace" fontWeight="bold" fontSize="15" fill={auge}>
+          {n}
+        </text>
+      )}
+    </svg>
+  );
+}
+
+function Wuerfel({ n, wurfNr, matt, art, zweiter }: { n: number | null; wurfNr: number; matt: boolean; art: string; zweiter: number | null }) {
   const [gezeigt, setGezeigt] = useState<number | null>(n);
   const [stand, setStand] = useState<'ruht' | 'rollt' | 'landet'>('ruht');
   const ziel = useRef(n);
@@ -381,9 +419,10 @@ function Wuerfel({ n, wurfNr, matt }: { n: number | null; wurfNr: number; matt: 
         t = window.setTimeout(() => setStand('ruht'), 300);
         return;
       }
+      const seiten = WUERFEL_SEITEN[art] ?? 6;
       setGezeigt((alt) => {
-        let neu = 1 + Math.floor(Math.random() * 6);
-        if (neu === alt) neu = (neu % 6) + 1;
+        let neu = 1 + Math.floor(Math.random() * seiten);
+        if (neu === alt) neu = (neu % seiten) + 1;
         return neu;
       });
       // Jeder Wechsel der Augen klackert - erst schnell, dann langsamer.
@@ -393,20 +432,12 @@ function Wuerfel({ n, wurfNr, matt }: { n: number | null; wurfNr: number; matt: 
     schritt();
     return () => window.clearTimeout(t);
   }, [wurfNr]);
-  const augen = gezeigt ? AUGEN[gezeigt]! : [];
   return (
     <div className={`ab-wuerfel-platz ${stand}${matt && stand === 'ruht' ? ' matt' : ''}`}>
       <span className="ab-wuerfel-schatten" />
-      <svg className="ab-wuerfel" viewBox="0 0 32 32" shapeRendering="crispEdges" aria-label={gezeigt ? `Wurf ${gezeigt}` : 'Wuerfel'}>
-        {/* Koerper mit abgeschraegten Ecken, Licht oben links, Schatten unten rechts. */}
-        <path d="M5 2 H27 V3 H29 V5 H30 V27 H29 V29 H27 V30 H5 V29 H3 V27 H2 V5 H3 V3 H5 Z" fill="#2a1f16" />
-        <path d="M5 4 H27 V5 H28 V27 H27 V28 H5 V27 H4 V5 H5 Z" fill="#f2e7d0" />
-        <path d="M5 4 H27 V6 H6 V27 H4 V5 H5 Z" fill="#fffaf0" />
-        <path d="M28 7 V27 H27 V28 H7 V26 H26 V7 Z" fill="#cdb68e" />
-        {augen.map(([x, y], i) => (
-          <rect key={i} x={7 + x * 7} y={7 + y * 7} width="5" height="5" fill={gezeigt === 1 ? '#b8322a' : '#2a1f16'} />
-        ))}
-      </svg>
+      <WuerfelFlaeche n={gezeigt} art={art} />
+      {/* Der Zwillingswuerfel: der zweite Wurf klein daneben. */}
+      {art === 'zwillingswuerfel' && stand === 'ruht' && zweiter !== null && <WuerfelFlaeche n={zweiter} art={art} klein />}
       <span className="ab-staub l" />
       <span className="ab-staub r" />
     </div>
@@ -451,6 +482,7 @@ function spieleKlaenge(a: Zustand): void {
     else if (e.art === 'faehigkeit') spaeter(e.takt + 0.1, e.name === 'feuerkreis' ? 'feuer' : e.name === 'runenblitz' ? 'blitz' : 'bereit');
     else if (e.art === 'boss') spaeter(e.takt, 'beben');
     else if (e.art === 'treffen') spaeter(e.takt, 'probe');
+    else if (e.art === 'fluch') spaeter(e.takt + 0.4, 'autsch');
     else if (e.art === 'faellt') spaeter(e.takt + 0.5, 'autsch');
     else if (e.art === 'kreis') spaeter(e.takt + 0.2, e.name === 'heilkreis' ? 'bereit' : e.name === 'schutzrune' ? 'geblockt' : e.name === 'bannkreis' ? 'blitz' : 'feuer');
     else if (e.art === 'tod') spaeter(e.takt + 0.5, 'zerplatzt');
@@ -641,6 +673,20 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     setZugTasten((z) => [...z, 's']);
     setze(neu);
   }, [halt, schritt, setze]);
+  /** Glueckswuerfel: neu wuerfeln - mit Rollen und Klackern wie beim ersten Wurf. */
+  const neuWurf = useCallback(() => {
+    const alt = aktuell.current;
+    if (!kannNeuWuerfeln(alt) || rolltRef.current) return;
+    halt();
+    rolltRef.current = true;
+    setRollt(true);
+    window.setTimeout(() => {
+      rolltRef.current = false;
+      setRollt(false);
+    }, ROLL_MS + 10);
+    setWurfNr((n) => n + 1);
+    setze(neuWuerfeln(alt));
+  }, [halt, setze]);
   const wirf: () => void = useCallback(() => {
     const alt = aktuell.current;
     if (alt.phase !== 'wuerfeln' || rolltRef.current) return;
@@ -712,6 +758,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       if ((TASTEN as readonly string[]).includes(k)) {
         e.preventDefault();
         drueck(k as Taste);
+      } else if (k === 'r') {
+        e.preventDefault();
+        neuWurf();
       } else if (k === 'b') {
         e.preventDefault();
         if (!rolltRef.current) setze(beschwoeren(aktuell.current));
@@ -1672,6 +1721,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               1.8 - (u - 1) * 0.8,
               6,
             );
+        } else if (e.art === 'fluch') {
+          if (u < 2.4) schrift('-1', sx(ritter.x) + 6 * f, sy(ritter.y) - (18 + u * 4) * f, '#d0503a', 1.6 - u * 0.6, 7);
+          if (u < 0.8) rot = Math.max(rot, 0.5 * (1 - u / 0.8));
         } else if (e.art === 'gift') {
           if (u < 2.4) schrift('-½', sx(ritter.x) + 6 * f, sy(ritter.y) - (18 + u * 4) * f, '#c890ff', 1.6 - u * 0.6, 6);
           if (u < 0.8) rot = Math.max(rot, 0.4 * (1 - u / 0.8));
@@ -2316,7 +2368,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           </div>
         </div>
         <div className="ab-tisch">
-          <Wuerfel n={a.wurf} wurfNr={wurfNr} matt={a.phase !== 'ziehen'} />
+          <Wuerfel n={a.wurf} wurfNr={wurfNr} matt={a.phase !== 'ziehen'} art={a.ausruestung.wuerfel ?? ''} zweiter={a.zweiterWurf ?? null} />
           <div className="ab-tisch-text">
             {a.phase === 'wuerfeln' && !rollt && <b>Wuerfle!</b>}
             {rollt && <b>Es rollt …</b>}
@@ -2342,6 +2394,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               title="Die Angel ins Wasser werfen (F) - ein Schritt"
             >
               Angeln (F)
+            </button>
+          )}
+          {kannNeuWuerfeln(a) && !rollt && (
+            <button className="ab-wurf ab-neuwurf" onClick={() => neuWurf()} title="Glueckswuerfel: einmal je Zug neu wuerfeln (R)">
+              Neu wuerfeln (R)
             </button>
           )}
           {(a.pentaStufe ?? 1) >= 3 && (

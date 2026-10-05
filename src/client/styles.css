@@ -7841,7 +7841,7 @@ em.off {
   grid-template-areas:
     '. kopf zubehoer'
     'waffe koerper schild'
-    '. fuesse .';
+    '. fuesse wuerfel';
   gap: 4px;
 }
 .ab-slot {
@@ -8834,4 +8834,22 @@ em.off {
 /* Der Wuerfeln-Knopf bleibt rechts unter dem Text. */
 .ab-tisch .primary.ab-wurf {
   grid-column: 2;
+}
+/* Der Wuerfel-Platz der Ausruestung, der zweite Zwillingswuerfel, Neu-wuerfeln. */
+.ab-slot-wuerfel {
+  grid-area: wuerfel;
+}
+.ab-wuerfel.klein {
+  position: absolute;
+  right: -14px;
+  bottom: -6px;
+  width: 26px;
+  height: 26px;
+}
+.ab-neuwurf {
+  grid-column: 1 / -1;
+  order: 4;
+  min-height: 30px;
+  border-color: #6aa85a;
+  color: #b8f0a0;
 }

@@ -446,7 +446,28 @@ const PENTAGRAMM: Pixelkarte = [
   '..kkkkk..',
 ];
 
+/** Ein Wuerfel als Bild: Koerper, Schatten rechts unten, Augen (Fuenf) - Palette PIX. */
+function wuerfelBild(koerper: string, schatten: string, auge: string): Pixelkarte {
+  const augen = ['2:2', '6:2', '4:4', '2:6', '6:6'];
+  return Array.from({ length: 9 }, (_, y) =>
+    Array.from({ length: 9 }, (_, x) => {
+      if (x === 0 || y === 0 || x === 8 || y === 8) return (x === 0 || x === 8) && (y === 0 || y === 8) ? '.' : 'k';
+      if (augen.includes(`${x}:${y}`)) return auge;
+      return x === 7 || y === 7 ? schatten : koerper;
+    }).join(''),
+  );
+}
+/** Zwei kleine Wuerfel nebeneinander. */
+const ZWILLINGE: Pixelkarte = ['kkkk.....', 'kuwuk....', 'kuuUkkkk.', 'kwUUkuwuk', '.kkkkuuUk', '....kwUUk', '....kkkk.'];
+
 export const SYMBOL: Record<string, Pixelkarte> = {
+  wuerfel: wuerfelBild('w', 'p', 'k'),
+  glueckswuerfel: wuerfelBild('e', 'E', 'w'),
+  bleiwuerfel: wuerfelBild('m', 'M', 'k'),
+  zwillingswuerfel: ZWILLINGE,
+  wanderwuerfel: wuerfelBild('d', 'D', 'k'),
+  fluchwuerfel: wuerfelBild('R', 'K', 'y'),
+  goldwuerfel: wuerfelBild('y', 'G', 'k'),
   schwert: SCHWERT,
   breitschwert: BREITSCHWERT,
   runenklinge: umfaerben(SCHWERT, { s: 'u', g: 'v' }),

@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { istWasser } from '../src/abenteuer/welt';
 import type { Boden } from '../src/abenteuer/welt';
-import { angelbar, angeln, betretbar, kannAngeln, BOSS_LEBEN, BOSS_NACH, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden, vergleich, naechsterBoss, KREIS_DAUER, PENTA_BOSS_NACH, verkaufen, verkaufsPreis, kaufen, ansprechen, anheuern, werberAngebot, PENTA_STUFE3_NACH, BESCHWOERUNG_VOLL, beschwoeren, angeheuerte } from '../src/abenteuer/regeln';
+import { angelbar, angeln, betretbar, kannAngeln, BOSS_LEBEN, BOSS_NACH, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden, vergleich, naechsterBoss, KREIS_DAUER, PENTA_BOSS_NACH, verkaufen, verkaufsPreis, kaufen, ansprechen, anheuern, werberAngebot, PENTA_STUFE3_NACH, BESCHWOERUNG_VOLL, beschwoeren, angeheuerte, kannNeuWuerfeln, neuWuerfeln } from '../src/abenteuer/regeln';
 import type { Abenteuer, Taste } from '../src/abenteuer/regeln';
 import { HEX_DIRS, hexDistance, hexesInRange as hexesInRangeTest } from '../src/core/coords';
 
@@ -715,6 +715,42 @@ describe('Abenteuer', () => {
     a = taste(a, 's');
     const ansage = a.ereignisse.find((e) => e.art === 'ansage' && e.wer === 7);
     if (ansage && ansage.art === 'ansage') expect(ansage.feld).toEqual(waechter);
+  });
+
+  it('Wuerfel als Ausruestung: jeder wirft anders', () => {
+    const mit = (id: string | null, seed: number) => {
+      const a = structuredClone(neuesAbenteuer(seed));
+      a.ausruestung = { ...a.ausruestung, wuerfel: id };
+      return wuerfeln(a);
+    };
+    const wuerfe = (id: string | null) => Array.from({ length: 80 }, (_, i) => mit(id, i + 1));
+    expect(neuesAbenteuer(1).ausruestung.wuerfel).toBeNull();
+    // Blei: nie unter 3.
+    expect(Math.min(...wuerfe('bleiwuerfel').map((a) => a.wurf!))).toBeGreaterThanOrEqual(3);
+    // Wanderwuerfel: auch 7 und 8.
+    const wander = wuerfe('wanderwuerfel').map((a) => a.wurf!);
+    expect(Math.max(...wander)).toBe(8);
+    // Fluchwuerfel: bis 10 - eine 1 kostet ein Leben.
+    const fluch = wuerfe('fluchwuerfel');
+    expect(Math.max(...fluch.map((a) => a.wurf!))).toBe(10);
+    for (const a of fluch) if (a.wurf === 1) expect(a.leben).toBe(GRUND_LEBEN - 1);
+    // Zwillinge: der hoehere zaehlt.
+    for (const a of wuerfe('zwillingswuerfel')) expect(a.wurf).toBeGreaterThanOrEqual(a.zweiterWurf!);
+    // Goldwuerfel: eine 6 bringt Gold.
+    for (const a of wuerfe('goldwuerfel')) expect((a.inventar['gold'] ?? 0) > 0).toBe(a.wurf === 6);
+  });
+
+  it('Glueckswuerfel: einmal je Zug neu wuerfeln, nur vor dem ersten Schritt', () => {
+    let a = structuredClone(neuesAbenteuer(21));
+    a.ausruestung = { ...a.ausruestung, wuerfel: 'glueckswuerfel' };
+    a = wuerfeln(a);
+    expect(kannNeuWuerfeln(a)).toBe(true);
+    a = neuWuerfeln(a);
+    expect(a.neuGewuerfelt).toBe(true);
+    expect(a.schritte).toBe(a.wurf);
+    expect(kannNeuWuerfeln(a)).toBe(false);
+    // Ohne Glueckswuerfel gar nicht.
+    expect(kannNeuWuerfeln(wuerfeln(neuesAbenteuer(21)))).toBe(false);
   });
 
   it('Herzen werden gleich verbraucht - bei vollem Leben bleiben sie liegen', () => {
