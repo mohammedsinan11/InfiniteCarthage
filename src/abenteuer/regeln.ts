@@ -350,9 +350,12 @@ export function fundAuf(a: Pick<Abenteuer, 'seed' | 'genommen'>, q: number, r: n
   // Ganz selten eine goldene Schatztruhe mit einem legendaeren Fund.
   if (hash3i(a.seed, q, r, SALT_FUND + 7) % 300 === 0) return 'schatz';
   const h = hash3i(a.seed, q, r, SALT_FUND) % 100;
-  if (h < 3) return 'truhe';
+  // Ausruestung liegt offen da - man sieht, was es ist.
+  if (h < 3) return TRUHENINHALT[hash3i(a.seed, q, r, SALT_FUND + 1) % TRUHENINHALT.length]!;
   if (h < 7 && (t === 'forest' || t === 'pasture' || t === 'field')) return 'kraut';
-  if (h < 10) return 'gold';
+  if (h < 9) return 'gold';
+  // Der Beutel: was drin ist, zeigt sich erst beim Oeffnen.
+  if (h < 10) return 'beutel';
   if (h < 11) return 'halbherz';
   if (h < 12) return 'herz';
   return null;
@@ -783,7 +786,7 @@ function bossErwacht(a: Abenteuer, takt: number): void {
 }
 
 function aufheben(a: Abenteuer): void {
-  const fund = fundAuf(a, a.pos.q, a.pos.r);
+  let fund = fundAuf(a, a.pos.q, a.pos.r);
   if (!fund) return;
   // Herzen werden beim Aufheben gleich verbraucht. Bei vollem Leben bleiben
   // sie liegen, fuer spaeter - nichts geht verloren.
@@ -811,13 +814,25 @@ function aufheben(a: Abenteuer): void {
     legendaerAnwenden(a, id, 0);
     return;
   }
-  if (fund === 'truhe') {
-    const inhalt = TRUHENINHALT[hash3i(a.seed, a.pos.q, a.pos.r, SALT_FUND + 1) % TRUHENINHALT.length]!;
+  // Der Beutel: ein zufaelliger Fund - Vorrat, Muenzen oder Ausruestung.
+  let woher = 'Gefunden';
+  if (fund === 'beutel') {
+    const BEUTEL = ['kraut', 'kraut', 'fisch', 'fisch', 'gold', 'gold', 'herz', ...TRUHENINHALT];
+    fund = BEUTEL[hash3i(a.seed, a.pos.q, a.pos.r, SALT_FUND + 11) % BEUTEL.length]!;
+    woher = 'Ein Beutel! Darin';
+    if (fund === 'herz') {
+      a.inventar = { ...a.inventar, herz: (a.inventar['herz'] ?? 0) + 1 };
+      melde(a, `${woher}: ein Herz - ins Inventar.`);
+      return;
+    }
+  }
+  if (gegenstand(fund)?.slot || fund === 'angel') {
+    const inhalt = fund;
     const g = gegenstand(inhalt)!;
     if (g.slot && a.ausruestung[g.slot] === null) {
       a.ausruestung = { ...a.ausruestung, [g.slot]: inhalt };
       if (g.leben) a.leben += g.leben;
-      melde(a, `Eine Truhe! Darin: ${g.name} - sofort angelegt.`);
+      melde(a, `${woher}: ${g.name} - sofort angelegt.`);
     } else if (g.slot === 'waffe' && waffenWert(inhalt) > waffenWert(a.ausruestung.waffe)) {
       // Eine bessere Waffe nimmt der Ritter gleich in die Hand.
       const alt = a.ausruestung.waffe!;
@@ -825,10 +840,10 @@ function aufheben(a: Abenteuer): void {
       a.ladung = 0;
       a.bereit = null;
       a.inventar = { ...a.inventar, [alt]: (a.inventar[alt] ?? 0) + 1 };
-      melde(a, `Eine Truhe! Darin: ${g.name} - gleich in der Hand, ${gegenstand(alt)?.name ?? alt} ins Inventar.`);
+      melde(a, `${woher}: ${g.name} - gleich in der Hand, ${gegenstand(alt)?.name ?? alt} ins Inventar.`);
     } else {
       a.inventar = { ...a.inventar, [inhalt]: (a.inventar[inhalt] ?? 0) + 1 };
-      melde(a, `Eine Truhe! Darin: ${g.name} - ins Inventar.`);
+      melde(a, `${woher}: ${g.name} - ins Inventar.`);
     }
     return;
   }

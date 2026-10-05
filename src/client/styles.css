@@ -8631,3 +8631,16 @@ em.off {
 .ab-legendaer-ding {
   position: relative;
 }
+
+/* Zug unter der Uebersichtskarte, Extra-Leben neben den Herzen. */
+.ab-zug {
+  margin-top: 5px;
+  text-align: center;
+  font-family: var(--pixel);
+  font-size: 9px;
+  color: var(--muted);
+}
+.ab-extraleben {
+  gap: 4px;
+  color: #f2c94c;
+}

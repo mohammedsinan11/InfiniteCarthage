@@ -464,6 +464,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const wirfRef = useRef<() => void>(() => undefined);
   const tippeRef = useRef<(h: Hex) => void>(() => undefined);
   const blick = useRef<1 | -1>(1);
+  /** Was auf den erkundeten Feldern liegt - einmal je Aenderung berechnet, nicht je Bild. */
+  const funde = useRef<{ fuer: unknown; karte: Map<string, string> }>({ fuer: null, karte: new Map() });
+  const fundeErkundet = useRef(0);
   /** Seit wann das Banner "Der Schleimkoenig erwacht" steht. */
   const banner = useRef(0);
   const bannerText = useRef('Der Schleimkoenig erwacht!');
@@ -754,15 +757,38 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         }
         ctx.globalAlpha = 1;
       }
-      // Funde in Sichtweite - sie schweben sacht.
+      if (funde.current.fuer !== a.genommen) {
+        // Neu berechnen, wenn sich das Genommene (oder das Erkundete) aendert.
+        const karte = new Map<string, string>();
+        for (const k of a.erkundet) {
+          const [q, rr] = k.split(':').map(Number) as [number, number];
+          const fd = fundAuf(a, q, rr);
+          if (fd) karte.set(k, fd);
+        }
+        funde.current = { fuer: a.genommen, karte };
+        fundeErkundet.current = a.erkundet.length;
+      } else if (fundeErkundet.current !== a.erkundet.length) {
+        for (const k of a.erkundet.slice(fundeErkundet.current)) {
+          const [q, rr] = k.split(':').map(Number) as [number, number];
+          const fd = fundAuf(a, q, rr);
+          if (fd) funde.current.karte.set(k, fd);
+        }
+        fundeErkundet.current = a.erkundet.length;
+      }
+      const fundKarte = funde.current.karte;
+      // Funde auf allen erkundeten Feldern - in Sicht hell und schwebend, im Nebel blasser.
       for (const hx of felder) {
-        if (hexDistance(hx, a.pos) > sicht) continue;
-        const fund = fundAuf(a, hx.q, hx.r);
+        const fund = fundKarte.get(hexKey(hx.q, hx.r));
         if (!fund || !SYMBOL[fund]) continue;
+        const nah = hexDistance(hx, a.pos) <= sicht;
         const pz = zentrum(hx.q, hx.r);
         const karte = SYMBOL[fund]!;
-        const schweb = Math.round(Math.sin(sek * 2 + hx.q * 1.3 + hx.r) * 1) * f;
+        const schweb = nah ? Math.round(Math.sin(sek * 2 + hx.q * 1.3 + hx.r) * 1) * f : 0;
+        ctx.globalAlpha = nah ? 1 : 0.55;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+        ctx.fillRect(pz.x - 3 * f, pz.y + f, 6 * f, f);
         zeichnePixel(ctx, karte, pz.x - Math.floor((karte[0]!.length * f) / 2), pz.y - karte.length * f + schweb, f, PIX);
+        ctx.globalAlpha = 1;
       }
       // Die Wege dieses Zuges als Pfeile: gold der Ritter, gruen die Schleime.
       const pfeile = (weg: readonly Hex[], farbe: string, dicke: number) => {
@@ -1491,6 +1517,14 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           mctx.fillStyle = '#b6f07a';
           mctx.fillRect(Math.round(x), Math.round(y), z * 2, z * 2);
         }
+        // Funde auf erkundeten Feldern: kleine Punkte - golden die Schatztruhe.
+        for (const [k, fund] of fundKarte) {
+          const [q, rr] = k.split(':').map(Number) as [number, number];
+          const x = (q - a.pos.q + (rr - a.pos.r) / 2) * z * 2 + m.width / 2;
+          const y = (rr - a.pos.r) * z * 1.7 + m.height / 2;
+          mctx.fillStyle = fund === 'schatz' ? '#f2c94c' : fund === 'herz' || fund === 'halbherz' ? '#e8604a' : '#f2e7d0';
+          mctx.fillRect(Math.round(x) + 1, Math.round(y) + 1, z * 2 - 2, z * 2 - 2);
+        }
         // Der Koenig steht immer auf der Karte - man soll ihn finden koennen.
         for (const s of a.schleime) {
           if (!s.boss) continue;
@@ -1584,7 +1618,12 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             <i key={i} className={a.leben >= i + 1 ? 'ab-herz voll' : a.leben >= i + 0.5 ? 'ab-herz halb' : 'ab-herz'} />
           ))}
         </span>
-        <span className="ab-schild">Zug {a.zug}</span>
+        {/* Extra-Leben: ein goldenes Herz mit der Anzahl. */}
+        {(a.extraLeben ?? 0) > 0 && (
+          <span className="ab-schild ab-extraleben" title={`${a.extraLeben} Extra-Leben: faellst du, stehst du wieder auf`}>
+            <Icon id="extraleben" groesse={12} />×{a.extraLeben}
+          </span>
+        )}
         {/* Legendaeres: ein Knopf, der die Sammlung zeigt - kein festes Fenster. */}
         {(a.legendaer?.length ?? 0) > 0 && (
           <button className="klein ab-legenden-knopf" onClick={() => setLegendenOffen(true)} title="Deine legendaeren Funde ansehen">
@@ -1611,6 +1650,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       <div className="ab-fenster ab-mini">
         <span className="ab-titel">Karte</span>
         <canvas ref={mini} width={170} height={130} />
+        <div className="ab-zug">Zug {a.zug}</div>
       </div>
 
       {/* Links: die Werte (mit Bildern statt Text), darunter die Ausruestung als Slots. */}

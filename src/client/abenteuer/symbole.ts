@@ -363,7 +363,9 @@ export const SYMBOL: Record<string, Pixelkarte> = {
   kraut: KRAUT,
   herz: HERZ,
   halbherz: HALBHERZ,
-  gold: SACK,
+  // Gold liegt als Muenze da; der Beutel ist das Taeschchen mit Zufallsinhalt.
+  gold: MUENZE,
+  beutel: SACK,
   gelee: GELEE,
   truhe: TRUHE,
   schatz: umfaerben(TRUHE, { b: 'y', B: 'G', g: 'R', y: 'w' }),

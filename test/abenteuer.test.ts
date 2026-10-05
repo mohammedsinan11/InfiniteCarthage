@@ -67,11 +67,12 @@ describe('Abenteuer', () => {
       for (const k of ['d', 'e', 'x', 'z', 'a', 'q'] as Taste[]) {
         const [dq, dr] = HEX_DIRS[['e', 'd', 'x', 'z', 'a', 'q'].indexOf(k)]!;
         const h = { q: a0.pos.q + dq, r: a0.pos.r + dr };
-        if (fundAuf(a0, h.q, h.r) !== 'truhe' || gelaende(seed, h.q, h.r) === 'mountain') continue;
+        // Ausruestung liegt offen auf der Karte - man sieht, welche Waffe.
+        const liegt = fundAuf(a0, h.q, h.r);
+        if (!liegt || !['axt', 'breitschwert', 'runenklinge', 'flammenschwert'].includes(liegt) || gelaende(seed, h.q, h.r) === 'mountain') continue;
         const b = taste(imZug(seed), k);
         const waffe = b.ausruestung.waffe!;
-        if (waffe === 'schwert') continue;
-        expect(['axt', 'breitschwert', 'runenklinge', 'flammenschwert']).toContain(waffe);
+        expect(waffe).toBe(liegt);
         expect(b.inventar['schwert']).toBe(1);
         return;
       }
