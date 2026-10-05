@@ -12,6 +12,20 @@ import { FIGUREN, SYMBOL, malKachelFigur } from './symbole';
 import { Px } from '../ui/KartenPixel';
 import { artVon, statZeilen, tippHandler } from './ItemTipp';
 import type { Tipp } from './ItemTipp';
+import { BODEN_FARBE, BODEN_NAME, WELT_VORGABE, einstellung, setzeEinstellung } from '../../abenteuer/welt';
+import type { Boden } from '../../abenteuer/welt';
+
+const WELT_KEY = 'infinitecarthage.abenteuer.welt';
+
+/** Gespeicherte Stellschrauben der Welt beim Start anwenden. */
+export function ladeWeltEinstellung(): void {
+  try {
+    const t = localStorage.getItem(WELT_KEY);
+    if (t) setzeEinstellung({ ...WELT_VORGABE, ...(JSON.parse(t) as Partial<typeof WELT_VORGABE>) });
+  } catch {
+    // ohne Speicher die Vorgabe
+  }
+}
 
 export const FIGUR_KEY = 'infinitecarthage.abenteuer.figur';
 const OFFEN_KEY = 'infinitecarthage.abenteuer.debug';
@@ -69,14 +83,30 @@ export function DebugFenster({
   waffe,
   onAktion,
   setTipp,
+  onWelt,
+  onNeueWelt,
 }: {
   figur: string;
   onFigur: (id: string) => void;
   waffe: string | null;
   onAktion: (d: DebugAktion) => void;
   setTipp: (t: Tipp) => void;
+  /** Die Welt hat sich geaendert (Stellschrauben) - neu zeichnen, Ritter aufs Land. */
+  onWelt: () => void;
+  onNeueWelt: () => void;
 }) {
-  const [reiter, setReiter] = useState<'test' | 'items'>('test');
+  const [reiter, setReiter] = useState<'test' | 'items' | 'welt'>('test');
+  const [welt, setWelt] = useState({ ...einstellung });
+  const stelle = (neu: Partial<typeof einstellung>) => {
+    setzeEinstellung(neu);
+    setWelt({ ...einstellung });
+    try {
+      localStorage.setItem(WELT_KEY, JSON.stringify(einstellung));
+    } catch {
+      // nur fuer jetzt
+    }
+    onWelt();
+  };
   const [offen, setOffen] = useState(() => {
     try {
       return localStorage.getItem(OFFEN_KEY) === 'an';
@@ -129,11 +159,52 @@ export function DebugFenster({
           <button className={reiter === 'items' ? 'ab-debug-wahl an' : 'ab-debug-wahl'} onClick={() => setReiter('items')}>
             Alle Items
           </button>
+          <button className={reiter === 'welt' ? 'ab-debug-wahl an' : 'ab-debug-wahl'} onClick={() => setReiter('welt')}>
+            Welt
+          </button>
         </span>
         <button className="klein" onClick={() => umschalten(false)} title="Schliessen">
           ×
         </button>
       </div>
+      {reiter === 'welt' && (
+        <div className="ab-debug-welt">
+          <label>
+            <small>Biomgroesse</small>
+            <input type="range" min={14} max={140} value={welt.klima} onChange={(e) => stelle({ klima: Number(e.target.value) })} />
+            <b>{welt.klima}</b>
+          </label>
+          <label>
+            <small>Landform (Kontinente, Gebirge)</small>
+            <input type="range" min={8} max={80} value={welt.hoehe} onChange={(e) => stelle({ hoehe: Number(e.target.value) })} />
+            <b>{welt.hoehe}</b>
+          </label>
+          <label>
+            <small>Meeresspiegel</small>
+            <input type="range" min={10} max={55} value={Math.round(welt.meer * 100)} onChange={(e) => stelle({ meer: Number(e.target.value) / 100 })} />
+            <b>{Math.round(welt.meer * 100)}</b>
+          </label>
+          <div className="ab-debug-zeile">
+            <button className="ab-debug-wahl" onClick={() => onAktion({ t: 'aufdecken' })}>
+              Aufdecken
+            </button>
+            <button className="ab-debug-wahl" onClick={onNeueWelt} title="Ein neues Abenteuer mit neuem Seed">
+              Neue Welt
+            </button>
+            <button className="ab-debug-wahl" onClick={() => stelle({ ...WELT_VORGABE })}>
+              Vorgabe
+            </button>
+          </div>
+          <div className="ab-debug-legende">
+            {(Object.keys(BODEN_NAME) as Boden[]).map((b) => (
+              <span key={b}>
+                <i style={{ background: BODEN_FARBE[b] }} />
+                {BODEN_NAME[b]}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       {reiter === 'items' && (
         <div className="ab-debug-items">
           {GEGENSTAENDE.map((g) => (

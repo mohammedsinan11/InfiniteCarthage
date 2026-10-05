@@ -27,9 +27,8 @@ import { HEX_DIRS, hexDistance, hexKey, hexesInRange } from '../core/coords';
 import type { Hex } from '../core/coords';
 import { hash3i } from '../core/hash';
 import { Rng } from '../core/rng';
-import { createWorld, ensureGenerated, tileAt } from '../core/world';
-import type { World } from '../core/world';
-import type { Terrain } from '../core/types';
+import { boden, istWasser } from './welt';
+import type { Boden } from './welt';
 
 export type Slot = 'waffe' | 'schild' | 'kopf' | 'koerper' | 'fuesse' | 'zubehoer';
 export const SLOTS: readonly Slot[] = ['waffe', 'schild', 'kopf', 'koerper', 'fuesse', 'zubehoer'];
@@ -112,7 +111,7 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
     id: 'hermes',
     name: 'Hermes-Stiefel',
     legendaer: true,
-    text: 'Legendaer. Jeder Schritt huepft bis zu drei Felder weit, wenn das Feld frei ist - auch uebers Wasser.',
+    text: 'Legendaer. Jeder Schritt huepft bis zu zwei Felder weit, wenn das Feld frei ist - auch uebers Wasser. Was dazwischen liegt, nimmt er mit.',
   },
   {
     id: 'herzcontainer',
@@ -151,6 +150,8 @@ export type Schleim = {
   art?: SchleimArt;
   /** Angesagter Flaechenschlag des Koenigs: alle diese Felder trifft er. */
   flaeche?: Hex[] | null;
+  /** Hoechstes Leben (nur der Koenig - jeder weitere hat mehr). */
+  max?: number;
   /** Wie oft der Koenig schon gehandelt hat - fuer seinen Rhythmus. */
   zaehler?: number;
 };
@@ -186,8 +187,8 @@ export function schleimName(s: Pick<Schleim, 'boss' | 'art' | 'gross'>): string 
 }
 
 /** Hoechstes Leben eines Schleims - fuer die Lebensbalken. */
-export function schleimMaxLeben(s: Pick<Schleim, 'boss' | 'art' | 'gross'>): number {
-  if (s.boss) return BOSS_LEBEN;
+export function schleimMaxLeben(s: Pick<Schleim, 'boss' | 'art' | 'gross'> & { max?: number }): number {
+  if (s.boss) return s.max ?? BOSS_LEBEN;
   if (s.art === 'panzer') return 3;
   return s.gross ? 4 : 2;
 }
@@ -255,6 +256,8 @@ export type Abenteuer = {
   erschlagen: number;
   /** Ist der Schleimkoenig schon erwacht? */
   bossErwacht?: boolean;
+  /** So viele Schleimkoenige sind schon bezwungen - jeder naechste ist staerker. */
+  koenige?: number;
   /** Was zuletzt geschah, neueste zuletzt. */
   log: string[];
   /** Die Ereignisse der letzten Aktion - nur fuers Bild. */
@@ -291,6 +294,8 @@ export type Abenteuer = {
  */
 export const BOSS_NACH = 8;
 export const BOSS_LEBEN = 10;
+/** Jeder weitere Koenig hat vier Leben mehr. */
+export const koenigLeben = (a: Pick<Abenteuer, 'koenige'>): number => BOSS_LEBEN + 4 * (a.koenige ?? 0);
 const BOSS_SCHADEN = 2;
 export const GRUND_LEBEN = 6;
 const GRUND_SICHT = 3;
@@ -322,24 +327,16 @@ export const TASTE_NAME: Record<Taste, string> = {
 
 // --- Welt ----------------------------------------------------------------
 
-const welten = new Map<number, World>();
-/** Die Welt zum Seed - einmal je Seed erzeugt und wachsend, nie gespeichert. */
-export function weltVon(seed: number, um?: Hex, radius = 10): World {
-  let w = welten.get(seed);
-  if (!w) {
-    w = createWorld(seed);
-    welten.set(seed, w);
-  }
-  if (um) ensureGenerated(w, um, radius);
-  return w;
+/** Der Boden eines Feldes (welt.ts - der eigene Generator des Abenteuers). */
+export function gelaende(seed: number, q: number, r: number): Boden {
+  return boden(seed, q, r);
 }
 
-export function gelaende(seed: number, q: number, r: number): Terrain | null {
-  return tileAt(weltVon(seed, { q, r }, 2), q, r)?.terrain ?? null;
-}
-
-const begehbar = (t: Terrain | null): boolean => t !== null && t !== 'water';
-const kosten = (t: Terrain | null): number => (t === 'mountain' ? 2 : 1);
+const begehbar = (t: Boden | null): boolean => t !== null && !istWasser(t);
+/** Berge, Sumpf und Baeche kosten zwei Schritte. */
+const kosten = (t: Boden | null): number => (t === 'berg' || t === 'sumpf' || t === 'fluss' ? 2 : 1);
+/** Wo die Angel etwas fangen kann: Wasser und Baeche. */
+export const angelbar = (t: Boden | null): boolean => istWasser(t) || t === 'fluss';
 
 /** Was auf einem Feld liegt - aus dem Seed, solange es niemand genommen hat. */
 export function fundAuf(a: Pick<Abenteuer, 'seed' | 'genommen'>, q: number, r: number): string | null {
@@ -352,7 +349,7 @@ export function fundAuf(a: Pick<Abenteuer, 'seed' | 'genommen'>, q: number, r: n
   const h = hash3i(a.seed, q, r, SALT_FUND) % 100;
   // Ausruestung liegt offen da - man sieht, was es ist.
   if (h < 3) return TRUHENINHALT[hash3i(a.seed, q, r, SALT_FUND + 1) % TRUHENINHALT.length]!;
-  if (h < 7 && (t === 'forest' || t === 'pasture' || t === 'field')) return 'kraut';
+  if (h < 7 && (t === 'wald' || t === 'wiese' || t === 'feld' || t === 'dschungel' || t === 'taiga')) return 'kraut';
   if (h < 9) return 'gold';
   // Der Beutel: was drin ist, zeigt sich erst beim Oeffnen.
   if (h < 10) return 'beutel';
@@ -383,11 +380,10 @@ export const schrittBonusVon = schrittBonus;
 function startFeld(seed: number, o: Hex = { q: 0, r: 0 }): Hex {
   let notfall: Hex | null = null;
   for (let ring = 0; ring <= 60; ring++) {
-    weltVon(seed, o, ring + 2);
     for (const h of hexesInRange(o, ring)) {
       if (hexDistance(h, o) !== ring) continue;
       const t = gelaende(seed, h.q, h.r);
-      if (!begehbar(t) || t === 'mountain') continue;
+      if (!begehbar(t) || kosten(t) > 1) continue;
       notfall ??= h;
       const nachbarn = HEX_DIRS.filter(([dq, dr]) => begehbar(gelaende(seed, h.q + dq, h.r + dr))).length;
       if (nachbarn >= 3) return h;
@@ -485,8 +481,11 @@ export function tasteZu(von: Hex, nach: Hex): Taste | null {
 /** Ob der Ritter ein Feld betreten kann (ohne Schleim darauf). */
 export function betretbar(a: Abenteuer, q: number, r: number): boolean {
   const t = gelaende(a.seed, q, r);
-  return begehbar(t) || (t === 'water' && hatLegende(a, 'hermes'));
+  return begehbar(t) || (istWasser(t) && hatLegende(a, 'hermes'));
 }
+
+/** So weit huepfen die Hermes-Stiefel (Spieltest: drei war zu viel). */
+export const HERMES_WEITE = 2;
 
 /** Traegt der Ritter diesen legendaeren Fund? */
 export const hatLegende = (a: Pick<Abenteuer, 'legendaer'>, id: string): boolean => (a.legendaer ?? []).includes(id);
@@ -520,14 +519,14 @@ export function taste(alt: Abenteuer, t: Taste): Abenteuer {
   const g = gelaende(a.seed, ziel.q, ziel.r);
   const hermes = hatLegende(a, 'hermes');
   // Mit der Angel: in Richtung Wasser wirft man sie aus (ohne Hermes-Stiefel).
-  if (g === 'water' && !hermes && (a.inventar['angel'] ?? 0) > 0) {
+  if (istWasser(g) && !hermes && (a.inventar['angel'] ?? 0) > 0) {
     auswerfen(a, ziel);
     return nachDemSchritt(a);
   }
   // Hermes-Stiefel: bis zu drei Felder weit huepfen, wo es frei ist - auch aufs Wasser.
   if (hermes) {
     let landung: Hex | null = null;
-    for (let k = 3; k >= 1 && !landung; k--) {
+    for (let k = HERMES_WEITE; k >= 1 && !landung; k--) {
       const h = { q: a.pos.q + d[0] * k, r: a.pos.r + d[1] * k };
       if (betretbar(a, h.q, h.r) && !schleimAuf(a, h.q, h.r)) landung = h;
     }
@@ -536,6 +535,13 @@ export function taste(alt: Abenteuer, t: Taste): Abenteuer {
       return a;
     }
     a.ereignisse.push({ art: 'gehen', takt: 0, wer: 'ritter', von: a.pos, nach: landung, sprung: hexDistance(a.pos, landung) > 1 });
+    // Was auf den uebersprungenen Feldern liegt, nimmt der Ritter im Flug mit.
+    const weit = hexDistance(a.pos, landung);
+    for (let k = 1; k < weit; k++) {
+      const zwischen = { q: a.pos.q + d[0] * k, r: a.pos.r + d[1] * k };
+      a.pos = zwischen;
+      aufheben(a);
+    }
     a.pos = landung;
     a.schritte -= 1;
     a.pfad = [...a.pfad, landung];
@@ -581,7 +587,7 @@ function auswerfen(a: Abenteuer, feld: Hex): void {
 /** Die Angel ins naechste Wasser werfen (Taste F oder Knopf). */
 export function angeln(alt: Abenteuer): Abenteuer {
   if (alt.phase !== 'ziehen' || !(alt.inventar['angel'] ?? 0)) return alt;
-  const feld = HEX_DIRS.map(([dq, dr]) => ({ q: alt.pos.q + dq, r: alt.pos.r + dr })).find((h) => gelaende(alt.seed, h.q, h.r) === 'water');
+  const feld = HEX_DIRS.map(([dq, dr]) => ({ q: alt.pos.q + dq, r: alt.pos.r + dr })).find((h) => angelbar(gelaende(alt.seed, h.q, h.r)));
   if (!feld) return alt;
   const a = structuredClone(alt);
   a.ereignisse = [];
@@ -591,7 +597,7 @@ export function angeln(alt: Abenteuer): Abenteuer {
 
 /** Steht der Ritter am Wasser (und hat eine Angel)? */
 export const kannAngeln = (a: Abenteuer): boolean =>
-  a.phase === 'ziehen' && (a.inventar['angel'] ?? 0) > 0 && HEX_DIRS.some(([dq, dr]) => gelaende(a.seed, a.pos.q + dq, a.pos.r + dr) === 'water');
+  a.phase === 'ziehen' && (a.inventar['angel'] ?? 0) > 0 && HEX_DIRS.some(([dq, dr]) => angelbar(gelaende(a.seed, a.pos.q + dq, a.pos.r + dr)));
 
 /** Die restlichen Schritte abwarten: jeder ist ein Tick. */
 export function zugBeenden(alt: Abenteuer): Abenteuer {
@@ -663,16 +669,22 @@ function verwunde(a: Abenteuer, s: Schleim, schaden: number, takt: number, vorne
   a.ereignisse.push({ art: 'tod', takt, wer: s.id, q: s.q, r: s.r, gross: s.gross, ...(s.boss ? { boss: true } : {}), ...(s.art ? { schleimArt: s.art } : {}) });
   erfahrung(a, s.boss ? 10 : s.gross || s.art ? 2 : 1, takt);
   if (s.boss) {
-    a.phase = 'sieg';
-    melde(a, `${vorne}: der Schleimkoenig zerplatzt! Das Land atmet auf - Sieg!`);
+    // Der Koenig ist bezwungen - kein Ende: er laesst einen legendaeren Fund
+    // fallen, und nach weiteren BOSS_NACH Schleimen erwacht ein staerkerer.
+    a.koenige = (a.koenige ?? 0) + 1;
+    a.bossErwacht = false;
+    melde(a, `${vorne}: der Schleimkoenig zerplatzt! Er hinterlaesst etwas Legendaeres.`);
+    const moeglich = ['sololeveling', 'hermes', 'extraleben', 'herzcontainer'].filter((x) => !((x === 'sololeveling' || x === 'hermes') && hatLegende(a, x)));
+    legendaerAnwenden(a, moeglich[(a.koenige * 7 + a.zeit) % moeglich.length]!, takt);
     return;
   }
   a.erschlagen += 1;
   const gelee = s.gross || s.art === 'panzer' ? 2 : 1;
   a.inventar = { ...a.inventar, gelee: (a.inventar['gelee'] ?? 0) + gelee };
-  const bisKoenig = a.bossErwacht ? '' : ` (${Math.min(a.erschlagen, BOSS_NACH)}/${BOSS_NACH})`;
+  const naechster = BOSS_NACH * (1 + (a.koenige ?? 0));
+  const bisKoenig = a.bossErwacht ? '' : ` (${Math.min(a.erschlagen, naechster)}/${naechster})`;
   melde(a, `${vorne}: der ${schleimName(s)} zerplatzt! +${gelee} Gelee${bisKoenig}.`);
-  if (!a.bossErwacht && a.erschlagen >= BOSS_NACH) bossErwacht(a, takt);
+  if (!a.bossErwacht && a.erschlagen >= BOSS_NACH * (1 + (a.koenige ?? 0))) bossErwacht(a, takt);
 }
 
 /** Legendaer: gleich beim Aufheben wirkt der Fund. */
@@ -689,7 +701,7 @@ export function legendaerAnwenden(a: Abenteuer, id: string, takt: number): void 
     a.extraLeben = (a.extraLeben ?? 0) + 1;
     melde(a, 'Legendaer: ein Extra-Leben! Faellst du, stehst du wieder auf.');
   } else if (id === 'hermes') {
-    melde(a, 'Legendaer: Hermes-Stiefel! Jeder Schritt huepft bis zu drei Felder - auch uebers Wasser.');
+    melde(a, 'Legendaer: Hermes-Stiefel! Jeder Schritt huepft bis zu zwei Felder - auch uebers Wasser.');
   }
 }
 
@@ -779,7 +791,7 @@ function bossErwacht(a: Abenteuer, takt: number): void {
   a.rng = rng.getState();
   if (!ort) return;
   const id = a.naechsteId++;
-  a.schleime.push({ id, q: ort.q, r: ort.r, leben: BOSS_LEBEN, gross: true, boss: true, zaehler: 0 });
+  a.schleime.push({ id, q: ort.q, r: ort.r, leben: koenigLeben(a), max: koenigLeben(a), gross: true, boss: true, zaehler: 0 });
   a.bossErwacht = true;
   a.ereignisse.push({ art: 'neu', takt, wer: id }, { art: 'boss', takt, wer: id });
   melde(a, 'Der Boden bebt - der Schleimkoenig ist erwacht! Bezwinge ihn.');
@@ -1196,7 +1208,8 @@ export type DebugAktion =
   | { t: 'legendaer'; id: string }
   | { t: 'item'; id: string }
   | { t: 'ep' }
-  | { t: 'schritte' };
+  | { t: 'schritte' }
+  | { t: 'aufdecken' };
 
 export function debugAktion(alt: Abenteuer, d: DebugAktion): Abenteuer {
   const a = structuredClone(alt);
@@ -1243,6 +1256,11 @@ export function debugAktion(alt: Abenteuer, d: DebugAktion): Abenteuer {
   } else if (d.t === 'heilen') {
     a.leben = maxLebenVon(a);
     melde(a, 'Debug: volles Leben.');
+  } else if (d.t === 'aufdecken') {
+    const neu = new Set(a.erkundet);
+    for (const h of hexesInRange(a.pos, 28)) neu.add(hexKey(h.q, h.r));
+    a.erkundet = [...neu];
+    melde(a, 'Debug: die Gegend ist aufgedeckt.');
   } else if (d.t === 'schritte') {
     a.phase = 'ziehen';
     a.wurf = 6;

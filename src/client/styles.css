@@ -8644,3 +8644,40 @@ em.off {
   gap: 4px;
   color: #f2c94c;
 }
+
+/* Debugfenster: Reiter Welt */
+.ab-debug-welt {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ab-debug-welt label {
+  display: grid;
+  grid-template-columns: 200px 1fr 40px;
+  align-items: center;
+  gap: 8px;
+}
+.ab-debug-welt label small {
+  font-size: 11px;
+  color: var(--muted);
+}
+.ab-debug-welt label b {
+  font-family: var(--pixel);
+  font-size: 10px;
+}
+.ab-debug-legende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 11px;
+}
+.ab-debug-legende span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ab-debug-legende i {
+  width: 10px;
+  height: 10px;
+  border: 1px solid #120d08;
+}

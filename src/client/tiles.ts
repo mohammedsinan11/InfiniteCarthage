@@ -479,3 +479,13 @@ export function ueberhangBild(bild: CanvasImageSource): HTMLCanvasElement | null
   UEBERHANG.set(bild, c);
   return c;
 }
+
+/**
+ * Eine Kachel nach ihrem Namen im Paket (etwa 'river_l' oder 'swamp_pads') -
+ * fuer Welten, die ihre Kachelsorte selbst waehlen (abenteuer/welt.ts).
+ */
+export function kachelUrlNachName(name: string, seed: number, q: number, r: number): string | null {
+  const group = GROUPS[name] ?? GROUPS['grass'];
+  if (!group || group.length === 0) return null;
+  return group[hash3i(seed, q, r, SALT_VARIANT) % group.length]!;
+}

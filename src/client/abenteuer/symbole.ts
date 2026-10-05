@@ -347,7 +347,7 @@ const EXTRALEBEN: Pixelkarte = ['.kk.kk.', 'kyykyyk', 'kywyyyk', 'kyyyyyk', '.ky
 const HERMES: Pixelkarte = ['ww.kkk...', '.wwkyk...', '..wkyk...', '...kyykk.', '..kyyyyyk', '..kggggGk', '...kkkkk.'];
 
 /** Eine Goldmuenze - fuer den Zaehler ueber dem Inventar. */
-export const MUENZE: Pixelkarte = ['.kkkk.', 'kyyygk', 'kywygk', 'kyyygk', 'kggggk', '.kkkk.'];
+export const MUENZE: Pixelkarte = ['..kkk..', '.kyyyk.', 'kywyygk', 'kyyyygk', 'kyyyggk', '.kgggk.', '..kkk..'];
 
 export const SYMBOL: Record<string, Pixelkarte> = {
   schwert: SCHWERT,

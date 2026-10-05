@@ -1,7 +1,9 @@
 /** Abenteuer (src/abenteuer/regeln.ts): wuerfeln, gehen, kaempfen, sammeln - im Takt der Spieluhr. */
 
 import { describe, it, expect } from 'vitest';
-import { angeln, betretbar, kannAngeln, BOSS_LEBEN, BOSS_NACH, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden } from '../src/abenteuer/regeln';
+import { istWasser } from '../src/abenteuer/welt';
+import type { Boden } from '../src/abenteuer/welt';
+import { angelbar, angeln, betretbar, kannAngeln, BOSS_LEBEN, BOSS_NACH, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden } from '../src/abenteuer/regeln';
 import type { Abenteuer, Taste } from '../src/abenteuer/regeln';
 import { HEX_DIRS, hexDistance } from '../src/core/coords';
 
@@ -13,12 +15,15 @@ function imZug(seed: number, schleime: Abenteuer['schleime'] = [], schritte = 6)
   return a;
 }
 
+/** Flaches, begehbares Land: ein Schritt kostet einen. */
+const eben = (g: Boden) => !istWasser(g) && g !== 'berg' && g !== 'sumpf' && g !== 'fluss';
+
 /** Eine Taste, die vom Start auf begehbares, flaches Land fuehrt. */
 function freieTaste(a: Abenteuer): Taste {
   for (const t of ['d', 'e', 'x', 'z', 'a', 'q'] as Taste[]) {
     const ziel = HEX_DIRS[['e', 'd', 'x', 'z', 'a', 'q'].indexOf(t)]!;
     const g = gelaende(a.seed, a.pos.q + ziel[0], a.pos.r + ziel[1]);
-    if (g && g !== 'water' && g !== 'mountain') return t;
+    if (g && eben(g)) return t;
   }
   throw new Error('kein freier Nachbar');
 }
@@ -31,7 +36,7 @@ function i6(a: Abenteuer, hin: Taste, zurueck: Taste): Taste {
 describe('Abenteuer', () => {
   it('beginnt auf Land, mit Schwert und ohne Wurf', () => {
     const a = neuesAbenteuer(42);
-    expect(gelaende(42, a.pos.q, a.pos.r)).not.toBe('water');
+    expect(istWasser(gelaende(42, a.pos.q, a.pos.r))).toBe(false);
     expect(a.ausruestung.waffe).toBe('schwert');
     expect(a.phase).toBe('wuerfeln');
     expect(a.erkundet.length).toBeGreaterThan(6);
@@ -42,7 +47,7 @@ describe('Abenteuer', () => {
     for (const seed of [774553834, 1844960718, 978983017, -1288175827, 2049389901, 1, 2, 3]) {
       const a = neuesAbenteuer(seed);
       const t = gelaende(seed, a.pos.q, a.pos.r);
-      expect(t).not.toBe('water');
+      expect(istWasser(t)).toBe(false);
       expect(t).not.toBeNull();
     }
   });
@@ -51,11 +56,11 @@ describe('Abenteuer', () => {
     const a = structuredClone(neuesAbenteuer(774553834));
     // Ein Wasserfeld in der Naehe suchen und den Ritter darauf stellen (wie ein alter Stand).
     let wasser: { q: number; r: number } | null = null;
-    for (let q = -6; q <= 6 && !wasser; q++) for (let r = -6; r <= 6 && !wasser; r++) if (gelaende(a.seed, q, r) === 'water') wasser = { q, r };
+    for (let q = -40; q <= 40 && !wasser; q++) for (let r = -40; r <= 40 && !wasser; r++) if (istWasser(gelaende(a.seed, q, r))) wasser = { q, r };
     expect(wasser).not.toBeNull();
     a.pos = wasser!;
     const b = normalisiere(a);
-    expect(gelaende(b.seed, b.pos.q, b.pos.r)).not.toBe('water');
+    expect(istWasser(gelaende(b.seed, b.pos.q, b.pos.r))).toBe(false);
   });
 
   it('Schwerter liegen in Truhen; eine bessere Waffe kommt gleich in die Hand', () => {
@@ -69,7 +74,7 @@ describe('Abenteuer', () => {
         const h = { q: a0.pos.q + dq, r: a0.pos.r + dr };
         // Ausruestung liegt offen auf der Karte - man sieht, welche Waffe.
         const liegt = fundAuf(a0, h.q, h.r);
-        if (!liegt || !['axt', 'breitschwert', 'runenklinge', 'flammenschwert'].includes(liegt) || gelaende(seed, h.q, h.r) === 'mountain') continue;
+        if (!liegt || !['axt', 'breitschwert', 'runenklinge', 'flammenschwert'].includes(liegt) || !eben(gelaende(seed, h.q, h.r))) continue;
         const b = taste(imZug(seed), k);
         const waffe = b.ausruestung.waffe!;
         expect(waffe).toBe(liegt);
@@ -180,7 +185,7 @@ describe('Abenteuer', () => {
     // Einen Start neben einem Berg suchen.
     for (let seed = 1; seed < 300; seed++) {
       const a0 = neuesAbenteuer(seed);
-      const i = HEX_DIRS.findIndex(([dq, dr]) => gelaende(seed, a0.pos.q + dq, a0.pos.r + dr) === 'mountain');
+      const i = HEX_DIRS.findIndex(([dq, dr]) => gelaende(seed, a0.pos.q + dq, a0.pos.r + dr) === 'berg');
       if (i < 0) continue;
       const t = (['e', 'd', 'x', 'z', 'a', 'q'] as Taste[])[i]!;
       const a = imZug(seed, [], 1);
@@ -192,7 +197,7 @@ describe('Abenteuer', () => {
     throw new Error('kein Start neben einem Berg');
   });
 
-  it('nach acht Schleimen erwacht der Schleimkoenig - wer ihn bezwingt, gewinnt', () => {
+  it('nach acht Schleimen erwacht der Schleimkoenig - bezwungen laesst er Legendaeres fallen, und es geht weiter', () => {
     const a0 = neuesAbenteuer(11);
     let b = imZug(11, [{ id: 99, q: a0.pos.q + 1, r: a0.pos.r, leben: 1, gross: false }], 20);
     b.erschlagen = BOSS_NACH - 1;
@@ -209,8 +214,12 @@ describe('Abenteuer', () => {
     c.leben = 99;
     c.schleime = [{ ...koenig!, q: c.pos.q + 1, r: c.pos.r, leben: 1, angriff: null, flaeche: null }];
     let d = c;
-    for (let i = 0; i < 30 && d.phase === 'ziehen'; i++) d = taste(d, 'd');
-    expect(d.phase).toBe('sieg');
+    for (let i = 0; i < 30 && d.schleime.some((x) => x.boss); i++) d = taste(d, 'd');
+    expect(d.schleime.some((x) => x.boss)).toBe(false);
+    expect(d.phase).not.toBe('sieg');
+    expect(d.koenige).toBe(1);
+    expect(d.legendaer?.length).toBe(1);
+    expect(d.bossErwacht).toBe(false);
   });
 
   it('der Koenig sagt Schlag oder Ring an und handelt nur jeden zweiten Tick', () => {
@@ -258,7 +267,7 @@ describe('Abenteuer', () => {
     a = taste(a, t);
     expect(a.leben).toBe(leben);
     // Er ist gesprungen - auf das leere Feld, wenn es Land ist.
-    if (gelaende(21, start.q, start.r) !== 'water') expect(a.schleime[0]).toMatchObject({ q: start.q, r: start.r });
+    if (!istWasser(gelaende(21, start.q, start.r))) expect(a.schleime[0]).toMatchObject({ q: start.q, r: start.r });
   });
 
   it('der Panzerschleim braucht einen Wurf ab 5', () => {
@@ -321,7 +330,7 @@ describe('Abenteuer', () => {
     // Einen Start am Wasser suchen.
     for (let seed = 1; seed < 300; seed++) {
       const a0 = neuesAbenteuer(seed);
-      if (!HEX_DIRS.some(([dq, dr]) => gelaende(seed, a0.pos.q + dq, a0.pos.r + dr) === 'water')) continue;
+      if (!HEX_DIRS.some(([dq, dr]) => angelbar(gelaende(seed, a0.pos.q + dq, a0.pos.r + dr)))) continue;
       let a = debugAktion(imZug(seed, [], 30), { t: 'item', id: 'angel' });
       expect(kannAngeln(a)).toBe(true);
       for (let i = 0; i < 12; i++) a = angeln(a);
@@ -366,7 +375,7 @@ describe('Abenteuer', () => {
       for (const k of ['d', 'e', 'x', 'z', 'a', 'q'] as Taste[]) {
         const [dq, dr] = HEX_DIRS[['e', 'd', 'x', 'z', 'a', 'q'].indexOf(k)]!;
         const h = { q: a0.pos.q + dq, r: a0.pos.r + dr };
-        if (fundAuf(a0, h.q, h.r) === 'herz' && gelaende(seed, h.q, h.r) !== 'mountain') {
+        if (fundAuf(a0, h.q, h.r) === 'herz' && eben(gelaende(seed, h.q, h.r))) {
           ziel = h;
           t = k;
           break;

@@ -20,10 +20,9 @@
  * warten, vor dem Wurf heisst Tippen wuerfeln.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
-  BOSS_LEBEN,
   FAEHIGKEIT_NAME,
   SLOTS,
   SLOT_NAME,
@@ -51,23 +50,25 @@ import {
   sichtVon,
   taste,
   tasteZu,
-  weltVon,
   wuerfeln,
   zugBeenden,
 } from '../../abenteuer/regeln';
 import type { Abenteuer as Zustand, DebugAktion, Ereignis, SchleimArt, Slot, Taste, Wer } from '../../abenteuer/regeln';
 import { HEX_DIRS, hexDistance, hexKey, hexesInRange } from '../../core/coords';
 import type { Hex } from '../../core/coords';
-import { tileAt } from '../../core/world';
-import type { Terrain } from '../../core/types';
-import { HEX_CX, HEX_CY, IMG_H, IMG_W, kachelEcke, preloadTiles, tileImage, tileImageFog, tileUrl } from '../tiles';
+import { BODEN_FARBE, feldInfo } from '../../abenteuer/welt';
+import type { Boden } from '../../abenteuer/welt';
+import { HEX_CX, HEX_CY, IMG_H, IMG_W, kachelEcke, kachelUrlNachName, preloadTiles, tileImage, tileImageFog } from '../tiles';
 import { preloadUnitSprites } from '../units';
 import { PIX, Px } from '../ui/KartenPixel';
 import { musikAn, setzeMusik, starteMusik, stoppeMusik } from './musik';
 import { DEKO, FIGUREN, KACHEL_PIX, malKachelFigur } from './symbole';
 import { hash3i } from '../../core/hash';
 import type { BeinBild, Haltung } from './symbole';
-import { DebugFenster, FIGUR_KEY, leseFigur } from './DebugFenster';
+import { DebugFenster, FIGUR_KEY, ladeWeltEinstellung, leseFigur } from './DebugFenster';
+
+// Die Stellschrauben der Welt aus dem Debugfenster gelten ab dem Laden.
+ladeWeltEinstellung();
 import { RITTER_HAND, RITTER_KOERPER, RITTER_SCHRITT, SCHLEIMKOENIG, SCHLEIM_BILD, SYMBOL, WAFFE, WAFFE_GRIFF, zeichnePixel } from './symbole';
 import { LAUT_STUFEN, beiTrack, klang, laufenderTrack, lautstaerke, setzeBiom, setzeLautstaerke } from './musik';
 import { BIOM_NAME } from './musik';
@@ -141,14 +142,22 @@ const SLOT_BILD: Record<Slot, string> = {
   zubehoer: 'laterne',
 };
 
-const MINI_FARBE: Record<Terrain, string> = {
-  forest: '#3f6b32',
-  pasture: '#7cb15a',
-  field: '#d9b84a',
-  hill: '#b4633c',
-  mountain: '#857e70',
-  desert: '#d8c8a8',
-  water: '#3a6a9a',
+/** Welche Musik zu welchem Boden gehoert - Wasser zaehlt nicht mit. */
+const MUSIK_BIOM: Partial<Record<Boden, Biom>> = {
+  wiese: 'wiese',
+  feld: 'wiese',
+  erde: 'wiese',
+  lehm: 'wiese',
+  fluss: 'wiese',
+  wald: 'wald',
+  dschungel: 'wald',
+  taiga: 'wald',
+  sumpf: 'wald',
+  sand: 'wueste',
+  duenen: 'wueste',
+  huegel: 'berg',
+  berg: 'berg',
+  schnee: 'berg',
 };
 
 // --- Hilfen fuer Bild und Weg ----------------------------------------------
@@ -435,22 +444,24 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       stoppeMusik();
     };
   }, []);
-  // Die Welt rund um den Ritter erzeugen, bevor gezeichnet wird.
-  useMemo(() => weltVon(a.seed, a.pos, 14), [a.seed, a.pos]);
   // Die Landschaft fuer die Musik: was rund um den Ritter ueberwiegt - und der Koenig, wenn er nah ist.
   const koenigNah = a.schleime.some((x) => x.boss && hexDistance(x, a.pos) <= 8);
+  // Mit Traegheit: erst wenn eine neue Landschaft im Umkreis von 4 Feldern
+  // klar ueberwiegt (60 %), wechselt das Thema - am Rand kein Hin und Her.
+  const musikBiom = useRef<Biom>('wiese');
   useEffect(() => {
     if (koenigNah) return setzeBiom('boss');
-    const zaehl: Record<string, number> = {};
-    for (const h of hexesInRange(a.pos, 2)) {
-      const t = tileAt(weltVon(a.seed), h.q, h.r)?.terrain;
-      if (t) zaehl[t] = (zaehl[t] ?? 0) + 1;
+    const zaehl: Partial<Record<Biom, number>> = {};
+    let alle = 0;
+    for (const h of hexesInRange(a.pos, 4)) {
+      const b = MUSIK_BIOM[feldInfo(a.seed, h.q, h.r).boden];
+      if (!b) continue;
+      zaehl[b] = (zaehl[b] ?? 0) + 1;
+      alle += 1;
     }
-    const wueste = zaehl['desert'] ?? 0;
-    const wald = zaehl['forest'] ?? 0;
-    const berg = (zaehl['mountain'] ?? 0) + (zaehl['hill'] ?? 0);
-    const b: Biom = wueste >= 7 ? 'wueste' : wald >= 7 ? 'wald' : berg >= 7 ? 'berg' : 'wiese';
-    setzeBiom(b);
+    const [staerkste, anzahl] = (Object.entries(zaehl) as [Biom, number][]).sort((x, y) => y[1] - x[1])[0] ?? [musikBiom.current, 0];
+    if (staerkste !== musikBiom.current && alle > 0 && anzahl / alle >= 0.6) musikBiom.current = staerkste;
+    setzeBiom(musikBiom.current);
   }, [a.seed, a.pos, koenigNah]);
 
   // Der aktuelle Stand fuer Tasten, Knoepfe und das Zeichnen - ohne Nebenwirkungen in setA.
@@ -714,7 +725,6 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       ansicht.current = { camX, camY, f, dpr, w: c.width, h: c.height };
       const sx = (x: number) => Math.round((x - camX) * f + c.width / 2);
       const sy = (y: number) => Math.round((y - camY) * f + c.height / 2);
-      const welt = weltVon(a.seed);
       const erkundet = new Set(a.erkundet);
       const sicht = sichtVon(a);
       const radius = Math.ceil(Math.max(c.width, c.height) / (17 * f)) + 2;
@@ -723,9 +733,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       for (const hx of felder) {
         const k = hexKey(hx.q, hx.r);
         if (!erkundet.has(k)) continue;
-        const t = tileAt(welt, hx.q, hx.r);
-        if (!t) continue;
-        const url = tileUrl(a.seed, t.terrain, hx.q, hx.r);
+        const url = kachelUrlNachName(feldInfo(a.seed, hx.q, hx.r).kachel, a.seed, hx.q, hx.r);
         if (!url) continue;
         const nah = hexDistance(hx, a.pos) <= sicht;
         const bild = nah ? tileImage(url) : tileImageFog(url);
@@ -740,8 +748,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       // Deko: Kakteen in der Wueste, Blumen auf Wiesen, Pilze im Wald - je Feld aus dem Seed.
       for (const hx of felder) {
         if (!erkundet.has(hexKey(hx.q, hx.r))) continue;
-        const t = tileAt(welt, hx.q, hx.r)?.terrain;
-        const art = t === 'desert' ? 'kaktus' : t === 'pasture' ? 'blume' : t === 'forest' ? 'pilz' : null;
+        const t = feldInfo(a.seed, hx.q, hx.r).boden;
+        const art = t === 'sand' || t === 'duenen' ? 'kaktus' : t === 'wiese' ? 'blume' : t === 'wald' || t === 'taiga' ? 'pilz' : null;
         if (!art) continue;
         const h = hash3i(a.seed, hx.q, hx.r, 91) % 100;
         const anzahl = art === 'kaktus' ? (h < 35 ? 1 : h < 50 ? 2 : 0) : h < 18 ? (art === 'blume' ? 2 : 1) : 0;
@@ -1503,11 +1511,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         const z = 3;
         for (const k of a.erkundet) {
           const [q, rr] = k.split(':').map(Number) as [number, number];
-          const t = tileAt(welt, q, rr);
-          if (!t) continue;
           const x = (q - a.pos.q + (rr - a.pos.r) / 2) * z * 2 + m.width / 2;
           const y = (rr - a.pos.r) * z * 1.7 + m.height / 2;
-          mctx.fillStyle = MINI_FARBE[t.terrain];
+          mctx.fillStyle = BODEN_FARBE[feldInfo(a.seed, q, rr).boden];
           mctx.fillRect(Math.round(x), Math.round(y), z * 2, z * 2);
         }
         for (const s of a.schleime) {
@@ -1640,7 +1646,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           <div className="ab-boss" title="Der Schleimkoenig - bezwinge ihn, um zu gewinnen">
             <span>Schleimkoenig</span>
             <div className="ab-boss-balken">
-              <i style={{ width: `${(100 * koenig.leben) / BOSS_LEBEN}%` }} />
+              <i style={{ width: `${(100 * koenig.leben) / schleimMaxLeben(koenig)}%` }} />
             </div>
           </div>
         );
@@ -1862,6 +1868,12 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         }}
         waffe={a.ausruestung.waffe}
         setTipp={setTipp}
+        onWelt={() => {
+          // Die Welt ist eine andere: Funde neu, der Ritter aufs Land.
+          funde.current = { fuer: null, karte: new Map() };
+          setze(normalisiere(structuredClone(aktuell.current)));
+        }}
+        onNeueWelt={neu}
         onAktion={(d: DebugAktion) => setze(debugAktion(aktuell.current, d))}
       />
 
