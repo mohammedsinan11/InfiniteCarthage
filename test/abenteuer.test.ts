@@ -614,6 +614,32 @@ describe('Abenteuer', () => {
     expect(gesehen).toBe(true);
   });
 
+  it('auf den Wiesen grasen Schafe', () => {
+    let schafe = 0;
+    for (let seed = 1; seed < 40; seed++) schafe += (neuesAbenteuer(seed).tiere ?? []).filter((t) => t.art === 'schaf').length;
+    expect(schafe).toBeGreaterThan(5);
+  });
+
+  it('mit der Axt im Wald einen Gegner faellen bringt Holz', () => {
+    for (let seed = 1; seed < 300; seed++) {
+      const a0 = neuesAbenteuer(seed);
+      for (const t of ['d', 'e', 'x', 'z', 'a', 'q'] as Taste[]) {
+        const [dq, dr] = HEX_DIRS[['e', 'd', 'x', 'z', 'a', 'q'].indexOf(t)]!;
+        const h = { q: a0.pos.q + dq, r: a0.pos.r + dr };
+        if (gelaende(seed, h.q, h.r) !== 'wald' || fundAuf(a0, h.q, h.r) || (a0.orte ?? []).some((o) => o.q === h.q && o.r === h.r)) continue;
+        let a = imZug(seed, [{ id: 77, q: h.q, r: h.r, leben: 1, gross: false }], 30);
+        a.ausruestung = { ...a.ausruestung, waffe: 'axt' };
+        a.leben = 99;
+        a.tiere = [];
+        for (let i = 0; i < 25 && a.schleime.some((s) => s.id === 77); i++) a = taste(a, t);
+        expect(a.inventar['holz']).toBe(1);
+        expect(verkaufsPreis('holz')).toBe(2);
+        return;
+      }
+    }
+    throw new Error('kein Wald neben dem Start');
+  });
+
   it('Herzen werden gleich verbraucht - bei vollem Leben bleiben sie liegen', () => {
     // Ein Herz direkt neben den Start legen: das Feld suchen, auf dem eines liegt.
     let seed = 0;

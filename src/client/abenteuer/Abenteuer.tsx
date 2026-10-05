@@ -68,7 +68,6 @@ import {
   taste,
   tasteZu,
   wuerfeln,
-  zugBeenden,
 } from '../../abenteuer/regeln';
 import type { Abenteuer as Zustand, DebugAktion, Ereignis, SchleimArt, Slot, Taste, Wer, Zauber } from '../../abenteuer/regeln';
 import { HEX_DIRS, hexDistance, hexKey, hexesInRange } from '../../core/coords';
@@ -86,7 +85,7 @@ import { DebugFenster, FIGUR_KEY, ladeWeltEinstellung, leseFigur } from './Debug
 
 // Die Stellschrauben der Welt aus dem Debugfenster gelten ab dem Laden.
 ladeWeltEinstellung();
-import { BANNER, GELEEKOLOSS, HASE, PENTASCHLEIM, SCHATTENSCHLEIM, STAND } from './symbole';
+import { BANNER, GELEEKOLOSS, HASE, PENTASCHLEIM, SCHAF, SCHATTENSCHLEIM, STAND } from './symbole';
 import { RITTER_HAND, RITTER_KOERPER, RITTER_SCHRITT, SCHLEIMKOENIG, SCHLEIM_BILD, SYMBOL, WAFFE, WAFFE_GRIFF, zeichnePixel } from './symbole';
 import { LAUT_STUFEN, beiTrack, klang, laufenderTrack, lautstaerke, setzeBiom, setzeLautstaerke } from './musik';
 import { BIOM_NAME } from './musik';
@@ -614,6 +613,24 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     },
     [halt, schritt],
   );
+  /**
+   * Angeln (F): wie S ein Schritt, der vergeht - am Wasser wirft der Ritter
+   * die Angel aus, sonst wartet er. Mit Autoroll wird erst gewuerfelt.
+   */
+  const angle = useCallback(() => {
+    halt();
+    if (autorollRef.current && aktuell.current.phase === 'wuerfeln' && !rolltRef.current) {
+      wirfRef.current();
+      window.setTimeout(() => angle(), ROLL_MS + 30);
+      return;
+    }
+    const alt = aktuell.current;
+    if (alt.phase !== 'ziehen' || rolltRef.current) return;
+    const neu = angeln(alt);
+    if (neu === alt) return void schritt('s');
+    setZugTasten((z) => [...z, 's']);
+    setze(neu);
+  }, [halt, schritt, setze]);
   const wirf: () => void = useCallback(() => {
     const alt = aktuell.current;
     if (alt.phase !== 'wuerfeln' || rolltRef.current) return;
@@ -629,12 +646,6 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     setze(wuerfeln(alt));
   }, [halt, setze]);
   wirfRef.current = wirf;
-  const beenden = useCallback(() => {
-    halt();
-    const alt = aktuell.current;
-    if (alt.phase !== 'ziehen' || rolltRef.current) return;
-    setze(zugBeenden(alt));
-  }, [halt, setze]);
 
   /** Den Weg zu einem Feld gehen, Schritt fuer Schritt, im Takt der Bilder. */
   const geheWeiter = useCallback(() => {
@@ -694,8 +705,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       } else if (k === 'f') {
         e.preventDefault();
         halt();
-        const alt = aktuell.current;
-        if (!rolltRef.current) setze(angeln(alt));
+        angle();
       } else if (k === ' ' || k === 'enter') {
         e.preventDefault();
         wirf();
@@ -824,9 +834,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       if (!enthuellt.current) enthuellt.current = new Map(a.erkundet.map((k) => [k, 0]));
       const FALL_MS = 380;
       // Kacheln: gesehen und jetzt sichtbar hell, gesehen und fern im Nebel.
+      // Kacheln fallen schon drei Felder hinter der Sicht herein (im Nebel) - nicht erst an ihrem Rand.
+      const NEBEL_RAND = 3;
       for (const hx of felder) {
         const k = hexKey(hx.q, hx.r);
-        if (!erkundet.has(k)) continue;
+        if (!erkundet.has(k) && hexDistance(hx, a.pos) > sicht + NEBEL_RAND) continue;
         let seit = enthuellt.current.get(k);
         if (seit === undefined) {
           // Ein wenig versetzt je Feld, damit der Rand nicht als Block faellt.
@@ -1377,6 +1389,26 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         const gehen = ev.find((e): e is Extract<Ereignis, { art: 'gehen' }> => e.art === 'gehen' && e.wer === t.id);
         const springt = o.hoch > 0.5;
         const nachLinks = gehen ? mitte(gehen.nach.q, gehen.nach.r).x < mitte(gehen.von.q, gehen.von.r).x : t.id % 2 === 0;
+        if (t.art === 'schaf') {
+          // Das Schaf grast (Kopf unten) und schaut ab und zu auf.
+          const grast = Math.sin(sek * 0.9 + t.id * 2.1) > -0.2;
+          const schaf = SCHAF[grast && o.hoch < 0.5 ? 1 : 0];
+          figuren.push({
+            y: o.y,
+            mal: () => {
+              const X = sx(o.x);
+              const Y = sy(o.y) + 3 * f - Math.round(o.hoch * 0.4) * f;
+              ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+              ctx.fillRect(X - 4 * f, sy(o.y) + 3 * f, 8 * f, f);
+              ctx.save();
+              ctx.translate(X, Y - schaf.length * f);
+              ctx.scale(nachLinks ? 1 : -1, 1);
+              zeichnePixel(ctx, schaf, -4 * f, 0, f, PIX);
+              ctx.restore();
+            },
+          });
+          continue;
+        }
         const bild = HASE[springt ? 1 : 0];
         const mummel = !springt && Math.sin(sek * 7 + t.id) > 0.85 ? 1 : 0;
         figuren.push({
@@ -2240,17 +2272,13 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             <button
               className="ab-wurf ab-angeln"
               disabled={rollt}
-              onClick={() => setze(angeln(aktuell.current))}
+              onClick={() => angle()}
               title="Die Angel ins Wasser werfen (F) - ein Schritt"
             >
               Angeln (F)
             </button>
           )}
-          {a.phase === 'ziehen' ? (
-            <button className="ab-wurf" disabled={rollt} onClick={beenden} title="Die restlichen Schritte abwarten - jeder ist ein Tick">
-              Zug beenden
-            </button>
-          ) : (
+          {a.phase !== 'ziehen' && (
             <button className="primary ab-wurf" disabled={a.phase !== 'wuerfeln' || rollt} onClick={wirf}>
               Wuerfeln
             </button>

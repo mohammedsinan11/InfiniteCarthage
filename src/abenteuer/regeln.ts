@@ -129,6 +129,7 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
   { id: 'angel', name: 'Angel', text: 'Am Wasser: in Richtung Wasser gehen (oder F) wirft die Angel aus - ein Schritt. Mit Glueck beisst ein Fisch.' },
   { id: 'fisch', name: 'Fisch', heilt: 1, text: 'Antippen: 1 Leben zurueck. Stapelt sich.' },
   { id: 'gold', name: 'Gold', text: 'Muenzen - sie stehen ueber dem Inventar. Noch kauft hier niemand etwas.' },
+  { id: 'holz', name: 'Holz', text: 'Mit der Axt im Wald geschlagen - der Haendler zahlt 2 Gold je Scheit.' },
   { id: 'gelee', name: 'Schleimgelee', text: 'Was ein Schleim zuruecklaesst - der Beweis deiner Taten.' },
 ];
 
@@ -324,7 +325,7 @@ export type Abenteuer = {
   /** So viele Schleimkoenige sind schon bezwungen - jeder naechste ist staerker. */
   koenige?: number;
   /** Neutrale Tiere: Schneehasen in Schnee und Taiga - sie fliehen vor dem Ritter. */
-  tiere?: { id: number; q: number; r: number; art: 'hase' }[];
+  tiere?: { id: number; q: number; r: number; art: 'hase' | 'schaf' }[];
   /** Giftpfuetzen der Giftschleime: wer darin steht, verliert je Tick ein halbes Leben. */
   gift?: { q: number; r: number; bis: number }[];
   /** Pentagrammmeister: so viele Zauber gewirkt - zu viele rufen den Pentagrammschleim. */
@@ -533,6 +534,10 @@ function sehen(a: Abenteuer): void {
     const b = gelaende(a.seed, h.q, h.r);
     if ((b === 'schnee' || b === 'taiga') && hash3i(a.seed, h.q, h.r, SALT_SCHLEIM + 9) % 40 === 0 && hexDistance(h, a.pos) > 1) {
       a.tiere = [...(a.tiere ?? []), { id: a.naechsteId++, q: h.q, r: h.r, art: 'hase' }];
+    }
+    // Auf den Wiesen grasen Schafe - viele, oft mehrere beieinander.
+    if ((b === 'wiese' || b === 'feld') && hash3i(a.seed, h.q, h.r, SALT_SCHLEIM + 10) % (b === 'wiese' ? 9 : 16) === 0 && hexDistance(h, a.pos) > 1) {
+      a.tiere = [...(a.tiere ?? []), { id: a.naechsteId++, q: h.q, r: h.r, art: 'schaf' }];
     }
     if (a.orte) ortEntdecken(a, h);
   }
@@ -761,8 +766,12 @@ export function taste(alt: Abenteuer, t: Taste): Abenteuer {
     kamerad.r = a.pos.r;
   }
   // Ein Schneehase auf dem Feld huscht weg - man kann nicht auf ihn treten.
-  if ((a.tiere ?? []).some((t) => t.q === ziel.q && t.r === ziel.r)) {
-    melde(a, 'Der Schneehase huscht dir zwischen den Beinen weg.');
+  const tier = (a.tiere ?? []).find((t) => t.q === ziel.q && t.r === ziel.r);
+  if (tier) {
+    if (tier.art === 'schaf') {
+      a.ereignisse.push({ art: 'spruch', takt: 0, wer: tier.id, text: 'Maeh!' });
+      melde(a, 'Das Schaf steht im Weg und bloekt dich an.');
+    } else melde(a, 'Der Schneehase huscht dir zwischen den Beinen weg.');
     return a;
   }
   const feind = schleimAuf(a, ziel.q, ziel.r);
@@ -912,6 +921,8 @@ function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
   }
   const vorne = `Wurf ${wurf}+${angriffVon(a)}${spalt ? ', Spalthieb' : ''}`;
   verwunde(a, s, schaden, takt, vorne);
+  // Mit der Axt im Wald: wer dort einen Gegner faellt, schlaegt auch Holz.
+  if (a.ausruestung.waffe === 'axt' && !a.schleime.some((x) => x.id === s.id) && istWald(gelaende(a.seed, s.q, s.r))) holzSchlagen(a, 1);
   // Ein Treffer laedt die Waffe.
   if (a.phase === 'ziehen') laden(a, takt);
 }
@@ -983,6 +994,15 @@ function verwunde(a: Abenteuer, s: Schleim, schaden: number, takt: number, vorne
   const bisKoenig = a.bossErwacht ? '' : ` (${Math.min(a.erschlagen, naechster)}/${naechster})`;
   melde(a, `${vorne}: der ${schleimName(s)} zerplatzt! +${gelee} Gelee${bisKoenig}.`);
   if (!a.bossErwacht && !a.schleime.some((x) => x.boss) && a.erschlagen >= BOSS_NACH * (1 + (a.koenige ?? 0))) bossErwacht(a, takt);
+}
+
+const istWald = (b: Boden | null) => b === 'wald' || b === 'dschungel' || b === 'taiga';
+
+/** Holz ins Inventar. */
+function holzSchlagen(a: Abenteuer, n: number): void {
+  a.inventar = { ...a.inventar, holz: (a.inventar['holz'] ?? 0) + n };
+  a.ereignisse.push({ art: 'fund', takt: 0, id: 'holz' });
+  melde(a, `+${n} Holz.`);
 }
 
 /** Legendaer: gleich beim Aufheben wirkt der Fund. */
@@ -1066,6 +1086,8 @@ export function entfessle(a: Abenteuer, f: Faehigkeit, takt: number): void {
     verwunde(a, ziel, 2, takt, 'Runenblitz');
     return;
   }
+  // Die Axt entfesselt ihren Spalthieb im Wald (oder am Waldrand): ein Scheit Holz.
+  if (f === 'spalthieb' && [a.pos, ...HEX_DIRS.map(([dq, dr]) => ({ q: a.pos.q + dq, r: a.pos.r + dr }))].some((h) => istWald(gelaende(a.seed, h.q, h.r)))) holzSchlagen(a, 1);
   // Spalthieb und Schutzwall warten auf den naechsten Treffer.
   a.bereit = f;
   a.ereignisse.push({ art: 'faehigkeit', takt, name: f });
@@ -1605,7 +1627,7 @@ export function verkaufsPreis(id: string): number {
   const g = gegenstand(id);
   if (!g || g.legendaer || id === 'gold') return 0;
   if (g.slot) return Math.max(1, Math.round(ausruestungsWert(id) * 0.8));
-  return id === 'angel' ? 3 : 1;
+  return id === 'angel' ? 3 : id === 'holz' ? 2 : 1;
 }
 /** Was der Haendler verkauft. */
 export const HAENDLER_WAREN: readonly { id: string; preis: number }[] = [
@@ -1887,7 +1909,7 @@ function fraktionenZiehen(a: Abenteuer, takt: number, rng: Rng, besetzt: (q: num
     }
     // Jaeger erlegen Hasen, die neben ihnen sitzen.
     if (w.fraktion === 'jaeger') {
-      const hase = (a.tiere ?? []).find((t) => hexDistance(t, w) === 1);
+      const hase = (a.tiere ?? []).find((t) => t.art === 'hase' && hexDistance(t, w) === 1);
       if (hase) {
         a.tiere = (a.tiere ?? []).filter((t) => t.id !== hase.id);
         a.ereignisse.push({ art: 'hieb', takt, wer: w.id, ziel: null, feld: { q: hase.q, r: hase.r }, wurf: 6, schaden: 0 });
@@ -1969,6 +1991,21 @@ function ticken(a: Abenteuer, takt: number): void {
   for (const t of a.tiere ?? []) {
     const d = hexDistance(t, a.pos);
     if (d > 12) continue;
+    if (t.art === 'schaf') {
+      // Schafe sind gemuetlich: nur wer direkt neben ihnen steht, scheucht sie; sonst grasen sie und tappen mal ein Feld weiter.
+      const weide = HEX_DIRS.map(([dq, dr]) => ({ q: t.q + dq, r: t.r + dr })).filter((h) => {
+        const b = gelaende(a.seed, h.q, h.r);
+        return (b === 'wiese' || b === 'feld') && !besetzt(h.q, h.r);
+      });
+      const ziel = d <= 1 ? weide.sort((x, y) => hexDistance(y, a.pos) - hexDistance(x, a.pos))[0] : rng.int(6) === 0 ? weide[rng.int(Math.max(1, weide.length))] : undefined;
+      if (ziel && (d > 1 || hexDistance(ziel, a.pos) > d)) {
+        a.ereignisse.push({ art: 'gehen', takt, wer: t.id, von: { q: t.q, r: t.r }, nach: ziel });
+        t.q = ziel.q;
+        t.r = ziel.r;
+      }
+      if (d <= 3 && rng.int(14) === 0) a.ereignisse.push({ art: 'spruch', takt, wer: t.id, text: rng.int(3) === 0 ? 'Maeeeh!' : 'Maeh.' });
+      continue;
+    }
     const nachbarn = HEX_DIRS.map(([dq, dr]) => ({ q: t.q + dq, r: t.r + dr })).filter((h) => begehbar(gelaende(a.seed, h.q, h.r)) && !besetzt(h.q, h.r));
     let ziel: Hex | null = null;
     if (d <= 2) ziel = nachbarn.sort((x, y) => hexDistance(y, a.pos) - hexDistance(x, a.pos))[0] ?? null;

@@ -332,6 +332,12 @@ export const HASE: [Pixelkarte, Pixelkarte] = [
   ['..a.a.', '..H.H.', '.HHHH.', 'HoHHHH', 'HHHHHa', 'aa..aa', '......'],
 ];
 
+/** Schaf - neutral, grast auf Wiesen (Palette PIX: h Wolle, c Gesicht). Zwei Bilder: steht, grast. */
+export const SCHAF: [Pixelkarte, Pixelkarte] = [
+  ['...hhhh..', 'cchhhhhhh', 'cchhhhhhH', '.hhhhhhHH', '..c..c.c.'],
+  ['...hhhh..', '..hhhhhhh', 'chhhhhhhH', 'chhhhhhHH', '..c..c.c.'],
+];
+
 /** Der Schleimkoenig: ein breiter Klumpen mit goldener Krone und rotem Stein. */
 export const SCHLEIMKOENIG: Pixelkarte = [
   '....y..r..y....',
@@ -399,6 +405,9 @@ const ANGEL: Pixelkarte = [
   'kb......k',
 ];
 
+/** Holz: zwei Scheite mit Schnittflaeche. */
+const HOLZ: Pixelkarte = ['.kkkkkkk.', 'kdDbbbbbk', 'kDdbbBBbk', '.kkkkkkkk', 'kdDbbbbbk', 'kDdbbBBbk', '.kkkkkkk.'];
+
 const FISCH: Pixelkarte = ['..kkkk..k', '.kuuuukkk', 'kwcuuuuUk', '.kUUUUkkk', '..kkkk..k'];
 
 /** Extra-Leben: ein goldenes Herz. */
@@ -446,6 +455,7 @@ export const SYMBOL: Record<string, Pixelkarte> = {
   sololeveling: SOLO_LEVELING,
   angel: ANGEL,
   fisch: FISCH,
+  holz: HOLZ,
   extraleben: EXTRALEBEN,
   hermes: HERMES,
   pentagramm: PENTAGRAMM,

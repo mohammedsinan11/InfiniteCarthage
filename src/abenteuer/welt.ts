@@ -11,9 +11,9 @@
  *            weite Landschaften: Wiesen und Felder, Waelder, Dschungel,
  *            Taiga und Schnee, Suempfe, Wuesten mit Duenen, Steppe aus Erde
  *            und Lehm
- *   BAECHE   gerade Laeufe ueber Wiesen und Felder (die Flusskacheln des
- *            Pakets zeigen einen diagonalen Bach) - watbar, und man kann
- *            darin angeln
+ *   BAECHE   kurze, gerade Laeufe ueber Wiesen und Felder, die in einen See
+ *            oder ins Meer muenden (die Flusskacheln des Pakets zeigen einen
+ *            diagonalen Bach) - watbar, und man kann darin angeln
  *
  * Jede Kachel des Pakets kommt vor (BODEN_KACHEL). Alles ist eine reine
  * Funktion von Seed und Feld, mit einem kleinen Zwischenspeicher.
@@ -168,20 +168,37 @@ const BACH_RICHTUNG: readonly [number, number, string][] = [
   [0, 1, 'river_l'],
   [-1, 1, 'river_r'],
 ];
-const BACH_LAENGE = 9;
+/** Laengster Bach - von der Muendung aus gezaehlt. */
+const BACH_LAENGE = 7;
 const wiesig = (b: Boden) => b === 'wiese' || b === 'feld';
 
-/** Liegt hier ein Bach? Dann welche Kachel. Ein Bach entspringt selten und laeuft gerade bergab. */
+/**
+ * Liegt hier ein Bach? Dann welche Kachel.
+ *
+ * Spieltest: "zu viele Fluesse, die mitten in der Landschaft reinschneiden".
+ * Darum muendet jeder Bach jetzt in einen See oder ins Meer: man geht vom
+ * Feld die Linie entlang, bis die Wiese endet - ist dort Wasser, ist das die
+ * Muendung. Nur jede vierzehnte Muendung hat einen Bach, drei bis sieben Felder
+ * lang. Die Kacheln des Pakets zeigen nur diagonale Baeche, darum gerade Laeufe.
+ */
 function bach(seed: number, q: number, r: number, grund: (q: number, r: number) => Boden): string | null {
   if (!wiesig(grund(q, r))) return null;
   for (const [dq, dr, kachel] of BACH_RICHTUNG) {
-    for (let k = 0; k < BACH_LAENGE; k++) {
-      const sq = q - dq * k;
-      const sr = r - dr * k;
-      if (!wiesig(grund(sq, sr))) break;
-      // Die Quelle: selten, und nur eine Richtung je Quelle.
-      const h = hash3i(seed, sq, sr, SALT_BACH);
-      if (h % 37 === 0 && (h >> 8) % 2 === BACH_RICHTUNG.findIndex((x) => x[2] === kachel)) return kachel;
+    for (const s of [1, -1]) {
+      // Flussab bis zum Ende der Wiese.
+      let mq = q;
+      let mr = r;
+      let k = 0;
+      while (k < BACH_LAENGE && wiesig(grund(mq + dq * s, mr + dr * s))) {
+        mq += dq * s;
+        mr += dr * s;
+        k++;
+      }
+      if (k >= BACH_LAENGE || !istWasser(grund(mq + dq * s, mr + dr * s))) continue;
+      const h = hash3i(seed, mq, mr, SALT_BACH + (kachel === 'river_l' ? 0 : 1) + (s > 0 ? 0 : 2));
+      if (h % 14 !== 0) continue;
+      const laenge = 3 + ((h >>> 8) % 5);
+      if (k < laenge) return kachel;
     }
   }
   return null;
