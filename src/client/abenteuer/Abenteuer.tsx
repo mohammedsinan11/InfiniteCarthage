@@ -91,7 +91,7 @@ const TAKT_MS = 170;
 /** So lange steigen Zahlen noch nach ihrem Takt auf (in Takten). */
 const NACHKLANG = 5;
 /** So lange rollt der Wuerfel. */
-const ROLL_MS = 540;
+const ROLL_MS = 260;
 /** Faecher im Inventar - es steht immer da, auch leer. */
 const FAECHER = 12;
 
@@ -301,11 +301,11 @@ function Wuerfel({ n, wurfNr, matt }: { n: number | null; wurfNr: number; matt: 
     setStand('rollt');
     const schritt = () => {
       i += 1;
-      if (i >= 7) {
+      if (i >= 4) {
         klang('wuerfelLand');
         setGezeigt(ziel.current);
         setStand('landet');
-        t = window.setTimeout(() => setStand('ruht'), 450);
+        t = window.setTimeout(() => setStand('ruht'), 300);
         return;
       }
       setGezeigt((alt) => {
@@ -315,7 +315,7 @@ function Wuerfel({ n, wurfNr, matt }: { n: number | null; wurfNr: number; matt: 
       });
       // Jeder Wechsel der Augen klackert - erst schnell, dann langsamer.
       klang('wuerfelKlack');
-      t = window.setTimeout(schritt, 28 + i * i * 3);
+      t = window.setTimeout(schritt, 30 + i * i * 6);
     };
     schritt();
     return () => window.clearTimeout(t);
@@ -406,6 +406,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const [musik, setMusik] = useState(musikAn);
   const [laut, setLaut] = useState(lautstaerke);
   const [tipp, setTipp] = useState<Tipp>(null);
+  const [legendenOffen, setLegendenOffen] = useState(false);
   const [track, setTrack] = useState(laufenderTrack);
   useEffect(() => beiTrack(setTrack), []);
   // Welche Figur der Spieler fuehrt (Debugfenster) - 'klassik' ist der bisherige Ritter.
@@ -514,7 +515,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       // Wuerfel liegt) den Schritt gehen.
       if (autorollRef.current && aktuell.current.phase === 'wuerfeln' && !rolltRef.current) {
         wirfRef.current();
-        window.setTimeout(() => schritt(t), ROLL_MS + 120);
+        window.setTimeout(() => schritt(t), ROLL_MS + 30);
         return;
       }
       schritt(t);
@@ -530,7 +531,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     window.setTimeout(() => {
       rolltRef.current = false;
       setRollt(false);
-    }, ROLL_MS + 80);
+    }, ROLL_MS + 10);
     setWurfNr((n) => n + 1);
     setZugTasten([]);
     setze(wuerfeln(alt));
@@ -571,7 +572,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       if (a0.phase === 'wuerfeln') {
         wirf();
         // Mit Autoroll geht es nach dem Wurf gleich zum angetippten Feld.
-        if (autorollRef.current) window.setTimeout(() => tippeRef.current(h), ROLL_MS + 120);
+        if (autorollRef.current) window.setTimeout(() => tippeRef.current(h), ROLL_MS + 30);
         return;
       }
       if (a0.phase !== 'ziehen' || rolltRef.current) return;
@@ -1584,6 +1585,12 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           ))}
         </span>
         <span className="ab-schild">Zug {a.zug}</span>
+        {/* Legendaeres: ein Knopf, der die Sammlung zeigt - kein festes Fenster. */}
+        {(a.legendaer?.length ?? 0) > 0 && (
+          <button className="klein ab-legenden-knopf" onClick={() => setLegendenOffen(true)} title="Deine legendaeren Funde ansehen">
+            <Icon id="extraleben" groesse={14} /> Legendaer {a.legendaer!.length}
+          </button>
+        )}
       </div>
 
       {/* Der Koenig ist erwacht: sein Leben oben in der Mitte, wie bei einem Boss. */}
@@ -1668,18 +1675,6 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             </div>
           );
         })()}
-        {(a.legendaer?.length ?? 0) > 0 && (
-          <div className="ab-fenster ab-legendaer">
-            <span className="ab-titel">Legendaer</span>
-            <div className="ab-legendaer-reihe">
-              {(a.legendaer ?? []).map((id, i) => (
-                <span key={i} className="ab-legendaer-ding" {...tippHandler(id, setTipp)}>
-                  <Icon id={id} groesse={22} />
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
         <div className="ab-fenster ab-ausruestung">
           <span className="ab-titel">Ausruestung</span>
           <div className="ab-slots">
@@ -1829,6 +1824,35 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         setTipp={setTipp}
         onAktion={(d: DebugAktion) => setze(debugAktion(aktuell.current, d))}
       />
+
+      {legendenOffen && (
+        <div className="ab-ende ab-legenden-huelle" onClick={() => setLegendenOffen(false)}>
+          <div className="ab-fenster ab-legenden" onClick={(e) => e.stopPropagation()}>
+            <div className="ab-debug-kopf">
+              <span className="ab-titel">Legendaere Funde</span>
+              <button className="klein" onClick={() => setLegendenOffen(false)} title="Schliessen">
+                ×
+              </button>
+            </div>
+            {/* Gleiche Funde stapeln sich - etwa mehrere Herzcontainer. */}
+            {Object.entries((a.legendaer ?? []).reduce<Record<string, number>>((m, id) => ({ ...m, [id]: (m[id] ?? 0) + 1 }), {})).map(([id, n]) => (
+              <div key={id} className="ab-legende" {...tippHandler(id, setTipp)}>
+                <span className="ab-legendaer-ding">
+                  <Icon id={id} groesse={22} />
+                  {n > 1 && <span className="ab-anzahl">{n}</span>}
+                </span>
+                <span>
+                  <b>
+                    {gegenstand(id)?.name}
+                    {n > 1 ? ` ×${n}` : ''}
+                  </b>
+                  <small>{gegenstand(id)?.text.replace(/^Legendaer\.\s*/, '')}</small>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <ItemTipp tipp={tipp} />
 

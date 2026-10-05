@@ -8068,10 +8068,10 @@ em.off {
 }
 /* Rollen: von oben hereingeworfen, zweimal aufgeschlagen, ausgetrudelt. */
 .ab-wuerfel-platz.rollt .ab-wuerfel {
-  animation: ab-taumeln 0.54s cubic-bezier(0.3, 0.7, 0.4, 1) both;
+  animation: ab-taumeln 0.26s cubic-bezier(0.3, 0.7, 0.4, 1) both;
 }
 .ab-wuerfel-platz.rollt .ab-wuerfel-schatten {
-  animation: ab-schatten 0.54s cubic-bezier(0.3, 0.7, 0.4, 1) both;
+  animation: ab-schatten 0.26s cubic-bezier(0.3, 0.7, 0.4, 1) both;
 }
 @keyframes ab-taumeln {
   0% {
@@ -8116,7 +8116,7 @@ em.off {
 }
 /* Gelandet: ein Ruck, ein goldener Schein, zwei Staubwoelkchen. */
 .ab-wuerfel-platz.landet .ab-wuerfel {
-  animation: ab-landen 0.45s ease-out;
+  animation: ab-landen 0.3s ease-out;
 }
 @keyframes ab-landen {
   0% {
@@ -8347,6 +8347,7 @@ em.off {
 /* --- Abenteuer: Debugfenster ------------------------------------------- */
 .ab-debug-zu {
   position: absolute;
+  z-index: 3;
   bottom: 10px;
   left: 50%;
   transform: translateX(-50%);
@@ -8594,4 +8595,39 @@ em.off {
 }
 .ab-debug-item-text em.schlecht {
   color: #e8604a;
+}
+
+/* --- Abenteuer: legendaere Sammlung (Knopf oben, Fenster in der Mitte) ---- */
+.ab-legenden-knopf {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-color: #d9a441;
+  color: #f2c94c;
+}
+.ab-legenden {
+  position: static;
+  text-align: left;
+  width: min(420px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-color: #d9a441;
+}
+.ab-legende {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ab-legende b {
+  display: block;
+  color: #f2c94c;
+  font-size: 13px;
+}
+.ab-legende small {
+  color: #d8c8a8;
+  font-size: 11px;
+}
+.ab-legendaer-ding {
+  position: relative;
 }
