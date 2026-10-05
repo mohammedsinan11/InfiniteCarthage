@@ -253,7 +253,9 @@ export const WAFFE_GRIFF = { x: 3.5, y: 10.5 };
  * gewoehnlich gruen, Spuckschleim blau mit rundem Maul, Springschleim gelb
  * mit Fuehlern, Panzerschleim grau mit Steinplatten.
  */
-export const SCHLEIM_BILD: Record<'schleim' | 'spuck' | 'spring' | 'panzer' | 'gift' | 'teil' | 'geist', Pixelkarte> = {
+export const SCHLEIM_BILD: Record<'schleim' | 'spuck' | 'spring' | 'panzer' | 'gift' | 'teil' | 'geist' | 'bandit', Pixelkarte> = {
+  // Bandit: als Figur gezeichnet (Kachelstil) - dies ist nur sein Kopf fuer kleine Bilder.
+  bandit: ['..ooo..', '.oqqqo.', 'oqsqsqo', 'oqqqqqo', '.oQQQo.', '.ooooo.'],
   // Giftschleim: violett, tropft - hinterlaesst Pfuetzen.
   gift: ['...ooo...', '..oPPPo..', '.oPLPPPo.', 'oPoPPoPpo', 'oPPPPPPpo', 'opPpPpppo', '.oooPooo.', '....p....'],
   // Teilschleim: zwei Lappen, eine Naht in der Mitte - zerfaellt in zwei.
@@ -691,3 +693,35 @@ export function malKachelFigur(
   ctx.restore();
 }
 
+
+/** Der Marktstand des Haendlers: gestreiftes Dach, Tresen mit Waren (Kachelpalette). */
+export const STAND: Pixelkarte = [
+  'oooooooooooooooo',
+  'oRARARARARARARAo',
+  'oRARARARARARARAo',
+  '.oooooooooooooo.',
+  '.w............w.',
+  '.w............w.',
+  '.w............w.',
+  'oWWWWWWWWWWWWWWo',
+  'oWfWYWRWfWGWYWWo',
+  'oWWWWWWWWWWWWWWo',
+  '.ww..........ww.',
+];
+
+/** Das Banner des Werbers: ein Stab mit Fahne (Kachelpalette). */
+export const BANNER: Pixelkarte = [
+  'o.......',
+  'wooooooo',
+  'wBBBBBBo',
+  'wBYYYBBo',
+  'wBBYBBBo',
+  'wBBBBBBo',
+  'woBoBoBo',
+  'w.o.o.o.',
+  'w.......',
+  'w.......',
+  'w.......',
+  'w.......',
+  'ww......',
+];

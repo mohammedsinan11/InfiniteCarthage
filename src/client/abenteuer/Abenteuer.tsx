@@ -24,6 +24,20 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
   FAEHIGKEIT_NAME,
+  FRAKTION_FIGUR,
+  GEFOLGE_MAX,
+  HAENDLER_WAREN,
+  ORT_NAME,
+  SOELDNER,
+  anheuern,
+  ansprechen,
+  kaufen,
+  ladenZu,
+  ortAuf,
+  soeldnerEp,
+  verkaufen,
+  verkaufsPreis,
+  werberAngebot,
   ZAUBER_NAME,
   SLOTS,
   SLOT_NAME,
@@ -72,7 +86,7 @@ import { DebugFenster, FIGUR_KEY, ladeWeltEinstellung, leseFigur } from './Debug
 
 // Die Stellschrauben der Welt aus dem Debugfenster gelten ab dem Laden.
 ladeWeltEinstellung();
-import { GELEEKOLOSS, HASE, PENTASCHLEIM, SCHATTENSCHLEIM } from './symbole';
+import { BANNER, GELEEKOLOSS, HASE, PENTASCHLEIM, SCHATTENSCHLEIM, STAND } from './symbole';
 import { RITTER_HAND, RITTER_KOERPER, RITTER_SCHRITT, SCHLEIMKOENIG, SCHLEIM_BILD, SYMBOL, WAFFE, WAFFE_GRIFF, zeichnePixel } from './symbole';
 import { LAUT_STUFEN, beiTrack, klang, laufenderTrack, lautstaerke, setzeBiom, setzeLautstaerke } from './musik';
 import { BIOM_NAME } from './musik';
@@ -428,6 +442,8 @@ function spieleKlaenge(a: Zustand): void {
     } else if (e.art === 'stufe') spaeter(e.takt + 0.3, 'stufe');
     else if (e.art === 'faehigkeit') spaeter(e.takt + 0.1, e.name === 'feuerkreis' ? 'feuer' : e.name === 'runenblitz' ? 'blitz' : 'bereit');
     else if (e.art === 'boss') spaeter(e.takt, 'beben');
+    else if (e.art === 'treffen') spaeter(e.takt, 'probe');
+    else if (e.art === 'faellt') spaeter(e.takt + 0.5, 'autsch');
     else if (e.art === 'kreis') spaeter(e.takt + 0.2, e.name === 'heilkreis' ? 'bereit' : e.name === 'schutzrune' ? 'geblockt' : e.name === 'bannkreis' ? 'blitz' : 'feuer');
     else if (e.art === 'tod') spaeter(e.takt + 0.5, 'zerplatzt');
   }
@@ -529,6 +545,12 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   /** Seit wann das Banner "Der Schleimkoenig erwacht" steht. */
   const banner = useRef(0);
   const bannerText = useRef('Der Schleimkoenig erwacht!');
+  /** Sprechblasen: wer etwas sagt, bis wann (Bildschirmzeit). */
+  const blasen = useRef<{ wer: number; text: string; ab: number; bis: number }[]>([]);
+  /** Die Uebersichtskarte gross (angetippt) oder klein. */
+  const [miniGross, setMiniGross] = useState(false);
+  const miniGrossRef = useRef(false);
+  miniGrossRef.current = miniGross;
 
   const setze = useCallback((neu: Zustand) => {
     aktuell.current = neu;
@@ -547,6 +569,13 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       if (leg) {
         banner.current = performance.now();
         bannerText.current = leg.id === 'pentagramm2' ? 'Pentagrammmeister Stufe 2!' : `Legendaer: ${gegenstand(leg.id)?.name ?? leg.id}`;
+      }
+      // Sprueche als Blasen - ein wenig nach ihrem Takt, dann gut drei Sekunden lang.
+      const jetzt = performance.now();
+      for (const e of neu.ereignisse) {
+        if (e.art !== 'spruch') continue;
+        const ab = jetzt + e.takt * TAKT_MS;
+        blasen.current = [...blasen.current.filter((b) => b.wer !== e.wer && b.bis > jetzt), { wer: e.wer, text: e.text, ab, bis: ab + 3400 }];
       }
       spieleKlaenge(neu);
     }
@@ -632,6 +661,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     (h: Hex) => {
       const a0 = aktuell.current;
       halt();
+      // Einen Haendler oder Werber nebenan antippen: ansprechen - in jeder Phase.
+      const o = ortAuf(a0, h.q, h.r);
+      if (o && hexDistance(o, a0.pos) <= 1) return void setze(ansprechen(a0, o.id));
       if (a0.phase === 'wuerfeln') {
         wirf();
         // Mit Autoroll geht es nach dem Wurf gleich zum angetippten Feld.
@@ -715,6 +747,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       for (const s of a.schleime) schleimEnde.set(s.id, s);
       for (const e of ev) if (e.art === 'tod') schleimEnde.set(e.wer, { q: e.q, r: e.r });
       for (const t of a.tiere ?? []) schleimEnde.set(t.id, t);
+      for (const g of a.gefolge ?? []) schleimEnde.set(g.id, g);
+      for (const w of a.wanderer ?? []) schleimEnde.set(w.id, w);
+      for (const e of ev) if (e.art === 'faellt') schleimEnde.set(e.wer, { q: e.q, r: e.r });
       const endeVon = (wer: Wer): Hex => (wer === 'ritter' ? a.pos : (schleimEnde.get(wer) ?? a.pos));
       const ort = (wer: Wer): { x: number; y: number; hoch: number } => {
         // Springschleime fliegen hoch, alle anderen huepfen.
@@ -1251,6 +1286,13 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               if (holtAus && alpha > 0.3) schrift('!', X + 12 * kf, Y - 10 * kf, '#ff4a3a', 1, 8);
               return;
             }
+            if (s.art === 'bandit') {
+              // Der Bandit: ein Mensch in Schwarz mit Axt.
+              if (s.tot === null) malPerson(s.id, { x: o.x, y: o.y, hoch: o0.hoch }, 'schwarz', 'axt', wu.blitz);
+              if (alpha > 0.3 && lebenJetzt > 0) balken(X, sy(o.y) - 15 * f, lebenJetzt, max);
+              if (holtAus) schrift('!', X + 8 * f, sy(o.y) - 14 * f, '#ff4a3a', 1, 7);
+              return;
+            }
             malSchleim(s.art, X, Y + f, fs, {
               sx: skx,
               sy: sky,
@@ -1259,6 +1301,72 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             });
             if (alpha > 0.3 && lebenJetzt > 0) balken(X, Y - (hoehe + 2) * fs, lebenJetzt, max);
             if (holtAus && alpha > 0.3) schrift('!', X + 9 * f, Y - (hoehe + 2) * fs, '#ff4a3a', 1, 7);
+          },
+        });
+      }
+      // Menschen im Kachelstil: Soeldner, Wanderer, Banditen, Haendler und Werber.
+      const malPerson = (wer: number, o: { x: number; y: number; hoch: number }, designId: string, waffeId: string | null, blitz: boolean) => {
+        const design = FIGUREN.find((d) => d.id === designId) ?? FIGUREN[0]!;
+        const geht = ev.find((e): e is Extract<Ereignis, { art: 'gehen' }> => e.art === 'gehen' && e.wer === wer && p >= e.takt && p < e.takt + 1);
+        const hieb = ev.find((e): e is Extract<Ereignis, { art: 'hieb' }> => e.art === 'hieb' && e.wer === wer && p >= e.takt - 0.05 && p < e.takt + 0.8);
+        // Blick: wohin er geht, wen er schlaegt - sonst zum Ritter.
+        const zu = geht ? mitte(geht.nach.q, geht.nach.r) : hieb ? (hieb.feld ? mitte(hieb.feld.q, hieb.feld.r) : hieb.ziel !== null ? ort(hieb.ziel) : ritter) : ritter;
+        const blickR: 1 | -1 = zu.x < o.x - 0.5 ? -1 : 1;
+        const schwung = hieb ? p - hieb.takt : -1;
+        const haltung: Haltung = schwung >= 0 ? (schwung < 0.18 ? 'aus' : schwung < 0.45 ? 'hieb' : 'nach') : 'ruhe';
+        const beine: BeinBild = geht ? ((p - geht.takt) % 0.5 < 0.25 ? 'lauf1' : 'lauf2') : 'steh';
+        // Atmen und ein leises Wippen - jeder in seinem Takt.
+        const atmet = !geht && Math.sin(sek * 2 + wer * 1.3) > 0.5 ? 1 : 0;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+        ctx.fillRect(sx(o.x) - 4 * f, sy(o.y) + 3 * f, 8 * f, f);
+        malKachelFigur(ctx, sx(o.x), sy(o.y) + 4 * f - Math.round(o.hoch + atmet) * f, f, design, beine, haltung, waffeId, blickR, blitz, null);
+      };
+      for (const g of a.gefolge ?? []) {
+        if (hexDistance(g, a.pos) > sicht + 2) continue;
+        const o0 = ort(g.id);
+        const o = stoss(g.id, o0.x, o0.y);
+        const wu = wucht(g.id);
+        figuren.push({
+          y: o.y,
+          mal: () => {
+            malPerson(g.id, { ...o, hoch: o0.hoch }, g.art, SOELDNER[g.art].waffe, wu.blitz);
+            balken(sx(o.x), sy(o.y) - 15 * f - Math.round(o0.hoch) * f, g.leben, g.max);
+            schrift(`${g.lv}`, sx(o.x) + 8 * f, sy(o.y) - 13 * f - Math.round(o0.hoch) * f, '#f2c94c', 1, 5);
+          },
+        });
+      }
+      for (const w of a.wanderer ?? []) {
+        if (hexDistance(w, a.pos) > sicht) continue;
+        const o0 = ort(w.id);
+        const o = stoss(w.id, o0.x, o0.y);
+        const wu = wucht(w.id);
+        figuren.push({
+          y: o.y,
+          mal: () => {
+            malPerson(w.id, { ...o, hoch: o0.hoch }, FRAKTION_FIGUR[w.fraktion], w.fraktion === 'orden' ? 'breitschwert' : 'schwert', wu.blitz);
+            // Ein Faehnchen in der Farbe der Fraktion.
+            ctx.fillStyle = w.fraktion === 'orden' ? '#dfe9f0' : '#3d6a45';
+            ctx.fillRect(sx(o.x) - 6 * f, sy(o.y) - 17 * f, 3 * f, 2 * f);
+            if (w.leben < w.max) balken(sx(o.x), sy(o.y) - 15 * f, w.leben, w.max);
+          },
+        });
+      }
+      for (const o of a.orte ?? []) {
+        if (hexDistance(o, a.pos) > sicht + 1 || !erkundet.has(hexKey(o.q, o.r))) continue;
+        const m = mitte(o.q, o.r);
+        figuren.push({
+          y: m.y,
+          mal: () => {
+            if (o.art === 'haendler') {
+              zeichnePixel(ctx, STAND, sx(m.x) - 8 * f, sy(m.y) - 12 * f, f, KACHEL_PIX);
+              malPerson(o.id, { x: m.x, y: m.y - 4, hoch: 0 }, 'zwerg', null, false);
+              zeichnePixel(ctx, STAND.slice(7), sx(m.x) - 8 * f, sy(m.y) - 5 * f, f, KACHEL_PIX);
+            } else {
+              zeichnePixel(ctx, BANNER, sx(m.x) + 4 * f, sy(m.y) - 14 * f, f, KACHEL_PIX);
+              malPerson(o.id, { x: m.x - 2, y: m.y, hoch: 0 }, 'soeldnerin', 'breitschwert', false);
+            }
+            const nah = hexDistance(o, a.pos) <= 1;
+            schrift(ORT_NAME[o.art], sx(m.x) - (o.art === 'haendler' ? 13 : 10) * f, sy(m.y) - 20 * f, nah ? '#f2c94c' : '#e8dcc0', nah ? 1 : 0.75, 5);
           },
         });
       }
@@ -1387,6 +1495,39 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         },
       });
       figuren.sort((x, y) => x.y - y.y).forEach((fi) => fi.mal());
+      // Sprechblasen ueber Soeldnern, Wanderern, Haendlern - mit Schwaenzchen nach unten.
+      {
+        const jetztMs = performance.now();
+        blasen.current = blasen.current.filter((b) => b.bis > jetztMs);
+        for (const b of blasen.current) {
+          if (b.ab > jetztMs) continue;
+          const wo = schleimEnde.get(b.wer) ?? (a.orte ?? []).find((o) => o.id === b.wer);
+          if (!wo || hexDistance(wo, a.pos) > sicht + 1) continue;
+          const o = schleimEnde.has(b.wer) ? ort(b.wer) : mitte(wo.q, wo.r);
+          const alpha = klemme((b.bis - jetztMs) / 400) * klemme((jetztMs - b.ab) / 150);
+          ctx.font = `bold ${5 * f}px monospace`;
+          // Zeilen von hoechstens 22 Zeichen.
+          const zeilen: string[] = [];
+          for (const wort of b.text.split(' ')) {
+            const z = zeilen[zeilen.length - 1];
+            if (z !== undefined && (z + ' ' + wort).length <= 22) zeilen[zeilen.length - 1] = z + ' ' + wort;
+            else zeilen.push(wort);
+          }
+          const breite = Math.max(...zeilen.map((z) => ctx.measureText(z).width)) + 6 * f;
+          const hoeheB = zeilen.length * 6 * f + 4 * f;
+          const bx = Math.round(sx(o.x) - breite / 2);
+          const by = Math.round(sy(o.y) - 22 * f - hoeheB);
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = '#120d08';
+          ctx.fillRect(bx - f, by - f, breite + 2 * f, hoeheB + 2 * f);
+          ctx.fillStyle = '#f2e7d0';
+          ctx.fillRect(bx, by, breite, hoeheB);
+          ctx.fillRect(sx(o.x) - f, by + hoeheB, 2 * f, 2 * f);
+          ctx.fillStyle = '#2b211a';
+          zeilen.forEach((z, i) => ctx.fillText(z, bx + 3 * f, by + (i + 1) * 6 * f));
+          ctx.globalAlpha = 1;
+        }
+      }
 
       // Der Ladebalken der Waffe unter dem Ritter - und eine Aura, wenn eine Faehigkeit wartet.
       const lad = ladungVon(a);
@@ -1650,7 +1791,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               const x = sx(m.x + Math.cos(w0) * v * k);
               const y = sy(m.y - 2 + Math.sin(w0) * v * 0.6 * k - 10 * k + 14 * k * k);
               ctx.globalAlpha = klemme(1.2 - k);
-              ctx.fillStyle = i % 3 === 0 ? '#d8ff9a' : '#6aa85a';
+              ctx.fillStyle = e.schleimArt === 'bandit' ? (i % 3 === 0 ? '#f6c04a' : '#5f4036') : i % 3 === 0 ? '#d8ff9a' : '#6aa85a';
               ctx.fillRect(x, y, f * (e.gross ? 2 : 1) + f, f * (e.gross ? 2 : 1) + f);
             }
             ctx.globalAlpha = 1;
@@ -1755,6 +1896,21 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           mctx.fillStyle = fund === 'schatz' ? '#f2c94c' : fund === 'herz' || fund === 'halbherz' ? '#e8604a' : '#f2e7d0';
           mctx.fillRect(Math.round(x) + 1, Math.round(y) + 1, z * 2 - 2, z * 2 - 2);
         }
+        // Leute: Haendler golden, Werber blau; das Gefolge weiss, Wanderer in ihrer Farbe, Banditen dunkelrot.
+        const punkt = (q: number, rr: number, farbe: string, rand = false) => {
+          const x = (q - a.pos.q + (rr - a.pos.r) / 2) * z * 2 + m.width / 2;
+          const y = (rr - a.pos.r) * z * 1.7 + m.height / 2;
+          if (rand) {
+            mctx.fillStyle = '#120d08';
+            mctx.fillRect(Math.round(x) - 1, Math.round(y) - 1, z * 2 + 2, z * 2 + 2);
+          }
+          mctx.fillStyle = farbe;
+          mctx.fillRect(Math.round(x), Math.round(y), z * 2, z * 2);
+        };
+        for (const o of a.orte ?? []) if (erkundet.has(hexKey(o.q, o.r))) punkt(o.q, o.r, o.art === 'haendler' ? '#f6c04a' : '#6ab0ff', true);
+        for (const w of a.wanderer ?? []) if (hexDistance(w, a.pos) <= sicht) punkt(w.q, w.r, w.fraktion === 'orden' ? '#dfe9f0' : '#2f7a3a');
+        for (const s of a.schleime) if (s.art === 'bandit' && hexDistance(s, a.pos) <= sicht) punkt(s.q, s.r, '#8a2a2a');
+        for (const g of a.gefolge ?? []) punkt(g.q, g.r, '#ffffff');
         // Der Koenig steht immer auf der Karte - man soll ihn finden koennen.
         for (const s of a.schleime) {
           if (!s.boss) continue;
@@ -1877,9 +2033,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       })()}
 
       {/* Rechts oben: die Uebersichtskarte. */}
-      <div className="ab-fenster ab-mini">
+      <div className={miniGross ? 'ab-fenster ab-mini gross' : 'ab-fenster ab-mini'} onClick={() => setMiniGross((x) => !x)} title={miniGross ? 'Antippen: Karte klein' : 'Antippen: Karte gross'}>
         <span className="ab-titel">Karte</span>
-        <canvas ref={mini} width={170} height={130} />
+        <canvas ref={mini} width={miniGross ? 440 : 170} height={miniGross ? 330 : 130} />
         <div className="ab-zug">Zug {a.zug}</div>
       </div>
 
@@ -1964,6 +2120,26 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             })}
           </div>
         </div>
+        {/* Das Gefolge: wer mitlaeuft, wie es ihm geht, wie weit er im Level ist. */}
+        {(a.gefolge ?? []).length > 0 && (
+          <div className="ab-fenster ab-gefolge">
+            <span className="ab-titel">Gefolge</span>
+            {(a.gefolge ?? []).map((g) => (
+              <div key={g.id} className="ab-kamerad" title={`${g.name}, ${SOELDNER[g.art].name} - ${SOELDNER[g.art].text}`}>
+                <b>{g.name}</b>
+                <small>
+                  Lv {g.lv} · {lebenText(g.leben)}/{g.max}
+                </small>
+                <span className="ab-kamerad-balken">
+                  <i style={{ width: `${(100 * g.leben) / g.max}%` } as CSSProperties} />
+                </span>
+                <span className="ab-kamerad-ep">
+                  <i style={{ width: `${(100 * g.ep) / soeldnerEp(g.lv)}%` } as CSSProperties} />
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Links unten: die Steuerung - versetzt wie die Tastatur, zugleich zum Tippen. */}
@@ -2132,6 +2308,92 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           </div>
         </div>
       )}
+
+      {/* Der Laden: beim Haendler verkaufen und kaufen, beim Werber Soeldner anheuern. */}
+      {(() => {
+        const o = (a.orte ?? []).find((x) => x.id === a.laden);
+        if (!o || hexDistance(o, a.pos) > 1) return null;
+        const zu = () => setze(ladenZu(aktuell.current));
+        const ware = vorrat.filter(([id]) => verkaufsPreis(id) > 0);
+        return (
+          <div className="ab-ende ab-legenden-huelle" onClick={zu}>
+            <div className="ab-fenster ab-laden" onClick={(e) => e.stopPropagation()}>
+              <div className="ab-debug-kopf">
+                <span className="ab-titel">
+                  {o.name}, {ORT_NAME[o.art]}
+                </span>
+                <span className="ab-laden-gold">
+                  <Icon id="muenze" groesse={14} /> {gold}
+                </span>
+                <button className="klein" onClick={zu} title="Schliessen">
+                  ×
+                </button>
+              </div>
+              {o.art === 'haendler' ? (
+                <>
+                  <small>Verkaufen</small>
+                  {ware.length === 0 && <p className="ab-leer">Nichts, was der Haendler kauft. Ausruestung, Gelee, Kraeuter und Fische nimmt er gern.</p>}
+                  {ware.map(([id, n]) => (
+                    <div key={id} className="ab-laden-zeile" {...tippHandler(id, setTipp)}>
+                      <Icon id={id} groesse={20} />
+                      <span>
+                        {gegenstand(id)?.name}
+                        {n > 1 ? ` ×${n}` : ''}
+                      </span>
+                      <button className="klein" onClick={() => setze(verkaufen(aktuell.current, id))}>
+                        +{verkaufsPreis(id)} Gold
+                      </button>
+                      {n > 1 && (
+                        <button className="klein" onClick={() => setze(verkaufen(aktuell.current, id, true))}>
+                          Alle +{verkaufsPreis(id) * n}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <small>Kaufen</small>
+                  {HAENDLER_WAREN.map((w) => (
+                    <div key={w.id} className="ab-laden-zeile" {...tippHandler(w.id, setTipp)}>
+                      <Icon id={w.id} groesse={20} />
+                      <span>{gegenstand(w.id)?.name}</span>
+                      <button className="klein" disabled={gold < w.preis} onClick={() => setze(kaufen(aktuell.current, w.id))}>
+                        {w.preis} Gold
+                      </button>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <small>
+                    Soeldner anheuern ({(a.gefolge ?? []).length}/{GEFOLGE_MAX} im Gefolge)
+                  </small>
+                  {werberAngebot(a, o).map((an, nr) => {
+                    const weg = (a.angeheuert ?? []).includes(`${o.id}:${nr}`);
+                    const def = SOELDNER[an.art];
+                    return (
+                      <div key={nr} className={weg ? 'ab-laden-zeile weg' : 'ab-laden-zeile'}>
+                        <span>
+                          <b>{an.name}</b>, {def.name}
+                          <small>
+                            {def.text} Leben {def.leben}, Angriff +{def.angriff}
+                            {def.weite > 1 ? `, ${def.weite} Felder weit` : ''}.
+                          </small>
+                        </span>
+                        <button
+                          className="klein"
+                          disabled={weg || gold < an.preis || (a.gefolge ?? []).length >= GEFOLGE_MAX}
+                          onClick={() => setze(anheuern(aktuell.current, nr))}
+                        >
+                          {weg ? 'Dabei' : `${an.preis} Gold`}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       <ItemTipp tipp={tipp} />
 

@@ -8697,3 +8697,111 @@ em.off {
   border-color: #c8402f;
   box-shadow: inset 0 0 0 1px rgba(200, 64, 47, 0.7);
 }
+
+/* Abenteuer: Laden (Haendler und Werber), Gefolge, grosse Uebersichtskarte. */
+.ab-laden {
+  position: static;
+  text-align: left;
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-color: #d9a441;
+}
+.ab-laden > small {
+  color: #a89878;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 10px;
+  margin-top: 4px;
+}
+.ab-laden-gold {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #f2c94c;
+  margin-left: auto;
+  margin-right: 8px;
+  font-weight: bold;
+}
+.ab-laden-zeile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ab-laden-zeile > span {
+  flex: 1;
+  color: #e8dcc0;
+  font-size: 13px;
+}
+.ab-laden-zeile > span small {
+  display: block;
+  color: #b8a888;
+  font-size: 11px;
+}
+.ab-laden-zeile b {
+  color: #f2c94c;
+}
+.ab-laden-zeile.weg {
+  opacity: 0.55;
+}
+.ab-leer {
+  color: #b8a888;
+  font-size: 12px;
+  margin: 0;
+}
+.ab-gefolge {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ab-kamerad {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1px 6px;
+  font-size: 11px;
+  color: #e8dcc0;
+}
+.ab-kamerad b {
+  color: #f2e7d0;
+  font-size: 12px;
+}
+.ab-kamerad small {
+  color: #b8a888;
+  text-align: right;
+}
+.ab-kamerad-balken,
+.ab-kamerad-ep {
+  grid-column: 1 / -1;
+  display: block;
+  height: 4px;
+  background: #4a2a22;
+  border: 1px solid #1a120c;
+}
+.ab-kamerad-ep {
+  height: 2px;
+  background: #2b2418;
+}
+.ab-kamerad-balken i,
+.ab-kamerad-ep i {
+  display: block;
+  height: 100%;
+  background: #7fd05a;
+}
+.ab-kamerad-ep i {
+  background: #f2c94c;
+}
+.ab-mini {
+  cursor: zoom-in;
+  z-index: 6;
+}
+.ab-mini.gross {
+  cursor: zoom-out;
+}
+.ab-mini.gross canvas {
+  width: min(440px, calc(100vw - 40px));
+  height: auto;
+  aspect-ratio: 4 / 3;
+}

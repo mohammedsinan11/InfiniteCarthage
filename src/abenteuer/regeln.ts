@@ -194,7 +194,7 @@ export type Phase = 'wuerfeln' | 'ziehen' | 'tot' | 'sieg';
  *   panzer  Panzerschleim: Steinpanzer - getroffen erst ab 5 statt 4, drei
  *           Leben, traege (jeder zweite Tick); gibt zwei Gelee.
  */
-export type SchleimArt = 'spuck' | 'spring' | 'panzer' | 'gift' | 'teil' | 'geist';
+export type SchleimArt = 'spuck' | 'spring' | 'panzer' | 'gift' | 'teil' | 'geist' | 'bandit';
 export const SCHLEIM_NAME: Record<SchleimArt, string> = {
   spuck: 'Spuckschleim',
   spring: 'Springschleim',
@@ -202,6 +202,7 @@ export const SCHLEIM_NAME: Record<SchleimArt, string> = {
   gift: 'Giftschleim',
   teil: 'Teilschleim',
   geist: 'Geisterschleim',
+  bandit: 'Bandit',
 };
 
 /**
@@ -241,7 +242,7 @@ export function schleimName(s: Pick<Schleim, 'boss' | 'art' | 'gross'> & { bossA
 /** Hoechstes Leben eines Schleims - fuer die Lebensbalken. */
 export function schleimMaxLeben(s: Pick<Schleim, 'boss' | 'art' | 'gross'> & { max?: number }): number {
   if (s.boss) return s.max ?? BOSS_LEBEN;
-  if (s.art === 'panzer' || s.art === 'teil') return 3;
+  if (s.art === 'panzer' || s.art === 'teil' || s.art === 'bandit') return 3;
   return s.gross ? 4 : 2;
 }
 
@@ -266,6 +267,12 @@ export type Ereignis =
   | { art: 'wiederbelebt'; takt: number }
   /** Pentagrammmeister: der Weg hat sich geschlossen - ein Zauber. */
   | { art: 'zauber'; takt: number; name: Zauber; felder: Hex[] }
+  /** Jemand sagt etwas - eine Sprechblase ueber Soeldner und Wanderern. */
+  | { art: 'spruch'; takt: number; wer: number; text: string }
+  /** Ein Soeldner oder Wanderer faellt. */
+  | { art: 'faellt'; takt: number; wer: number; q: number; r: number }
+  /** Der Ritter spricht einen Haendler oder Werber an. */
+  | { art: 'treffen'; takt: number; ort: number }
   /** Stufe 2: ein bleibender Kreis wirkt (Schaden, Heilung, Bann, Schutz). */
   | { art: 'kreis'; takt: number; name: Zauber; ziele: number[]; felder?: Hex[] }
   /** Gift: der Ritter steht in einer Pfuetze. */
@@ -328,6 +335,16 @@ export type Abenteuer = {
   pentaGerufen?: boolean;
   /** Stufe 2: Zauberkreise, die auf der Karte bleiben. */
   kreise?: Kreis[];
+  /** Leute an festen Orten: Haendler und Werber. */
+  orte?: Ort[];
+  /** Angeheuerte Soeldner - sie laufen mit, kaempfen und lernen dazu. */
+  gefolge?: Soeldner[];
+  /** Schon angeheuerte Angebote der Werber ("ortId:nr"). */
+  angeheuert?: string[];
+  /** Andere Fraktionen, die durch die Welt ziehen (Orden, Jaeger). */
+  wanderer?: Wanderer[];
+  /** Mit wem der Ritter gerade spricht (Ort-Id) - dann ist ein Laden offen. */
+  laden?: number | null;
   /** Was zuletzt geschah, neueste zuletzt. */
   log: string[];
   /** Die Ereignisse der letzten Aktion - nur fuers Bild. */
@@ -498,6 +515,8 @@ export function neuesAbenteuer(seed: number): Abenteuer {
     if (!begehbar(gelaende(seed, h.q, h.r))) continue;
     a.schleime.push(neuerSchleim(a.naechsteId++, h.q, h.r, hash3i(seed, h.q, h.r, SALT_SCHLEIM + 1) % 100, d > 8));
   }
+  ortePlatzieren(a);
+  a.schleime = a.schleime.filter((s) => !ortAuf(a, s.q, s.r));
   sehen(a);
   return a;
 }
@@ -515,6 +534,7 @@ function sehen(a: Abenteuer): void {
     if ((b === 'schnee' || b === 'taiga') && hash3i(a.seed, h.q, h.r, SALT_SCHLEIM + 9) % 40 === 0 && hexDistance(h, a.pos) > 1) {
       a.tiere = [...(a.tiere ?? []), { id: a.naechsteId++, q: h.q, r: h.r, art: 'hase' }];
     }
+    if (a.orte) ortEntdecken(a, h);
   }
   a.erkundet = [...neu];
 }
@@ -722,6 +742,24 @@ export function taste(alt: Abenteuer, t: Taste): Abenteuer {
   if (dir === null) return alt;
   const d = HEX_DIRS[dir]!;
   const ziel = { q: a.pos.q + d[0], r: a.pos.r + d[1] };
+  a.laden = null;
+  // Gegen einen Haendler oder Werber laufen: ansprechen - kostet keinen Schritt.
+  const ort = ortAuf(a, ziel.q, ziel.r);
+  if (ort) return ansprechen(a, ort.id);
+  // Ein Wanderer anderer Fraktion steht im Weg - er gruesst.
+  const wand = wandererAuf(a, ziel.q, ziel.r);
+  if (wand) {
+    a.ereignisse.push({ art: 'spruch', takt: 0, wer: wand.id, text: SPRUCH[wand.fraktion][a.zeit % SPRUCH[wand.fraktion].length]! });
+    melde(a, `${wand.name} vom ${FRAKTION_NAME[wand.fraktion]} steht dir im Weg.`);
+    return a;
+  }
+  // Ein Soeldner im Weg: Platz tauschen.
+  const kamerad = soeldnerAuf(a, ziel.q, ziel.r);
+  if (kamerad) {
+    a.ereignisse.push({ art: 'gehen', takt: 0, wer: kamerad.id, von: { q: kamerad.q, r: kamerad.r }, nach: { q: a.pos.q, r: a.pos.r } });
+    kamerad.q = a.pos.q;
+    kamerad.r = a.pos.r;
+  }
   // Ein Schneehase auf dem Feld huscht weg - man kann nicht auf ihn treten.
   if ((a.tiere ?? []).some((t) => t.q === ziel.q && t.r === ziel.r)) {
     melde(a, 'Der Schneehase huscht dir zwischen den Beinen weg.');
@@ -746,7 +784,7 @@ export function taste(alt: Abenteuer, t: Taste): Abenteuer {
     let landung: Hex | null = null;
     for (let k = HERMES_WEITE; k >= 1 && !landung; k--) {
       const h = { q: a.pos.q + d[0] * k, r: a.pos.r + d[1] * k };
-      if (betretbar(a, h.q, h.r) && !schleimAuf(a, h.q, h.r)) landung = h;
+      if (betretbar(a, h.q, h.r) && !schleimAuf(a, h.q, h.r) && !ortAuf(a, h.q, h.r) && !wandererAuf(a, h.q, h.r) && !soeldnerAuf(a, h.q, h.r)) landung = h;
     }
     if (!landung) {
       melde(a, 'Kein freies Feld zum Huepfen.');
@@ -879,7 +917,7 @@ function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
 }
 
 /** Schaden an einem Schleim - stirbt er, zerplatzt er (und der Koenig erwacht vielleicht). */
-function verwunde(a: Abenteuer, s: Schleim, schaden: number, takt: number, vorne: string): void {
+function verwunde(a: Abenteuer, s: Schleim, schaden: number, takt: number, vorne: string, fremd = false): void {
   s.leben -= schaden;
   if (s.leben > 0) {
     melde(a, `${vorne}: Treffer${schaden > 1 ? ` (${schaden} Schaden)` : ''} - der ${schleimName(s)} wankt.`);
@@ -896,6 +934,11 @@ function verwunde(a: Abenteuer, s: Schleim, schaden: number, takt: number, vorne
     ...(s.boss ? { boss: true, bossArt: s.bossArt ?? 'koenig' } : {}),
     ...(s.art ? { schleimArt: s.art } : {}),
   });
+  // Erlegt eine andere Fraktion den Gegner, bekommt der Ritter nichts.
+  if (fremd) {
+    melde(a, `${vorne} erlegt den ${schleimName(s)}.`);
+    return;
+  }
   erfahrung(a, s.boss ? 10 : s.gross || s.art ? 2 : 1, takt);
   if (s.boss && s.bossArt === 'penta') {
     // Der Pentagrammschleim ist bezwungen: Stufe 2 des Pentagrammmeisters.
@@ -926,6 +969,13 @@ function verwunde(a: Abenteuer, s: Schleim, schaden: number, takt: number, vorne
       a.ereignisse.push({ art: 'neu', takt, wer: id });
     }
     if (plaetze.length) melde(a, 'Der Teilschleim zerfaellt in kleine Stuecke!');
+  }
+  // Banditen lassen Gold fallen, Schleime Gelee.
+  if (s.art === 'bandit') {
+    const gold = 2 + (s.id % 3);
+    a.inventar = { ...a.inventar, gold: (a.inventar['gold'] ?? 0) + gold };
+    melde(a, `${vorne}: der Bandit faellt! +${gold} Gold.`);
+    return;
   }
   const gelee = s.gross || s.art === 'panzer' || s.art === 'teil' ? 2 : 1;
   a.inventar = { ...a.inventar, gelee: (a.inventar['gelee'] ?? 0) + gelee };
@@ -1215,6 +1265,7 @@ function schleimHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetz
       }
       return;
     }
+    if (!getroffen && helferGetroffen(a, s, feld, takt, rng)) return;
     if (!getroffen) {
       a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: null, feld, wurf: 0, schaden: 0 });
       melde(a, `Ausgewichen! Der ${schleimName(s)} klatscht ins Leere.`);
@@ -1233,6 +1284,13 @@ function schleimHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetz
       melde(a, 'Der Spuckschleim zielt - tritt seitlich aus der Linie!');
       return;
     }
+  }
+  // Steht ein Soeldner oder Wanderer neben ihm (und der Ritter nicht), geht er auf den los.
+  const helfer = d > 1 && s.art !== 'spring' && s.art !== 'spuck' ? helferNeben(a, s) : null;
+  if (helfer) {
+    s.angriff = helfer;
+    a.ereignisse.push({ art: 'ansage', takt, wer: s.id, feld: helfer });
+    return;
   }
   // Der Springschleim: bis drei Felder weit sagt er sein Landefeld an.
   if ((s.art === 'spring' && d <= 3) || d === 1) {
@@ -1486,6 +1544,382 @@ function kolossHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetzt
   bossZieht(a, s, takt, besetzt);
 }
 
+// --- LEUTE: Haendler, Werber, Soeldner und Fraktionen ------------------------
+
+/**
+ * Spieltest: "Items bei einem Haendler verkaufen", "Soeldner anheuern, die
+ * mitlaufen, helfen, mittrainieren, Sprueche sagen und sich lebendig
+ * anfuehlen" und "andere Fraktionen laufen auf der Karte herum".
+ *
+ *   ORTE       Haendler (kauft Beute, verkauft Kraeuter) und Werber (bietet
+ *              Soeldner an). Einer von jedem steht nah am Start, weitere
+ *              findet man beim Erkunden. Man laeuft gegen sie, um zu reden.
+ *   SOELDNER   folgen dem Ritter, schlagen Gegner neben sich (der
+ *              Bogenschuetze zwei Felder weit), die Heilerin heilt. Mit jedem
+ *              Treffer lernen sie (Erfahrung, Level, mehr Leben und Kraft).
+ *              Schleime koennen sie angreifen; sie koennen fallen.
+ *   FRAKTIONEN Der Orden der Waage zieht auf Patrouille und jagt Schleime und
+ *              Banditen; die Gruenwald-Jaeger streifen umher und jagen
+ *              Hasen; Banditen sind Feinde (eine Gegnerart) - sie lassen Gold
+ *              fallen. Wer nah am Ritter ist, sagt manchmal etwas.
+ */
+export type OrtArt = 'haendler' | 'werber';
+export type Ort = { id: number; q: number; r: number; art: OrtArt; name: string };
+export type SoeldnerArt = 'zwerg' | 'soeldnerin' | 'waldlaeufer' | 'paladin';
+export type Soeldner = { id: number; art: SoeldnerArt; name: string; q: number; r: number; leben: number; max: number; lv: number; ep: number; geredet?: number };
+export type Fraktion = 'orden' | 'jaeger';
+export type Wanderer = { id: number; fraktion: Fraktion; name: string; q: number; r: number; leben: number; max: number; ziel?: Hex; geredet?: number };
+
+export const ORT_NAME: Record<OrtArt, string> = { haendler: 'Haendler', werber: 'Werber' };
+export const FRAKTION_NAME: Record<Fraktion, string> = { orden: 'Orden der Waage', jaeger: 'Gruenwald-Jaeger' };
+/** Wie die Fraktionen aussehen (Figuren des Kachelstils). */
+export const FRAKTION_FIGUR: Record<Fraktion, string> = { orden: 'paladin', jaeger: 'waldlaeufer' };
+
+export const SOELDNER: Record<SoeldnerArt, { name: string; leben: number; angriff: number; weite: number; preis: number; text: string; waffe: string }> = {
+  zwerg: { name: 'Axtkaempfer', leben: 5, angriff: 1, weite: 1, preis: 6, text: 'Zaeh und treu - steht vorn, wenn es kracht.', waffe: 'axt' },
+  soeldnerin: { name: 'Klingenmeisterin', leben: 4, angriff: 2, weite: 1, preis: 9, text: 'Schnell und scharf - trifft oft.', waffe: 'breitschwert' },
+  waldlaeufer: { name: 'Bogenschuetze', leben: 3, angriff: 1, weite: 2, preis: 8, text: 'Trifft Gegner bis zwei Felder weit.', waffe: 'schwert' },
+  paladin: { name: 'Heilerin', leben: 4, angriff: 0, weite: 1, preis: 10, text: 'Heilt dich alle vier Takte um ein halbes Herz.', waffe: 'schwert' },
+};
+/** So viele Soeldner folgen hoechstens. */
+export const GEFOLGE_MAX = 3;
+const VORNAMEN = ['Bjarne', 'Hilda', 'Odo', 'Ragna', 'Wido', 'Frida', 'Gero', 'Ilka', 'Konrad', 'Mechthild', 'Tassilo', 'Wiebke', 'Ansgar', 'Sigrun', 'Volker', 'Edda'];
+
+const SPRUCH = {
+  anheuern: ['Mein Schwert gehoert dir - solange das Gold klingt.', 'Endlich Arbeit! Wohin geht es?', 'Ich bin dabei. Lass mich vorgehen.'],
+  sieg: ['Der war schnell erledigt!', 'Noch einer weniger.', 'Fuer die Muenzen!', 'Ha! Hast du das gesehen?'],
+  stufe: ['Ich werde besser!', 'Spuerst du das? Ich bin staerker geworden.', 'Jeder Kampf lehrt mich etwas.'],
+  wenig: ['Ich blute ... pass auf!', 'Lange halte ich das nicht durch.', 'Heilt mich jemand?'],
+  boss: ['Was ist DAS denn?!', 'Bei allen Goettern - ein Boss!', 'Bleib hinter mir!'],
+  heilen: ['Halt still, ich heile dich.', 'Das Licht schliesst deine Wunden.'],
+  zwerg: ['Ein Bier waer jetzt was.', 'Berge sind mir lieber als Wiesen.', 'Meine Axt juckt.'],
+  soeldnerin: ['Bleib dicht hinter mir.', 'Langweilig. Wo sind die Schleime?', 'Ich hab schon Schlimmeres gesehen.'],
+  waldlaeufer: ['Hoerst du das? Nur der Wind.', 'Ich sehe Spuren im Gras.', 'Ein guter Tag zum Jagen.'],
+  paladin: ['Moege das Licht uns fuehren.', 'Ich spuere etwas Dunkles in der Naehe.', 'Ruh dich aus, wenn du kannst.'],
+  orden: ['Fuer die Waage!', 'Gruss dir, Ritter.', 'Die Wege sind nicht sicher.', 'Hast du Banditen gesehen?'],
+  jaeger: ['Psst - du verscheuchst das Wild.', 'Heute gibt es Hasenbraten!', 'Der Wald hat Augen.', 'Gute Jagd, Ritter.'],
+} as const;
+
+/** Was der Haendler fuer etwas zahlt - Ausruestung nach ihrem Wert, Beute fuer wenig. */
+export function verkaufsPreis(id: string): number {
+  const g = gegenstand(id);
+  if (!g || g.legendaer || id === 'gold') return 0;
+  if (g.slot) return Math.max(1, Math.round(ausruestungsWert(id) * 0.8));
+  return id === 'angel' ? 3 : 1;
+}
+/** Was der Haendler verkauft. */
+export const HAENDLER_WAREN: readonly { id: string; preis: number }[] = [
+  { id: 'kraut', preis: 3 },
+  { id: 'angel', preis: 6 },
+];
+
+/** Die drei Angebote eines Werbers - fest aus Seed und Ort. */
+export function werberAngebot(a: Pick<Abenteuer, 'seed'>, o: Ort): { art: SoeldnerArt; name: string; preis: number }[] {
+  const arten = Object.keys(SOELDNER) as SoeldnerArt[];
+  return [0, 1, 2].map((i) => {
+    const h = hash3i(a.seed, o.q * 7 + i, o.r, SALT_LEUTE + 3);
+    const art = arten[(h + i) % arten.length]!;
+    return { art, name: VORNAMEN[(h >>> 4) % VORNAMEN.length]!, preis: SOELDNER[art].preis };
+  });
+}
+
+const SALT_LEUTE = 4711;
+const sag = (a: Abenteuer, wer: { id: number; geredet?: number }, takt: number, liste: readonly string[]) => {
+  const text = liste[(a.zeit + wer.id * 7) % liste.length]!;
+  wer.geredet = a.zeit;
+  a.ereignisse.push({ art: 'spruch', takt, wer: wer.id, text });
+};
+
+/** Ein Ort fuer Leute: begehbares Land, frei, ohne Fund. */
+function ortFrei(a: Abenteuer, h: Hex): boolean {
+  const b = gelaende(a.seed, h.q, h.r);
+  return begehbar(b) && b !== 'berg' && b !== 'sumpf' && !(h.q === a.pos.q && h.r === a.pos.r) && !(a.orte ?? []).some((o) => hexDistance(o, h) < 3);
+}
+
+/** Am Start: ein Haendler und ein Werber in der Naehe. */
+function ortePlatzieren(a: Abenteuer): void {
+  a.orte = [];
+  for (const [art, weit] of [['haendler', 3], ['werber', 4]] as const) {
+    const ring = hexesInRange(a.pos, weit).filter((h) => hexDistance(h, a.pos) === weit && ortFrei(a, h));
+    const h = ring[hash3i(a.seed, weit, 0, SALT_LEUTE) % Math.max(1, ring.length)];
+    if (h) a.orte.push({ id: a.naechsteId++, q: h.q, r: h.r, art, name: VORNAMEN[hash3i(a.seed, h.q, h.r, SALT_LEUTE + 1) % VORNAMEN.length]! });
+  }
+}
+
+/** Beim Erkunden: ab und zu ein weiterer Haendler oder Werber. */
+function ortEntdecken(a: Abenteuer, h: Hex): void {
+  const z = hash3i(a.seed, h.q, h.r, SALT_LEUTE + 2) % 260;
+  if (z !== 7 && z !== 77) return;
+  if (!ortFrei(a, h) || hexDistance(h, a.pos) < 2) return;
+  const art: OrtArt = z === 7 ? 'haendler' : 'werber';
+  a.orte = [...(a.orte ?? []), { id: a.naechsteId++, q: h.q, r: h.r, art, name: VORNAMEN[hash3i(a.seed, h.q, h.r, SALT_LEUTE + 1) % VORNAMEN.length]! }];
+}
+
+export const ortAuf = (a: Abenteuer, q: number, r: number): Ort | undefined => (a.orte ?? []).find((o) => o.q === q && o.r === r);
+const soeldnerAuf = (a: Abenteuer, q: number, r: number) => (a.gefolge ?? []).find((g) => g.q === q && g.r === r);
+const wandererAuf = (a: Abenteuer, q: number, r: number) => (a.wanderer ?? []).find((w) => w.q === q && w.r === r);
+
+/** Mit einem Haendler oder Werber reden - er muss nah sein. Oeffnet den Laden. */
+export function ansprechen(alt: Abenteuer, ortId: number): Abenteuer {
+  const o = (alt.orte ?? []).find((x) => x.id === ortId);
+  if (!o || hexDistance(o, alt.pos) > 1 || alt.phase === 'tot') return alt;
+  const a = structuredClone(alt);
+  a.ereignisse = [{ art: 'treffen', takt: 0, ort: o.id }];
+  a.laden = o.id;
+  melde(a, o.art === 'haendler' ? `${o.name}, der Haendler: "Zeig her, was du hast!"` : `${o.name}, der Werber: "Suchst du Klingen? Ich kenne die besten."`);
+  return a;
+}
+
+export function ladenZu(alt: Abenteuer): Abenteuer {
+  if (alt.laden == null) return alt;
+  return { ...alt, laden: null, ereignisse: [] };
+}
+
+const offenerLaden = (a: Abenteuer, art: OrtArt): Ort | null => {
+  const o = (a.orte ?? []).find((x) => x.id === a.laden);
+  return o && o.art === art && hexDistance(o, a.pos) <= 1 ? o : null;
+};
+
+/** Ein Stueck an den Haendler verkaufen (alle: den ganzen Stapel). */
+export function verkaufen(alt: Abenteuer, id: string, alle = false): Abenteuer {
+  const preis = verkaufsPreis(id);
+  const n = alt.inventar[id] ?? 0;
+  if (!offenerLaden(alt, 'haendler') || preis <= 0 || n <= 0) return alt;
+  const a = structuredClone(alt);
+  a.ereignisse = [];
+  const stueck = alle ? n : 1;
+  const inv = { ...a.inventar };
+  if (n - stueck > 0) inv[id] = n - stueck;
+  else delete inv[id];
+  inv['gold'] = (inv['gold'] ?? 0) + preis * stueck;
+  a.inventar = inv;
+  melde(a, `Verkauft: ${stueck > 1 ? `${stueck}× ` : ''}${gegenstand(id)!.name} fuer ${preis * stueck} Gold.`);
+  return a;
+}
+
+/** Beim Haendler kaufen. */
+export function kaufen(alt: Abenteuer, id: string): Abenteuer {
+  const ware = HAENDLER_WAREN.find((w) => w.id === id);
+  if (!offenerLaden(alt, 'haendler') || !ware || (alt.inventar['gold'] ?? 0) < ware.preis) return alt;
+  const a = structuredClone(alt);
+  a.ereignisse = [];
+  a.inventar = { ...a.inventar, gold: (a.inventar['gold'] ?? 0) - ware.preis, [id]: (a.inventar[id] ?? 0) + 1 };
+  if (a.inventar['gold'] === 0) delete a.inventar['gold'];
+  melde(a, `Gekauft: ${gegenstand(id)!.name} fuer ${ware.preis} Gold.`);
+  return a;
+}
+
+/** Einen Soeldner beim Werber anheuern (nr: 0 bis 2 seines Angebots). */
+export function anheuern(alt: Abenteuer, nr: number): Abenteuer {
+  const o = offenerLaden(alt, 'werber');
+  if (!o) return alt;
+  const angebot = werberAngebot(alt, o)[nr];
+  const schluessel = `${o.id}:${nr}`;
+  if (!angebot || (alt.angeheuert ?? []).includes(schluessel) || (alt.gefolge ?? []).length >= GEFOLGE_MAX || (alt.inventar['gold'] ?? 0) < angebot.preis) return alt;
+  // Ein freies Feld neben dem Ritter.
+  const platz = HEX_DIRS.map(([dq, dr]) => ({ q: alt.pos.q + dq, r: alt.pos.r + dr })).find(
+    (h) => begehbar(gelaende(alt.seed, h.q, h.r)) && !schleimAuf(alt, h.q, h.r) && !ortAuf(alt, h.q, h.r) && !soeldnerAuf(alt, h.q, h.r) && !wandererAuf(alt, h.q, h.r),
+  );
+  if (!platz) return alt;
+  const a = structuredClone(alt);
+  a.ereignisse = [];
+  const def = SOELDNER[angebot.art];
+  const g: Soeldner = { id: a.naechsteId++, art: angebot.art, name: angebot.name, q: platz.q, r: platz.r, leben: def.leben, max: def.leben, lv: 1, ep: 0 };
+  a.gefolge = [...(a.gefolge ?? []), g];
+  a.angeheuert = [...(a.angeheuert ?? []), schluessel];
+  a.inventar = { ...a.inventar, gold: (a.inventar['gold'] ?? 0) - angebot.preis };
+  if (a.inventar['gold'] === 0) delete a.inventar['gold'];
+  a.ereignisse.push({ art: 'neu', takt: 0, wer: g.id });
+  sag(a, g, 0, SPRUCH.anheuern);
+  melde(a, `${g.name} (${def.name}) schliesst sich dir an.`);
+  return a;
+}
+
+/** Soeldner: Angriff mit Level. */
+const soeldnerAngriff = (g: Soeldner) => SOELDNER[g.art].angriff + Math.floor((g.lv - 1) / 2);
+/** Erfahrung bis zum naechsten Level eines Soeldners. */
+export const soeldnerEp = (lv: number) => 3 + lv * 2;
+
+function soeldnerLernt(a: Abenteuer, g: Soeldner, ep: number, takt: number): void {
+  g.ep += ep;
+  if (g.ep < soeldnerEp(g.lv)) return;
+  g.ep -= soeldnerEp(g.lv);
+  g.lv += 1;
+  g.max += 1;
+  g.leben = g.max;
+  sag(a, g, takt, SPRUCH.stufe);
+  melde(a, `${g.name} steigt auf Level ${g.lv}!`);
+}
+
+/** Ein Schlag eines Soeldners oder Wanderers auf einen Gegner. */
+function helferSchlaegt(a: Abenteuer, wer: { id: number; name: string }, s: Schleim, angriff: number, rng: Rng, takt: number, fremd: boolean): boolean {
+  const wurf = 1 + rng.int(6);
+  const noetig = s.art === 'panzer' ? 5 : 4;
+  const schaden = wurf + angriff >= noetig ? 1 : 0;
+  a.ereignisse.push({ art: 'hieb', takt, wer: wer.id, ziel: s.id, wurf, schaden });
+  if (!schaden) return false;
+  const vorher = a.schleime.length;
+  verwunde(a, s, schaden, takt, wer.name, fremd);
+  return a.schleime.length < vorher && !a.schleime.some((x) => x.id === s.id);
+}
+
+/** Ein Tick des Gefolges: heilen, zuschlagen, sonst dem Ritter folgen. */
+function gefolgeHandelt(a: Abenteuer, takt: number, rng: Rng, besetzt: (q: number, r: number) => boolean): void {
+  for (const g of a.gefolge ?? []) {
+    const def = SOELDNER[g.art];
+    if (g.art === 'paladin' && a.zeit % 4 === 0 && a.leben < maxLebenVon(a) && hexDistance(g, a.pos) <= 2) {
+      const plus = Math.min(0.5, maxLebenVon(a) - a.leben);
+      a.leben += plus;
+      a.ereignisse.push({ art: 'heil', takt, leben: plus });
+      if (rng.int(3) === 0) sag(a, g, takt, SPRUCH.heilen);
+      soeldnerLernt(a, g, 1, takt);
+      continue;
+    }
+    // Den schwaechsten Gegner in Reichweite.
+    const ziel = a.schleime
+      .filter((s) => hexDistance(s, g) <= def.weite && (s.gebannt ?? 0) <= a.zeit)
+      .sort((x, y) => x.leben - y.leben || hexDistance(x, g) - hexDistance(y, g))[0];
+    if (ziel && (def.angriff > 0 || hexDistance(ziel, g) === 1)) {
+      const tot = helferSchlaegt(a, g, ziel, soeldnerAngriff(g), rng, takt, false);
+      if (tot) {
+        soeldnerLernt(a, g, 2, takt);
+        if (rng.int(2) === 0 && (g.geredet ?? -9) < a.zeit - 3) sag(a, g, takt, SPRUCH.sieg);
+      } else soeldnerLernt(a, g, 1, takt);
+      continue;
+    }
+    // Folgen: weit weg - durch die Buesche nachkommen; sonst einen Schritt naeher.
+    const d = hexDistance(g, a.pos);
+    let nach: Hex | null = null;
+    let blink = false;
+    if (d > 6) {
+      nach = HEX_DIRS.map(([dq, dr]) => ({ q: a.pos.q + dq, r: a.pos.r + dr })).find((h) => begehbar(gelaende(a.seed, h.q, h.r)) && !besetzt(h.q, h.r)) ?? null;
+      blink = true;
+    } else if (d > 1) {
+      for (const [dq, dr] of HEX_DIRS) {
+        const n = { q: g.q + dq, r: g.r + dr };
+        if (!begehbar(gelaende(a.seed, n.q, n.r)) || besetzt(n.q, n.r)) continue;
+        if (hexDistance(n, a.pos) < hexDistance(nach ?? g, a.pos)) nach = n;
+      }
+    }
+    if (nach) {
+      a.ereignisse.push({ art: 'gehen', takt, wer: g.id, von: { q: g.q, r: g.r }, nach, ...(blink ? { blink: true } : {}) });
+      g.q = nach.q;
+      g.r = nach.r;
+    }
+    // Ab und zu ein Wort - jeder auf seine Art.
+    if ((g.geredet ?? -99) < a.zeit - 12 && hash3i(a.seed, a.zeit, g.id, SALT_LEUTE + 5) % 9 === 0) {
+      if (g.leben <= g.max / 3) sag(a, g, takt, SPRUCH.wenig);
+      else if (a.schleime.some((x) => x.boss && hexDistance(x, a.pos) <= 6)) sag(a, g, takt, SPRUCH.boss);
+      else sag(a, g, takt, SPRUCH[g.art]);
+    }
+  }
+}
+
+/** Ein Schleim (oder Bandit) trifft einen Soeldner oder Wanderer. */
+function helferGetroffen(a: Abenteuer, s: Schleim, feld: Hex, takt: number, rng: Rng): boolean {
+  const g = soeldnerAuf(a, feld.q, feld.r);
+  const w = g ? undefined : wandererAuf(a, feld.q, feld.r);
+  const wer = g ?? w;
+  if (!wer) return false;
+  const wurf = 1 + rng.int(6);
+  const schaden = wurf >= 3 ? (s.gross ? 2 : 1) : 0;
+  a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: wer.id, feld, wurf, schaden });
+  if (!schaden) return true;
+  wer.leben -= schaden;
+  if (wer.leben > 0) {
+    if (g && g.leben <= g.max / 3 && (g.geredet ?? -9) < a.zeit - 3) sag(a, g, takt, SPRUCH.wenig);
+    return true;
+  }
+  a.ereignisse.push({ art: 'faellt', takt, wer: wer.id, q: wer.q, r: wer.r });
+  if (g) {
+    a.gefolge = (a.gefolge ?? []).filter((x) => x.id !== g.id);
+    melde(a, `${g.name} faellt im Kampf.`);
+  } else a.wanderer = (a.wanderer ?? []).filter((x) => x.id !== wer.id);
+  return true;
+}
+
+/** Steht neben dem Schleim ein Helfer (und nicht der Ritter)? Dann den. */
+function helferNeben(a: Abenteuer, s: Schleim): Hex | null {
+  const ziele = [...(a.gefolge ?? []), ...(a.wanderer ?? [])].filter((x) => hexDistance(x, s) === 1);
+  // Banditen gehen auf alle los, Schleime auf das Gefolge und den Orden.
+  return ziele.length ? { q: ziele[0]!.q, r: ziele[0]!.r } : null;
+}
+
+/**
+ * Die Fraktionen: alle paar Ticks zieht eine Gruppe herein (Orden, Jaeger
+ * oder Banditen), weit weg; wer zu weit vom Ritter ist, verschwindet.
+ */
+const FRAKTION_ALLE = 12;
+function fraktionenZiehen(a: Abenteuer, takt: number, rng: Rng, besetzt: (q: number, r: number) => boolean): void {
+  a.wanderer = (a.wanderer ?? []).filter((w) => hexDistance(w, a.pos) <= 20);
+  // Banditen, die weit weg sind, gehen auch.
+  a.schleime = a.schleime.filter((s) => s.art !== 'bandit' || hexDistance(s, a.pos) <= 20);
+  if (a.zeit % FRAKTION_ALLE === 0 && a.wanderer.length + a.schleime.filter((s) => s.art === 'bandit').length < 5) {
+    const welche = rng.int(3);
+    for (let versuch = 0; versuch < 12; versuch++) {
+      const [dq, dr] = HEX_DIRS[rng.int(6)]!;
+      const weit = 7 + rng.int(3);
+      const mitte = { q: a.pos.q + dq * weit + rng.int(3) - 1, r: a.pos.r + dr * weit + rng.int(3) - 1 };
+      const plaetze = [mitte, ...HEX_DIRS.map(([x, y]) => ({ q: mitte.q + x, r: mitte.r + y }))].filter((h) => begehbar(gelaende(a.seed, h.q, h.r)) && !besetzt(h.q, h.r));
+      if (plaetze.length < 2) continue;
+      for (const h of plaetze.slice(0, 2)) {
+        const id = a.naechsteId++;
+        if (welche === 2) a.schleime.push({ id, q: h.q, r: h.r, leben: 3, gross: false, art: 'bandit' });
+        else {
+          const fraktion: Fraktion = welche === 0 ? 'orden' : 'jaeger';
+          const leben = fraktion === 'orden' ? 4 : 3;
+          a.wanderer.push({ id, fraktion, name: VORNAMEN[(id * 5 + a.zeit) % VORNAMEN.length]!, q: h.q, r: h.r, leben, max: leben, ziel: { q: a.pos.q - dq * weit, r: a.pos.r - dr * weit } });
+        }
+        a.ereignisse.push({ art: 'neu', takt, wer: id });
+      }
+      break;
+    }
+  }
+  for (const w of a.wanderer) {
+    // Der Orden jagt Banditen und Schleime (keine Bosse), die Jaeger nur, wer ihnen zu nah kommt.
+    const weit = w.fraktion === 'jaeger' ? 2 : 1;
+    const feind = a.schleime
+      .filter((s) => !s.boss && hexDistance(s, w) <= weit)
+      .sort((x, y) => (y.art === 'bandit' ? 1 : 0) - (x.art === 'bandit' ? 1 : 0) || x.leben - y.leben)[0];
+    if (feind) {
+      helferSchlaegt(a, w, feind, w.fraktion === 'orden' ? 1 : 0, rng, takt, true);
+      continue;
+    }
+    // Jaeger erlegen Hasen, die neben ihnen sitzen.
+    if (w.fraktion === 'jaeger') {
+      const hase = (a.tiere ?? []).find((t) => hexDistance(t, w) === 1);
+      if (hase) {
+        a.tiere = (a.tiere ?? []).filter((t) => t.id !== hase.id);
+        a.ereignisse.push({ art: 'hieb', takt, wer: w.id, ziel: null, feld: { q: hase.q, r: hase.r }, wurf: 6, schaden: 0 });
+        if (hexDistance(w, a.pos) <= 6) sag(a, w, takt, ['Heute gibt es Hasenbraten!']);
+        continue;
+      }
+    }
+    // Sonst ziehen sie ihres Weges: zum Ziel, der Orden zu Schleimen in der Naehe.
+    const jagd = w.fraktion === 'orden' ? a.schleime.filter((s) => !s.boss && hexDistance(s, w) <= 5).sort((x, y) => hexDistance(x, w) - hexDistance(y, w))[0] : undefined;
+    let ziel: Hex | undefined = jagd ?? w.ziel;
+    if (!ziel || hexDistance(ziel, w) <= 1) {
+      const [dq, dr] = HEX_DIRS[rng.int(6)]!;
+      w.ziel = { q: w.q + dq * 8, r: w.r + dr * 8 };
+      ziel = w.ziel;
+    }
+    if (rng.int(4) !== 0) {
+      let nach: Hex | null = null;
+      for (const [dq, dr] of HEX_DIRS) {
+        const n = { q: w.q + dq, r: w.r + dr };
+        if (!begehbar(gelaende(a.seed, n.q, n.r)) || besetzt(n.q, n.r)) continue;
+        if (hexDistance(n, ziel) < hexDistance(nach ?? w, ziel)) nach = n;
+      }
+      if (nach) {
+        a.ereignisse.push({ art: 'gehen', takt, wer: w.id, von: { q: w.q, r: w.r }, nach });
+        w.q = nach.q;
+        w.r = nach.r;
+      }
+    }
+    if (hexDistance(w, a.pos) <= 3 && (w.geredet ?? -99) < a.zeit - 15 && rng.int(4) === 0) sag(a, w, takt, SPRUCH[w.fraktion]);
+  }
+}
+
 /**
  * Ein Tick der Spieluhr. Jeder Schleim tut eines: neben dem Ritter springt er
  * ihn an, in Witterung huepft er naeher, sonst huepft er mal hierhin, mal
@@ -1495,9 +1929,16 @@ function ticken(a: Abenteuer, takt: number): void {
   a.zeit += 1;
   const rng = new Rng(a.rng);
   const besetzt = (q: number, r: number) =>
-    (q === a.pos.q && r === a.pos.r) || a.schleime.some((s) => s.q === q && s.r === r) || (a.tiere ?? []).some((t) => t.q === q && t.r === r);
+    (q === a.pos.q && r === a.pos.r) ||
+    a.schleime.some((s) => s.q === q && s.r === r) ||
+    (a.tiere ?? []).some((t) => t.q === q && t.r === r) ||
+    !!ortAuf(a, q, r) ||
+    !!soeldnerAuf(a, q, r) ||
+    !!wandererAuf(a, q, r);
   // Stufe 2: erst wirken die Zauberkreise - wer im Bannkreis steht, kommt gar nicht erst zum Zug.
   kreiseWirken(a, takt);
+  // Das Gefolge: heilen, zuschlagen, folgen.
+  gefolgeHandelt(a, takt, rng, besetzt);
   const neue: Schleim[] = [];
   for (const s of a.schleime) {
     if ((s.gebannt ?? 0) > a.zeit) continue;
@@ -1522,6 +1963,8 @@ function ticken(a: Abenteuer, takt: number): void {
       break;
     }
   }
+  // Die Fraktionen ziehen durchs Land.
+  fraktionenZiehen(a, takt, rng, besetzt);
   // Die Schneehasen: nah am Ritter fliehen sie, sonst hoppeln sie mal hierhin, mal dorthin.
   for (const t of a.tiere ?? []) {
     const d = hexDistance(t, a.pos);
@@ -1569,6 +2012,11 @@ export function normalisiere(a: Abenteuer): Abenteuer {
   a.ereignisse ??= [];
   a.geruht ??= false;
   a.spuren ??= {};
+  // Spielstaende von vor den Haendlern: einen Haendler und einen Werber dazustellen.
+  if (!a.orte) {
+    ortePlatzieren(a);
+    a.schleime = a.schleime.filter((s) => !ortAuf(a, s.q, s.r));
+  }
   // Ein Spielstand von vor der Landsuche kann den Ritter im Wasser haben
   // (Spieltest: "Ich starte immer noch im Wasser" - der alte Stand wurde
   // geladen). Dann auf das naechste Land setzen.
@@ -1634,7 +2082,8 @@ export type DebugAktion =
   | { t: 'schritte' }
   | { t: 'aufdecken' }
   | { t: 'boss'; art: BossArt }
-  | { t: 'pentaStufe' };
+  | { t: 'pentaStufe' }
+  | { t: 'gold' };
 
 export function debugAktion(alt: Abenteuer, d: DebugAktion): Abenteuer {
   const a = structuredClone(alt);
@@ -1681,6 +2130,9 @@ export function debugAktion(alt: Abenteuer, d: DebugAktion): Abenteuer {
   } else if (d.t === 'heilen') {
     a.leben = maxLebenVon(a);
     melde(a, 'Debug: volles Leben.');
+  } else if (d.t === 'gold') {
+    a.inventar = { ...a.inventar, gold: (a.inventar['gold'] ?? 0) + 20 };
+    melde(a, 'Debug: +20 Gold.');
   } else if (d.t === 'pentaStufe') {
     if (!hatLegende(a, 'pentagramm')) legendaerAnwenden(a, 'pentagramm', 0);
     a.pentaStufe = (a.pentaStufe ?? 1) >= 2 ? 1 : 2;
@@ -1720,7 +2172,7 @@ export function debugAktion(alt: Abenteuer, d: DebugAktion): Abenteuer {
     const id = a.naechsteId++;
     const art = d.art === 'normal' || d.art === 'gross' ? undefined : d.art;
     const gross = d.art === 'gross';
-    a.schleime.push({ id, q: ort.q, r: ort.r, leben: art === 'panzer' || art === 'teil' ? 3 : gross ? 4 : 2, gross, ...(art ? { art } : {}) });
+    a.schleime.push({ id, q: ort.q, r: ort.r, leben: art === 'panzer' || art === 'teil' || art === 'bandit' ? 3 : gross ? 4 : 2, gross, ...(art ? { art } : {}) });
     a.ereignisse.push({ art: 'neu', takt: 0, wer: id });
     melde(a, `Debug: ein ${art ? SCHLEIM_NAME[art] : gross ? 'grosser Schleim' : 'Schleim'} erscheint.`);
   }

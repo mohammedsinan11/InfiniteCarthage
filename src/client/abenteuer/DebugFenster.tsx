@@ -77,6 +77,7 @@ const SCHLEIME: {
   { art: 'gift', name: 'Gift' },
   { art: 'teil', name: 'Teil' },
   { art: 'geist', name: 'Geist' },
+  { art: 'bandit', name: 'Bandit' },
 ];
 
 export function DebugFenster({
@@ -309,6 +310,9 @@ export function DebugFenster({
               Level +1
             </button>
             <small>Sonst</small>
+            <button className="ab-debug-wahl" onClick={() => onAktion({ t: 'gold' })}>
+              +20 Gold
+            </button>
             <button className="ab-debug-wahl" onClick={() => onAktion({ t: 'heilen' })}>
               Leben voll
             </button>

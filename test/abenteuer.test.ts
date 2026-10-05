@@ -3,9 +3,9 @@
 import { describe, it, expect } from 'vitest';
 import { istWasser } from '../src/abenteuer/welt';
 import type { Boden } from '../src/abenteuer/welt';
-import { angelbar, angeln, betretbar, kannAngeln, BOSS_LEBEN, BOSS_NACH, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden, vergleich, naechsterBoss, KREIS_DAUER, PENTA_BOSS_NACH } from '../src/abenteuer/regeln';
+import { angelbar, angeln, betretbar, kannAngeln, BOSS_LEBEN, BOSS_NACH, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden, vergleich, naechsterBoss, KREIS_DAUER, PENTA_BOSS_NACH, verkaufen, verkaufsPreis, kaufen, ansprechen, anheuern, werberAngebot } from '../src/abenteuer/regeln';
 import type { Abenteuer, Taste } from '../src/abenteuer/regeln';
-import { HEX_DIRS, hexDistance } from '../src/core/coords';
+import { HEX_DIRS, hexDistance, hexesInRange as hexesInRangeTest } from '../src/core/coords';
 
 /** Ein Abenteuer im Zug, mit festen Schritten und nur den gegebenen Schleimen. */
 function imZug(seed: number, schleime: Abenteuer['schleime'] = [], schritte = 6): Abenteuer {
@@ -532,6 +532,86 @@ describe('Abenteuer', () => {
       return;
     }
     throw new Error('kein Start mit freiem Dreieck');
+  });
+
+  it('nah am Start stehen ein Haendler und ein Werber - anlaufen oeffnet den Laden, verkaufen bringt Gold', () => {
+    const a0 = neuesAbenteuer(13);
+    const h = a0.orte!.find((o) => o.art === 'haendler')!;
+    const w = a0.orte!.find((o) => o.art === 'werber')!;
+    expect(hexDistance(h, a0.pos)).toBe(3);
+    expect(hexDistance(w, a0.pos)).toBe(4);
+    // Neben den Haendler stellen und gegen ihn laufen.
+    let a = imZug(13, [], 10);
+    const neben = HEX_DIRS.map(([dq, dr]) => ({ q: h.q + dq, r: h.r + dr })).find((x) => betretbar(a, x.q, x.r))!;
+    a.pos = neben;
+    a.inventar = { gelee: 3, axt: 1 };
+    const t = tasteZu(a.pos, h)!;
+    a = taste(a, t);
+    expect(a.laden).toBe(h.id);
+    expect(a.pos).toEqual(neben);
+    expect(a.schritte).toBe(10);
+    a = verkaufen(a, 'gelee', true);
+    expect(a.inventar['gelee']).toBeUndefined();
+    expect(a.inventar['gold']).toBe(3);
+    a = verkaufen(a, 'axt');
+    expect(a.inventar['gold']).toBe(3 + verkaufsPreis('axt'));
+    a = kaufen(a, 'kraut');
+    expect(a.inventar['kraut']).toBe(1);
+    // Legendaeres kauft er nicht.
+    expect(verkaufsPreis('hermes')).toBe(0);
+  });
+
+  it('Soeldner: anheuern, folgen, zuschlagen und dazulernen', () => {
+    const a0 = neuesAbenteuer(13);
+    const w = a0.orte!.find((o) => o.art === 'werber')!;
+    let a = imZug(13, [], 30);
+    a.pos = HEX_DIRS.map(([dq, dr]) => ({ q: w.q + dq, r: w.r + dr })).find((x) => betretbar(a, x.q, x.r))!;
+    a.inventar = { gold: 30 };
+    a = ansprechen(a, w.id);
+    const angebot = werberAngebot(a, w);
+    a = anheuern(a, 0);
+    expect(a.gefolge).toHaveLength(1);
+    expect(a.inventar['gold']).toBe(30 - angebot[0]!.preis);
+    expect(a.ereignisse.some((e) => e.art === 'spruch')).toBe(true);
+    // Dasselbe Angebot gibt es nur einmal.
+    expect(anheuern(a, 0)).toBe(a);
+    // Ein Schleim neben dem Soeldner: er schlaegt zu (der Heilerin fehlt der Angriff - dann ein Kaempfer).
+    const g = a.gefolge![0]!;
+    g.art = 'zwerg';
+    a.leben = 99;
+    const platz = HEX_DIRS.map(([dq, dr]) => ({ q: g.q + dq, r: g.r + dr })).find((x) => betretbar(a, x.q, x.r) && hexDistance(x, a.pos) > 1 && !(x.q === a.pos.q && x.r === a.pos.r));
+    if (platz) {
+      a.schleime = [{ id: 500, q: platz.q, r: platz.r, leben: 9, gross: true }];
+      let hiebe = 0;
+      for (let i = 0; i < 6; i++) {
+        a = taste(a, 's');
+        hiebe += a.ereignisse.filter((e) => e.art === 'hieb' && e.wer === g.id).length;
+      }
+      expect(hiebe).toBeGreaterThan(0);
+      expect(a.gefolge![0]!.ep + (a.gefolge![0]!.lv - 1) * 5).toBeGreaterThan(0);
+    }
+  });
+
+  it('der Soeldner folgt dem Ritter', () => {
+    const a0 = neuesAbenteuer(21);
+    let a = imZug(21, [], 30);
+    a.gefolge = [{ id: 600, art: 'zwerg', name: 'Odo', q: a0.pos.q, r: a0.pos.r, leben: 5, max: 5, lv: 1, ep: 0 }];
+    // Der Ritter geht weg (wir setzen ihn), der Soeldner holt auf.
+    const weg = hexesInRangeTest(a0.pos, 4).find((h) => hexDistance(h, a0.pos) === 4 && betretbar(a, h.q, h.r))!;
+    a.pos = weg;
+    for (let i = 0; i < 6; i++) a = taste(a, 's');
+    expect(hexDistance(a.gefolge![0]!, a.pos)).toBeLessThanOrEqual(1);
+  });
+
+  it('Fraktionen ziehen durchs Land: Orden, Jaeger oder Banditen tauchen auf', () => {
+    let a = imZug(13, [], 200);
+    a.leben = 999;
+    let gesehen = false;
+    for (let i = 0; i < 60 && !gesehen; i++) {
+      a = taste(a, 's');
+      gesehen = (a.wanderer ?? []).length > 0 || a.schleime.some((s) => s.art === 'bandit');
+    }
+    expect(gesehen).toBe(true);
   });
 
   it('Herzen werden gleich verbraucht - bei vollem Leben bleiben sie liegen', () => {
