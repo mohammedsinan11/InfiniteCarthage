@@ -8812,3 +8812,26 @@ em.off {
 .ab-boss-weg {
   color: #d08a7a;
 }
+/* Pentagrammmeister Stufe 3: der Beschwoeren-Knopf leuchtet violett, wenn er bereit ist. */
+.ab-beschwoeren.bereit {
+  border-color: #b58ae0;
+  color: #e8d4ff;
+  box-shadow: 0 0 10px rgba(181, 138, 224, 0.6);
+  animation: ab-beschwoeren-puls 1.4s ease-in-out infinite;
+}
+@keyframes ab-beschwoeren-puls {
+  50% {
+    box-shadow: 0 0 18px rgba(181, 138, 224, 0.9);
+  }
+}
+.ab-beschwoeren {
+  grid-column: 1 / -1;
+  order: 5;
+  min-height: 30px;
+  border-color: #7a4fa8;
+  color: #c8a8f0;
+}
+/* Der Wuerfeln-Knopf bleibt rechts unter dem Text. */
+.ab-tisch .primary.ab-wurf {
+  grid-column: 2;
+}

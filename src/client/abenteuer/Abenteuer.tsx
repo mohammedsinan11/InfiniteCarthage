@@ -25,6 +25,12 @@ import type { CSSProperties } from 'react';
 import {
   FAEHIGKEIT_NAME,
   FRAKTION_FIGUR,
+  BEGLEITER_FUER,
+  BESCHWOERUNG_VOLL,
+  PENTA_STUFE3_NACH,
+  angeheuerte,
+  beschwoeren,
+  meisterZauber,
   BOSS_NACH,
   BOSS_NAME,
   naechsterBoss,
@@ -88,7 +94,7 @@ import { DebugFenster, FIGUR_KEY, ladeWeltEinstellung, leseFigur } from './Debug
 
 // Die Stellschrauben der Welt aus dem Debugfenster gelten ab dem Laden.
 ladeWeltEinstellung();
-import { BANNER, GELEEKOLOSS, HASE, PENTASCHLEIM, SCHAF, SCHATTENSCHLEIM, STAND } from './symbole';
+import { BANNER, BEGLEITER_BILD, GELEEKOLOSS, HASE, PENTASCHLEIM, SCHAF, SCHATTENSCHLEIM, STAND } from './symbole';
 import { RITTER_HAND, RITTER_KOERPER, RITTER_SCHRITT, SCHLEIMKOENIG, SCHLEIM_BILD, SYMBOL, WAFFE, WAFFE_GRIFF, zeichnePixel } from './symbole';
 import { LAUT_STUFEN, beiTrack, klang, laufenderTrack, lautstaerke, setzeBiom, setzeLautstaerke } from './musik';
 import { BIOM_NAME } from './musik';
@@ -570,7 +576,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       const leg = neu.ereignisse.find((e): e is Extract<Ereignis, { art: 'legende' }> => e.art === 'legende');
       if (leg) {
         banner.current = performance.now();
-        bannerText.current = leg.id === 'pentagramm2' ? 'Pentagrammmeister Stufe 2!' : `Legendaer: ${gegenstand(leg.id)?.name ?? leg.id}`;
+        bannerText.current =
+          leg.id === 'pentagramm2' ? 'Pentagrammmeister Stufe 2!' : leg.id === 'pentagramm3' ? 'Pentagrammmeister Stufe 3!' : `Legendaer: ${gegenstand(leg.id)?.name ?? leg.id}`;
       }
       // Sprueche als Blasen - ein wenig nach ihrem Takt, dann gut drei Sekunden lang.
       const jetzt = performance.now();
@@ -705,6 +712,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       if ((TASTEN as readonly string[]).includes(k)) {
         e.preventDefault();
         drueck(k as Taste);
+      } else if (k === 'b') {
+        e.preventDefault();
+        if (!rolltRef.current) setze(beschwoeren(aktuell.current));
       } else if (k === 'f') {
         e.preventDefault();
         halt();
@@ -1344,6 +1354,37 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         figuren.push({
           y: o.y,
           mal: () => {
+            const bild = g.beschworen ? BEGLEITER_BILD[g.art as keyof typeof BEGLEITER_BILD] : undefined;
+            if (bild) {
+              // Ein Begleiter: schwebt (Fee, Geist) oder atmet; violetter Schimmer am Boden.
+              const schwebt = g.art === 'fee' || g.art === 'lichtgeist';
+              const hub = schwebt ? 3 + Math.sin(sek * 3 + g.id) * 2 : Math.sin(sek * 2 + g.id) > 0.5 ? 1 : 0;
+              const geht = ev.find((e): e is Extract<Ereignis, { art: 'gehen' }> => e.art === 'gehen' && e.wer === g.id);
+              const links = geht ? mitte(geht.nach.q, geht.nach.r).x < mitte(geht.von.q, geht.von.r).x : ritter.x < o.x;
+              ctx.fillStyle = 'rgba(181, 138, 224, 0.35)';
+              ctx.fillRect(sx(o.x) - 4 * f, sy(o.y) + 3 * f, 8 * f, f);
+              ctx.save();
+              ctx.globalAlpha = g.art === 'lichtgeist' ? 0.8 : 1;
+              ctx.translate(sx(o.x), sy(o.y) + 4 * f - Math.round(o0.hoch + hub) * f - bild.length * f);
+              ctx.scale(links ? 1 : -1, 1);
+              zeichnePixel(ctx, bild, -Math.floor(bild[0]!.length / 2) * f, 0, f, PIX);
+              if (wu.blitz) {
+                ctx.filter = 'brightness(4) saturate(0)';
+                ctx.globalAlpha = 0.7;
+                zeichnePixel(ctx, bild, -Math.floor(bild[0]!.length / 2) * f, 0, f, PIX);
+              }
+              ctx.restore();
+              // Die Fee laesst Funken rieseln.
+              if (g.art === 'fee') {
+                const fl = (sek * 1.2 + g.id * 0.3) % 1;
+                ctx.globalAlpha = 1 - fl;
+                ctx.fillStyle = '#f6e07a';
+                ctx.fillRect(sx(o.x) + ((g.id * 3 + Math.floor(sek * 2)) % 7) * f - 3 * f, sy(o.y) - (8 - fl * 8) * f, f, f);
+                ctx.globalAlpha = 1;
+              }
+              balken(sx(o.x), sy(o.y) - (bild.length + 4) * f - Math.round(o0.hoch + hub) * f, g.leben, g.max);
+              return;
+            }
             malPerson(g.id, { ...o, hoch: o0.hoch }, g.art, SOELDNER[g.art].waffe, wu.blitz);
             balken(sx(o.x), sy(o.y) - 15 * f - Math.round(o0.hoch) * f, g.leben, g.max);
             schrift(`${g.lv}`, sx(o.x) + 8 * f, sy(o.y) - 13 * f - Math.round(o0.hoch) * f, '#f2c94c', 1, 5);
@@ -1530,42 +1571,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         },
       });
       figuren.sort((x, y) => x.y - y.y).forEach((fi) => fi.mal());
-      // Sprechblasen ueber Soeldnern, Wanderern, Haendlern - mit Schwaenzchen nach unten.
-      {
-        const jetztMs = performance.now();
-        blasen.current = blasen.current.filter((b) => b.bis > jetztMs);
-        for (const b of blasen.current) {
-          if (b.ab > jetztMs) continue;
-          const wo = schleimEnde.get(b.wer) ?? (a.orte ?? []).find((o) => o.id === b.wer);
-          if (!wo || hexDistance(wo, a.pos) > sicht + 1) continue;
-          const o = schleimEnde.has(b.wer) ? ort(b.wer) : mitte(wo.q, wo.r);
-          const alpha = klemme((b.bis - jetztMs) / 400) * klemme((jetztMs - b.ab) / 150);
-          ctx.font = `bold ${5 * f}px monospace`;
-          // Zeilen von hoechstens 22 Zeichen.
-          const zeilen: string[] = [];
-          for (const wort of b.text.split(' ')) {
-            const z = zeilen[zeilen.length - 1];
-            if (z !== undefined && (z + ' ' + wort).length <= 22) zeilen[zeilen.length - 1] = z + ' ' + wort;
-            else zeilen.push(wort);
-          }
-          const breite = Math.max(...zeilen.map((z) => ctx.measureText(z).width)) + 6 * f;
-          const hoeheB = zeilen.length * 6 * f + 4 * f;
-          const bx = Math.round(sx(o.x) - breite / 2);
-          const by = Math.round(sy(o.y) - 22 * f - hoeheB);
-          ctx.save();
-          ctx.textAlign = 'left';
-          ctx.textBaseline = 'alphabetic';
-          ctx.globalAlpha = alpha;
-          ctx.fillStyle = '#120d08';
-          ctx.fillRect(bx - f, by - f, breite + 2 * f, hoeheB + 2 * f);
-          ctx.fillStyle = '#f2e7d0';
-          ctx.fillRect(bx, by, breite, hoeheB);
-          ctx.fillRect(sx(o.x) - f, by + hoeheB, 2 * f, 2 * f);
-          ctx.fillStyle = '#2b211a';
-          zeilen.forEach((z, i) => ctx.fillText(z, bx + 3 * f, by + (i + 1) * 6 * f));
-          ctx.restore();
-        }
-      }
+
 
       // Der Ladebalken der Waffe unter dem Ritter - und eine Aura, wenn eine Faehigkeit wartet.
       const lad = ladungVon(a);
@@ -1905,6 +1911,49 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         ctx.fillRect(0, 0, c.width, c.height);
       }
 
+      // Sprechblasen ueber Soeldnern, Wanderern, Haendlern - mit Schwaenzchen nach unten; zuletzt, damit nichts sie verdeckt.
+      {
+        const jetztMs = performance.now();
+        blasen.current = blasen.current.filter((b) => b.bis > jetztMs);
+        for (const b of blasen.current) {
+          if (b.ab > jetztMs) continue;
+          const wo = schleimEnde.get(b.wer) ?? (a.orte ?? []).find((o) => o.id === b.wer);
+          if (!wo || hexDistance(wo, a.pos) > sicht + 1) continue;
+          const o = schleimEnde.has(b.wer) ? ort(b.wer) : mitte(wo.q, wo.r);
+          const alpha = klemme((b.bis - jetztMs) / 400) * klemme((jetztMs - b.ab) / 150);
+          ctx.font = `bold ${5 * f}px monospace`;
+          // Zeilen von hoechstens 22 Zeichen.
+          const zeilen: string[] = [];
+          for (const wort of b.text.split(' ')) {
+            const z = zeilen[zeilen.length - 1];
+            if (z !== undefined && (z + ' ' + wort).length <= 22) zeilen[zeilen.length - 1] = z + ' ' + wort;
+            else zeilen.push(wort);
+          }
+          const breite = Math.ceil((Math.max(...zeilen.map((z) => ctx.measureText(z).width)) + 8 * f) / f) * f;
+          const zeileH = 6 * f;
+          const hoeheB = zeilen.length * zeileH + 4 * f;
+          const bx = Math.round((sx(o.x) - breite / 2) / f) * f;
+          const by = Math.round((sy(o.y) - 22 * f - hoeheB) / f) * f;
+          const mx = bx + breite / 2;
+          ctx.save();
+          // Text mittig in jeder Zeile, senkrecht in der Mitte der Zeile.
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = '#120d08';
+          ctx.fillRect(bx - f, by - f, breite + 2 * f, hoeheB + 2 * f);
+          // Das Schwaenzchen: mittig unter der Blase, mit Rand.
+          ctx.fillRect(mx - 2 * f, by + hoeheB, 4 * f, 2 * f);
+          ctx.fillRect(mx - f, by + hoeheB + 2 * f, 2 * f, f);
+          ctx.fillStyle = '#f2e7d0';
+          ctx.fillRect(bx, by, breite, hoeheB);
+          ctx.fillRect(mx - f, by + hoeheB, 2 * f, f);
+          ctx.fillStyle = '#2b211a';
+          zeilen.forEach((z, i) => ctx.fillText(z, mx, by + 2 * f + (i + 0.5) * zeileH + f / 2));
+          ctx.restore();
+        }
+      }
+
       // Uebersichtskarte.
       const m = mini.current;
       const mctx = m?.getContext('2d');
@@ -2175,7 +2224,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             <span className="ab-titel">Gefolge</span>
             {(a.gefolge ?? []).map((g) => (
               <div key={g.id} className="ab-kamerad" title={`${g.name}, ${SOELDNER[g.art].name} - ${SOELDNER[g.art].text}`}>
-                <b>{g.name}</b>
+                <b>{g.beschworen ? `✦ ${g.name}` : g.name}</b>
                 <small>
                   Lv {g.lv} · {lebenText(g.leben)}/{g.max}
                 </small>
@@ -2295,6 +2344,16 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               Angeln (F)
             </button>
           )}
+          {(a.pentaStufe ?? 1) >= 3 && (
+            <button
+              className={(a.beschwoerung ?? 0) >= BESCHWOERUNG_VOLL ? 'ab-wurf ab-beschwoeren bereit' : 'ab-wurf ab-beschwoeren'}
+              disabled={(a.beschwoerung ?? 0) < BESCHWOERUNG_VOLL || rollt}
+              onClick={() => setze(beschwoeren(aktuell.current))}
+              title={`Beschwoeren (B): ruft einen ${SOELDNER[BEGLEITER_FUER[meisterZauber(a)]].name} - je nach deinem haeufigsten Zauber. Laedt sich, wenn Gegner in Pentagrammen fallen.`}
+            >
+              Beschwoeren (B) {Math.min(a.beschwoerung ?? 0, BESCHWOERUNG_VOLL)}/{BESCHWOERUNG_VOLL}
+            </button>
+          )}
           {a.phase !== 'ziehen' && (
             <button className="primary ab-wurf" disabled={a.phase !== 'wuerfeln' || rollt} onClick={wirf}>
               Wuerfeln
@@ -2346,6 +2405,16 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                     {n > 1 ? ` ×${n}` : ''}
                     {id === 'pentagramm' ? ` · Stufe ${a.pentaStufe ?? 1}` : ''}
                   </b>
+                  {id === 'pentagramm' && (a.pentaStufe ?? 1) === 2 && (
+                    <small>
+                      Stufe 3: {a.pentaKills ?? 0}/{PENTA_STUFE3_NACH} Gegner durch Pentagramme
+                    </small>
+                  )}
+                  {id === 'pentagramm' && (a.pentaStufe ?? 1) >= 3 && (
+                    <small>
+                      Beschwoerung {a.beschwoerung ?? 0}/{BESCHWOERUNG_VOLL} - ruft: {SOELDNER[BEGLEITER_FUER[meisterZauber(a)]].name}
+                    </small>
+                  )}
                   <small>{gegenstand(id)?.text.replace(/^Legendaer\.\s*/, '')}</small>
                 </span>
               </div>
@@ -2409,7 +2478,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               ) : (
                 <>
                   <small>
-                    Soeldner anheuern ({(a.gefolge ?? []).length}/{GEFOLGE_MAX} im Gefolge)
+                    Soeldner anheuern ({angeheuerte(a)}/{GEFOLGE_MAX} im Gefolge)
                   </small>
                   {werberAngebot(a, o).map((an, nr) => {
                     const weg = (a.angeheuert ?? []).includes(`${o.id}:${nr}`);
@@ -2425,7 +2494,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                         </span>
                         <button
                           className="klein"
-                          disabled={weg || gold < an.preis || (a.gefolge ?? []).length >= GEFOLGE_MAX}
+                          disabled={weg || gold < an.preis || angeheuerte(a) >= GEFOLGE_MAX}
                           onClick={() => setze(anheuern(aktuell.current, nr))}
                         >
                           {weg ? 'Dabei' : `${an.preis} Gold`}

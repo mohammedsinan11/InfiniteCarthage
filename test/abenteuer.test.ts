@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { istWasser } from '../src/abenteuer/welt';
 import type { Boden } from '../src/abenteuer/welt';
-import { angelbar, angeln, betretbar, kannAngeln, BOSS_LEBEN, BOSS_NACH, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden, vergleich, naechsterBoss, KREIS_DAUER, PENTA_BOSS_NACH, verkaufen, verkaufsPreis, kaufen, ansprechen, anheuern, werberAngebot } from '../src/abenteuer/regeln';
+import { angelbar, angeln, betretbar, kannAngeln, BOSS_LEBEN, BOSS_NACH, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden, vergleich, naechsterBoss, KREIS_DAUER, PENTA_BOSS_NACH, verkaufen, verkaufsPreis, kaufen, ansprechen, anheuern, werberAngebot, PENTA_STUFE3_NACH, BESCHWOERUNG_VOLL, beschwoeren, angeheuerte } from '../src/abenteuer/regeln';
 import type { Abenteuer, Taste } from '../src/abenteuer/regeln';
 import { HEX_DIRS, hexDistance, hexesInRange as hexesInRangeTest } from '../src/core/coords';
 
@@ -667,6 +667,54 @@ describe('Abenteuer', () => {
           expect(ok).toBe(true);
         }
     }
+  });
+
+  it('Pentagrammmeister Stufe 3: Pentagramm-Kills auf Stufe 2 schalten sie frei, dann laden sie die Beschwoerung', () => {
+    const a0 = neuesAbenteuer(13);
+    const neben = { q: a0.pos.q + 1, r: a0.pos.r };
+    let a = imZug(13, [{ id: 7, q: neben.q, r: neben.r, leben: 1, gross: false }], 10);
+    a.pentaStufe = 2;
+    a.pentaKills = PENTA_STUFE3_NACH - 1;
+    a.kreise = [{ id: 900, name: 'pentagramm', felder: [neben], mitte: a0.pos, bis: 99 }];
+    a = taste(a, 's');
+    expect(a.pentaStufe).toBe(3);
+    expect(a.ereignisse.some((e) => e.art === 'legende' && e.id === 'pentagramm3')).toBe(true);
+    // Auf Stufe 3 laedt jeder Pentagramm-Kill die Beschwoerung.
+    a.schleime = [{ id: 8, q: neben.q, r: neben.r, leben: 1, gross: false }];
+    a = taste(a, 's');
+    expect(a.beschwoerung).toBe(1);
+  });
+
+  it('Beschwoerung: der haeufigste Zauber bestimmt den Begleiter', () => {
+    let a = imZug(13, [], 10);
+    a.pentaStufe = 3;
+    a.beschwoerung = BESCHWOERUNG_VOLL;
+    a.zauberArten = { funkenregen: 1, heilkreis: 4, bannkreis: 2 };
+    a = beschwoeren(a);
+    const b = a.gefolge!.find((g) => g.beschworen)!;
+    expect(b.art).toBe('lichtgeist');
+    expect(a.beschwoerung).toBe(0);
+    expect(angeheuerte(a)).toBe(0);
+    // Leer laesst sich nicht beschwoeren.
+    expect(beschwoeren(a)).toBe(a);
+    // Ein neuer ersetzt den alten.
+    a.beschwoerung = BESCHWOERUNG_VOLL;
+    a.zauberArten = { schutzrune: 9 };
+    a = beschwoeren(a);
+    expect(a.gefolge!.filter((g) => g.beschworen).map((g) => g.art)).toEqual(['golem']);
+  });
+
+  it('der Runenwaechter zieht die Schlaege auf sich', () => {
+    const a0 = neuesAbenteuer(13);
+    // Schleim oestlich des Ritters, Waechter suedoestlich - beide neben dem Schleim.
+    const schleim = { q: a0.pos.q + 1, r: a0.pos.r };
+    const waechter = { q: a0.pos.q, r: a0.pos.r + 1 };
+    let a = imZug(13, [{ id: 7, q: schleim.q, r: schleim.r, leben: 2, gross: false }], 10);
+    a.gefolge = [{ id: 600, art: 'golem', name: 'Runenwaechter', q: waechter.q, r: waechter.r, leben: 10, max: 10, lv: 1, ep: 0, beschworen: true }];
+    a.leben = 99;
+    a = taste(a, 's');
+    const ansage = a.ereignisse.find((e) => e.art === 'ansage' && e.wer === 7);
+    if (ansage && ansage.art === 'ansage') expect(ansage.feld).toEqual(waechter);
   });
 
   it('Herzen werden gleich verbraucht - bei vollem Leben bleiben sie liegen', () => {

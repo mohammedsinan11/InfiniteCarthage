@@ -338,6 +338,20 @@ export const SCHAF: [Pixelkarte, Pixelkarte] = [
   ['...hhhh..', '..hhhhhhh', 'chhhhhhhH', 'chhhhhhHH', '..c..c.c.'],
 ];
 
+/** Beschworene Begleiter (Pentagrammmeister Stufe 3, Palette PIX) - schauen nach links. */
+export const BEGLEITER_BILD: Record<'fee' | 'golem' | 'daemon' | 'lichtgeist' | 'wolf', Pixelkarte> = {
+  // Funkenfee: ein Gluehen mit vier Fluegeln.
+  fee: ['.w...w.', 'wvw.wvw', '.wyyyw.', '..yoy..', '.wyyyw.', 'wvw.wvw', '.w...w.'],
+  // Runenwaechter: ein Steinkoloss mit blauen Runen.
+  golem: ['..kkkkk..', '.kmmmmmk.', '.kmuMumk.', '.kmmmmmk.', 'kkMmmmMkk', 'kmkmumkmk', 'kmkmmmkmk', 'kmkMMMkmk', '..kmkmk..', '..kmkmk..', '.kkk.kkk.'],
+  // Flammendaemon: rot, mit Hoernern und Flammenbauch.
+  daemon: ['.k.....k.', 'kRk...kRk', '.krrrrrk.', 'krryrryrk', 'krrrrrrrk', '.krRRRrk.', '.kroooork', '..krrrk..', '..kr.rk..', '.kk...kk.'],
+  // Lichtgeist: ein heller Schleier.
+  lichtgeist: ['..www..', '.wtttw.', 'wtkwktw', 'wtttttw', '.wtttw.', '.wtttw.', 'wtwtwtw', '.w.w.w.'],
+  // Bannwolf: dunkelviolett, gelbe Augen.
+  wolf: ['k.k........', 'kvkk.......', 'kvyvkkkkkk.', '.kvvvvvvvvk', '..kvvvvvvVk', '..kVk..kVk.', '..kk....kk.'],
+};
+
 /** Der Schleimkoenig: ein breiter Klumpen mit goldener Krone und rotem Stein. */
 export const SCHLEIMKOENIG: Pixelkarte = [
   '....y..r..y....',

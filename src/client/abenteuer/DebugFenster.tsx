@@ -291,8 +291,8 @@ export function DebugFenster({
             <button className="ab-debug-wahl" onClick={() => onAktion({ t: 'legendaer', id: 'pentagramm' })}>
               Pentagrammmeister
             </button>
-            <button className="ab-debug-wahl" onClick={() => onAktion({ t: 'pentaStufe' })} title="Pentagrammmeister Stufe 2 an/aus">
-              Pentagramm Stufe 2
+            <button className="ab-debug-wahl" onClick={() => onAktion({ t: 'pentaStufe' })} title="Pentagrammmeister Stufe 1 - 2 - 3 (Stufe 3 mit voller Beschwoerung)">
+              Pentagramm Stufe +1
             </button>
             <button className="ab-debug-wahl" onClick={() => onAktion({ t: 'legendaer', id: 'sololeveling' })}>
               Solo-Leveling

@@ -336,6 +336,12 @@ export type Abenteuer = {
   pentaGerufen?: boolean;
   /** Stufe 2: Zauberkreise, die auf der Karte bleiben. */
   kreise?: Kreis[];
+  /** Wie oft jeder Zauber gewirkt wurde - der haeufigste bestimmt den Begleiter. */
+  zauberArten?: Partial<Record<Zauber, number>>;
+  /** Gegner, die auf Stufe 2 durch Pentagramme fielen (fuer Stufe 3). */
+  pentaKills?: number;
+  /** Stufe 3: Ladung der Beschwoerung (bis BESCHWOERUNG_VOLL). */
+  beschwoerung?: number;
   /** Leute an festen Orten: Haendler und Werber. */
   orte?: Ort[];
   /** Angeheuerte Soeldner - sie laufen mit, kaempfen und lernen dazu. */
@@ -616,6 +622,7 @@ function zauberPruefen(a: Abenteuer): void {
   const name: Zauber = schritte === 3 ? 'funkenregen' : schritte === 4 ? 'schutzrune' : schritte === 5 ? 'pentagramm' : schritte === 6 ? 'heilkreis' : 'bannkreis';
   a.ereignisse.push({ art: 'zauber', takt: 0, name, felder: form });
   a.zauberZahl = (a.zauberZahl ?? 0) + 1;
+  a.zauberArten = { ...a.zauberArten, [name]: (a.zauberArten?.[name] ?? 0) + 1 };
   const nahe = (weit: number, um: readonly Hex[]) => a.schleime.filter((s) => um.some((h) => hexDistance(s, h) <= weit));
   if (name === 'funkenregen') {
     melde(a, 'Ein Dreieck - Funkenregen!');
@@ -717,6 +724,26 @@ function kreiseWirken(a: Abenteuer, takt: number): void {
     }
   }
   a.kreise = kreise.filter((k) => k.bis > a.zeit);
+}
+
+/** So steht ein Zauber vorne in der Meldung - daran erkennt verwunde Pentagramm-Kills. */
+const ZAUBER_VORNE = ['Funkenregen', 'Pentagramm', 'Bannkreis'] as const;
+
+/** Ein Gegner fiel durch ein Pentagramm: auf Stufe 2 zaehlt das fuer Stufe 3, auf Stufe 3 laedt es die Beschwoerung. */
+function pentagrammKill(a: Abenteuer, takt: number): void {
+  const stufe = a.pentaStufe ?? 1;
+  if (stufe === 2) {
+    a.pentaKills = (a.pentaKills ?? 0) + 1;
+    if (a.pentaKills >= PENTA_STUFE3_NACH) {
+      a.pentaStufe = 3;
+      a.beschwoerung = 0;
+      a.ereignisse.push({ art: 'legende', takt, id: 'pentagramm3' });
+      melde(a, `Pentagrammmeister Stufe 3! Fallen ${BESCHWOERUNG_VOLL} Gegner durch deine Pentagramme, beschwoerst du einen Begleiter (B).`);
+    }
+  } else if (stufe >= 3 && (a.beschwoerung ?? 0) < BESCHWOERUNG_VOLL) {
+    a.beschwoerung = (a.beschwoerung ?? 0) + 1;
+    if (a.beschwoerung === BESCHWOERUNG_VOLL) melde(a, 'Die Beschwoerung ist bereit - druecke B.');
+  }
 }
 
 /** Legendaeres, das es nur einmal gibt. */
@@ -951,6 +978,7 @@ function verwunde(a: Abenteuer, s: Schleim, schaden: number, takt: number, vorne
     return;
   }
   erfahrung(a, s.boss ? 10 : s.gross || s.art ? 2 : 1, takt);
+  if ((ZAUBER_VORNE as readonly string[]).includes(vorne)) pentagrammKill(a, takt);
   if (s.boss && s.bossArt === 'penta') {
     // Der Pentagrammschleim ist bezwungen: Stufe 2 des Pentagrammmeisters.
     a.pentaStufe = 2;
@@ -1308,7 +1336,9 @@ function schleimHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetz
     }
   }
   // Steht ein Soeldner oder Wanderer neben ihm (und der Ritter nicht), geht er auf den los.
-  const helfer = d > 1 && s.art !== 'spring' && s.art !== 'spuck' ? helferNeben(a, s) : null;
+  // Der Runenwaechter zieht die Schlaege auf sich - auch wenn der Ritter daneben steht.
+  const waechter = s.art !== 'spring' && s.art !== 'spuck' && (a.gefolge ?? []).some((g) => g.art === 'golem' && hexDistance(g, s) === 1);
+  const helfer = (d > 1 || waechter) && s.art !== 'spring' && s.art !== 'spuck' ? helferNeben(a, s) : null;
   if (helfer) {
     s.angriff = helfer;
     a.ereignisse.push({ art: 'ansage', takt, wer: s.id, feld: helfer });
@@ -1596,8 +1626,10 @@ function kolossHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetzt
  */
 export type OrtArt = 'haendler' | 'werber';
 export type Ort = { id: number; q: number; r: number; art: OrtArt; name: string };
-export type SoeldnerArt = 'zwerg' | 'soeldnerin' | 'waldlaeufer' | 'paladin';
-export type Soeldner = { id: number; art: SoeldnerArt; name: string; q: number; r: number; leben: number; max: number; lv: number; ep: number; geredet?: number };
+export type SoeldnerArt = 'zwerg' | 'soeldnerin' | 'waldlaeufer' | 'paladin' | BegleiterArt;
+/** Beschworene Begleiter des Pentagrammmeisters (Stufe 3). */
+export type BegleiterArt = 'fee' | 'golem' | 'daemon' | 'lichtgeist' | 'wolf';
+export type Soeldner = { id: number; art: SoeldnerArt; name: string; q: number; r: number; leben: number; max: number; lv: number; ep: number; geredet?: number; beschworen?: boolean };
 export type Fraktion = 'orden' | 'jaeger';
 export type Wanderer = { id: number; fraktion: Fraktion; name: string; q: number; r: number; leben: number; max: number; ziel?: Hex; geredet?: number };
 
@@ -1611,7 +1643,67 @@ export const SOELDNER: Record<SoeldnerArt, { name: string; leben: number; angrif
   soeldnerin: { name: 'Klingenmeisterin', leben: 4, angriff: 2, weite: 1, preis: 9, text: 'Schnell und scharf - trifft oft.', waffe: 'breitschwert' },
   waldlaeufer: { name: 'Bogenschuetze', leben: 3, angriff: 1, weite: 2, preis: 8, text: 'Trifft Gegner bis zwei Felder weit.', waffe: 'schwert' },
   paladin: { name: 'Heilerin', leben: 4, angriff: 0, weite: 1, preis: 10, text: 'Heilt dich alle vier Takte um ein halbes Herz.', waffe: 'schwert' },
+  // Beschworen (Pentagrammmeister Stufe 3) - nicht zu kaufen.
+  fee: { name: 'Funkenfee', leben: 3, angriff: 1, weite: 3, preis: 0, text: 'Schwebt, auch uebers Wasser, und schiesst Funken bis drei Felder weit.', waffe: '' },
+  golem: { name: 'Runenwaechter', leben: 10, angriff: 1, weite: 1, preis: 0, text: 'Ein Steinkoloss: Gegner neben ihm schlagen auf ihn statt auf dich.', waffe: '' },
+  daemon: { name: 'Flammendaemon', leben: 5, angriff: 2, weite: 1, preis: 0, text: 'Brennt: jeder Treffer macht 2 Schaden.', waffe: '' },
+  lichtgeist: { name: 'Lichtgeist', leben: 4, angriff: 0, weite: 1, preis: 0, text: 'Heilt dich alle zwei Takte um ein halbes Herz.', waffe: '' },
+  wolf: { name: 'Bannwolf', leben: 5, angriff: 1, weite: 1, preis: 0, text: 'Sein Biss bannt den Gegner drei Takte lang.', waffe: '' },
 };
+
+/** Welcher Zauber welchen Begleiter ruft. */
+export const BEGLEITER_FUER: Record<Zauber, BegleiterArt> = {
+  funkenregen: 'fee',
+  schutzrune: 'golem',
+  pentagramm: 'daemon',
+  heilkreis: 'lichtgeist',
+  bannkreis: 'wolf',
+};
+/** Stufe 3: so viele Gegner muessen auf Stufe 2 durch Pentagramme fallen. */
+export const PENTA_STUFE3_NACH = 12;
+/** Stufe 3: so viele Pentagramm-Kills laden die Beschwoerung. */
+export const BESCHWOERUNG_VOLL = 8;
+/** Der Zauber, den der Ritter am meisten gewirkt hat. */
+export function meisterZauber(a: Pick<Abenteuer, 'zauberArten'>): Zauber {
+  const z = a.zauberArten ?? {};
+  return (Object.keys(BEGLEITER_FUER) as Zauber[]).reduce((best, k) => ((z[k] ?? 0) > (z[best] ?? 0) ? k : best), 'pentagramm' as Zauber);
+}
+
+/**
+ * PENTAGRAMMMEISTER STUFE 3: die Beschwoerung. Ist der Balken voll (durch
+ * Gegner, die in Pentagrammen fallen), ruft der Ritter einen Begleiter -
+ * welchen, entscheidet der Zauber, den er am meisten gewirkt hat. Ein
+ * Begleiter zur Zeit; ein neuer ersetzt den alten.
+ */
+export function beschwoeren(alt: Abenteuer): Abenteuer {
+  if ((alt.pentaStufe ?? 1) < 3 || (alt.beschwoerung ?? 0) < BESCHWOERUNG_VOLL || alt.phase === 'tot') return alt;
+  const a = structuredClone(alt);
+  a.ereignisse = [];
+  const art = BEGLEITER_FUER[meisterZauber(a)];
+  const alter = (a.gefolge ?? []).find((g) => g.beschworen);
+  const frei = (h: Hex) =>
+    (art === 'fee' ? gelaende(a.seed, h.q, h.r) !== null : begehbar(gelaende(a.seed, h.q, h.r))) &&
+    !(h.q === a.pos.q && h.r === a.pos.r) &&
+    !schleimAuf(a, h.q, h.r) &&
+    !ortAuf(a, h.q, h.r) &&
+    !wandererAuf(a, h.q, h.r) &&
+    !(a.gefolge ?? []).some((g) => g !== alter && g.q === h.q && g.r === h.r) &&
+    !(a.tiere ?? []).some((t) => t.q === h.q && t.r === h.r);
+  const platz = (alter && frei(alter) ? alter : null) ?? HEX_DIRS.map(([dq, dr]) => ({ q: a.pos.q + dq, r: a.pos.r + dr })).find(frei);
+  if (!platz) {
+    melde(a, 'Kein Platz fuer die Beschwoerung.');
+    return a;
+  }
+  const def = SOELDNER[art];
+  const g: Soeldner = { id: a.naechsteId++, art, name: def.name, q: platz.q, r: platz.r, leben: def.leben, max: def.leben, lv: 1, ep: 0, beschworen: true };
+  a.gefolge = [...(a.gefolge ?? []).filter((x) => !x.beschworen), g];
+  a.beschwoerung = 0;
+  a.ereignisse.push({ art: 'zauber', takt: 0, name: meisterZauber(a), felder: [platz, ...HEX_DIRS.map(([dq, dr]) => ({ q: platz.q + dq, r: platz.r + dr }))] });
+  a.ereignisse.push({ art: 'neu', takt: 0, wer: g.id });
+  sag(a, g, 0, SPRUCH[art]);
+  melde(a, `Beschwoerung! ${alter ? 'Der alte Begleiter vergeht - ' : ''}ein ${def.name} erscheint an deiner Seite.`);
+  return a;
+}
 /** So viele Soeldner folgen hoechstens. */
 export const GEFOLGE_MAX = 3;
 const VORNAMEN = ['Bjarne', 'Hilda', 'Odo', 'Ragna', 'Wido', 'Frida', 'Gero', 'Ilka', 'Konrad', 'Mechthild', 'Tassilo', 'Wiebke', 'Ansgar', 'Sigrun', 'Volker', 'Edda'];
@@ -1627,6 +1719,11 @@ const SPRUCH = {
   soeldnerin: ['Bleib dicht hinter mir.', 'Langweilig. Wo sind die Schleime?', 'Ich hab schon Schlimmeres gesehen.'],
   waldlaeufer: ['Hoerst du das? Nur der Wind.', 'Ich sehe Spuren im Gras.', 'Ein guter Tag zum Jagen.'],
   paladin: ['Moege das Licht uns fuehren.', 'Ich spuere etwas Dunkles in der Naehe.', 'Ruh dich aus, wenn du kannst.'],
+  fee: ['Hihi! Funken!', 'Ich leuchte dir den Weg.', 'Bssst - da drueben!'],
+  golem: ['... STEIN ... SCHUETZT ...', 'Rumms.', '... ICH ... HALTE ...'],
+  daemon: ['Brennen soll es!', 'Mehr! Gib mir mehr Schleim!', 'Hehehe ... Feuer.'],
+  lichtgeist: ['Ich bin bei dir.', 'Das Licht heilt.', 'Fuerchte dich nicht.'],
+  wolf: ['Grrrr ...', 'Awuuuh!', '*schnueffelt*'],
   orden: ['Fuer die Waage!', 'Gruss dir, Ritter.', 'Die Wege sind nicht sicher.', 'Hast du Banditen gesehen?'],
   jaeger: ['Psst - du verscheuchst das Wild.', 'Heute gibt es Hasenbraten!', 'Der Wald hat Augen.', 'Gute Jagd, Ritter.'],
 } as const;
@@ -1748,7 +1845,7 @@ export function anheuern(alt: Abenteuer, nr: number): Abenteuer {
   if (!o) return alt;
   const angebot = werberAngebot(alt, o)[nr];
   const schluessel = `${o.id}:${nr}`;
-  if (!angebot || (alt.angeheuert ?? []).includes(schluessel) || (alt.gefolge ?? []).length >= GEFOLGE_MAX || (alt.inventar['gold'] ?? 0) < angebot.preis) return alt;
+  if (!angebot || (alt.angeheuert ?? []).includes(schluessel) || angeheuerte(alt) >= GEFOLGE_MAX || (alt.inventar['gold'] ?? 0) < angebot.preis) return alt;
   // Ein freies Feld neben dem Ritter.
   const platz = HEX_DIRS.map(([dq, dr]) => ({ q: alt.pos.q + dq, r: alt.pos.r + dr })).find(
     (h) => begehbar(gelaende(alt.seed, h.q, h.r)) && !schleimAuf(alt, h.q, h.r) && !ortAuf(alt, h.q, h.r) && !soeldnerAuf(alt, h.q, h.r) && !wandererAuf(alt, h.q, h.r),
@@ -1768,6 +1865,9 @@ export function anheuern(alt: Abenteuer, nr: number): Abenteuer {
   return a;
 }
 
+/** Wie viele Soeldner angeheuert sind (Beschworene zaehlen nicht). */
+export const angeheuerte = (a: Pick<Abenteuer, 'gefolge'>): number => (a.gefolge ?? []).filter((g) => !g.beschworen).length;
+
 /** Soeldner: Angriff mit Level. */
 const soeldnerAngriff = (g: Soeldner) => SOELDNER[g.art].angriff + Math.floor((g.lv - 1) / 2);
 /** Erfahrung bis zum naechsten Level eines Soeldners. */
@@ -1785,10 +1885,10 @@ function soeldnerLernt(a: Abenteuer, g: Soeldner, ep: number, takt: number): voi
 }
 
 /** Ein Schlag eines Soeldners oder Wanderers auf einen Gegner. */
-function helferSchlaegt(a: Abenteuer, wer: { id: number; name: string }, s: Schleim, angriff: number, rng: Rng, takt: number, fremd: boolean): boolean {
+function helferSchlaegt(a: Abenteuer, wer: { id: number; name: string }, s: Schleim, angriff: number, rng: Rng, takt: number, fremd: boolean, wucht = 1): boolean {
   const wurf = 1 + rng.int(6);
   const noetig = s.art === 'panzer' ? 5 : 4;
-  const schaden = wurf + angriff >= noetig ? 1 : 0;
+  const schaden = wurf + angriff >= noetig ? wucht : 0;
   a.ereignisse.push({ art: 'hieb', takt, wer: wer.id, ziel: s.id, wurf, schaden });
   if (!schaden) return false;
   const vorher = a.schleime.length;
@@ -1800,11 +1900,13 @@ function helferSchlaegt(a: Abenteuer, wer: { id: number; name: string }, s: Schl
 function gefolgeHandelt(a: Abenteuer, takt: number, rng: Rng, besetzt: (q: number, r: number) => boolean): void {
   for (const g of a.gefolge ?? []) {
     const def = SOELDNER[g.art];
-    if (g.art === 'paladin' && a.zeit % 4 === 0 && a.leben < maxLebenVon(a) && hexDistance(g, a.pos) <= 2) {
+    // Heilerin alle vier Takte, Lichtgeist alle zwei: ein halbes Herz, wenn der Ritter nah und verwundet ist.
+    const heiltJetzt = (g.art === 'paladin' && a.zeit % 4 === 0) || (g.art === 'lichtgeist' && a.zeit % 2 === 0);
+    if (heiltJetzt && a.leben < maxLebenVon(a) && hexDistance(g, a.pos) <= 2) {
       const plus = Math.min(0.5, maxLebenVon(a) - a.leben);
       a.leben += plus;
       a.ereignisse.push({ art: 'heil', takt, leben: plus });
-      if (rng.int(3) === 0) sag(a, g, takt, SPRUCH.heilen);
+      if (rng.int(3) === 0) sag(a, g, takt, g.art === 'lichtgeist' ? SPRUCH.lichtgeist : SPRUCH.heilen);
       soeldnerLernt(a, g, 1, takt);
       continue;
     }
@@ -1813,7 +1915,13 @@ function gefolgeHandelt(a: Abenteuer, takt: number, rng: Rng, besetzt: (q: numbe
       .filter((s) => hexDistance(s, g) <= def.weite && (s.gebannt ?? 0) <= a.zeit)
       .sort((x, y) => x.leben - y.leben || hexDistance(x, g) - hexDistance(y, g))[0];
     if (ziel && (def.angriff > 0 || hexDistance(ziel, g) === 1)) {
-      const tot = helferSchlaegt(a, g, ziel, soeldnerAngriff(g), rng, takt, false);
+      const tot = helferSchlaegt(a, g, ziel, soeldnerAngriff(g), rng, takt, false, g.art === 'daemon' ? 2 : 1);
+      // Der Bannwolf bannt, wen er beisst.
+      if (!tot && g.art === 'wolf' && a.ereignisse.some((e) => e.art === 'hieb' && e.wer === g.id && e.ziel === ziel.id && e.schaden > 0)) {
+        ziel.gebannt = Math.max(ziel.gebannt ?? 0, a.zeit + 3);
+        ziel.angriff = null;
+        ziel.flaeche = null;
+      }
       if (tot) {
         soeldnerLernt(a, g, 2, takt);
         if (rng.int(2) === 0 && (g.geredet ?? -9) < a.zeit - 3) sag(a, g, takt, SPRUCH.sieg);
@@ -1830,12 +1938,13 @@ function gefolgeHandelt(a: Abenteuer, takt: number, rng: Rng, besetzt: (q: numbe
     } else if (d > 1) {
       for (const [dq, dr] of HEX_DIRS) {
         const n = { q: g.q + dq, r: g.r + dr };
-        if (!begehbar(gelaende(a.seed, n.q, n.r)) || besetzt(n.q, n.r)) continue;
+        const b = gelaende(a.seed, n.q, n.r);
+        if (!(g.art === 'fee' ? b !== null : begehbar(b)) || besetzt(n.q, n.r)) continue;
         if (hexDistance(n, a.pos) < hexDistance(nach ?? g, a.pos)) nach = n;
       }
     }
     if (nach) {
-      a.ereignisse.push({ art: 'gehen', takt, wer: g.id, von: { q: g.q, r: g.r }, nach, ...(blink ? { blink: true } : {}) });
+      a.ereignisse.push({ art: 'gehen', takt, wer: g.id, von: { q: g.q, r: g.r }, nach, ...(blink ? { blink: true } : {}), ...(g.art === 'wolf' && !blink ? { sprung: true } : {}) });
       g.q = nach.q;
       g.r = nach.r;
     }
@@ -1873,6 +1982,8 @@ function helferGetroffen(a: Abenteuer, s: Schleim, feld: Hex, takt: number, rng:
 
 /** Steht neben dem Schleim ein Helfer (und nicht der Ritter)? Dann den. */
 function helferNeben(a: Abenteuer, s: Schleim): Hex | null {
+  const golem = (a.gefolge ?? []).find((g) => g.art === 'golem' && hexDistance(g, s) === 1);
+  if (golem) return { q: golem.q, r: golem.r };
   const ziele = [...(a.gefolge ?? []), ...(a.wanderer ?? [])].filter((x) => hexDistance(x, s) === 1);
   // Banditen gehen auf alle los, Schleime auf das Gefolge und den Orden.
   return ziele.length ? { q: ziele[0]!.q, r: ziele[0]!.r } : null;
@@ -2183,8 +2294,9 @@ export function debugAktion(alt: Abenteuer, d: DebugAktion): Abenteuer {
     melde(a, 'Debug: +20 Gold.');
   } else if (d.t === 'pentaStufe') {
     if (!hatLegende(a, 'pentagramm')) legendaerAnwenden(a, 'pentagramm', 0);
-    a.pentaStufe = (a.pentaStufe ?? 1) >= 2 ? 1 : 2;
-    melde(a, `Debug: Pentagrammmeister Stufe ${a.pentaStufe}.`);
+    a.pentaStufe = ((a.pentaStufe ?? 1) % 3) + 1;
+    if (a.pentaStufe === 3) a.beschwoerung = BESCHWOERUNG_VOLL;
+    melde(a, `Debug: Pentagrammmeister Stufe ${a.pentaStufe}${a.pentaStufe === 3 ? ' - Beschwoerung voll' : ''}.`);
   } else if (d.t === 'boss') {
     if (a.schleime.some((s) => s.boss)) return alt;
     if (d.art === 'penta') {
