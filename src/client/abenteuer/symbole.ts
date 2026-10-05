@@ -292,6 +292,22 @@ export const SCHATTENSCHLEIM: Pixelkarte = [
   '..kkkkkkkkkkk..',
 ];
 
+/** Der Pentagrammschleim: violett, mit goldenem Pentagramm auf dem Leib und spitzer Kapuze. */
+export const PENTASCHLEIM: Pixelkarte = [
+  '.......k.......',
+  '......kVk......',
+  '.....kVVVk.....',
+  '....kVrVrVk....',
+  '...kVVVVVVVk...',
+  '..kVVVVyVVVVk..',
+  '.kVVVVyVyVVVVk.',
+  'kVyyyyyyyyyyyVk',
+  'kVVVyVVVVVyVVVk',
+  'kVVVVyVyVyVVVVk',
+  'kvVVyVVVVVyVVvk',
+  '.kkkkkkkkkkkkk.',
+];
+
 /** Der Gelee-Koloss: riesig, tuerkis, viele Augen. */
 export const GELEEKOLOSS: Pixelkarte = [
   '.....kkkkkkk.....',

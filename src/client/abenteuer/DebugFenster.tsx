@@ -274,16 +274,25 @@ export function DebugFenster({
               </button>
             ))}
             <small>Bosse</small>
-        <button className="ab-debug-wahl" onClick={() => onAktion({ t: 'boss', art: 'koenig' })}>
-          Koenig
-        </button>
-        <button className="ab-debug-wahl" onClick={() => onAktion({ t: 'boss', art: 'schatten' })}>
-          Schatten
-        </button>
-        <button className="ab-debug-wahl" onClick={() => onAktion({ t: 'boss', art: 'koloss' })}>
-          Koloss
-        </button>
-        <small>Legendaer</small>
+            <button className="ab-debug-wahl" onClick={() => onAktion({ t: 'boss', art: 'koenig' })}>
+              Koenig
+            </button>
+            <button className="ab-debug-wahl" onClick={() => onAktion({ t: 'boss', art: 'schatten' })}>
+              Schatten
+            </button>
+            <button className="ab-debug-wahl" onClick={() => onAktion({ t: 'boss', art: 'koloss' })}>
+              Koloss
+            </button>
+            <button className="ab-debug-wahl" onClick={() => onAktion({ t: 'boss', art: 'penta' })} title="Der Pentagrammschleim - kommt sonst nach zu vielen Zaubern">
+              Pentagramm
+            </button>
+            <small>Legendaer</small>
+            <button className="ab-debug-wahl" onClick={() => onAktion({ t: 'legendaer', id: 'pentagramm' })}>
+              Pentagrammmeister
+            </button>
+            <button className="ab-debug-wahl" onClick={() => onAktion({ t: 'pentaStufe' })} title="Pentagrammmeister Stufe 2 an/aus">
+              Pentagramm Stufe 2
+            </button>
             <button className="ab-debug-wahl" onClick={() => onAktion({ t: 'legendaer', id: 'sololeveling' })}>
               Solo-Leveling
             </button>

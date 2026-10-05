@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { istWasser } from '../src/abenteuer/welt';
 import type { Boden } from '../src/abenteuer/welt';
-import { angelbar, angeln, betretbar, kannAngeln, BOSS_LEBEN, BOSS_NACH, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden, vergleich, naechsterBoss } from '../src/abenteuer/regeln';
+import { angelbar, angeln, betretbar, kannAngeln, BOSS_LEBEN, BOSS_NACH, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden, vergleich, naechsterBoss, KREIS_DAUER, PENTA_BOSS_NACH } from '../src/abenteuer/regeln';
 import type { Abenteuer, Taste } from '../src/abenteuer/regeln';
 import { HEX_DIRS, hexDistance } from '../src/core/coords';
 
@@ -439,6 +439,96 @@ describe('Abenteuer', () => {
       expect(a.pos).toEqual(a0.pos);
       expect(a.ereignisse.some((e) => e.art === 'zauber' && e.name === 'funkenregen')).toBe(true);
       expect(a.pfad).toHaveLength(1);
+      return;
+    }
+    throw new Error('kein Start mit freiem Dreieck');
+  });
+
+  it('Pentagrammmeister Stufe 2: der Funkenregen bleibt als Kreis und trifft noch dreimal', () => {
+    for (let seed = 1; seed < 400; seed++) {
+      const a0 = neuesAbenteuer(seed);
+      const p1 = { q: a0.pos.q + 1, r: a0.pos.r };
+      const p2 = { q: a0.pos.q, r: a0.pos.r + 1 };
+      if (![p1, p2].every((h) => eben(gelaende(seed, h.q, h.r)))) continue;
+      let a = debugAktion(debugAktion(imZug(seed, [], 20), { t: 'legendaer', id: 'pentagramm' }), { t: 'pentaStufe' });
+      expect(a.pentaStufe).toBe(2);
+      a.schleime = [];
+      a = taste(a, 'd');
+      a = taste(a, 'z');
+      a = taste(a, 'q');
+      expect(a.kreise).toHaveLength(1);
+      expect(a.kreise![0]).toMatchObject({ name: 'funkenregen', mal: 3 });
+      let regen = 0;
+      for (let i = 0; i < KREIS_DAUER + 1; i++) {
+        a = taste(a, 's');
+        regen += a.ereignisse.filter((e) => e.art === 'kreis' && e.name === 'funkenregen').length;
+      }
+      expect(regen).toBe(3);
+      expect(a.kreise).toHaveLength(0);
+      return;
+    }
+    throw new Error('kein Start mit freiem Dreieck');
+  });
+
+  it('Stufe 2: das Pentagramm schadet dauernd, der Bannkreis bannt, die Schutzrune schuetzt, der Heilkreis heilt', () => {
+    const a0 = neuesAbenteuer(13);
+    const neben = { q: a0.pos.q + 1, r: a0.pos.r };
+    const kreis = (name: 'pentagramm' | 'bannkreis' | 'schutzrune' | 'heilkreis', felder: { q: number; r: number }[]) => [{ id: 900, name, felder, mitte: a0.pos, bis: 99 }];
+    // Pentagramm: ein Schleim darin verliert jeden Tick ein Leben.
+    let a = imZug(13, [{ id: 7, q: neben.q, r: neben.r, leben: 4, gross: true }], 10);
+    a.leben = 99;
+    a.kreise = kreis('pentagramm', [neben]);
+    a = taste(a, 's');
+    expect(a.schleime[0]!.leben).toBe(3);
+    // Bannkreis: gebannt holt er nicht aus, obwohl er neben dem Ritter steht.
+    a = imZug(13, [{ id: 7, q: neben.q, r: neben.r, leben: 2, gross: false }], 10);
+    a.kreise = kreis('bannkreis', [neben]);
+    for (let i = 0; i < 4; i++) {
+      a = taste(a, 's');
+      expect(a.ereignisse.some((e) => e.art === 'ansage')).toBe(false);
+    }
+    expect(a.schleime[0]!.gebannt).toBeGreaterThan(a.zeit);
+    // Schutzrune: der angesagte Schlag prallt ab.
+    a = imZug(13, [{ id: 7, q: neben.q, r: neben.r, leben: 2, gross: false, angriff: { ...a0.pos } }], 10);
+    a.leben = 5;
+    a.kreise = kreis('schutzrune', [a0.pos]);
+    a = taste(a, 's');
+    expect(a.leben).toBeGreaterThanOrEqual(5);
+    expect(a.ereignisse.some((e) => e.art === 'kreis' && e.name === 'schutzrune')).toBe(true);
+    // Heilkreis: jeden Tick ein halbes Leben.
+    a = imZug(13, [], 10);
+    a.leben = 2;
+    const ohne = taste(a, 's').leben;
+    a.kreise = kreis('heilkreis', [a0.pos]);
+    expect(taste(a, 's').leben).toBe(ohne + 0.5);
+  });
+
+  it('wer zu oft zaubert, ruft den Pentagrammschleim - bezwungen gibt er Stufe 2', () => {
+    for (let seed = 1; seed < 400; seed++) {
+      const a0 = neuesAbenteuer(seed);
+      const p1 = { q: a0.pos.q + 1, r: a0.pos.r };
+      const p2 = { q: a0.pos.q, r: a0.pos.r + 1 };
+      if (![p1, p2].every((h) => eben(gelaende(seed, h.q, h.r)))) continue;
+      let a = debugAktion(imZug(seed, [], 20), { t: 'legendaer', id: 'pentagramm' });
+      a.schleime = [];
+      a.zauberZahl = PENTA_BOSS_NACH - 1;
+      a = taste(a, 'd');
+      a = taste(a, 'z');
+      a = taste(a, 'q');
+      const boss = a.schleime.find((s) => s.boss);
+      expect(boss?.bossArt).toBe('penta');
+      expect(a.bossErwacht ?? false).toBe(false);
+      // Neben den Ritter, fast bezwungen - zuschlagen, bis er faellt.
+      const t = freieTaste(a);
+      const [dq, dr] = HEX_DIRS[['e', 'd', 'x', 'z', 'a', 'q'].indexOf(t)]!;
+      a.schleime = [{ ...boss!, q: a.pos.q + dq, r: a.pos.r + dr, leben: 1, angriff: null, flaeche: null }];
+      a.leben = 99;
+      a.schritte = 30;
+      for (let i = 0; i < 25 && a.schleime.some((s) => s.boss); i++) a = taste(a, t);
+      expect(a.schleime.some((s) => s.boss)).toBe(false);
+      expect(a.pentaStufe).toBe(2);
+      // Kein zweites Mal.
+      expect(a.pentaGerufen).toBe(true);
       return;
     }
     throw new Error('kein Start mit freiem Dreieck');

@@ -56,7 +56,7 @@ import {
   wuerfeln,
   zugBeenden,
 } from '../../abenteuer/regeln';
-import type { Abenteuer as Zustand, DebugAktion, Ereignis, SchleimArt, Slot, Taste, Wer } from '../../abenteuer/regeln';
+import type { Abenteuer as Zustand, DebugAktion, Ereignis, SchleimArt, Slot, Taste, Wer, Zauber } from '../../abenteuer/regeln';
 import { HEX_DIRS, hexDistance, hexKey, hexesInRange } from '../../core/coords';
 import type { Hex } from '../../core/coords';
 import { BODEN_FARBE, einstellung, feldInfo, istWasser, klima } from '../../abenteuer/welt';
@@ -72,7 +72,7 @@ import { DebugFenster, FIGUR_KEY, ladeWeltEinstellung, leseFigur } from './Debug
 
 // Die Stellschrauben der Welt aus dem Debugfenster gelten ab dem Laden.
 ladeWeltEinstellung();
-import { GELEEKOLOSS, HASE, SCHATTENSCHLEIM } from './symbole';
+import { GELEEKOLOSS, HASE, PENTASCHLEIM, SCHATTENSCHLEIM } from './symbole';
 import { RITTER_HAND, RITTER_KOERPER, RITTER_SCHRITT, SCHLEIMKOENIG, SCHLEIM_BILD, SYMBOL, WAFFE, WAFFE_GRIFF, zeichnePixel } from './symbole';
 import { LAUT_STUFEN, beiTrack, klang, laufenderTrack, lautstaerke, setzeBiom, setzeLautstaerke } from './musik';
 import { BIOM_NAME } from './musik';
@@ -144,6 +144,15 @@ const SLOT_BILD: Record<Slot, string> = {
   koerper: 'ruestung',
   fuesse: 'stiefel',
   zubehoer: 'laterne',
+};
+
+/** Farben der Zauberkreise (Pentagrammmeister Stufe 2). */
+const KREIS_FARBE: Record<Zauber, string> = {
+  funkenregen: '#f6a040',
+  schutzrune: '#8ad0ff',
+  pentagramm: '#e05aa0',
+  heilkreis: '#7ee08a',
+  bannkreis: '#b58ae0',
 };
 
 /** Welche Musik zu welchem Boden gehoert - Wasser zaehlt nicht mit. */
@@ -419,6 +428,7 @@ function spieleKlaenge(a: Zustand): void {
     } else if (e.art === 'stufe') spaeter(e.takt + 0.3, 'stufe');
     else if (e.art === 'faehigkeit') spaeter(e.takt + 0.1, e.name === 'feuerkreis' ? 'feuer' : e.name === 'runenblitz' ? 'blitz' : 'bereit');
     else if (e.art === 'boss') spaeter(e.takt, 'beben');
+    else if (e.art === 'kreis') spaeter(e.takt + 0.2, e.name === 'heilkreis' ? 'bereit' : e.name === 'schutzrune' ? 'geblockt' : e.name === 'bannkreis' ? 'blitz' : 'feuer');
     else if (e.art === 'tod') spaeter(e.takt + 0.5, 'zerplatzt');
   }
 }
@@ -536,7 +546,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       const leg = neu.ereignisse.find((e): e is Extract<Ereignis, { art: 'legende' }> => e.art === 'legende');
       if (leg) {
         banner.current = performance.now();
-        bannerText.current = `Legendaer: ${gegenstand(leg.id)?.name ?? leg.id}`;
+        bannerText.current = leg.id === 'pentagramm2' ? 'Pentagrammmeister Stufe 2!' : `Legendaer: ${gegenstand(leg.id)?.name ?? leg.id}`;
       }
       spieleKlaenge(neu);
     }
@@ -816,6 +826,42 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         const blase = (sek * 1.5 + g.q * 0.3) % 1;
         ctx.fillStyle = 'rgba(210, 170, 255, 0.8)';
         ctx.fillRect(sx(m.x - 3 + (g.r % 3) * 2), sy(m.y - blase * 4), f, f);
+      }
+      // Stufe 2: Zauberkreise bleiben auf der Karte - je Zauber eine Farbe, kurz vor dem Ende flackern sie.
+      for (const k of a.kreise ?? []) {
+        if (k.bis <= a.zeit) continue;
+        const farbe = KREIS_FARBE[k.name];
+        const rest = k.bis - a.zeit;
+        const flacker = rest <= 2 ? 0.5 + 0.5 * Math.sin(sek * 14) : 1;
+        for (const h of k.felder) {
+          if (hexDistance(h, a.pos) > sicht + 2) continue;
+          const m = mitte(h.q, h.r);
+          const puls = 0.75 + 0.25 * Math.sin(sek * 3 + h.q + h.r);
+          ctx.globalAlpha = 0.32 * puls * flacker;
+          ctx.fillStyle = farbe;
+          ctx.beginPath();
+          ctx.ellipse(sx(m.x), sy(m.y + 1), 10 * f, 5 * f, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 0.85 * flacker;
+          ctx.strokeStyle = farbe;
+          ctx.lineWidth = f;
+          ctx.stroke();
+          // Ein Runenfunke steigt auf.
+          const fl = (sek * 0.8 + (h.q * 7 + h.r * 3) * 0.13) % 1;
+          ctx.globalAlpha = (1 - fl) * flacker;
+          ctx.fillRect(sx(m.x + ((h.q * 5 + h.r) % 7) - 3), sy(m.y - fl * 10), f, f);
+        }
+        ctx.globalAlpha = 1;
+      }
+      // Gebannte Schleime: ein violetter Bannring unter ihnen.
+      for (const s of a.schleime) {
+        if ((s.gebannt ?? 0) <= a.zeit || hexDistance(s, a.pos) > sicht + 1) continue;
+        const m = mitte(s.q, s.r);
+        ctx.strokeStyle = `rgba(190, 130, 255, ${0.6 + 0.3 * Math.sin(sek * 5)})`;
+        ctx.lineWidth = f;
+        ctx.beginPath();
+        ctx.ellipse(sx(m.x), sy(m.y + 2), 9 * f, 4 * f, 0, 0, Math.PI * 2);
+        ctx.stroke();
       }
       const zentrum = (q: number, r: number) => {
         const m = mitte(q, r);
@@ -1188,7 +1234,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             ctx.fillRect(sx(o.x) - sw, sy(o.y) + 3 * f, 2 * sw, f);
             if (s.boss) {
               // Die Bosse: eigene Bilder, deutlich groesser als ein Feld-Schleim; der Koloss am groessten.
-              const bild = s.bossArt === 'schatten' ? SCHATTENSCHLEIM : s.bossArt === 'koloss' ? GELEEKOLOSS : SCHLEIMKOENIG;
+              const bild = s.bossArt === 'schatten' ? SCHATTENSCHLEIM : s.bossArt === 'koloss' ? GELEEKOLOSS : s.bossArt === 'penta' ? PENTASCHLEIM : SCHLEIMKOENIG;
               const kf = Math.round(f * (s.bossArt === 'koloss' ? 1.9 : 1.6));
               const kb = bild[0]!.length;
               ctx.save();
@@ -1492,6 +1538,30 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             ctx.globalAlpha = 1;
           }
           if (u < 3) schrift(`Level ${e.lv}! ${e.bonus}`, sx(ritter.x), sy(ritter.y) - (24 + u * 4) * f, '#f2c94c', 1.8 - u * 0.6, 6);
+        } else if (e.art === 'kreis') {
+          // Ein bleibender Kreis wirkt: Funken auf die Getroffenen, der Schutz leuchtet um den Ritter.
+          if (u < 1.2) {
+            const k = u / 1.2;
+            ctx.fillStyle = KREIS_FARBE[e.name];
+            if (e.name === 'schutzrune') {
+              ctx.strokeStyle = KREIS_FARBE.schutzrune;
+              ctx.globalAlpha = 1 - k;
+              ctx.lineWidth = 2 * f;
+              ctx.beginPath();
+              ctx.arc(sx(ritter.x), sy(ritter.y) - 6 * f, (10 + k * 8) * f, 0, Math.PI * 2);
+              ctx.stroke();
+            }
+            const orte = [...e.ziele.map((id) => a.schleime.find((x) => x.id === id)).filter((x): x is NonNullable<typeof x> => !!x), ...(e.felder ?? [])];
+            for (const h of orte) {
+              const m = mitte(h.q, h.r);
+              for (let i = 0; i < 4; i++) {
+                const fl = (k + i * 0.25) % 1;
+                ctx.globalAlpha = (1 - k) * (1 - fl);
+                ctx.fillRect(sx(m.x + (i - 1.5) * 4), sy(m.y - 10 + fl * 12), f, 2 * f);
+              }
+            }
+            ctx.globalAlpha = 1;
+          }
         } else if (e.art === 'legende') {
           if (u < 2) {
             const k = u / 2;
@@ -2053,6 +2123,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                   <b>
                     {gegenstand(id)?.name}
                     {n > 1 ? ` ×${n}` : ''}
+                    {id === 'pentagramm' ? ` · Stufe ${a.pentaStufe ?? 1}` : ''}
                   </b>
                   <small>{gegenstand(id)?.text.replace(/^Legendaer\.\s*/, '')}</small>
                 </span>

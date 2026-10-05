@@ -118,7 +118,7 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
     name: 'Pentagrammmeister',
     legendaer: true,
     text:
-      'Legendaer. Schliesst dein Weg in einem Zug eine Form, wirkst du einen Zauber: Dreieck - Funkenregen, Raute - Schutzrune, Fuenfeck - Pentagramm, Sechseck - Heilkreis, groesser - Bannkreis.',
+      'Legendaer. Schliesst dein Weg in einem Zug eine Form, wirkst du einen Zauber: Dreieck - Funkenregen, Raute - Schutzrune, Fuenfeck - Pentagramm, Sechseck - Heilkreis, groesser - Bannkreis. Wer zu oft zaubert, ruft den Pentagrammschleim - bezwungen schaltet er Stufe 2 frei: die Zauber bleiben 10 Takte als Kreise auf der Karte.',
   },
   {
     id: 'herzcontainer',
@@ -179,6 +179,8 @@ export type Schleim = {
   bossArt?: BossArt;
   /** Wie oft der Koenig schon gehandelt hat - fuer seinen Rhythmus. */
   zaehler?: number;
+  /** Gebannt (Bannkreis, Stufe 2) bis zu diesem Tick: er tut nichts. */
+  gebannt?: number;
 };
 
 export type Phase = 'wuerfeln' | 'ziehen' | 'tot' | 'sieg';
@@ -208,11 +210,14 @@ export const SCHLEIM_NAME: Record<SchleimArt, string> = {
  *   koenig   Schlag aufs Feld, jedes dritte Mal der Ring um ihn, spaltet ab
  *   schatten springt durch die Schatten neben den Ritter, spuckt Linien
  *   koloss   riesig und traege: ein Ring zwei Felder weit, ruft Schleime
+ * Ausserhalb der Reihe: der Pentagrammschleim (penta) - er kommt, wer den
+ * Pentagrammmeister zu oft benutzt (PENTA_BOSS_NACH Zauber). Bezwungen
+ * schaltet er Stufe 2 frei: die Zauber bleiben als Kreise auf der Karte.
  */
-export type BossArt = 'koenig' | 'schatten' | 'koloss';
-export const BOSS_NAME: Record<BossArt, string> = { koenig: 'Schleimkoenig', schatten: 'Schattenschleim', koloss: 'Gelee-Koloss' };
+export type BossArt = 'koenig' | 'schatten' | 'koloss' | 'penta';
+export const BOSS_NAME: Record<BossArt, string> = { koenig: 'Schleimkoenig', schatten: 'Schattenschleim', koloss: 'Gelee-Koloss', penta: 'Pentagrammschleim' };
 const BOSS_FOLGE: readonly BossArt[] = ['koenig', 'schatten', 'koloss'];
-const BOSS_GRUND: Record<BossArt, number> = { koenig: 10, schatten: 12, koloss: 16 };
+const BOSS_GRUND: Record<BossArt, number> = { koenig: 10, schatten: 12, koloss: 16, penta: 16 };
 
 /** Ein neuer Schleim: die Art aus einer Zahl 0..99 - gut die Haelfte gewoehnlich. */
 function neuerSchleim(id: number, q: number, r: number, zahl: number, fern: boolean): Schleim {
@@ -261,6 +266,8 @@ export type Ereignis =
   | { art: 'wiederbelebt'; takt: number }
   /** Pentagrammmeister: der Weg hat sich geschlossen - ein Zauber. */
   | { art: 'zauber'; takt: number; name: Zauber; felder: Hex[] }
+  /** Stufe 2: ein bleibender Kreis wirkt (Schaden, Heilung, Bann, Schutz). */
+  | { art: 'kreis'; takt: number; name: Zauber; ziele: number[]; felder?: Hex[] }
   /** Gift: der Ritter steht in einer Pfuetze. */
   | { art: 'gift'; takt: number }
   /** Ein legendaerer Fund wirkt. */
@@ -313,6 +320,14 @@ export type Abenteuer = {
   tiere?: { id: number; q: number; r: number; art: 'hase' }[];
   /** Giftpfuetzen der Giftschleime: wer darin steht, verliert je Tick ein halbes Leben. */
   gift?: { q: number; r: number; bis: number }[];
+  /** Pentagrammmeister: so viele Zauber gewirkt - zu viele rufen den Pentagrammschleim. */
+  zauberZahl?: number;
+  /** Pentagrammmeister-Stufe: 2, wenn der Pentagrammschleim bezwungen ist. */
+  pentaStufe?: number;
+  /** Ist der Pentagrammschleim gerufen (oder schon bezwungen)? */
+  pentaGerufen?: boolean;
+  /** Stufe 2: Zauberkreise, die auf der Karte bleiben. */
+  kreise?: Kreis[];
   /** Was zuletzt geschah, neueste zuletzt. */
   log: string[];
   /** Die Ereignisse der letzten Aktion - nur fuers Bild. */
@@ -575,6 +590,7 @@ function zauberPruefen(a: Abenteuer): void {
   if (schritte < 3) return;
   const name: Zauber = schritte === 3 ? 'funkenregen' : schritte === 4 ? 'schutzrune' : schritte === 5 ? 'pentagramm' : schritte === 6 ? 'heilkreis' : 'bannkreis';
   a.ereignisse.push({ art: 'zauber', takt: 0, name, felder: form });
+  a.zauberZahl = (a.zauberZahl ?? 0) + 1;
   const nahe = (weit: number, um: readonly Hex[]) => a.schleime.filter((s) => um.some((h) => hexDistance(s, h) <= weit));
   if (name === 'funkenregen') {
     melde(a, 'Ein Dreieck - Funkenregen!');
@@ -594,8 +610,88 @@ function zauberPruefen(a: Abenteuer): void {
     melde(a, 'Ein grosser Kreis - der Bannkreis!');
     for (const s of nahe(1, form)) verwunde(a, s, 2, 0, 'Bannkreis');
   }
+  // Stufe 2: der Zauber bleibt als Kreis auf der Karte.
+  if ((a.pentaStufe ?? 1) >= 2) {
+    const felder = [...form.slice(1), ...umschlossen(form)];
+    a.kreise = [...(a.kreise ?? []), { id: a.naechsteId++, name, felder, mitte: { q: a.pos.q, r: a.pos.r }, bis: a.zeit + KREIS_DAUER, ...(name === 'funkenregen' ? { mal: 3 } : {}) }];
+  }
+  // Wer zu oft zaubert, ruft den Pentagrammschleim.
+  if (!a.pentaGerufen && (a.pentaStufe ?? 1) < 2) {
+    if (a.zauberZahl === PENTA_BOSS_NACH - 3) melde(a, 'Die Pentagramme locken etwas an ... du spuerst einen Blick.');
+    if (a.zauberZahl >= PENTA_BOSS_NACH && !a.schleime.some((x) => x.boss)) bossErwacht(a, 0, 'penta');
+  }
   // Die Zeichnung beginnt neu.
   a.pfad = [{ q: a.pos.q, r: a.pos.r }];
+}
+
+/** So viele Zauber, dann kommt der Pentagrammschleim. */
+export const PENTA_BOSS_NACH = 10;
+/** Stufe 2: so viele Ticks bleibt ein Kreis. */
+export const KREIS_DAUER = 10;
+
+/** Stufe 2: ein Zauberkreis auf der Karte - seine Felder sind der Weg und was er umschliesst. */
+export type Kreis = { id: number; name: Zauber; felder: Hex[]; mitte: Hex; bis: number; mal?: number; gebannt?: number[] };
+
+/** Die Felder innerhalb eines geschlossenen Weges (ohne den Weg selbst). */
+function umschlossen(form: readonly Hex[]): Hex[] {
+  const punkt = (h: Hex) => ({ x: h.q + h.r / 2, y: h.r * 0.866 });
+  const ecken = form.map(punkt);
+  const drin = (p: { x: number; y: number }) => {
+    let ja = false;
+    for (let i = 0, j = ecken.length - 1; i < ecken.length; j = i++) {
+      const a = ecken[i]!;
+      const b = ecken[j]!;
+      if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) ja = !ja;
+    }
+    return ja;
+  };
+  return hexesInRange(form[0]!, form.length).filter((h) => !form.some((f) => f.q === h.q && f.r === h.r) && drin(punkt(h)));
+}
+
+/** Steht der Ritter in einer Schutzrune (Stufe 2)? Dann trifft ihn nichts. */
+function inSchutzrune(a: Abenteuer): boolean {
+  return (a.kreise ?? []).some((k) => k.name === 'schutzrune' && k.felder.some((h) => h.q === a.pos.q && h.r === a.pos.r));
+}
+
+/** Stufe 2: die Kreise wirken in jedem Tick - und vergehen nach KREIS_DAUER. */
+function kreiseWirken(a: Abenteuer, takt: number): void {
+  const kreise = (a.kreise ?? []).filter((k) => k.bis > a.zeit);
+  const im = (k: Kreis, h: Hex, weit = 0) => k.felder.some((f) => hexDistance(f, h) <= weit);
+  for (const k of kreise) {
+    if (k.name === 'pentagramm') {
+      // Dauernder Schaden an allem, was im Pentagramm steht.
+      const ziele = a.schleime.filter((s) => im(k, s));
+      if (ziele.length) a.ereignisse.push({ art: 'kreis', takt, name: k.name, ziele: ziele.map((s) => s.id) });
+      for (const s of ziele) verwunde(a, s, 1, takt, 'Pentagramm');
+    } else if (k.name === 'heilkreis') {
+      if (im(k, a.pos) && a.leben < maxLebenVon(a)) {
+        const plus = Math.min(0.5, maxLebenVon(a) - a.leben);
+        a.leben += plus;
+        a.ereignisse.push({ art: 'heil', takt, leben: plus });
+      }
+    } else if (k.name === 'bannkreis') {
+      // Wer in den Bannkreis kommt, ist lange gebannt - ein Boss kuerzer, und nur einmal je Kreis.
+      const ziele = a.schleime.filter((s) => im(k, s, 1) && (s.gebannt ?? 0) <= a.zeit && !(k.gebannt ?? []).includes(s.id));
+      for (const s of ziele) {
+        s.gebannt = a.zeit + (s.boss ? 3 : KREIS_DAUER);
+        s.angriff = null;
+        s.flaeche = null;
+        if (s.boss) k.gebannt = [...(k.gebannt ?? []), s.id];
+      }
+      if (ziele.length) {
+        a.ereignisse.push({ art: 'kreis', takt, name: k.name, ziele: ziele.map((s) => s.id) });
+        melde(a, ziele.length > 1 ? `Der Bannkreis bannt ${ziele.length} Schleime.` : `Der Bannkreis bannt den ${schleimName(ziele[0]!)}.`);
+      }
+    } else if (k.name === 'funkenregen' && (k.bis - a.zeit) % 2 === 0 && (k.mal ?? 0) > 0) {
+      // Noch dreimal regnen Funken, dann ist er fort.
+      k.mal = (k.mal ?? 0) - 1;
+      const ziele = a.schleime.filter((s) => hexDistance(s, k.mitte) <= 2);
+      a.ereignisse.push({ art: 'kreis', takt, name: k.name, ziele: ziele.map((s) => s.id), felder: hexesInRange(k.mitte, 2) });
+      for (const s of ziele) verwunde(a, s, 1, takt, 'Funkenregen');
+      if (k.mal === 0) k.bis = a.zeit;
+    }
+  }
+  a.kreise = kreise.filter((k) => k.bis > a.zeit);
 }
 
 /** Legendaeres, das es nur einmal gibt. */
@@ -801,6 +897,13 @@ function verwunde(a: Abenteuer, s: Schleim, schaden: number, takt: number, vorne
     ...(s.art ? { schleimArt: s.art } : {}),
   });
   erfahrung(a, s.boss ? 10 : s.gross || s.art ? 2 : 1, takt);
+  if (s.boss && s.bossArt === 'penta') {
+    // Der Pentagrammschleim ist bezwungen: Stufe 2 des Pentagrammmeisters.
+    a.pentaStufe = 2;
+    melde(a, `${vorne}: der Pentagrammschleim zerfaellt! Pentagrammmeister Stufe 2: deine Zauber bleiben ${KREIS_DAUER} Takte als Kreise auf der Karte.`);
+    a.ereignisse.push({ art: 'legende', takt, id: 'pentagramm2' });
+    return;
+  }
   if (s.boss) {
     // Der Koenig ist bezwungen - kein Ende: er laesst einen legendaeren Fund
     // fallen, und nach weiteren BOSS_NACH Schleimen erwacht ein staerkerer.
@@ -829,7 +932,7 @@ function verwunde(a: Abenteuer, s: Schleim, schaden: number, takt: number, vorne
   const naechster = BOSS_NACH * (1 + (a.koenige ?? 0));
   const bisKoenig = a.bossErwacht ? '' : ` (${Math.min(a.erschlagen, naechster)}/${naechster})`;
   melde(a, `${vorne}: der ${schleimName(s)} zerplatzt! +${gelee} Gelee${bisKoenig}.`);
-  if (!a.bossErwacht && a.erschlagen >= BOSS_NACH * (1 + (a.koenige ?? 0))) bossErwacht(a, takt);
+  if (!a.bossErwacht && !a.schleime.some((x) => x.boss) && a.erschlagen >= BOSS_NACH * (1 + (a.koenige ?? 0))) bossErwacht(a, takt);
 }
 
 /** Legendaer: gleich beim Aufheben wirkt der Fund. */
@@ -920,7 +1023,7 @@ export function entfessle(a: Abenteuer, f: Faehigkeit, takt: number): void {
 }
 
 /** Der Schleimkoenig erwacht, ein Stueck entfernt, und sucht den Ritter. */
-function bossErwacht(a: Abenteuer, takt: number): void {
+function bossErwacht(a: Abenteuer, takt: number, art: BossArt = naechsterBoss(a)): void {
   const frei = (q: number, r: number) =>
     begehbar(gelaende(a.seed, q, r)) && !(q === a.pos.q && r === a.pos.r) && !a.schleime.some((x) => x.q === q && x.r === r);
   const rng = new Rng(a.rng);
@@ -938,11 +1041,17 @@ function bossErwacht(a: Abenteuer, takt: number): void {
   a.rng = rng.getState();
   if (!ort) return;
   const id = a.naechsteId++;
-  const art = naechsterBoss(a);
-  a.schleime.push({ id, q: ort.q, r: ort.r, leben: koenigLeben(a), max: koenigLeben(a), gross: true, boss: true, bossArt: art, zaehler: 0 });
-  a.bossErwacht = true;
+  const leben = art === 'penta' ? BOSS_GRUND.penta : koenigLeben(a);
+  a.schleime.push({ id, q: ort.q, r: ort.r, leben, max: leben, gross: true, boss: true, bossArt: art, zaehler: 0 });
+  if (art === 'penta') a.pentaGerufen = true;
+  else a.bossErwacht = true;
   a.ereignisse.push({ art: 'neu', takt, wer: id }, { art: 'boss', takt, wer: id, name: BOSS_NAME[art] });
-  melde(a, `Der Boden bebt - der ${BOSS_NAME[art]} ist erwacht! Bezwinge ihn.`);
+  melde(
+    a,
+    art === 'penta'
+      ? 'Deine Pentagramme haben ihn gerufen: der Pentagrammschleim! Bezwinge ihn, und deine Zauber werden staerker.'
+      : `Der Boden bebt - der ${BOSS_NAME[art]} ist erwacht! Bezwinge ihn.`,
+  );
 }
 
 function aufheben(a: Abenteuer): void {
@@ -1021,6 +1130,12 @@ export function lebenText(n: number): string {
 
 /** Ein geladener Schutzwall faengt einen Treffer ab - einmal. */
 function schutzwall(a: Abenteuer, s: Schleim, feld: Hex, takt: number, wurf: number): boolean {
+  if (inSchutzrune(a)) {
+    a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: 'ritter', feld, wurf, schaden: 0 });
+    a.ereignisse.push({ art: 'kreis', takt, name: 'schutzrune', ziele: [] });
+    melde(a, `Die Schutzrune haelt - der ${schleimName(s)} prallt ab.`);
+    return true;
+  }
   if (a.bereit !== 'schutzwall') return false;
   a.bereit = null;
   a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: 'ritter', feld, wurf, schaden: 0 });
@@ -1164,7 +1279,7 @@ function koenigTrifft(a: Abenteuer, s: Schleim, felder: readonly Hex[], takt: nu
   const feld = drauf ? { q: a.pos.q, r: a.pos.r } : felder[0]!;
   if (!drauf) {
     a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: null, feld, wurf, schaden: 0 });
-    melde(a, 'Ausgewichen! Der Schleimkoenig schlaegt ins Leere.');
+    melde(a, `Ausgewichen! Der ${schleimName(s)} schlaegt ins Leere.`);
     return;
   }
   if (schutzwall(a, s, feld, takt, wurf)) return;
@@ -1172,14 +1287,15 @@ function koenigTrifft(a: Abenteuer, s: Schleim, felder: readonly Hex[], takt: nu
   a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: 'ritter', feld, wurf, schaden });
   if (schaden > 0) {
     a.leben -= schaden;
-    melde(a, `Der Schleimkoenig trifft dich: -${schaden} Leben.`);
-  } else melde(a, 'Dein Schild faengt den Koenig ab.');
+    melde(a, `Der ${schleimName(s)} trifft dich: -${schaden} Leben.`);
+  } else melde(a, `Dein Schild faengt den ${schleimName(s)} ab.`);
 }
 
 /** Der Koenig handelt (nur jeden zweiten Tick, wie alle grossen Schleime). */
 function koenigHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetzt: (q: number, r: number) => boolean, neue: Schleim[]): void {
   if (s.bossArt === 'schatten') return schattenHandelt(a, s, takt, rng, besetzt);
   if (s.bossArt === 'koloss') return kolossHandelt(a, s, takt, rng, besetzt, neue);
+  if (s.bossArt === 'penta') return pentaHandelt(a, s, takt, rng, besetzt);
   // Erst die Ansage einloesen.
   if (s.flaeche) {
     const felder = s.flaeche;
@@ -1302,6 +1418,39 @@ function schattenHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, beset
   bossZieht(a, s, takt, besetzt);
 }
 
+/**
+ * Der Pentagrammschleim: zeichnet Bannsterne. Jedes dritte Mal das Feld des
+ * Ritters und fuenf der sechs Nachbarn - nur die eine Luecke rettet. Sonst
+ * Linien aus Zauberfeuer, oder ein Schlag, wenn er nah ist.
+ */
+function pentaHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetzt: (q: number, r: number) => boolean): void {
+  if (bossLoestEin(a, s, takt, rng)) return;
+  s.zaehler = (s.zaehler ?? 0) + 1;
+  const d = hexDistance(s, a.pos);
+  if (s.zaehler % 3 === 0 && d <= 4) {
+    const luecke = rng.int(6);
+    s.flaeche = [{ q: a.pos.q, r: a.pos.r }, ...HEX_DIRS.filter((_, i) => i !== luecke).map(([dq, dr]) => ({ q: a.pos.q + dq, r: a.pos.r + dr }))];
+    a.ereignisse.push({ art: 'ansage', takt, wer: s.id, feld: { q: a.pos.q, r: a.pos.r }, felder: s.flaeche });
+    melde(a, 'Der Pentagrammschleim zeichnet einen Bannstern - finde die Luecke!');
+    return;
+  }
+  if (d === 1) {
+    s.angriff = { q: a.pos.q, r: a.pos.r };
+    a.ereignisse.push({ art: 'ansage', takt, wer: s.id, feld: s.angriff });
+    melde(a, 'Der Pentagrammschleim holt aus!');
+    return;
+  }
+  const dir = linieZum(s, a.pos);
+  if (dir !== null) {
+    const [dq, dr] = HEX_DIRS[dir]!;
+    s.flaeche = [1, 2, 3].map((k) => ({ q: s.q + dq * k, r: s.r + dr * k }));
+    a.ereignisse.push({ art: 'ansage', takt, wer: s.id, feld: { q: a.pos.q, r: a.pos.r }, felder: s.flaeche });
+    melde(a, 'Der Pentagrammschleim schleudert Zauberfeuer - tritt aus der Linie!');
+    return;
+  }
+  bossZieht(a, s, takt, besetzt);
+}
+
 /** Der Gelee-Koloss: riesig und traege - ein Ring zwei Felder weit, ruft kleine Schleime. */
 function kolossHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetzt: (q: number, r: number) => boolean, neue: Schleim[]): void {
   if (bossLoestEin(a, s, takt, rng)) return;
@@ -1347,8 +1496,11 @@ function ticken(a: Abenteuer, takt: number): void {
   const rng = new Rng(a.rng);
   const besetzt = (q: number, r: number) =>
     (q === a.pos.q && r === a.pos.r) || a.schleime.some((s) => s.q === q && s.r === r) || (a.tiere ?? []).some((t) => t.q === q && t.r === r);
+  // Stufe 2: erst wirken die Zauberkreise - wer im Bannkreis steht, kommt gar nicht erst zum Zug.
+  kreiseWirken(a, takt);
   const neue: Schleim[] = [];
   for (const s of a.schleime) {
+    if ((s.gebannt ?? 0) > a.zeit) continue;
     if ((s.gross || s.art === 'panzer') && a.zeit % 2 === 1) continue;
     if (s.boss) {
       koenigHandelt(a, s, takt, rng, besetzt, neue);
@@ -1385,9 +1537,11 @@ function ticken(a: Abenteuer, takt: number): void {
     }
   }
   a.rng = rng.getState();
+  // Ein aufgeschobener Pentagrammschleim kommt, sobald kein anderer Boss mehr da ist.
+  if (!a.pentaGerufen && (a.pentaStufe ?? 1) < 2 && (a.zauberZahl ?? 0) >= PENTA_BOSS_NACH && !a.schleime.some((x) => x.boss)) bossErwacht(a, takt, 'penta');
   // Gift: wer in einer Pfuetze steht, verliert ein halbes Leben; alte Pfuetzen vertrocknen.
   a.gift = (a.gift ?? []).filter((g) => g.bis > a.zeit);
-  if (a.gift.some((g) => g.q === a.pos.q && g.r === a.pos.r)) {
+  if (a.gift.some((g) => g.q === a.pos.q && g.r === a.pos.r) && !inSchutzrune(a)) {
     a.leben -= 0.5;
     a.ereignisse.push({ art: 'gift', takt });
     melde(a, 'Gift! -½ Leben.');
@@ -1479,7 +1633,8 @@ export type DebugAktion =
   | { t: 'ep' }
   | { t: 'schritte' }
   | { t: 'aufdecken' }
-  | { t: 'boss'; art: BossArt };
+  | { t: 'boss'; art: BossArt }
+  | { t: 'pentaStufe' };
 
 export function debugAktion(alt: Abenteuer, d: DebugAktion): Abenteuer {
   const a = structuredClone(alt);
@@ -1526,8 +1681,16 @@ export function debugAktion(alt: Abenteuer, d: DebugAktion): Abenteuer {
   } else if (d.t === 'heilen') {
     a.leben = maxLebenVon(a);
     melde(a, 'Debug: volles Leben.');
+  } else if (d.t === 'pentaStufe') {
+    if (!hatLegende(a, 'pentagramm')) legendaerAnwenden(a, 'pentagramm', 0);
+    a.pentaStufe = (a.pentaStufe ?? 1) >= 2 ? 1 : 2;
+    melde(a, `Debug: Pentagrammmeister Stufe ${a.pentaStufe}.`);
   } else if (d.t === 'boss') {
     if (a.schleime.some((s) => s.boss)) return alt;
+    if (d.art === 'penta') {
+      bossErwacht(a, 0, 'penta');
+      return a;
+    }
     const vorher = a.koenige;
     a.koenige = BOSS_FOLGE.indexOf(d.art);
     bossErwacht(a, 0);
