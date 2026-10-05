@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { istWasser } from '../src/abenteuer/welt';
 import type { Boden } from '../src/abenteuer/welt';
-import { angelbar, angeln, betretbar, kannAngeln, BOSS_LEBEN, BOSS_NACH, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden, vergleich, naechsterBoss, KREIS_DAUER, PENTA_BOSS_NACH, verkaufen, verkaufsPreis, kaufen, ansprechen, anheuern, werberAngebot, PENTA_STUFE3_NACH, BESCHWOERUNG_VOLL, beschwoeren, angeheuerte, kannNeuWuerfeln, neuWuerfeln } from '../src/abenteuer/regeln';
+import { angelbar, angeln, betretbar, kannAngeln, BOSS_LEBEN, BOSS_NACH, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden, vergleich, naechsterBoss, KREIS_DAUER, PENTA_BOSS_NACH, verkaufen, verkaufsPreis, kaufen, ansprechen, anheuern, werberAngebot, PENTA_STUFE3_NACH, BESCHWOERUNG_VOLL, beschwoeren, angeheuerte, kannNeuWuerfeln, neuWuerfeln, WUERFEL_EFFEKT } from '../src/abenteuer/regeln';
 import type { Abenteuer, Taste } from '../src/abenteuer/regeln';
 import { HEX_DIRS, hexDistance, hexesInRange as hexesInRangeTest } from '../src/core/coords';
 
@@ -751,6 +751,38 @@ describe('Abenteuer', () => {
     expect(kannNeuWuerfeln(a)).toBe(false);
     // Ohne Glueckswuerfel gar nicht.
     expect(kannNeuWuerfeln(wuerfeln(neuesAbenteuer(21)))).toBe(false);
+  });
+
+  it('Wuerfel mit Seiteneffekten: bestimmte Augen loesen etwas aus', () => {
+    /** Ein Wurf mit dem Wuerfel, der die gewuenschte Augenzahl zeigt (oder nicht). */
+    const wurfMit = (id: string, treffer: boolean, vorher: (a: Abenteuer) => void = () => {}) => {
+      for (let seed = 1; seed < 500; seed++) {
+        const a = structuredClone(neuesAbenteuer(seed));
+        a.ausruestung = { ...a.ausruestung, wuerfel: id };
+        vorher(a);
+        const b = wuerfeln(a);
+        if (WUERFEL_EFFEKT[id]!.includes(b.wurf!) === treffer) return b;
+      }
+      throw new Error('kein passender Wurf');
+    };
+    // Kraeuterwuerfel: eine 1 bringt ein Kraut, sonst nichts.
+    expect(wurfMit('kraeuterwuerfel', true).inventar['kraut']).toBe(1);
+    expect(wurfMit('kraeuterwuerfel', false).inventar['kraut']).toBeUndefined();
+    // Schildwuerfel: 1 oder 2 - Schutzwall.
+    expect(wurfMit('schildwuerfel', true).bereit).toBe('schutzwall');
+    // Heilwuerfel: gerade Zahl heilt ein halbes Herz.
+    const heil = wurfMit('heilwuerfel', true, (a) => (a.leben = 3));
+    expect(heil.leben).toBe(3.5);
+    // Funkenwuerfel: eine 6 entfesselt die Faehigkeit der Waffe (Flammenschwert: Feuerkreis).
+    const funken = wurfMit('funkenwuerfel', true, (a) => (a.ausruestung = { ...a.ausruestung, waffe: 'flammenschwert' }));
+    expect(funken.ereignisse.some((e) => e.art === 'faehigkeit' && e.name === 'feuerkreis')).toBe(true);
+    // Runenwuerfel: 5 oder 6 - Funken auf Gegner bis zwei Felder.
+    const rune = wurfMit('runenwuerfel', true, (a) => (a.schleime = [{ id: 7, q: a.pos.q + 2, r: a.pos.r, leben: 3, gross: false }]));
+    expect(rune.schleime[0]!.leben).toBe(2);
+    // Bannwuerfel: eine 6 bannt Gegner bis drei Felder.
+    const bann = wurfMit('bannwuerfel', true, (a) => (a.schleime = [{ id: 7, q: a.pos.q + 3, r: a.pos.r, leben: 3, gross: false }]));
+    expect(bann.schleime[0]!.gebannt).toBeGreaterThan(bann.zeit);
+    expect(bann.ereignisse.some((e) => e.art === 'wuerfelEffekt')).toBe(true);
   });
 
   it('Herzen werden gleich verbraucht - bei vollem Leben bleiben sie liegen', () => {

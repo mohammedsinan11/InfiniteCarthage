@@ -96,6 +96,25 @@ export type Gegenstand = {
  */
 export const WUERFEL_SEITEN: Record<string, number> = { wanderwuerfel: 8, fluchwuerfel: 10 };
 
+/**
+ * WUERFEL MIT SEITENEFFEKTEN - gewoehnliche W6, aber bestimmte Augen loesen
+ * etwas aus (im Bild leuchten diese Augen golden):
+ *   funkenwuerfel   6: die Waffe ist voll geladen - ihre Faehigkeit wirkt
+ *   kraeuterwuerfel 1: ein Kraut - selbst Pech hat sein Gutes
+ *   runenwuerfel    5, 6: Funken regnen auf alle Gegner bis 2 Felder
+ *   schildwuerfel   1, 2: ein Schutzwall faengt den naechsten Treffer
+ *   heilwuerfel     2, 4, 6: ein halbes Herz zurueck
+ *   bannwuerfel     6: alle Gegner bis 3 Felder sind zwei Takte gebannt
+ */
+export const WUERFEL_EFFEKT: Record<string, readonly number[]> = {
+  funkenwuerfel: [6],
+  kraeuterwuerfel: [1],
+  runenwuerfel: [5, 6],
+  schildwuerfel: [1, 2],
+  heilwuerfel: [2, 4, 6],
+  bannwuerfel: [6],
+};
+
 export const GEGENSTAENDE: readonly Gegenstand[] = [
   { id: 'glueckswuerfel', name: 'Glueckswuerfel', slot: 'wuerfel', wuerfelWert: 3, text: 'Einmal je Zug darfst du neu wuerfeln (R) - solange du noch keinen Schritt gegangen bist.' },
   { id: 'bleiwuerfel', name: 'Bleiwuerfel', slot: 'wuerfel', wuerfelWert: 3, text: 'Schwer und treu: wuerfelt nie unter 3.' },
@@ -103,6 +122,12 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
   { id: 'wanderwuerfel', name: 'Wanderwuerfel', slot: 'wuerfel', wuerfelWert: 3, text: 'Acht Seiten: 1 bis 8 Schritte.' },
   { id: 'fluchwuerfel', name: 'Fluchwuerfel', slot: 'wuerfel', wuerfelWert: 2, text: 'Zehn Seiten: 1 bis 10 Schritte - aber eine 1 kostet dich ein Leben.' },
   { id: 'goldwuerfel', name: 'Goldwuerfel', slot: 'wuerfel', wuerfelWert: 2, text: 'Ein gewoehnlicher W6 - aber jede 6 bringt 1 bis 3 Gold.' },
+  { id: 'funkenwuerfel', name: 'Funkenwuerfel', slot: 'wuerfel', wuerfelWert: 3, text: 'Eine 6 laedt deine Waffe voll - ihre Faehigkeit wirkt sofort.' },
+  { id: 'kraeuterwuerfel', name: 'Kraeuterwuerfel', slot: 'wuerfel', wuerfelWert: 2, text: 'Eine 1 bringt ein Kraut - selbst Pech hat sein Gutes.' },
+  { id: 'runenwuerfel', name: 'Runenwuerfel', slot: 'wuerfel', wuerfelWert: 3, text: 'Eine 5 oder 6 laesst Funken regnen: 1 Schaden an allen Gegnern bis 2 Felder.' },
+  { id: 'schildwuerfel', name: 'Schildwuerfel', slot: 'wuerfel', wuerfelWert: 2, text: 'Eine 1 oder 2 ruft einen Schutzwall: der naechste Treffer prallt ab.' },
+  { id: 'heilwuerfel', name: 'Heilwuerfel', slot: 'wuerfel', wuerfelWert: 3, text: 'Jede gerade Zahl heilt ein halbes Herz.' },
+  { id: 'bannwuerfel', name: 'Bannwuerfel', slot: 'wuerfel', wuerfelWert: 3, text: 'Eine 6 bannt alle Gegner bis 3 Felder fuer zwei Takte.' },
   { id: 'schwert', name: 'Schwert', slot: 'waffe', angriff: 1, text: '+1 auf jeden Angriffswurf.' },
   { id: 'axt', name: 'Streitaxt', slot: 'waffe', angriff: 2, ladung: 5, faehigkeit: 'spalthieb', text: '+2 auf jeden Angriffswurf. Ladung 5: Spalthieb - der naechste Treffer macht 2 Schaden mehr.' },
   { id: 'breitschwert', name: 'Breitschwert', slot: 'waffe', angriff: 2, ladung: 6, faehigkeit: 'schutzwall', text: '+2 auf jeden Angriffswurf. Ladung 6: Schutzwall - der naechste Treffer gegen dich wird abgefangen.' },
@@ -174,6 +199,12 @@ const TRUHENINHALT = [
   'wanderwuerfel',
   'fluchwuerfel',
   'goldwuerfel',
+  'funkenwuerfel',
+  'kraeuterwuerfel',
+  'runenwuerfel',
+  'schildwuerfel',
+  'heilwuerfel',
+  'bannwuerfel',
 ];
 
 /**
@@ -321,6 +352,8 @@ export type Ereignis =
   | { art: 'treffen'; takt: number; ort: number }
   /** Stufe 2: ein bleibender Kreis wirkt (Schaden, Heilung, Bann, Schutz). */
   | { art: 'kreis'; takt: number; name: Zauber; ziele: number[]; felder?: Hex[] }
+  /** Ein Wuerfel loest seinen Seiteneffekt aus - der Name steigt ueber dem Ritter auf. */
+  | { art: 'wuerfelEffekt'; takt: number; text: string }
   /** Der Fluchwuerfel zeigt eine 1: ein Leben weniger. */
   | { art: 'fluch'; takt: number }
   /** Gift: der Ritter steht in einer Pfuetze. */
@@ -642,7 +675,57 @@ function wuerfelWurf(a: Abenteuer): { wurf: number; zusatz: string } {
     zusatz = ` - der Goldwuerfel klimpert: +${gold} Gold`;
   }
   a.rng = rng.getState();
+  zusatz += wuerfelEffekt(a, id, wurf);
   return { wurf, zusatz };
+}
+
+/** Der Seiteneffekt eines Wuerfels bei dieser Augenzahl - gibt den Text fuer die Meldung. */
+function wuerfelEffekt(a: Abenteuer, id: string, wurf: number): string {
+  if (!(WUERFEL_EFFEKT[id] ?? []).includes(wurf)) return '';
+  const zeige = (text: string) => a.ereignisse.push({ art: 'wuerfelEffekt', takt: 0, text });
+  if (id === 'funkenwuerfel') {
+    const { faehigkeit } = ladungVon(a);
+    zeige('Volle Ladung!');
+    if (!faehigkeit) return ' - Funken spruehen, doch deine Waffe hat keine Faehigkeit';
+    a.ladung = 0;
+    entfessle(a, faehigkeit, 0);
+    return ' - die Waffe ist voll geladen!';
+  }
+  if (id === 'kraeuterwuerfel') {
+    a.inventar = { ...a.inventar, kraut: (a.inventar['kraut'] ?? 0) + 1 };
+    zeige('+1 Kraut');
+    return ' - ein Kraut faellt aus dem Wuerfel';
+  }
+  if (id === 'runenwuerfel') {
+    const ziele = a.schleime.filter((s) => hexDistance(s, a.pos) <= 2);
+    a.ereignisse.push({ art: 'zauber', takt: 0, name: 'funkenregen', felder: HEX_DIRS.map(([dq, dr]) => ({ q: a.pos.q + dq * 2, r: a.pos.r + dr * 2 })) });
+    zeige('Runenfunken!');
+    for (const s of ziele) verwunde(a, s, 1, 0, 'Runenfunken');
+    return ziele.length ? ' - Runenfunken regnen auf die Gegner' : ' - Runenfunken regnen, doch niemand ist nah';
+  }
+  if (id === 'schildwuerfel') {
+    a.bereit = 'schutzwall';
+    zeige('Schutzwall!');
+    return ' - ein Schutzwall faengt den naechsten Treffer';
+  }
+  if (id === 'heilwuerfel') {
+    const plus = Math.min(0.5, maxLebenVon(a) - a.leben);
+    if (plus <= 0) return '';
+    a.leben += plus;
+    a.ereignisse.push({ art: 'heil', takt: 0, leben: plus });
+    return ' - der Wuerfel heilt dich';
+  }
+  if (id === 'bannwuerfel') {
+    const ziele = a.schleime.filter((s) => hexDistance(s, a.pos) <= 3);
+    for (const s of ziele) {
+      s.gebannt = Math.max(s.gebannt ?? 0, a.zeit + (s.boss ? 1 : 2));
+      s.angriff = null;
+      s.flaeche = null;
+    }
+    zeige('Bann!');
+    return ziele.length ? ` - ${ziele.length} ${ziele.length === 1 ? 'Gegner ist' : 'Gegner sind'} gebannt` : ' - der Bann trifft niemanden';
+  }
+  return '';
 }
 
 export function wuerfeln(alt: Abenteuer): Abenteuer {
@@ -1840,6 +1923,7 @@ export const HAENDLER_WAREN: readonly { id: string; preis: number }[] = [
   { id: 'angel', preis: 6 },
   { id: 'bleiwuerfel', preis: 10 },
   { id: 'glueckswuerfel', preis: 14 },
+  { id: 'kraeuterwuerfel', preis: 8 },
 ];
 
 /** Die drei Angebote eines Werbers - fest aus Seed und Ort. */

@@ -26,6 +26,7 @@ import {
   FAEHIGKEIT_NAME,
   FRAKTION_FIGUR,
   WUERFEL_SEITEN,
+  WUERFEL_EFFEKT,
   kannNeuWuerfeln,
   neuWuerfeln,
   BEGLEITER_FUER,
@@ -375,12 +376,19 @@ const WUERFEL_FARBE: Record<string, [string, string, string, string]> = {
   wanderwuerfel: ['#d2a56a', '#e8c590', '#9a6b3a', '#2a1f16'],
   fluchwuerfel: ['#8a2a20', '#b0483a', '#5a1a14', '#f2c94c'],
   goldwuerfel: ['#f2c94c', '#fff0a0', '#a97c28', '#2a1f16'],
+  funkenwuerfel: ['#f2e7d0', '#fffaf0', '#cdb68e', '#e8641e'],
+  kraeuterwuerfel: ['#c8d890', '#e0ecb0', '#8aa060', '#3f6b32'],
+  runenwuerfel: ['#3a6a9a', '#5a8ac0', '#24466a', '#9ad8ff'],
+  schildwuerfel: ['#c9ccd6', '#e8eaf0', '#8a8e9a', '#3a6a9a'],
+  heilwuerfel: ['#f2e7d0', '#fffaf0', '#cdb68e', '#c8402f'],
+  bannwuerfel: ['#7a4fa8', '#9a70c8', '#4f2f78', '#e8d4ff'],
 };
 
 /** Die Flaeche eines Wuerfels: Augen bis sechs, darueber die Zahl. */
 function WuerfelFlaeche({ n, art, klein = false }: { n: number | null; art: string; klein?: boolean }) {
   const [flaeche, licht, schatten, auge] = WUERFEL_FARBE[art] ?? WUERFEL_FARBE['']!;
   const augen = n && n <= 6 ? AUGEN[n]! : [];
+  const effekt = n !== null && (WUERFEL_EFFEKT[art] ?? []).includes(n);
   return (
     <svg className={klein ? 'ab-wuerfel klein' : 'ab-wuerfel'} viewBox="0 0 32 32" shapeRendering="crispEdges" aria-label={n ? `Wurf ${n}` : 'Wuerfel'}>
       {/* Koerper mit abgeschraegten Ecken, Licht oben links, Schatten unten rechts. */}
@@ -389,8 +397,10 @@ function WuerfelFlaeche({ n, art, klein = false }: { n: number | null; art: stri
       <path d="M5 4 H27 V6 H6 V27 H4 V5 H5 Z" fill={licht} />
       <path d="M28 7 V27 H27 V28 H7 V26 H26 V7 Z" fill={schatten} />
       {augen.map(([x, y], i) => (
-        <rect key={i} x={7 + x * 7} y={7 + y * 7} width="5" height="5" fill={n === 1 ? '#b8322a' : auge} />
+        <rect key={i} x={7 + x * 7} y={7 + y * 7} width="5" height="5" fill={effekt ? '#f6c04a' : n === 1 ? '#b8322a' : auge} />
       ))}
+      {/* Eine Augenzahl mit Seiteneffekt: die Augen leuchten golden, der Rand gluet. */}
+      {effekt && <path d="M5 2 H27 V3 H29 V5 H30 V27 H29 V29 H27 V30 H5 V29 H3 V27 H2 V5 H3 V3 H5 Z" fill="none" stroke="#f6c04a" strokeWidth="1" />}
       {n !== null && n > 6 && (
         <text x="16" y="17" textAnchor="middle" dominantBaseline="middle" fontFamily="monospace" fontWeight="bold" fontSize="15" fill={auge}>
           {n}
@@ -483,6 +493,7 @@ function spieleKlaenge(a: Zustand): void {
     else if (e.art === 'boss') spaeter(e.takt, 'beben');
     else if (e.art === 'treffen') spaeter(e.takt, 'probe');
     else if (e.art === 'fluch') spaeter(e.takt + 0.4, 'autsch');
+    else if (e.art === 'wuerfelEffekt') spaeter(e.takt + 0.35, 'bereit');
     else if (e.art === 'faellt') spaeter(e.takt + 0.5, 'autsch');
     else if (e.art === 'kreis') spaeter(e.takt + 0.2, e.name === 'heilkreis' ? 'bereit' : e.name === 'schutzrune' ? 'geblockt' : e.name === 'bannkreis' ? 'blitz' : 'feuer');
     else if (e.art === 'tod') spaeter(e.takt + 0.5, 'zerplatzt');
@@ -1721,6 +1732,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               1.8 - (u - 1) * 0.8,
               6,
             );
+        } else if (e.art === 'wuerfelEffekt') {
+          if (u < 2.6) schrift(e.text, sx(ritter.x), sy(ritter.y) - (30 + u * 5) * f, '#f6c04a', 1.8 - u * 0.6, 6);
         } else if (e.art === 'fluch') {
           if (u < 2.4) schrift('-1', sx(ritter.x) + 6 * f, sy(ritter.y) - (18 + u * 4) * f, '#d0503a', 1.6 - u * 0.6, 7);
           if (u < 0.8) rot = Math.max(rot, 0.5 * (1 - u / 0.8));
@@ -2336,6 +2349,35 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         </div>
       </div>
 
+      {/*
+        Die Faehigkeitenleiste unten in der Mitte: runde Knoepfe, um die sich
+        ein Ladebalken wickelt - ist der Ring voll, leuchtet der Knopf.
+        Bisher: die Beschwoerung (Pentagrammmeister Stufe 3).
+      */}
+      {(a.pentaStufe ?? 1) >= 3 && (
+        <div className="ab-faehigkeiten">
+          {(() => {
+            const ladung = Math.min(a.beschwoerung ?? 0, BESCHWOERUNG_VOLL);
+            const voll = ladung >= BESCHWOERUNG_VOLL;
+            const art = BEGLEITER_FUER[meisterZauber(a)];
+            return (
+              <button
+                className={voll ? 'ab-faehigkeit voll' : 'ab-faehigkeit'}
+                style={{ '--anteil': ladung / BESCHWOERUNG_VOLL, '--ring': '#b58ae0' } as CSSProperties}
+                aria-disabled={!voll}
+                onClick={() => voll && !rollt && setze(beschwoeren(aktuell.current))}
+                title={`Beschwoeren (B): ruft einen ${SOELDNER[art].name} - je nach deinem haeufigsten Zauber. ${ladung}/${BESCHWOERUNG_VOLL} - laedt sich, wenn Gegner in Pentagrammen fallen.`}
+              >
+                <span className="ab-faehigkeit-innen">
+                  <Icon id={`begleiter_${art}`} groesse={28} />
+                </span>
+                <kbd>B</kbd>
+              </button>
+            );
+          })()}
+        </div>
+      )}
+
       {/* Rechts unten: Inventar ueber dem Spieltisch. */}
       <div className="ab-rechts-unten">
         <div className="ab-muenzen" title={`${gold} Goldmuenzen`}>
@@ -2399,16 +2441,6 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           {kannNeuWuerfeln(a) && !rollt && (
             <button className="ab-wurf ab-neuwurf" onClick={() => neuWurf()} title="Glueckswuerfel: einmal je Zug neu wuerfeln (R)">
               Neu wuerfeln (R)
-            </button>
-          )}
-          {(a.pentaStufe ?? 1) >= 3 && (
-            <button
-              className={(a.beschwoerung ?? 0) >= BESCHWOERUNG_VOLL ? 'ab-wurf ab-beschwoeren bereit' : 'ab-wurf ab-beschwoeren'}
-              disabled={(a.beschwoerung ?? 0) < BESCHWOERUNG_VOLL || rollt}
-              onClick={() => setze(beschwoeren(aktuell.current))}
-              title={`Beschwoeren (B): ruft einen ${SOELDNER[BEGLEITER_FUER[meisterZauber(a)]].name} - je nach deinem haeufigsten Zauber. Laedt sich, wenn Gegner in Pentagrammen fallen.`}
-            >
-              Beschwoeren (B) {Math.min(a.beschwoerung ?? 0, BESCHWOERUNG_VOLL)}/{BESCHWOERUNG_VOLL}
             </button>
           )}
           {a.phase !== 'ziehen' && (

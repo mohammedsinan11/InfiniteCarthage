@@ -461,6 +461,12 @@ function wuerfelBild(koerper: string, schatten: string, auge: string): Pixelkart
 const ZWILLINGE: Pixelkarte = ['kkkk.....', 'kuwuk....', 'kuuUkkkk.', 'kwUUkuwuk', '.kkkkuuUk', '....kwUUk', '....kkkk.'];
 
 export const SYMBOL: Record<string, Pixelkarte> = {
+  // Die Begleiter als Bild fuer die Faehigkeitenleiste.
+  begleiter_fee: BEGLEITER_BILD.fee,
+  begleiter_golem: BEGLEITER_BILD.golem,
+  begleiter_daemon: BEGLEITER_BILD.daemon,
+  begleiter_lichtgeist: BEGLEITER_BILD.lichtgeist,
+  begleiter_wolf: BEGLEITER_BILD.wolf,
   wuerfel: wuerfelBild('w', 'p', 'k'),
   glueckswuerfel: wuerfelBild('e', 'E', 'w'),
   bleiwuerfel: wuerfelBild('m', 'M', 'k'),
@@ -468,6 +474,12 @@ export const SYMBOL: Record<string, Pixelkarte> = {
   wanderwuerfel: wuerfelBild('d', 'D', 'k'),
   fluchwuerfel: wuerfelBild('R', 'K', 'y'),
   goldwuerfel: wuerfelBild('y', 'G', 'k'),
+  funkenwuerfel: wuerfelBild('w', 'p', 'o'),
+  kraeuterwuerfel: wuerfelBild('t', 'T', 'E'),
+  runenwuerfel: wuerfelBild('U', 'K', 'u'),
+  schildwuerfel: wuerfelBild('s', 'S', 'U'),
+  heilwuerfel: wuerfelBild('w', 'p', 'r'),
+  bannwuerfel: wuerfelBild('V', 'K', 'v'),
   schwert: SCHWERT,
   breitschwert: BREITSCHWERT,
   runenklinge: umfaerben(SCHWERT, { s: 'u', g: 'v' }),
