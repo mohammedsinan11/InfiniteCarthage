@@ -349,6 +349,19 @@ const HERMES: Pixelkarte = ['ww.kkk...', '.wwkyk...', '..wkyk...', '...kyykk.', 
 /** Eine Goldmuenze - fuer den Zaehler ueber dem Inventar. */
 export const MUENZE: Pixelkarte = ['..kkk..', '.kyyyk.', 'kywyygk', 'kyyyygk', 'kyyyggk', '.kgggk.', '..kkk..'];
 
+/** Pentagrammmeister: ein violetter Stern im Kreis. */
+const PENTAGRAMM: Pixelkarte = [
+  '..kkkkk..',
+  '.kV.v.Vk.',
+  'kV.vVv.Vk',
+  'kvvvvvvvk',
+  'kV.vVv.Vk',
+  'kV.v.v.Vk',
+  'kVv.V.vVk',
+  '.kVVVVVk.',
+  '..kkkkk..',
+];
+
 export const SYMBOL: Record<string, Pixelkarte> = {
   schwert: SCHWERT,
   breitschwert: BREITSCHWERT,
@@ -374,6 +387,7 @@ export const SYMBOL: Record<string, Pixelkarte> = {
   fisch: FISCH,
   extraleben: EXTRALEBEN,
   hermes: HERMES,
+  pentagramm: PENTAGRAMM,
   muenze: MUENZE,
   herzcontainer: HERZCONTAINER,
   auge: AUGE,

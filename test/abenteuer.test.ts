@@ -365,6 +365,27 @@ describe('Abenteuer', () => {
     expect(betretbar(a, a.pos.q, a.pos.r)).toBe(true);
   });
 
+  it('Pentagrammmeister: ein geschlossener Weg wirkt einen Zauber, danach beginnt die Zeichnung neu', () => {
+    // Ein Dreieck: hin, zur Seite, zurueck - drei Schritte zurueck zum Start.
+    for (let seed = 1; seed < 400; seed++) {
+      const a0 = neuesAbenteuer(seed);
+      // Dreieck: d (Ost), z (Suedwest), q (Nordwest) - zurueck am Start.
+      const p1 = { q: a0.pos.q + 1, r: a0.pos.r };
+      const p2 = { q: a0.pos.q, r: a0.pos.r + 1 };
+      if (![p1, p2].every((h) => eben(gelaende(seed, h.q, h.r)))) continue;
+      let a = debugAktion(imZug(seed, [], 10), { t: 'legendaer', id: 'pentagramm' });
+      a.schleime = [];
+      a = taste(a, 'd');
+      a = taste(a, 'z');
+      a = taste(a, 'q');
+      expect(a.pos).toEqual(a0.pos);
+      expect(a.ereignisse.some((e) => e.art === 'zauber' && e.name === 'funkenregen')).toBe(true);
+      expect(a.pfad).toHaveLength(1);
+      return;
+    }
+    throw new Error('kein Start mit freiem Dreieck');
+  });
+
   it('Herzen werden gleich verbraucht - bei vollem Leben bleiben sie liegen', () => {
     // Ein Herz direkt neben den Start legen: das Feld suchen, auf dem eines liegt.
     let seed = 0;

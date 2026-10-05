@@ -114,6 +114,13 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
     text: 'Legendaer. Jeder Schritt huepft bis zu zwei Felder weit, wenn das Feld frei ist - auch uebers Wasser. Was dazwischen liegt, nimmt er mit.',
   },
   {
+    id: 'pentagramm',
+    name: 'Pentagrammmeister',
+    legendaer: true,
+    text:
+      'Legendaer. Schliesst dein Weg in einem Zug eine Form, wirkst du einen Zauber: Dreieck - Funkenregen, Raute - Schutzrune, Fuenfeck - Pentagramm, Sechseck - Heilkreis, groesser - Bannkreis.',
+  },
+  {
     id: 'herzcontainer',
     name: 'Leerer Herzcontainer',
     legendaer: true,
@@ -212,6 +219,8 @@ export type Ereignis =
   | { art: 'angeln'; takt: number; feld: Hex; fang: boolean }
   /** Das Extra-Leben: der Ritter steht wieder auf. */
   | { art: 'wiederbelebt'; takt: number }
+  /** Pentagrammmeister: der Weg hat sich geschlossen - ein Zauber. */
+  | { art: 'zauber'; takt: number; name: Zauber; felder: Hex[] }
   /** Ein legendaerer Fund wirkt. */
   | { art: 'legende'; takt: number; id: string }
   /** Solo-Leveling: ein Levelaufstieg. */
@@ -484,6 +493,56 @@ export function betretbar(a: Abenteuer, q: number, r: number): boolean {
   return begehbar(t) || (istWasser(t) && hatLegende(a, 'hermes'));
 }
 
+/**
+ * PENTAGRAMMMEISTER. Die Pfeile des Zuges (pfad) sind eine Zeichnung. Kehrt
+ * der Ritter auf ein Feld zurueck, das er in diesem Zug schon betrat, schliesst
+ * sich eine Form - je nach Zahl der Schritte ein anderer Zauber. Danach
+ * beginnt die Zeichnung neu.
+ */
+export type Zauber = 'funkenregen' | 'schutzrune' | 'pentagramm' | 'heilkreis' | 'bannkreis';
+export const ZAUBER_NAME: Record<Zauber, string> = {
+  funkenregen: 'Funkenregen',
+  schutzrune: 'Schutzrune',
+  pentagramm: 'Pentagramm',
+  heilkreis: 'Heilkreis',
+  bannkreis: 'Bannkreis',
+};
+
+function zauberPruefen(a: Abenteuer): void {
+  if (!hatLegende(a, 'pentagramm')) return;
+  const i = a.pfad.slice(0, -1).findIndex((h) => h.q === a.pos.q && h.r === a.pos.r);
+  if (i < 0) return;
+  const form = a.pfad.slice(i);
+  const schritte = form.length - 1;
+  if (schritte < 3) return;
+  const name: Zauber = schritte === 3 ? 'funkenregen' : schritte === 4 ? 'schutzrune' : schritte === 5 ? 'pentagramm' : schritte === 6 ? 'heilkreis' : 'bannkreis';
+  a.ereignisse.push({ art: 'zauber', takt: 0, name, felder: form });
+  const nahe = (weit: number, um: readonly Hex[]) => a.schleime.filter((s) => um.some((h) => hexDistance(s, h) <= weit));
+  if (name === 'funkenregen') {
+    melde(a, 'Ein Dreieck - Funkenregen!');
+    for (const s of nahe(2, [a.pos])) verwunde(a, s, 1, 0, 'Funkenregen');
+  } else if (name === 'schutzrune') {
+    a.bereit = 'schutzwall';
+    melde(a, 'Eine Raute - die Schutzrune faengt den naechsten Treffer ab.');
+  } else if (name === 'pentagramm') {
+    melde(a, 'Ein Fuenfeck - das Pentagramm flammt auf!');
+    for (const s of nahe(2, form)) verwunde(a, s, 3, 0, 'Pentagramm');
+  } else if (name === 'heilkreis') {
+    const plus = Math.min(2, maxLebenVon(a) - a.leben);
+    a.leben += plus;
+    if (plus > 0) a.ereignisse.push({ art: 'heil', takt: 0, leben: plus });
+    melde(a, `Ein Sechseck - der Heilkreis: +${lebenText(plus)} Leben.`);
+  } else {
+    melde(a, 'Ein grosser Kreis - der Bannkreis!');
+    for (const s of nahe(1, form)) verwunde(a, s, 2, 0, 'Bannkreis');
+  }
+  // Die Zeichnung beginnt neu.
+  a.pfad = [{ q: a.pos.q, r: a.pos.r }];
+}
+
+/** Legendaeres, das es nur einmal gibt. */
+const EINMALIG = ['sololeveling', 'hermes', 'pentagramm'];
+
 /** So weit huepfen die Hermes-Stiefel (Spieltest: drei war zu viel). */
 export const HERMES_WEITE = 2;
 
@@ -547,6 +606,7 @@ export function taste(alt: Abenteuer, t: Taste): Abenteuer {
     a.pfad = [...a.pfad, landung];
     sehen(a);
     aufheben(a);
+    zauberPruefen(a);
     laden(a, 0);
     ticken(a, 1);
     return nachDemSchritt(a);
@@ -565,6 +625,7 @@ export function taste(alt: Abenteuer, t: Taste): Abenteuer {
   a.pfad = [...a.pfad, ziel];
   sehen(a);
   aufheben(a);
+  zauberPruefen(a);
   laden(a, 0);
   // Ein Berg kostet zwei Ticks - die Schleime huepfen zweimal.
   for (let i = 1; i <= k && a.phase === 'ziehen'; i++) ticken(a, i);
@@ -674,7 +735,7 @@ function verwunde(a: Abenteuer, s: Schleim, schaden: number, takt: number, vorne
     a.koenige = (a.koenige ?? 0) + 1;
     a.bossErwacht = false;
     melde(a, `${vorne}: der Schleimkoenig zerplatzt! Er hinterlaesst etwas Legendaeres.`);
-    const moeglich = ['sololeveling', 'hermes', 'extraleben', 'herzcontainer'].filter((x) => !((x === 'sololeveling' || x === 'hermes') && hatLegende(a, x)));
+    const moeglich = ['sololeveling', 'hermes', 'pentagramm', 'extraleben', 'herzcontainer'].filter((x) => !(EINMALIG.includes(x) && hatLegende(a, x)));
     legendaerAnwenden(a, moeglich[(a.koenige * 7 + a.zeit) % moeglich.length]!, takt);
     return;
   }
@@ -700,6 +761,8 @@ export function legendaerAnwenden(a: Abenteuer, id: string, takt: number): void 
   } else if (id === 'extraleben') {
     a.extraLeben = (a.extraLeben ?? 0) + 1;
     melde(a, 'Legendaer: ein Extra-Leben! Faellst du, stehst du wieder auf.');
+  } else if (id === 'pentagramm') {
+    melde(a, 'Legendaer: Pentagrammmeister! Schliesst dein Weg eine Form, wirkst du einen Zauber.');
   } else if (id === 'hermes') {
     melde(a, 'Legendaer: Hermes-Stiefel! Jeder Schritt huepft bis zu zwei Felder - auch uebers Wasser.');
   }
@@ -820,7 +883,7 @@ function aufheben(a: Abenteuer): void {
   if (fund === 'schatz') {
     // Solo-Leveling gibt es einmal; danach (oder bei ungerader Zahl) ein Herzcontainer.
     // Solo-Leveling und Hermes gibt es je einmal; Herzcontainer und Extra-Leben oefter.
-    const moeglich = ['sololeveling', 'hermes', 'extraleben', 'herzcontainer'].filter((x) => !((x === 'sololeveling' || x === 'hermes') && hatLegende(a, x)));
+    const moeglich = ['sololeveling', 'hermes', 'pentagramm', 'extraleben', 'herzcontainer'].filter((x) => !(EINMALIG.includes(x) && hatLegende(a, x)));
     const id = moeglich[hash3i(a.seed, a.pos.q, a.pos.r, SALT_FUND + 8) % moeglich.length]!;
     melde(a, 'Eine goldene Schatztruhe!');
     legendaerAnwenden(a, id, 0);

@@ -24,6 +24,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
   FAEHIGKEIT_NAME,
+  ZAUBER_NAME,
   SLOTS,
   SLOT_NAME,
   TASTEN,
@@ -378,7 +379,7 @@ function spieleKlaenge(a: Zustand): void {
     } else if (e.art === 'ansage') spaeter(e.takt + 0.2, 'warnung');
     else if (e.art === 'stampf') spaeter(e.takt + 0.5, 'beben');
     else if (e.art === 'spuck') spaeter(e.takt + 0.1, 'spuck');
-    else if (e.art === 'legende' || e.art === 'wiederbelebt') spaeter(e.takt, 'legende');
+    else if (e.art === 'legende' || e.art === 'wiederbelebt' || e.art === 'zauber') spaeter(e.takt, 'legende');
     else if (e.art === 'angeln') {
       spaeter(e.takt, 'hieb');
       spaeter(e.takt + 0.4, 'leer');
@@ -1319,6 +1320,35 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               1.8 - (u - 1) * 0.8,
               6,
             );
+        } else if (e.art === 'zauber') {
+          // Die geschlossene Form leuchtet violett auf, Funken steigen, der Name erscheint.
+          if (u < 2.2) {
+            const k = u / 2.2;
+            ctx.strokeStyle = `rgba(190, 130, 255, ${1 - k})`;
+            ctx.lineWidth = 2 * f;
+            ctx.shadowColor = '#b58ae0';
+            ctx.shadowBlur = 6 * f;
+            ctx.beginPath();
+            e.felder.forEach((h, i) => {
+              const m = mitte(h.q, h.r);
+              if (i === 0) ctx.moveTo(sx(m.x), sy(m.y));
+              else ctx.lineTo(sx(m.x), sy(m.y));
+            });
+            ctx.closePath();
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+            for (const h of e.felder) {
+              const m = mitte(h.q, h.r);
+              for (let i = 0; i < 3; i++) {
+                const fl = (u * 1.5 + i * 0.33) % 1;
+                ctx.globalAlpha = (1 - k) * (1 - fl);
+                ctx.fillStyle = i % 2 ? '#e8d4ff' : '#b58ae0';
+                ctx.fillRect(sx(m.x + (i - 1) * 4) - f / 2, sy(m.y - fl * 14), f, f);
+              }
+            }
+            ctx.globalAlpha = 1;
+          }
+          if (u < 3) schrift(ZAUBER_NAME[e.name], sx(ritter.x), sy(ritter.y) - (26 + u * 4) * f, '#d8b8ff', 1.8 - u * 0.6, 7);
         } else if (e.art === 'wiederbelebt') {
           if (u < 2) {
             const k = u / 2;
