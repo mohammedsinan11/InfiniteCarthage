@@ -640,6 +640,35 @@ describe('Abenteuer', () => {
     throw new Error('kein Wald neben dem Start');
   });
 
+  it('ein Boss verfolgt den Ritter, egal wie weit er ist', () => {
+    const a0 = neuesAbenteuer(13);
+    let a = imZug(13, [{ id: 50, q: a0.pos.q + 20, r: a0.pos.r - 5, leben: 20, max: 20, gross: true, boss: true, bossArt: 'koloss', zaehler: 0 }], 10);
+    a.leben = 99;
+    for (let i = 0; i < 3; i++) a = taste(a, 's');
+    expect(hexDistance(a.schleime[0]!, a.pos)).toBeLessThanOrEqual(6);
+  });
+
+  it('Baeche liegen nur auf Wiese und verbinden zwei Gewaesser', () => {
+    for (const seed of [1, 21, 99]) {
+      for (let q = -40; q <= 40; q++)
+        for (let r = -40; r <= 40; r++) {
+          if (gelaende(seed, q, r) !== 'fluss') continue;
+          // Entlang einer der beiden Bachlinien liegt an beiden Enden Wasser.
+          const ok = [[0, 1], [-1, 1]].some(([dq, dr]) =>
+            [1, -1].every((s) => {
+              for (let k = 1; k <= 8; k++) {
+                const b = gelaende(seed, q + dq! * s * k, r + dr! * s * k);
+                if (istWasser(b)) return true;
+                if (b !== 'wiese' && b !== 'fluss') return false;
+              }
+              return false;
+            }),
+          );
+          expect(ok).toBe(true);
+        }
+    }
+  });
+
   it('Herzen werden gleich verbraucht - bei vollem Leben bleiben sie liegen', () => {
     // Ein Herz direkt neben den Start legen: das Feld suchen, auf dem eines liegt.
     let seed = 0;

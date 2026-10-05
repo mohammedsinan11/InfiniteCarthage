@@ -8805,3 +8805,10 @@ em.off {
   height: auto;
   aspect-ratio: 4 / 3;
 }
+/* Laden und Legenden liegen ueber dem Log oben in der Mitte. */
+.ab-legenden-huelle {
+  z-index: 30;
+}
+.ab-boss-weg {
+  color: #d08a7a;
+}

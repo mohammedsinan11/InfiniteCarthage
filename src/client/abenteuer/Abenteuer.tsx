@@ -25,6 +25,9 @@ import type { CSSProperties } from 'react';
 import {
   FAEHIGKEIT_NAME,
   FRAKTION_FIGUR,
+  BOSS_NACH,
+  BOSS_NAME,
+  naechsterBoss,
   GEFOLGE_MAX,
   HAENDLER_WAREN,
   ORT_NAME,
@@ -1378,7 +1381,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               malPerson(o.id, { x: m.x - 2, y: m.y, hoch: 0 }, 'soeldnerin', 'breitschwert', false);
             }
             const nah = hexDistance(o, a.pos) <= 1;
-            schrift(ORT_NAME[o.art], sx(m.x) - (o.art === 'haendler' ? 13 : 10) * f, sy(m.y) - 20 * f, nah ? '#f2c94c' : '#e8dcc0', nah ? 1 : 0.75, 5);
+            schrift(ORT_NAME[o.art], sx(m.x), sy(m.y) - 20 * f, nah ? '#f2c94c' : '#e8dcc0', nah ? 1 : 0.75, 5);
           },
         });
       }
@@ -1549,6 +1552,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           const hoeheB = zeilen.length * 6 * f + 4 * f;
           const bx = Math.round(sx(o.x) - breite / 2);
           const by = Math.round(sy(o.y) - 22 * f - hoeheB);
+          ctx.save();
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'alphabetic';
           ctx.globalAlpha = alpha;
           ctx.fillStyle = '#120d08';
           ctx.fillRect(bx - f, by - f, breite + 2 * f, hoeheB + 2 * f);
@@ -1557,7 +1563,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           ctx.fillRect(sx(o.x) - f, by + hoeheB, 2 * f, 2 * f);
           ctx.fillStyle = '#2b211a';
           zeilen.forEach((z, i) => ctx.fillText(z, bx + 3 * f, by + (i + 1) * 6 * f));
-          ctx.globalAlpha = 1;
+          ctx.restore();
         }
       }
 
@@ -2069,6 +2075,17 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         <span className="ab-titel">Karte</span>
         <canvas ref={mini} width={miniGross ? 440 : 170} height={miniGross ? 330 : 130} />
         <div className="ab-zug">Zug {a.zug}</div>
+        {/* Wann der naechste Boss kommt: nach so vielen erlegten Gegnern. */}
+        {(() => {
+          const boss = a.schleime.find((x) => x.boss);
+          if (boss) return <div className="ab-zug ab-boss-weg">{BOSS_NAME[boss.bossArt ?? 'koenig']} jagt dich</div>;
+          const ziel = BOSS_NACH * (1 + (a.koenige ?? 0));
+          return (
+            <div className="ab-zug" title="Nach so vielen erlegten Gegnern erwacht der naechste Boss">
+              {BOSS_NAME[naechsterBoss(a)]}: {Math.min(a.erschlagen, ziel)}/{ziel}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Links: die Werte (mit Bildern statt Text), darunter die Ausruestung als Slots. */}

@@ -11,9 +11,9 @@
  *            weite Landschaften: Wiesen und Felder, Waelder, Dschungel,
  *            Taiga und Schnee, Suempfe, Wuesten mit Duenen, Steppe aus Erde
  *            und Lehm
- *   BAECHE   kurze, gerade Laeufe ueber Wiesen und Felder, die in einen See
- *            oder ins Meer muenden (die Flusskacheln des Pakets zeigen einen
- *            diagonalen Bach) - watbar, und man kann darin angeln
+ *   BAECHE   selten: kurze, gerade Laeufe ueber Wiesen, die zwei Gewaesser
+ *            verbinden (die Flusskacheln des Pakets zeigen einen diagonalen
+ *            Bach auf Wiese) - watbar, und man kann darin angeln
  *
  * Jede Kachel des Pakets kommt vor (BODEN_KACHEL). Alles ist eine reine
  * Funktion von Seed und Feld, mit einem kleinen Zwischenspeicher.
@@ -163,43 +163,50 @@ function grundboden(seed: number, q: number, r: number): Boden {
   return detail > 0.6 ? 'feld' : 'wiese';
 }
 
+type Hex = { q: number; r: number };
 /** Bachrichtungen: nach rechts unten (river_l) und links unten (river_r). */
 const BACH_RICHTUNG: readonly [number, number, string][] = [
   [0, 1, 'river_l'],
   [-1, 1, 'river_r'],
 ];
-/** Laengster Bach - von der Muendung aus gezaehlt. */
-const BACH_LAENGE = 7;
-const wiesig = (b: Boden) => b === 'wiese' || b === 'feld';
+/** Laengster Bach - von Ufer zu Ufer. */
+const BACH_LAENGE = 8;
+const wiesig = (b: Boden) => b === 'wiese';
 
 /**
  * Liegt hier ein Bach? Dann welche Kachel.
  *
- * Spieltest: "zu viele Fluesse, die mitten in der Landschaft reinschneiden".
- * Darum muendet jeder Bach jetzt in einen See oder ins Meer: man geht vom
- * Feld die Linie entlang, bis die Wiese endet - ist dort Wasser, ist das die
- * Muendung. Nur jede vierzehnte Muendung hat einen Bach, drei bis sieben Felder
- * lang. Die Kacheln des Pakets zeigen nur diagonale Baeche, darum gerade Laeufe.
+ * Spieltest: "zu viele Fluesse, die mitten in der Landschaft reinschneiden"
+ * und "nur in Weiden-Biomen, nur von einem Gewaesser ins andere, und rarer".
+ * Darum: ein Bach liegt nur auf Wiese (die Flusskacheln des Pakets sind
+ * Wiese mit Bach), und nur, wo eine gerade Linie Wiese an BEIDEN Enden an
+ * Wasser stoesst - er verbindet zwei Gewaesser. Und nur jede dritte solche
+ * Verbindung hat einen. Die Kacheln zeigen nur diagonale Baeche, darum gerade.
  */
 function bach(seed: number, q: number, r: number, grund: (q: number, r: number) => Boden): string | null {
   if (!wiesig(grund(q, r))) return null;
   for (const [dq, dr, kachel] of BACH_RICHTUNG) {
-    for (const s of [1, -1]) {
-      // Flussab bis zum Ende der Wiese.
+    // In beide Richtungen bis zum Ende der Wiese - dort muss Wasser sein.
+    const ende = (s: number): Hex | null => {
       let mq = q;
       let mr = r;
-      let k = 0;
-      while (k < BACH_LAENGE && wiesig(grund(mq + dq * s, mr + dr * s))) {
-        mq += dq * s;
-        mr += dr * s;
-        k++;
+      for (let k = 0; k < BACH_LAENGE; k++) {
+        const nq = mq + dq * s;
+        const nr = mr + dr * s;
+        const b = grund(nq, nr);
+        if (istWasser(b)) return { q: mq, r: mr };
+        if (!wiesig(b)) return null;
+        mq = nq;
+        mr = nr;
       }
-      if (k >= BACH_LAENGE || !istWasser(grund(mq + dq * s, mr + dr * s))) continue;
-      const h = hash3i(seed, mq, mr, SALT_BACH + (kachel === 'river_l' ? 0 : 1) + (s > 0 ? 0 : 2));
-      if (h % 14 !== 0) continue;
-      const laenge = 3 + ((h >>> 8) % 5);
-      if (k < laenge) return kachel;
-    }
+      return null;
+    };
+    const unten = ende(1);
+    const oben = unten && ende(-1);
+    if (!unten || !oben) continue;
+    const laenge = Math.abs(unten.r - oben.r) + 1;
+    if (laenge < 2 || laenge > BACH_LAENGE) continue;
+    if (hash3i(seed, oben.q, oben.r, SALT_BACH + (kachel === 'river_l' ? 0 : 1)) % 3 === 0) return kachel;
   }
   return null;
 }

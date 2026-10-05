@@ -1420,18 +1420,7 @@ function koenigHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetzt
     return;
   }
   // Sonst walzt er heran - er wittert den Ritter ueberall.
-  let ziel: Hex | null = null;
-  for (const [dq, dr] of HEX_DIRS) {
-    const n = { q: s.q + dq, r: s.r + dr };
-    if (!begehbar(gelaende(a.seed, n.q, n.r)) || besetzt(n.q, n.r)) continue;
-    if (hexDistance(n, a.pos) < hexDistance(ziel ?? s, a.pos)) ziel = n;
-  }
-  if (ziel) {
-    a.ereignisse.push({ art: 'gehen', takt, wer: s.id, von: { q: s.q, r: s.r }, nach: ziel });
-    a.spuren = { ...a.spuren, [s.id]: [...(a.spuren[s.id] ?? [{ q: s.q, r: s.r }]), ziel] };
-    s.q = ziel.q;
-    s.r = ziel.r;
-  }
+  bossZieht(a, s, takt, besetzt);
 }
 
 /** Angesagtes einloesen (Ring, Linie oder Feld) - fuer alle Bosse gleich. */
@@ -1452,13 +1441,33 @@ function bossLoestEin(a: Abenteuer, s: Schleim, takt: number, rng: Rng): boolean
   return false;
 }
 
-/** Einen Hops naeher an den Ritter. */
+/**
+ * Einen Hops naeher an den Ritter. Spieltest: "Die Endbosse sollen dich
+ * verfolgen, egal wie weit du bist." Ist der Boss weit weg (mehr als
+ * BOSS_FERN Felder) oder steckt er fest (Wasser, Berge im Weg), holt er auf:
+ * er taucht ein paar Felder vor dem Ritter wieder auf.
+ */
+const BOSS_FERN = 8;
 function bossZieht(a: Abenteuer, s: Schleim, takt: number, besetzt: (q: number, r: number) => boolean): void {
   let ziel: Hex | null = null;
   for (const [dq, dr] of HEX_DIRS) {
     const n = { q: s.q + dq, r: s.r + dr };
     if (!begehbar(gelaende(a.seed, n.q, n.r)) || besetzt(n.q, n.r)) continue;
     if (hexDistance(n, a.pos) < hexDistance(ziel ?? s, a.pos)) ziel = n;
+  }
+  const d = hexDistance(s, a.pos);
+  if (d > BOSS_FERN || (!ziel && d > 3)) {
+    // Aufholen: das freie Feld 4 bis 6 Schritte vor dem Ritter, das auf seiner Seite liegt.
+    const nah = hexesInRange(a.pos, 6)
+      .filter((h) => hexDistance(h, a.pos) >= 4 && begehbar(gelaende(a.seed, h.q, h.r)) && !besetzt(h.q, h.r))
+      .sort((x, y) => hexDistance(x, s) - hexDistance(y, s))[0];
+    if (nah) {
+      a.ereignisse.push({ art: 'gehen', takt, wer: s.id, von: { q: s.q, r: s.r }, nach: nah, blink: true });
+      s.q = nah.q;
+      s.r = nah.r;
+      melde(a, `Der ${schleimName(s)} ist dir auf den Fersen!`);
+      return;
+    }
   }
   if (ziel) zieheSchleim(a, s, ziel, takt);
 }
@@ -1638,10 +1647,12 @@ export const HAENDLER_WAREN: readonly { id: string; preis: number }[] = [
 /** Die drei Angebote eines Werbers - fest aus Seed und Ort. */
 export function werberAngebot(a: Pick<Abenteuer, 'seed'>, o: Ort): { art: SoeldnerArt; name: string; preis: number }[] {
   const arten = Object.keys(SOELDNER) as SoeldnerArt[];
+  // Drei verschiedene Namen: ein Startname, dann je fuenf weiter.
+  const n0 = hash3i(a.seed, o.q, o.r, SALT_LEUTE + 4) % VORNAMEN.length;
   return [0, 1, 2].map((i) => {
     const h = hash3i(a.seed, o.q * 7 + i, o.r, SALT_LEUTE + 3);
     const art = arten[(h + i) % arten.length]!;
-    return { art, name: VORNAMEN[(h >>> 4) % VORNAMEN.length]!, preis: SOELDNER[art].preis };
+    return { art, name: VORNAMEN[(n0 + i * 5) % VORNAMEN.length]!, preis: SOELDNER[art].preis };
   });
 }
 
