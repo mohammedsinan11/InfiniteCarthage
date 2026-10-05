@@ -253,7 +253,13 @@ export const WAFFE_GRIFF = { x: 3.5, y: 10.5 };
  * gewoehnlich gruen, Spuckschleim blau mit rundem Maul, Springschleim gelb
  * mit Fuehlern, Panzerschleim grau mit Steinplatten.
  */
-export const SCHLEIM_BILD: Record<'schleim' | 'spuck' | 'spring' | 'panzer', Pixelkarte> = {
+export const SCHLEIM_BILD: Record<'schleim' | 'spuck' | 'spring' | 'panzer' | 'gift' | 'teil' | 'geist', Pixelkarte> = {
+  // Giftschleim: violett, tropft - hinterlaesst Pfuetzen.
+  gift: ['...ooo...', '..oPPPo..', '.oPLPPPo.', 'oPoPPoPpo', 'oPPPPPPpo', 'opPpPpppo', '.oooPooo.', '....p....'],
+  // Teilschleim: zwei Lappen, eine Naht in der Mitte - zerfaellt in zwei.
+  teil: ['.ooo.ooo.', 'oOfOoOOOo', 'oOoOoOoFo', 'oOOOoOOFo', 'oFOOoOFFo', '.ooooooo.'],
+  // Geisterschleim: blass, ohne dunklen Umriss, mit welligem Saum.
+  geist: ['...aaa...', '..aAAAa..', '.aAAAAAa.', 'aAoAAoAAa', 'aAAAAAAAa', 'aAAAAAAAa', 'aAaAaAaAa'],
   // Gewoehnlich: ein runder Klumpen, der quillt und sackt.
   schleim: ['...ooo...', '..oGGGo..', '.oGLGGGo.', 'oGoGGoGgo', 'oGGGGGGgo', 'ogGGGGggo', '.ooooooo.'],
   // Spuckschleim: tropfenfoermig, mit rundem Maul zur Seite - blaest die Backen auf.
@@ -270,6 +276,43 @@ export const DEKO: Record<'kaktus' | 'blume' | 'pilz', Pixelkarte> = {
   blume: ['.R.', 'RYR', '.g.'],
   pilz: ['RLR', 'RRR', '.l.'],
 };
+
+/** Der Schattenschleim: dunkelviolett, mit Hoernern und rot gluehenden Augen. */
+export const SCHATTENSCHLEIM: Pixelkarte = [
+  '..k.........k..',
+  '.kVk.......kVk.',
+  '.kVVkkkkkkkVVk.',
+  '..kVVVVVVVVVk..',
+  '.kVvVVVVVVVvVk.',
+  'kVVrrVVVVVrrVVk',
+  'kVVVVVVVVVVVVVk',
+  'kVvVVkkkkkVVvVk',
+  'kVVVVVVVVVVVVVk',
+  '.kVvVVvVVvVVvk.',
+  '..kkkkkkkkkkk..',
+];
+
+/** Der Gelee-Koloss: riesig, tuerkis, viele Augen. */
+export const GELEEKOLOSS: Pixelkarte = [
+  '.....kkkkkkk.....',
+  '...kkuuuuuuukk...',
+  '..kuuwwuuuuuuUk..',
+  '.kuuwuuuuuuuuuUk.',
+  '.kuucuuucuuucuUk.',
+  'kuuuuuuuuuuuuuuUk',
+  'kuuuuUUUUUUUuuuUk',
+  'kuuuUcccccccUuuUk',
+  'kuuuuUUUUUUUuuUUk',
+  'kUuuuuuuuuuuuuUUk',
+  '.kUUuuUuuUuuUUUk.',
+  '..kkkkkkkkkkkkk..',
+];
+
+/** Schneehase - neutral, huepft und flieht (Kachelpalette). Zwei Bilder: sitzend, im Sprung. */
+export const HASE: [Pixelkarte, Pixelkarte] = [
+  ['.a.a..', '.H.H..', '.HHH..', 'HoHHH.', 'HHHHHH', '.HHHHa', '.aa.a.'],
+  ['..a.a.', '..H.H.', '.HHHH.', 'HoHHHH', 'HHHHHa', 'aa..aa', '......'],
+];
 
 /** Der Schleimkoenig: ein breiter Klumpen mit goldener Krone und rotem Stein. */
 export const SCHLEIMKOENIG: Pixelkarte = [
@@ -438,6 +481,11 @@ export const KACHEL_PIX: Record<string, string> = {
   Q: '#3e434d',
   O: '#c8743a',
   F: '#e8641e',
+  P: '#9a6ac0',
+  p: '#5e3d80',
+  A: '#dfe9f0',
+  a: '#a9bccb',
+  H: '#f4f8fb',
   f: '#f6c04a',
   ',': 'rgba(230, 240, 255, 0.55)',
 };

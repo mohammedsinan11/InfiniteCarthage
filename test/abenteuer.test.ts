@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { istWasser } from '../src/abenteuer/welt';
 import type { Boden } from '../src/abenteuer/welt';
-import { angelbar, angeln, betretbar, kannAngeln, BOSS_LEBEN, BOSS_NACH, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden } from '../src/abenteuer/regeln';
+import { angelbar, angeln, betretbar, kannAngeln, BOSS_LEBEN, BOSS_NACH, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden, vergleich, naechsterBoss } from '../src/abenteuer/regeln';
 import type { Abenteuer, Taste } from '../src/abenteuer/regeln';
 import { HEX_DIRS, hexDistance } from '../src/core/coords';
 
@@ -63,7 +63,7 @@ describe('Abenteuer', () => {
     expect(istWasser(gelaende(b.seed, b.pos.q, b.pos.r))).toBe(false);
   });
 
-  it('Schwerter liegen in Truhen; eine bessere Waffe kommt gleich in die Hand', () => {
+  it('Schwerter liegen in Truhen; eine bessere Waffe wandert ins Inventar und leuchtet', () => {
     expect(gegenstand('runenklinge')?.krit).toBe(3);
     expect(gegenstand('flammenschwert')?.angriff).toBe(3);
     // Eine Truhe mit einem Schwert finden und hinlaufen.
@@ -76,9 +76,11 @@ describe('Abenteuer', () => {
         const liegt = fundAuf(a0, h.q, h.r);
         if (!liegt || !['axt', 'breitschwert', 'runenklinge', 'flammenschwert'].includes(liegt) || !eben(gelaende(seed, h.q, h.r))) continue;
         const b = taste(imZug(seed), k);
-        const waffe = b.ausruestung.waffe!;
-        expect(waffe).toBe(liegt);
-        expect(b.inventar['schwert']).toBe(1);
+        // Nicht gleich anlegen - im Inventar leuchtet sie gruen.
+        expect(b.ausruestung.waffe).toBe('schwert');
+        expect(b.inventar[liegt]).toBe(1);
+        expect(vergleich(b, liegt)).toBe(1);
+        expect(vergleich(b, 'schwert')).toBe(0);
         return;
       }
     }
@@ -283,6 +285,62 @@ describe('Abenteuer', () => {
       }
     }
     expect(treffer).toBeGreaterThan(0);
+  });
+
+  it('Gift: wer in einer Pfuetze steht, verliert ein halbes Leben - sie vertrocknet', () => {
+    let a = imZug(13, [], 10);
+    a.leben = 5;
+    // Zum Vergleich derselbe Tick ohne Pfuetze (Rasten kann heilen).
+    const ohne = taste(a, 's').leben;
+    a.gift = [{ q: a.pos.q, r: a.pos.r, bis: a.zeit + 2 }];
+    a = taste(a, 's');
+    expect(a.leben).toBe(ohne - 0.5);
+    expect(a.ereignisse.some((e) => e.art === 'gift')).toBe(true);
+    a = taste(a, 's');
+    a = taste(a, 's');
+    expect(a.gift).toHaveLength(0);
+  });
+
+  it('der Giftschleim hinterlaesst beim Kriechen eine Pfuetze', () => {
+    const a0 = neuesAbenteuer(13);
+    let a = imZug(13, [{ id: 7, q: a0.pos.q + 3, r: a0.pos.r, leben: 2, gross: false, art: 'gift' }], 10);
+    a.leben = 99;
+    for (let i = 0; i < 4 && !(a.gift ?? []).length; i++) a = taste(a, 's');
+    expect((a.gift ?? []).length).toBeGreaterThan(0);
+  });
+
+  it('der Teilschleim zerfaellt in zwei kleine Stuecke', () => {
+    const a0 = neuesAbenteuer(21);
+    const t = freieTaste(a0);
+    const [dq, dr] = HEX_DIRS[['e', 'd', 'x', 'z', 'a', 'q'].indexOf(t)]!;
+    let a = imZug(21, [{ id: 9, q: a0.pos.q + dq, r: a0.pos.r + dr, leben: 1, gross: false, art: 'teil' }], 30);
+    a.leben = 99;
+    for (let i = 0; i < 20 && a.schleime.some((s) => s.id === 9); i++) a = taste(a, t);
+    expect(a.schleime.some((s) => s.id === 9)).toBe(false);
+    const stuecke = a.schleime.filter((s) => !s.art && s.leben === 1);
+    expect(stuecke.length).toBeGreaterThan(0);
+  });
+
+  it('die Bosse kommen der Reihe nach: Koenig, Schatten, Koloss', () => {
+    const a = neuesAbenteuer(13);
+    expect(naechsterBoss({ koenige: 0 })).toBe('koenig');
+    expect(naechsterBoss({ koenige: 1 })).toBe('schatten');
+    expect(naechsterBoss({ koenige: 2 })).toBe('koloss');
+    expect(naechsterBoss({ koenige: 3 })).toBe('koenig');
+    const b = debugAktion(a, { t: 'boss', art: 'koloss' });
+    const boss = b.schleime.find((s) => s.boss);
+    expect(boss?.bossArt).toBe('koloss');
+    expect(b.koenige ?? 0).toBe(a.koenige ?? 0);
+  });
+
+  it('ein Schneehase steht im Weg - er huscht weg, der Ritter bleibt stehen', () => {
+    const a0 = imZug(21, [], 10);
+    const t = freieTaste(a0);
+    const [dq, dr] = HEX_DIRS[['e', 'd', 'x', 'z', 'a', 'q'].indexOf(t)]!;
+    const a = structuredClone(a0);
+    a.tiere = [{ id: 99, q: a0.pos.q + dq, r: a0.pos.r + dr, art: 'hase' }];
+    const b = taste(a, t);
+    expect(b.pos).toEqual(a0.pos);
   });
 
   it('Waffen laden mit Schritten und Treffern; voll wirkt ihre Faehigkeit', () => {

@@ -8681,3 +8681,19 @@ em.off {
   height: 10px;
   border: 1px solid #120d08;
 }
+
+/* Inventar: besser als das Angelegte leuchtet gruen, schlechter rot. */
+.ab-fach.besser {
+  border-color: #7fd05a;
+  box-shadow: inset 0 0 0 1px #7fd05a, 0 0 8px rgba(127, 208, 90, 0.55);
+  animation: ab-besser 1.4s ease-in-out infinite alternate;
+}
+@keyframes ab-besser {
+  to {
+    box-shadow: inset 0 0 0 1px #7fd05a, 0 0 2px rgba(127, 208, 90, 0.2);
+  }
+}
+.ab-fach.schlechter {
+  border-color: #c8402f;
+  box-shadow: inset 0 0 0 1px rgba(200, 64, 47, 0.7);
+}

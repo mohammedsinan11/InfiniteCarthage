@@ -137,11 +137,27 @@ export const gegenstand = (id: string): Gegenstand | undefined => GEGENSTAENDE.f
 /** Was in Truhen liegen kann - das Schwert traegt der Ritter schon. */
 const TRUHENINHALT = ['axt', 'breitschwert', 'runenklinge', 'flammenschwert', 'schild', 'helm', 'ruestung', 'stiefel', 'laterne', 'angel'];
 
-/** Wie gut eine Waffe ist - fuer "die bessere gleich in die Hand". */
-const waffenWert = (id: string | null): number => {
+/**
+ * Wie gut ein Ausruestungsteil ist - fuer den Vergleich im Inventar (gruen
+ * besser, rot schlechter als das Angelegte).
+ */
+export function ausruestungsWert(id: string | null): number {
   const g = gegenstand(id ?? '');
-  return g ? (g.angriff ?? 0) * 2 + ((g.krit ?? 2) - 2) : -1;
-};
+  if (!g?.slot) return -1;
+  return (
+    (g.angriff ?? 0) * 3 + ((g.krit ?? 2) - 2) * 2 + (g.ladung ? 2 : 0) + (g.abwehr ?? 0) * 3 + (g.leben ?? 0) * 2 + (g.schritte ?? 0) * 3 + (g.sicht ?? 0) * 2
+  );
+}
+
+/** Besser (1), schlechter (-1) oder gleich (0) als das, was im Platz liegt - null fuer Nicht-Ausruestung. */
+export function vergleich(a: Abenteuer, id: string): 1 | -1 | 0 | null {
+  const g = gegenstand(id);
+  if (!g?.slot) return null;
+  const jetzt = a.ausruestung[g.slot];
+  if (!jetzt) return 1;
+  const d = ausruestungsWert(id) - ausruestungsWert(jetzt);
+  return d > 0 ? 1 : d < 0 ? -1 : 0;
+}
 
 export type Schleim = {
   id: number;
@@ -159,6 +175,8 @@ export type Schleim = {
   flaeche?: Hex[] | null;
   /** Hoechstes Leben (nur der Koenig - jeder weitere hat mehr). */
   max?: number;
+  /** Welcher Boss (fehlt: der Schleimkoenig). */
+  bossArt?: BossArt;
   /** Wie oft der Koenig schon gehandelt hat - fuer seinen Rhythmus. */
   zaehler?: number;
 };
@@ -174,21 +192,43 @@ export type Phase = 'wuerfeln' | 'ziehen' | 'tot' | 'sieg';
  *   panzer  Panzerschleim: Steinpanzer - getroffen erst ab 5 statt 4, drei
  *           Leben, traege (jeder zweite Tick); gibt zwei Gelee.
  */
-export type SchleimArt = 'spuck' | 'spring' | 'panzer';
-export const SCHLEIM_NAME: Record<SchleimArt, string> = { spuck: 'Spuckschleim', spring: 'Springschleim', panzer: 'Panzerschleim' };
+export type SchleimArt = 'spuck' | 'spring' | 'panzer' | 'gift' | 'teil' | 'geist';
+export const SCHLEIM_NAME: Record<SchleimArt, string> = {
+  spuck: 'Spuckschleim',
+  spring: 'Springschleim',
+  panzer: 'Panzerschleim',
+  gift: 'Giftschleim',
+  teil: 'Teilschleim',
+  geist: 'Geisterschleim',
+};
+
+/**
+ * Die Bosse - nacheinander: erst der Schleimkoenig, dann der Schattenschleim,
+ * dann der Gelee-Koloss, dann wieder von vorn, jedes Mal staerker.
+ *   koenig   Schlag aufs Feld, jedes dritte Mal der Ring um ihn, spaltet ab
+ *   schatten springt durch die Schatten neben den Ritter, spuckt Linien
+ *   koloss   riesig und traege: ein Ring zwei Felder weit, ruft Schleime
+ */
+export type BossArt = 'koenig' | 'schatten' | 'koloss';
+export const BOSS_NAME: Record<BossArt, string> = { koenig: 'Schleimkoenig', schatten: 'Schattenschleim', koloss: 'Gelee-Koloss' };
+const BOSS_FOLGE: readonly BossArt[] = ['koenig', 'schatten', 'koloss'];
+const BOSS_GRUND: Record<BossArt, number> = { koenig: 10, schatten: 12, koloss: 16 };
 
 /** Ein neuer Schleim: die Art aus einer Zahl 0..99 - gut die Haelfte gewoehnlich. */
 function neuerSchleim(id: number, q: number, r: number, zahl: number, fern: boolean): Schleim {
-  if (zahl < 16) return { id, q, r, leben: 2, gross: false, art: 'spuck' };
-  if (zahl < 32) return { id, q, r, leben: 2, gross: false, art: 'spring' };
-  if (zahl < 45) return { id, q, r, leben: 3, gross: false, art: 'panzer' };
+  if (zahl < 12) return { id, q, r, leben: 2, gross: false, art: 'spuck' };
+  if (zahl < 24) return { id, q, r, leben: 2, gross: false, art: 'spring' };
+  if (zahl < 33) return { id, q, r, leben: 3, gross: false, art: 'panzer' };
+  if (zahl < 42) return { id, q, r, leben: 2, gross: false, art: 'gift' };
+  if (zahl < 50) return { id, q, r, leben: 3, gross: false, art: 'teil' };
+  if (zahl < 57) return { id, q, r, leben: 2, gross: false, art: 'geist' };
   const gross = fern && zahl % 3 === 0;
   return { id, q, r, leben: gross ? 4 : 2, gross };
 }
 
 /** Wie man ihn nennt - mit "Der" davor. */
-export function schleimName(s: Pick<Schleim, 'boss' | 'art' | 'gross'>): string {
-  if (s.boss) return 'Schleimkoenig';
+export function schleimName(s: Pick<Schleim, 'boss' | 'art' | 'gross'> & { bossArt?: BossArt }): string {
+  if (s.boss) return BOSS_NAME[s.bossArt ?? 'koenig'];
   if (s.art) return SCHLEIM_NAME[s.art];
   return s.gross ? 'grosse Schleim' : 'Schleim';
 }
@@ -196,7 +236,7 @@ export function schleimName(s: Pick<Schleim, 'boss' | 'art' | 'gross'>): string 
 /** Hoechstes Leben eines Schleims - fuer die Lebensbalken. */
 export function schleimMaxLeben(s: Pick<Schleim, 'boss' | 'art' | 'gross'> & { max?: number }): number {
   if (s.boss) return s.max ?? BOSS_LEBEN;
-  if (s.art === 'panzer') return 3;
+  if (s.art === 'panzer' || s.art === 'teil') return 3;
   return s.gross ? 4 : 2;
 }
 
@@ -208,7 +248,7 @@ export type Wer = 'ritter' | number;
  * Takt 0 ist der Ritter, jeder weitere Takt ein Tick der Spieluhr.
  */
 export type Ereignis =
-  | { art: 'gehen'; takt: number; wer: Wer; von: Hex; nach: Hex; sprung?: boolean }
+  | { art: 'gehen'; takt: number; wer: Wer; von: Hex; nach: Hex; sprung?: boolean; blink?: boolean }
   /** Ein Spuckschleim spuckt seine Linie entlang. */
   | { art: 'spuck'; takt: number; wer: number; felder: Hex[] }
   /** Ein Hieb; ziel null heisst: ins Leere, der Ritter ist ausgewichen. */
@@ -221,6 +261,8 @@ export type Ereignis =
   | { art: 'wiederbelebt'; takt: number }
   /** Pentagrammmeister: der Weg hat sich geschlossen - ein Zauber. */
   | { art: 'zauber'; takt: number; name: Zauber; felder: Hex[] }
+  /** Gift: der Ritter steht in einer Pfuetze. */
+  | { art: 'gift'; takt: number }
   /** Ein legendaerer Fund wirkt. */
   | { art: 'legende'; takt: number; id: string }
   /** Solo-Leveling: ein Levelaufstieg. */
@@ -229,9 +271,9 @@ export type Ereignis =
   | { art: 'stampf'; takt: number; wer: number; felder: Hex[] }
   /** Eine Waffe entfesselt ihre Faehigkeit (Ladebalken voll). */
   | { art: 'faehigkeit'; takt: number; name: Faehigkeit; felder?: Hex[]; ziel?: number }
-  /** Der Schleimkoenig erwacht. */
-  | { art: 'boss'; takt: number; wer: number }
-  | { art: 'tod'; takt: number; wer: number; q: number; r: number; gross: boolean; boss?: boolean; schleimArt?: SchleimArt }
+  /** Ein Boss erwacht. */
+  | { art: 'boss'; takt: number; wer: number; name?: string }
+  | { art: 'tod'; takt: number; wer: number; q: number; r: number; gross: boolean; boss?: boolean; bossArt?: BossArt; schleimArt?: SchleimArt }
   | { art: 'neu'; takt: number; wer: number }
   | { art: 'heil'; takt: number; leben: number }
   | { art: 'warten'; takt: number }
@@ -267,6 +309,10 @@ export type Abenteuer = {
   bossErwacht?: boolean;
   /** So viele Schleimkoenige sind schon bezwungen - jeder naechste ist staerker. */
   koenige?: number;
+  /** Neutrale Tiere: Schneehasen in Schnee und Taiga - sie fliehen vor dem Ritter. */
+  tiere?: { id: number; q: number; r: number; art: 'hase' }[];
+  /** Giftpfuetzen der Giftschleime: wer darin steht, verliert je Tick ein halbes Leben. */
+  gift?: { q: number; r: number; bis: number }[];
   /** Was zuletzt geschah, neueste zuletzt. */
   log: string[];
   /** Die Ereignisse der letzten Aktion - nur fuers Bild. */
@@ -304,7 +350,10 @@ export type Abenteuer = {
 export const BOSS_NACH = 8;
 export const BOSS_LEBEN = 10;
 /** Jeder weitere Koenig hat vier Leben mehr. */
-export const koenigLeben = (a: Pick<Abenteuer, 'koenige'>): number => BOSS_LEBEN + 4 * (a.koenige ?? 0);
+export const koenigLeben = (a: Pick<Abenteuer, 'koenige'>): number =>
+  BOSS_GRUND[naechsterBoss(a)] + 4 * Math.floor((a.koenige ?? 0) / BOSS_FOLGE.length) + (a.koenige ?? 0);
+/** Welcher Boss als naechster kommt. */
+export const naechsterBoss = (a: Pick<Abenteuer, 'koenige'>): BossArt => BOSS_FOLGE[(a.koenige ?? 0) % BOSS_FOLGE.length]!;
 const BOSS_SCHADEN = 2;
 export const GRUND_LEBEN = 6;
 const GRUND_SICHT = 3;
@@ -442,7 +491,16 @@ export function neuesAbenteuer(seed: number): Abenteuer {
 
 function sehen(a: Abenteuer): void {
   const neu = new Set(a.erkundet);
-  for (const h of hexesInRange(a.pos, sichtVon(a))) neu.add(hexKey(h.q, h.r));
+  for (const h of hexesInRange(a.pos, sichtVon(a))) {
+    const k = hexKey(h.q, h.r);
+    if (neu.has(k)) continue;
+    neu.add(k);
+    // Auf frisch entdecktem Schnee und in der Taiga sitzt manchmal ein Schneehase.
+    const b = gelaende(a.seed, h.q, h.r);
+    if ((b === 'schnee' || b === 'taiga') && hash3i(a.seed, h.q, h.r, SALT_SCHLEIM + 9) % 40 === 0 && hexDistance(h, a.pos) > 1) {
+      a.tiere = [...(a.tiere ?? []), { id: a.naechsteId++, q: h.q, r: h.r, art: 'hase' }];
+    }
+  }
   a.erkundet = [...neu];
 }
 
@@ -568,6 +626,11 @@ export function taste(alt: Abenteuer, t: Taste): Abenteuer {
   if (dir === null) return alt;
   const d = HEX_DIRS[dir]!;
   const ziel = { q: a.pos.q + d[0], r: a.pos.r + d[1] };
+  // Ein Schneehase auf dem Feld huscht weg - man kann nicht auf ihn treten.
+  if ((a.tiere ?? []).some((t) => t.q === ziel.q && t.r === ziel.r)) {
+    melde(a, 'Der Schneehase huscht dir zwischen den Beinen weg.');
+    return a;
+  }
   const feind = schleimAuf(a, ziel.q, ziel.r);
   if (feind) {
     angreifen(a, feind, 0);
@@ -727,20 +790,41 @@ function verwunde(a: Abenteuer, s: Schleim, schaden: number, takt: number, vorne
     return;
   }
   a.schleime = a.schleime.filter((x) => x.id !== s.id);
-  a.ereignisse.push({ art: 'tod', takt, wer: s.id, q: s.q, r: s.r, gross: s.gross, ...(s.boss ? { boss: true } : {}), ...(s.art ? { schleimArt: s.art } : {}) });
+  a.ereignisse.push({
+    art: 'tod',
+    takt,
+    wer: s.id,
+    q: s.q,
+    r: s.r,
+    gross: s.gross,
+    ...(s.boss ? { boss: true, bossArt: s.bossArt ?? 'koenig' } : {}),
+    ...(s.art ? { schleimArt: s.art } : {}),
+  });
   erfahrung(a, s.boss ? 10 : s.gross || s.art ? 2 : 1, takt);
   if (s.boss) {
     // Der Koenig ist bezwungen - kein Ende: er laesst einen legendaeren Fund
     // fallen, und nach weiteren BOSS_NACH Schleimen erwacht ein staerkerer.
     a.koenige = (a.koenige ?? 0) + 1;
     a.bossErwacht = false;
-    melde(a, `${vorne}: der Schleimkoenig zerplatzt! Er hinterlaesst etwas Legendaeres.`);
+    melde(a, `${vorne}: der ${schleimName(s)} zerplatzt! Er hinterlaesst etwas Legendaeres.`);
     const moeglich = ['sololeveling', 'hermes', 'pentagramm', 'extraleben', 'herzcontainer'].filter((x) => !(EINMALIG.includes(x) && hatLegende(a, x)));
     legendaerAnwenden(a, moeglich[(a.koenige * 7 + a.zeit) % moeglich.length]!, takt);
     return;
   }
   a.erschlagen += 1;
-  const gelee = s.gross || s.art === 'panzer' ? 2 : 1;
+  // Der Teilschleim zerfaellt in zwei kleine Stuecke.
+  if (s.art === 'teil') {
+    const plaetze = HEX_DIRS.map(([dq, dr]) => ({ q: s.q + dq, r: s.r + dr }))
+      .filter((h) => begehbar(gelaende(a.seed, h.q, h.r)) && !(h.q === a.pos.q && h.r === a.pos.r) && !a.schleime.some((x) => x.q === h.q && x.r === h.r))
+      .slice(0, 2);
+    for (const h of plaetze) {
+      const id = a.naechsteId++;
+      a.schleime.push({ id, q: h.q, r: h.r, leben: 1, gross: false });
+      a.ereignisse.push({ art: 'neu', takt, wer: id });
+    }
+    if (plaetze.length) melde(a, 'Der Teilschleim zerfaellt in kleine Stuecke!');
+  }
+  const gelee = s.gross || s.art === 'panzer' || s.art === 'teil' ? 2 : 1;
   a.inventar = { ...a.inventar, gelee: (a.inventar['gelee'] ?? 0) + gelee };
   const naechster = BOSS_NACH * (1 + (a.koenige ?? 0));
   const bisKoenig = a.bossErwacht ? '' : ` (${Math.min(a.erschlagen, naechster)}/${naechster})`;
@@ -854,10 +938,11 @@ function bossErwacht(a: Abenteuer, takt: number): void {
   a.rng = rng.getState();
   if (!ort) return;
   const id = a.naechsteId++;
-  a.schleime.push({ id, q: ort.q, r: ort.r, leben: koenigLeben(a), max: koenigLeben(a), gross: true, boss: true, zaehler: 0 });
+  const art = naechsterBoss(a);
+  a.schleime.push({ id, q: ort.q, r: ort.r, leben: koenigLeben(a), max: koenigLeben(a), gross: true, boss: true, bossArt: art, zaehler: 0 });
   a.bossErwacht = true;
-  a.ereignisse.push({ art: 'neu', takt, wer: id }, { art: 'boss', takt, wer: id });
-  melde(a, 'Der Boden bebt - der Schleimkoenig ist erwacht! Bezwinge ihn.');
+  a.ereignisse.push({ art: 'neu', takt, wer: id }, { art: 'boss', takt, wer: id, name: BOSS_NAME[art] });
+  melde(a, `Der Boden bebt - der ${BOSS_NAME[art]} ist erwacht! Bezwinge ihn.`);
 }
 
 function aufheben(a: Abenteuer): void {
@@ -908,15 +993,8 @@ function aufheben(a: Abenteuer): void {
       a.ausruestung = { ...a.ausruestung, [g.slot]: inhalt };
       if (g.leben) a.leben += g.leben;
       melde(a, `${woher}: ${g.name} - sofort angelegt.`);
-    } else if (g.slot === 'waffe' && waffenWert(inhalt) > waffenWert(a.ausruestung.waffe)) {
-      // Eine bessere Waffe nimmt der Ritter gleich in die Hand.
-      const alt = a.ausruestung.waffe!;
-      a.ausruestung = { ...a.ausruestung, waffe: inhalt };
-      a.ladung = 0;
-      a.bereit = null;
-      a.inventar = { ...a.inventar, [alt]: (a.inventar[alt] ?? 0) + 1 };
-      melde(a, `${woher}: ${g.name} - gleich in der Hand, ${gegenstand(alt)?.name ?? alt} ins Inventar.`);
     } else {
+      // Nicht gleich anlegen (Spieltest): im Inventar leuchtet es gruen, wenn es besser ist.
       a.inventar = { ...a.inventar, [inhalt]: (a.inventar[inhalt] ?? 0) + 1 };
       melde(a, `${woher}: ${g.name} - ins Inventar.`);
     }
@@ -950,6 +1028,9 @@ function schutzwall(a: Abenteuer, s: Schleim, feld: Hex, takt: number, wurf: num
   return true;
 }
 
+/** So viele Ticks bleibt eine Giftpfuetze. */
+const GIFT_DAUER = 5;
+
 /** Ein Hieb eines Schleims auf den Ritter: trifft, oder das Schild faengt ihn ab. */
 function schleimTrifft(a: Abenteuer, s: Schleim, feld: Hex, takt: number, rng: Rng): void {
   const wurf = 1 + rng.int(6);
@@ -971,8 +1052,9 @@ function linieZum(s: Hex, ziel: Hex): number | null {
   return null;
 }
 
-/** Einen Schritt (oder Sprung) gehen - mit Spur und Ereignis. */
+/** Einen Schritt (oder Sprung) gehen - mit Spur und Ereignis. Der Giftschleim hinterlaesst eine Pfuetze. */
 function zieheSchleim(a: Abenteuer, s: Schleim, ziel: Hex, takt: number, sprung = false): void {
+  if (s.art === 'gift') a.gift = [...(a.gift ?? []).filter((g) => g.bis > a.zeit), { q: s.q, r: s.r, bis: a.zeit + GIFT_DAUER }];
   a.ereignisse.push({ art: 'gehen', takt, wer: s.id, von: { q: s.q, r: s.r }, nach: ziel, ...(sprung ? { sprung: true } : {}) });
   a.spuren = { ...a.spuren, [s.id]: [...(a.spuren[s.id] ?? [{ q: s.q, r: s.r }]), ziel] };
   s.q = ziel.q;
@@ -981,7 +1063,8 @@ function zieheSchleim(a: Abenteuer, s: Schleim, ziel: Hex, takt: number, sprung 
 
 /** Ein gewoehnlicher, grosser oder besonderer Schleim in seinem Tick. */
 function schleimHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetzt: (q: number, r: number) => boolean): void {
-  const frei = (h: Hex) => begehbar(gelaende(a.seed, h.q, h.r)) && !besetzt(h.q, h.r);
+  // Der Geisterschleim schwebt auch uebers Wasser.
+  const frei = (h: Hex) => (s.art === 'geist' ? gelaende(a.seed, h.q, h.r) !== null : begehbar(gelaende(a.seed, h.q, h.r))) && !besetzt(h.q, h.r);
   const d = hexDistance(s, a.pos);
   // Der Spuckschleim spuckt seine angesagte Linie entlang.
   if (s.flaeche) {
@@ -1095,6 +1178,8 @@ function koenigTrifft(a: Abenteuer, s: Schleim, felder: readonly Hex[], takt: nu
 
 /** Der Koenig handelt (nur jeden zweiten Tick, wie alle grossen Schleime). */
 function koenigHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetzt: (q: number, r: number) => boolean, neue: Schleim[]): void {
+  if (s.bossArt === 'schatten') return schattenHandelt(a, s, takt, rng, besetzt);
+  if (s.bossArt === 'koloss') return kolossHandelt(a, s, takt, rng, besetzt, neue);
   // Erst die Ansage einloesen.
   if (s.flaeche) {
     const felder = s.flaeche;
@@ -1153,6 +1238,105 @@ function koenigHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetzt
   }
 }
 
+/** Angesagtes einloesen (Ring, Linie oder Feld) - fuer alle Bosse gleich. */
+function bossLoestEin(a: Abenteuer, s: Schleim, takt: number, rng: Rng): boolean {
+  if (s.flaeche) {
+    const felder = s.flaeche;
+    s.flaeche = null;
+    a.ereignisse.push({ art: 'stampf', takt, wer: s.id, felder });
+    koenigTrifft(a, s, felder, takt, rng);
+    return true;
+  }
+  if (s.angriff) {
+    const feld = s.angriff;
+    s.angriff = null;
+    koenigTrifft(a, s, [feld], takt, rng);
+    return true;
+  }
+  return false;
+}
+
+/** Einen Hops naeher an den Ritter. */
+function bossZieht(a: Abenteuer, s: Schleim, takt: number, besetzt: (q: number, r: number) => boolean): void {
+  let ziel: Hex | null = null;
+  for (const [dq, dr] of HEX_DIRS) {
+    const n = { q: s.q + dq, r: s.r + dr };
+    if (!begehbar(gelaende(a.seed, n.q, n.r)) || besetzt(n.q, n.r)) continue;
+    if (hexDistance(n, a.pos) < hexDistance(ziel ?? s, a.pos)) ziel = n;
+  }
+  if (ziel) zieheSchleim(a, s, ziel, takt);
+}
+
+/** Der Schattenschleim: springt durch die Schatten neben den Ritter, spuckt Linien, schlaegt zu. */
+function schattenHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetzt: (q: number, r: number) => boolean): void {
+  if (bossLoestEin(a, s, takt, rng)) return;
+  s.zaehler = (s.zaehler ?? 0) + 1;
+  const d = hexDistance(s, a.pos);
+  // Jedes dritte Mal: durch die Schatten neben den Ritter - auf die Seite, die er nicht erwartet.
+  if (s.zaehler % 3 === 0 && d > 1) {
+    const neben = HEX_DIRS.map(([dq, dr]) => ({ q: a.pos.q + dq, r: a.pos.r + dr }))
+      .filter((h) => begehbar(gelaende(a.seed, h.q, h.r)) && !besetzt(h.q, h.r))
+      .sort((x, y) => hexDistance(y, s) - hexDistance(x, s))[0];
+    if (neben) {
+      a.ereignisse.push({ art: 'gehen', takt, wer: s.id, von: { q: s.q, r: s.r }, nach: neben, blink: true });
+      s.q = neben.q;
+      s.r = neben.r;
+      melde(a, 'Der Schattenschleim verschwindet - und taucht neben dir auf!');
+      return;
+    }
+  }
+  if (d === 1) {
+    s.angriff = { q: a.pos.q, r: a.pos.r };
+    a.ereignisse.push({ art: 'ansage', takt, wer: s.id, feld: s.angriff });
+    melde(a, 'Der Schattenschleim holt aus - weich aus!');
+    return;
+  }
+  const dir = linieZum(s, a.pos);
+  if (dir !== null) {
+    const [dq, dr] = HEX_DIRS[dir]!;
+    s.flaeche = [1, 2, 3].map((k) => ({ q: s.q + dq * k, r: s.r + dr * k }));
+    a.ereignisse.push({ art: 'ansage', takt, wer: s.id, feld: { q: a.pos.q, r: a.pos.r }, felder: s.flaeche });
+    melde(a, 'Der Schattenschleim zielt eine dunkle Linie - tritt heraus!');
+    return;
+  }
+  bossZieht(a, s, takt, besetzt);
+}
+
+/** Der Gelee-Koloss: riesig und traege - ein Ring zwei Felder weit, ruft kleine Schleime. */
+function kolossHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetzt: (q: number, r: number) => boolean, neue: Schleim[]): void {
+  if (bossLoestEin(a, s, takt, rng)) return;
+  s.zaehler = (s.zaehler ?? 0) + 1;
+  const d = hexDistance(s, a.pos);
+  if (s.zaehler % 4 === 0) {
+    const plaetze = HEX_DIRS.map(([dq, dr]) => ({ q: s.q + dq, r: s.r + dr }))
+      .filter((h) => begehbar(gelaende(a.seed, h.q, h.r)) && !besetzt(h.q, h.r) && !neue.some((x) => x.q === h.q && x.r === h.r))
+      .slice(0, 2);
+    for (const h of plaetze) {
+      const id = a.naechsteId++;
+      neue.push({ id, q: h.q, r: h.r, leben: 2, gross: false });
+      a.ereignisse.push({ art: 'neu', takt, wer: id });
+    }
+    if (plaetze.length) {
+      melde(a, 'Der Gelee-Koloss bebt - kleine Schleime loesen sich von ihm.');
+      return;
+    }
+  }
+  if (d <= 2 && s.zaehler % 2 === 1) {
+    // Der grosse Ring: alles bis zwei Felder um ihn - erst drei Felder Abstand rettet.
+    s.flaeche = hexesInRange(s, 2).filter((h) => !(h.q === s.q && h.r === s.r));
+    a.ereignisse.push({ art: 'ansage', takt, wer: s.id, feld: { q: a.pos.q, r: a.pos.r }, felder: s.flaeche });
+    melde(a, 'Der Gelee-Koloss blaeht sich auf - weg, mindestens drei Felder!');
+    return;
+  }
+  if (d === 1) {
+    s.angriff = { q: a.pos.q, r: a.pos.r };
+    a.ereignisse.push({ art: 'ansage', takt, wer: s.id, feld: s.angriff });
+    melde(a, 'Der Gelee-Koloss holt aus!');
+    return;
+  }
+  bossZieht(a, s, takt, besetzt);
+}
+
 /**
  * Ein Tick der Spieluhr. Jeder Schleim tut eines: neben dem Ritter springt er
  * ihn an, in Witterung huepft er naeher, sonst huepft er mal hierhin, mal
@@ -1161,7 +1345,8 @@ function koenigHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetzt
 function ticken(a: Abenteuer, takt: number): void {
   a.zeit += 1;
   const rng = new Rng(a.rng);
-  const besetzt = (q: number, r: number) => (q === a.pos.q && r === a.pos.r) || a.schleime.some((s) => s.q === q && s.r === r);
+  const besetzt = (q: number, r: number) =>
+    (q === a.pos.q && r === a.pos.r) || a.schleime.some((s) => s.q === q && s.r === r) || (a.tiere ?? []).some((t) => t.q === q && t.r === r);
   const neue: Schleim[] = [];
   for (const s of a.schleime) {
     if ((s.gross || s.art === 'panzer') && a.zeit % 2 === 1) continue;
@@ -1185,7 +1370,28 @@ function ticken(a: Abenteuer, takt: number): void {
       break;
     }
   }
+  // Die Schneehasen: nah am Ritter fliehen sie, sonst hoppeln sie mal hierhin, mal dorthin.
+  for (const t of a.tiere ?? []) {
+    const d = hexDistance(t, a.pos);
+    if (d > 12) continue;
+    const nachbarn = HEX_DIRS.map(([dq, dr]) => ({ q: t.q + dq, r: t.r + dr })).filter((h) => begehbar(gelaende(a.seed, h.q, h.r)) && !besetzt(h.q, h.r));
+    let ziel: Hex | null = null;
+    if (d <= 2) ziel = nachbarn.sort((x, y) => hexDistance(y, a.pos) - hexDistance(x, a.pos))[0] ?? null;
+    else if (rng.int(3) === 0 && nachbarn.length) ziel = nachbarn[rng.int(nachbarn.length)]!;
+    if (ziel && hexDistance(ziel, a.pos) >= d) {
+      a.ereignisse.push({ art: 'gehen', takt, wer: t.id, von: { q: t.q, r: t.r }, nach: ziel, sprung: true });
+      t.q = ziel.q;
+      t.r = ziel.r;
+    }
+  }
   a.rng = rng.getState();
+  // Gift: wer in einer Pfuetze steht, verliert ein halbes Leben; alte Pfuetzen vertrocknen.
+  a.gift = (a.gift ?? []).filter((g) => g.bis > a.zeit);
+  if (a.gift.some((g) => g.q === a.pos.q && g.r === a.pos.r)) {
+    a.leben -= 0.5;
+    a.ereignisse.push({ art: 'gift', takt });
+    melde(a, 'Gift! -½ Leben.');
+  }
   if (a.leben <= 0) {
     // Das Extra-Leben: einmal steht der Ritter wieder auf.
     if ((a.extraLeben ?? 0) > 0) {
@@ -1272,7 +1478,8 @@ export type DebugAktion =
   | { t: 'item'; id: string }
   | { t: 'ep' }
   | { t: 'schritte' }
-  | { t: 'aufdecken' };
+  | { t: 'aufdecken' }
+  | { t: 'boss'; art: BossArt };
 
 export function debugAktion(alt: Abenteuer, d: DebugAktion): Abenteuer {
   const a = structuredClone(alt);
@@ -1319,6 +1526,12 @@ export function debugAktion(alt: Abenteuer, d: DebugAktion): Abenteuer {
   } else if (d.t === 'heilen') {
     a.leben = maxLebenVon(a);
     melde(a, 'Debug: volles Leben.');
+  } else if (d.t === 'boss') {
+    if (a.schleime.some((s) => s.boss)) return alt;
+    const vorher = a.koenige;
+    a.koenige = BOSS_FOLGE.indexOf(d.art);
+    bossErwacht(a, 0);
+    a.koenige = vorher;
   } else if (d.t === 'aufdecken') {
     const neu = new Set(a.erkundet);
     for (const h of hexesInRange(a.pos, 28)) neu.add(hexKey(h.q, h.r));
@@ -1344,7 +1557,7 @@ export function debugAktion(alt: Abenteuer, d: DebugAktion): Abenteuer {
     const id = a.naechsteId++;
     const art = d.art === 'normal' || d.art === 'gross' ? undefined : d.art;
     const gross = d.art === 'gross';
-    a.schleime.push({ id, q: ort.q, r: ort.r, leben: art === 'panzer' ? 3 : gross ? 4 : 2, gross, ...(art ? { art } : {}) });
+    a.schleime.push({ id, q: ort.q, r: ort.r, leben: art === 'panzer' || art === 'teil' ? 3 : gross ? 4 : 2, gross, ...(art ? { art } : {}) });
     a.ereignisse.push({ art: 'neu', takt: 0, wer: id });
     melde(a, `Debug: ein ${art ? SCHLEIM_NAME[art] : gross ? 'grosser Schleim' : 'Schleim'} erscheint.`);
   }

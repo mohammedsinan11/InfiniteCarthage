@@ -40,12 +40,14 @@ import {
   neuesAbenteuer,
   normalisiere,
   angeln,
+  vergleich,
   debugAktion,
   kannAngeln,
   epFuer,
   ladungVon,
   richtungFuer,
   schleimMaxLeben,
+  schleimName,
   schrittBonusVon,
   schrittKosten,
   sichtVon,
@@ -57,7 +59,7 @@ import {
 import type { Abenteuer as Zustand, DebugAktion, Ereignis, SchleimArt, Slot, Taste, Wer } from '../../abenteuer/regeln';
 import { HEX_DIRS, hexDistance, hexKey, hexesInRange } from '../../core/coords';
 import type { Hex } from '../../core/coords';
-import { BODEN_FARBE, feldInfo } from '../../abenteuer/welt';
+import { BODEN_FARBE, einstellung, feldInfo, istWasser, klima } from '../../abenteuer/welt';
 import type { Boden } from '../../abenteuer/welt';
 import { HEX_CX, HEX_CY, IMG_H, IMG_W, kachelEcke, kachelUrlNachName, preloadTiles, tileImage, tileImageFog } from '../tiles';
 import { preloadUnitSprites } from '../units';
@@ -70,6 +72,7 @@ import { DebugFenster, FIGUR_KEY, ladeWeltEinstellung, leseFigur } from './Debug
 
 // Die Stellschrauben der Welt aus dem Debugfenster gelten ab dem Laden.
 ladeWeltEinstellung();
+import { GELEEKOLOSS, HASE, SCHATTENSCHLEIM } from './symbole';
 import { RITTER_HAND, RITTER_KOERPER, RITTER_SCHRITT, SCHLEIMKOENIG, SCHLEIM_BILD, SYMBOL, WAFFE, WAFFE_GRIFF, zeichnePixel } from './symbole';
 import { LAUT_STUFEN, beiTrack, klang, laufenderTrack, lautstaerke, setzeBiom, setzeLautstaerke } from './musik';
 import { BIOM_NAME } from './musik';
@@ -152,21 +155,50 @@ const MUSIK_BIOM: Partial<Record<Boden, Biom>> = {
   fluss: 'wiese',
   wald: 'wald',
   dschungel: 'wald',
-  taiga: 'wald',
-  sumpf: 'wald',
+  taiga: 'schnee',
+  sumpf: 'sumpf',
   sand: 'wueste',
   duenen: 'wueste',
   huegel: 'berg',
   berg: 'berg',
-  schnee: 'berg',
+  schnee: 'schnee',
 };
 
 // --- Hilfen fuer Bild und Weg ----------------------------------------------
 
-/** Mitte eines Feldes in Kunstpixeln. */
+/**
+ * HOEHENPROFIL: Land hebt sich mit seiner Hoehe (welt.ts, klima) - bis zu
+ * zwoelf Kunstpixel, Berge noch etwas mehr; Wasser bleibt flach. Gezeichnet
+ * mit Klippen: unter einer gehobenen Kachel ihr Rand, Stufe um Stufe.
+ */
+let hoehenSeed = 0;
+const hoehenSpeicher = new Map<string, number>();
+function anhebung(q: number, r: number): number {
+  const k = q + ':' + r;
+  const da = hoehenSpeicher.get(k);
+  if (da !== undefined) return da;
+  const info = feldInfo(hoehenSeed, q, r);
+  let l = 0;
+  if (!istWasser(info.boden)) {
+    const h = klima(hoehenSeed, q, r).hoehe;
+    const t = Math.max(0, Math.min(1, (h - einstellung.meer) / (0.95 - einstellung.meer)));
+    l = Math.round(t * 5) * 2 + (info.boden === 'berg' ? 2 : 0);
+  }
+  if (hoehenSpeicher.size > 100000) hoehenSpeicher.clear();
+  hoehenSpeicher.set(k, l);
+  return l;
+}
+function setzeHoehenSeed(seed: number): void {
+  if (seed !== hoehenSeed) {
+    hoehenSeed = seed;
+    hoehenSpeicher.clear();
+  }
+}
+
+/** Mitte eines Feldes in Kunstpixeln - mit seiner Hoehe. */
 function mitte(q: number, r: number): { x: number; y: number } {
   const e = kachelEcke(q, r);
-  return { x: e.x + HEX_CX, y: e.y + HEX_CY };
+  return { x: e.x + HEX_CX, y: e.y + HEX_CY - anhebung(q, r) };
 }
 
 /** Das Feld unter einem Punkt in Kunstpixeln. */
@@ -446,12 +478,14 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     };
   }, []);
   // Die Landschaft fuer die Musik: was rund um den Ritter ueberwiegt - und der Koenig, wenn er nah ist.
-  const koenigNah = a.schleime.some((x) => x.boss && hexDistance(x, a.pos) <= 8);
+  const nahBoss = a.schleime.find((x) => x.boss && hexDistance(x, a.pos) <= 8);
+  const koenigNah = nahBoss ? (nahBoss.bossArt ?? 'koenig') : null;
   // Mit Traegheit: erst wenn eine neue Landschaft im Umkreis von 4 Feldern
   // klar ueberwiegt (60 %), wechselt das Thema - am Rand kein Hin und Her.
   const musikBiom = useRef<Biom>('wiese');
   useEffect(() => {
-    if (koenigNah) return setzeBiom('boss');
+    // Jeder Boss hat sein eigenes Thema.
+    if (koenigNah) return setzeBiom('boss', koenigNah);
     const zaehl: Partial<Record<Biom, number>> = {};
     let alle = 0;
     for (const h of hexesInRange(a.pos, 4)) {
@@ -479,6 +513,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   /** Was auf den erkundeten Feldern liegt - einmal je Aenderung berechnet, nicht je Bild. */
   const funde = useRef<{ fuer: unknown; karte: Map<string, string> }>({ fuer: null, karte: new Map() });
   const fundeErkundet = useRef(0);
+  /** Wann ein Feld zum ersten Mal ins Bild kam - neue Kacheln fallen hinein. */
+  const enthuellt = useRef<Map<string, number> | null>(null);
+  const fallBis = useRef(0);
   /** Seit wann das Banner "Der Schleimkoenig erwacht" steht. */
   const banner = useRef(0);
   const bannerText = useRef('Der Schleimkoenig erwacht!');
@@ -487,9 +524,10 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     aktuell.current = neu;
     if (neu.ereignisse.length > 0) {
       anim.current = { start: performance.now(), ev: neu.ereignisse };
-      if (neu.ereignisse.some((e) => e.art === 'boss')) {
+      const boss = neu.ereignisse.find((e): e is Extract<Ereignis, { art: 'boss' }> => e.art === 'boss');
+      if (boss) {
         banner.current = performance.now();
-        bannerText.current = 'Der Schleimkoenig erwacht!';
+        bannerText.current = `Der ${boss.name ?? 'Schleimkoenig'} erwacht!`;
       }
       if (neu.ereignisse.some((e) => e.art === 'wiederbelebt')) {
         banner.current = performance.now();
@@ -637,12 +675,13 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       const a = aktuell.current;
       const { start, ev } = anim.current;
       const p = (jetzt - start) / TAKT_MS;
+      setzeHoehenSeed(a.seed);
       const ende = letzterTakt(ev) + 1 + NACHKLANG;
       const bewegt = p < ende;
       // Steht alles wieder still (nur Zahlen steigen noch), zeigen sich Tasten und Wege.
       const still = p >= letzterTakt(ev) + 1;
-      // In Ruhe genuegen zwoelf Bilder je Sekunde fuers Atmen.
-      if (!bewegt && jetzt - zuletzt < 80) return;
+      // In Ruhe genuegen zwoelf Bilder je Sekunde fuers Atmen - ausser Kacheln fallen gerade.
+      if (!bewegt && jetzt > fallBis.current && jetzt - zuletzt < 80) return;
       zuletzt = jetzt;
       const sek = jetzt / 1000;
 
@@ -665,6 +704,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       const schleimEnde = new Map<number, Hex>();
       for (const s of a.schleime) schleimEnde.set(s.id, s);
       for (const e of ev) if (e.art === 'tod') schleimEnde.set(e.wer, { q: e.q, r: e.r });
+      for (const t of a.tiere ?? []) schleimEnde.set(t.id, t);
       const endeVon = (wer: Wer): Hex => (wer === 'ritter' ? a.pos : (schleimEnde.get(wer) ?? a.pos));
       const ort = (wer: Wer): { x: number; y: number; hoch: number } => {
         // Springschleime fliegen hoch, alle anderen huepfen.
@@ -680,6 +720,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               const u = sanft(klemme(p - g.takt));
               const m0 = mitte(g.von.q, g.von.r);
               const m1 = mitte(g.nach.q, g.nach.r);
+              // Der Schattenschleim springt nicht - er verschwindet und taucht woanders auf.
+              if (g.blink) {
+                const m = mitte((u < 0.5 ? g.von : g.nach).q, (u < 0.5 ? g.von : g.nach).r);
+                return { x: m.x, y: m.y, hoch: 0 };
+              }
               const hoch = wer === 'ritter' && !g.sprung ? Math.abs(Math.sin(u * Math.PI * 2)) * 1.5 : Math.sin(u * Math.PI) * (g.sprung ? 18 : 7);
               return {
                 x: m0.x + (m1.x - m0.x) * u,
@@ -730,17 +775,47 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       const sicht = sichtVon(a);
       const radius = Math.ceil(Math.max(c.width, c.height) / (17 * f)) + 2;
       const felder = hexesInRange(a.pos, radius).sort((p1, p2) => p1.r - p2.r || p1.q - p2.q);
+      // Beim ersten Bild gilt alles als laengst da - danach fallen neue Kacheln hinein.
+      if (!enthuellt.current) enthuellt.current = new Map(a.erkundet.map((k) => [k, 0]));
+      const FALL_MS = 380;
       // Kacheln: gesehen und jetzt sichtbar hell, gesehen und fern im Nebel.
       for (const hx of felder) {
         const k = hexKey(hx.q, hx.r);
         if (!erkundet.has(k)) continue;
+        let seit = enthuellt.current.get(k);
+        if (seit === undefined) {
+          // Ein wenig versetzt je Feld, damit der Rand nicht als Block faellt.
+          seit = jetzt + (hash3i(a.seed, hx.q, hx.r, 77) % 120);
+          enthuellt.current.set(k, seit);
+          fallBis.current = Math.max(fallBis.current, seit + FALL_MS);
+        }
+        const fall = seit === 0 ? 1 : klemme((jetzt - seit) / FALL_MS);
+        if (fall <= 0) continue;
+        const fallY = (1 - sanft(fall)) * -28;
         const url = kachelUrlNachName(feldInfo(a.seed, hx.q, hx.r).kachel, a.seed, hx.q, hx.r);
         if (!url) continue;
         const nah = hexDistance(hx, a.pos) <= sicht;
         const bild = nah ? tileImage(url) : tileImageFog(url);
         if (!bild) continue;
         const e = kachelEcke(hx.q, hx.r);
-        ctx.drawImage(bild, sx(e.x), sy(e.y), IMG_W * f, IMG_H * f);
+        const lift = anhebung(hx.q, hx.r);
+        ctx.globalAlpha = fall < 1 ? fall : 1;
+        // Klippen: unter der gehobenen Kachel ihr Rand, alle drei Pixel eine Stufe.
+        for (let dy = lift; dy > 0; dy -= 3) ctx.drawImage(bild, sx(e.x), sy(e.y - lift + dy + fallY), IMG_W * f, IMG_H * f);
+        ctx.drawImage(bild, sx(e.x), sy(e.y - lift + fallY), IMG_W * f, IMG_H * f);
+        ctx.globalAlpha = 1;
+      }
+      // Giftpfuetzen: violett schimmernd, mit Blasen.
+      for (const g of a.gift ?? []) {
+        if (g.bis <= a.zeit || hexDistance(g, a.pos) > sicht + 1) continue;
+        const m = mitte(g.q, g.r);
+        ctx.fillStyle = 'rgba(140, 80, 190, 0.45)';
+        ctx.beginPath();
+        ctx.ellipse(sx(m.x), sy(m.y + 1), 8 * f, 4 * f, 0, 0, Math.PI * 2);
+        ctx.fill();
+        const blase = (sek * 1.5 + g.q * 0.3) % 1;
+        ctx.fillStyle = 'rgba(210, 170, 255, 0.8)';
+        ctx.fillRect(sx(m.x - 3 + (g.r % 3) * 2), sy(m.y - blase * 4), f, f);
       }
       const zentrum = (q: number, r: number) => {
         const m = mitte(q, r);
@@ -988,6 +1063,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           id: s.id,
           gross: s.gross,
           boss: !!s.boss,
+          bossArt: s.bossArt,
+          max: s.max,
           art: s.art,
           leben: s.leben,
           tot: null as number | null,
@@ -999,6 +1076,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                   id: e.wer,
                   gross: e.gross,
                   boss: !!e.boss,
+                  bossArt: e.bossArt,
+                  max: undefined,
                   art: e.schleimArt,
                   leben: 0,
                   tot: e.takt,
@@ -1033,6 +1112,17 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           hoch += hops * 2.5;
           skx = hops > 0.3 ? 0.94 : 1.1;
           sky = hops > 0.3 ? 1.08 : 0.85;
+        } else if (s.art === 'geist') {
+          // Schwebt und flackert - von weitem kaum zu sehen.
+          hoch += 1.5 + Math.sin(sek * 2 + s.id) * 1.5;
+          alpha = hexDistance(feldBei(o0.x, o0.y), a.pos) <= 2 ? 0.85 : 0.3 + 0.1 * Math.sin(sek * 5 + s.id);
+        } else if (s.art === 'teil') {
+          // Die zwei Lappen wackeln gegeneinander.
+          skx = 1 + Math.sin(sek * 6 + s.id) * 0.07;
+          sky = 1 - Math.sin(sek * 6 + s.id) * 0.05;
+        } else if (s.art === 'gift') {
+          skx = 1 - atem * 0.04;
+          sky = 1 + atem * 0.1;
         } else if (s.art === 'panzer') {
           // Liegt schwer da - nur ein leises Heben des Panzers.
           skx = 1;
@@ -1060,6 +1150,12 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           sky = s.art === 'spuck' ? 0.92 : s.art === 'spring' ? 0.7 : 0.8;
           if (s.art === 'spring') hoch = 0;
           zittern = Math.round(Math.sin(sek * 40) * (s.art === 'panzer' ? 1 : 0.6));
+        }
+        // Schattensprung: aus- und wieder einblenden.
+        const blink = ev.find((e): e is Extract<Ereignis, { art: 'gehen' }> => e.art === 'gehen' && e.wer === s.id && !!e.blink);
+        if (blink) {
+          const u = p - blink.takt;
+          if (u >= 0 && u < 1) alpha = Math.abs(Math.cos(u * Math.PI));
         }
         // Neu aus dem Unbekannten: faellt herab und plumpst auf.
         const neu = ev.find((e) => e.art === 'neu' && e.wer === s.id);
@@ -1091,18 +1187,19 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             const sw = s.boss ? 10 * f : 3 * fs;
             ctx.fillRect(sx(o.x) - sw, sy(o.y) + 3 * f, 2 * sw, f);
             if (s.boss) {
-              // Der Koenig: eigenes Bild, deutlich groesser als ein Feld-Schleim.
-              const kf = Math.round(f * 1.6);
-              const kb = SCHLEIMKOENIG[0]!.length;
+              // Die Bosse: eigene Bilder, deutlich groesser als ein Feld-Schleim; der Koloss am groessten.
+              const bild = s.bossArt === 'schatten' ? SCHATTENSCHLEIM : s.bossArt === 'koloss' ? GELEEKOLOSS : SCHLEIMKOENIG;
+              const kf = Math.round(f * (s.bossArt === 'koloss' ? 1.9 : 1.6));
+              const kb = bild[0]!.length;
               ctx.save();
               ctx.globalAlpha = alpha;
               ctx.translate(X, Y);
               ctx.scale(skx, sky);
-              zeichnePixel(ctx, SCHLEIMKOENIG, -Math.floor(kb / 2) * kf, -SCHLEIMKOENIG.length * kf, kf, PIX);
+              zeichnePixel(ctx, bild, -Math.floor(kb / 2) * kf, -bild.length * kf, kf, PIX);
               if (wu.blitz) {
                 ctx.filter = 'brightness(4) saturate(0)';
                 ctx.globalAlpha = alpha * 0.7;
-                zeichnePixel(ctx, SCHLEIMKOENIG, -Math.floor(kb / 2) * kf, -SCHLEIMKOENIG.length * kf, kf, PIX);
+                zeichnePixel(ctx, bild, -Math.floor(kb / 2) * kf, -bild.length * kf, kf, PIX);
               }
               ctx.restore();
               if (holtAus && alpha > 0.3) schrift('!', X + 12 * kf, Y - 10 * kf, '#ff4a3a', 1, 8);
@@ -1116,6 +1213,30 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             });
             if (alpha > 0.3 && lebenJetzt > 0) balken(X, Y - (hoehe + 2) * fs, lebenJetzt, max);
             if (holtAus && alpha > 0.3) schrift('!', X + 9 * f, Y - (hoehe + 2) * fs, '#ff4a3a', 1, 7);
+          },
+        });
+      }
+      // Schneehasen: sitzen, mummeln, und huepfen davon (Bild 2 im Sprung).
+      for (const t of a.tiere ?? []) {
+        if (hexDistance(t, a.pos) > sicht) continue;
+        const o = ort(t.id);
+        const gehen = ev.find((e): e is Extract<Ereignis, { art: 'gehen' }> => e.art === 'gehen' && e.wer === t.id);
+        const springt = o.hoch > 0.5;
+        const nachLinks = gehen ? mitte(gehen.nach.q, gehen.nach.r).x < mitte(gehen.von.q, gehen.von.r).x : t.id % 2 === 0;
+        const bild = HASE[springt ? 1 : 0];
+        const mummel = !springt && Math.sin(sek * 7 + t.id) > 0.85 ? 1 : 0;
+        figuren.push({
+          y: o.y,
+          mal: () => {
+            const X = sx(o.x);
+            const Y = sy(o.y) + 3 * f - Math.round(o.hoch * 0.6) * f;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+            ctx.fillRect(X - 3 * f, sy(o.y) + 3 * f, 6 * f, f);
+            ctx.save();
+            ctx.translate(X, Y - bild.length * f - mummel * f);
+            ctx.scale(nachLinks ? 1 : -1, 1);
+            zeichnePixel(ctx, bild, -3 * f, 0, f, KACHEL_PIX);
+            ctx.restore();
           },
         });
       }
@@ -1320,6 +1441,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               1.8 - (u - 1) * 0.8,
               6,
             );
+        } else if (e.art === 'gift') {
+          if (u < 2.4) schrift('-½', sx(ritter.x) + 6 * f, sy(ritter.y) - (18 + u * 4) * f, '#c890ff', 1.6 - u * 0.6, 6);
+          if (u < 0.8) rot = Math.max(rot, 0.4 * (1 - u / 0.8));
         } else if (e.art === 'zauber') {
           // Die geschlossene Form leuchtet violett auf, Funken steigen, der Name erscheint.
           if (u < 2.2) {
@@ -1674,7 +1798,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         if (!koenig) return null;
         return (
           <div className="ab-boss" title="Der Schleimkoenig - bezwinge ihn, um zu gewinnen">
-            <span>Schleimkoenig</span>
+            <span>{schleimName(koenig)}</span>
             <div className="ab-boss-balken">
               <i style={{ width: `${(100 * koenig.leben) / schleimMaxLeben(koenig)}%` }} />
             </div>
@@ -1833,7 +1957,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               return (
                 <button
                   key={id}
-                  className={g?.legendaer ? 'ab-fach ab-gegenstand legendaer' : 'ab-fach ab-gegenstand'}
+                  className={['ab-fach ab-gegenstand', g?.legendaer ? 'legendaer' : '', vergleich(a, id) === 1 ? 'besser' : vergleich(a, id) === -1 ? 'schlechter' : '']
+                    .filter(Boolean)
+                    .join(' ')}
                   aria-label={g?.name ?? id}
                   {...tippHandler(id, setTipp)}
                   onClick={() => setze(benutzen(aktuell.current, id))}

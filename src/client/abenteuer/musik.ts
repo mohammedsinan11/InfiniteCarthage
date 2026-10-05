@@ -2,14 +2,18 @@
  * Musik und Klaenge des Abenteuers - eigen, nichts aus der Strategie
  * (client/audio.ts). Ein Knopf schaltet beides.
  *
- * MUSIK. Mehrere Stuecke, im Browser erzeugt, je Landschaft (Biom) eine
- * Warteschlange: Wiese, Wald, Wueste, Berge - und der Schleimkoenig. Ein
- * Stueck laeuft ein paar Durchgaenge, dann blendet das naechste der
+ * MUSIK. Viele Stuecke, im Browser erzeugt, je Landschaft (Biom) eine
+ * Warteschlange: Wiese, Wald, Wueste, Berge, Schnee, Sumpf - und je Boss ein
+ * eigenes Thema. Ein Stueck ist in Teile gegliedert (Vorspiel, A, B, ein
+ * Zwischenspiel nur mit Begleitung, A mit anderem Klang ...) und spielt seine
+ * ganze Folge - zwei bis vier Minuten -, dann blendet das naechste der
  * Warteschlange ueber. Wechselt der Ritter die Landschaft, blendet das alte
  * Thema aus und das neue ein (UEBERBLENDEN Sekunden). Die Nummer und der
  * Name des laufenden Stuecks stehen unter der Lautstaerke.
- * PLATZHALTER - die Musik wird neu gemacht; Knopf, Warteschlangen und
- * Ueberblenden bleiben.
+ *
+ * Spieltest: "Ueberarbeite #3 Waldlied. Mache die Musik laenger und
+ * abwechslungsreicher." Darum Teile und Folgen (TEIL), Weisen mit Motiven, die
+ * wiederkehren, und mehr Begleitmuster.
  */
 
 const SPEICHER = 'infinitecarthage.abenteuer.musik';
@@ -19,33 +23,69 @@ export const LAUT_STUFEN = 10;
 /** So viele Sekunden blendet ein Stueck ins naechste. */
 const UEBERBLENDEN = 3;
 
-export type Biom = 'wiese' | 'wald' | 'wueste' | 'berg' | 'boss';
-export const BIOM_NAME: Record<Biom, string> = { wiese: 'Wiese', wald: 'Wald', wueste: 'Wueste', berg: 'Berge', boss: 'Schleimkoenig' };
+export type Biom = 'wiese' | 'wald' | 'wueste' | 'berg' | 'schnee' | 'sumpf' | 'boss';
+export const BIOM_NAME: Record<Biom, string> = { wiese: 'Wiese', wald: 'Wald', wueste: 'Wueste', berg: 'Berge', schnee: 'Schnee', sumpf: 'Sumpf', boss: 'Boss' };
 
-type Instrument = { art: OscillatorType; laut: number; anschlag: number; dauer: number; filter?: number; oktave?: number };
+/** echo: ein leiseres Nachklingen der Weise (Anteil der Lautstaerke). */
+type Instrument = { art: OscillatorType; laut: number; anschlag: number; dauer: number; filter?: number; oktave?: number; echo?: number };
 type Weise = [number | null, number][][];
+type Muster = 'zupf' | 'akkord' | 'bordun' | 'treiben' | 'harfe' | 'puls';
+type Trommel = 'tamburin' | 'pauke' | 'marsch';
+
+/** Ein Teil eines Stuecks. Was fehlt, nimmt er vom Stueck. */
+type Teil = {
+  /** Stufe der Tonleiter je Takt - der Akkordgrundton. */
+  akkorde: number[];
+  /** Von Hand geschriebene Weise (Achtel) - sonst erzeugt aus seed. */
+  weise?: Weise;
+  seed?: number;
+  muster?: Muster;
+  /** null: dieser Teil spielt ohne Weise, nur Begleitung. */
+  lead?: Instrument | null;
+  begleit?: Instrument;
+  trommel?: Trommel | null;
+};
 
 type Track = {
   id: number;
   name: string;
   biom: Biom;
+  /** Fuer welchen Boss (bossArt) - sonst fuer jeden. */
+  fuer?: string;
   tempo: number;
   /** Grundton (MIDI) und Tonleiter (Halbtonschritte). */
   grund: number;
   skala: number[];
-  /** Stufe der Tonleiter je Takt - der Akkordgrundton. */
+  /** Akkorde des Hauptteils A - und des Gegenteils B (sonst AKKORDE_B). */
   akkorde: number[];
-  /** Von Hand geschriebene Weise (Achtel) - sonst erzeugt aus seed. */
+  akkordeB?: number[];
   weise?: Weise;
   seed: number;
   bass: Instrument;
   begleit: Instrument;
   lead: Instrument;
-  muster: 'zupf' | 'akkord' | 'bordun' | 'treiben';
-  trommel?: 'tamburin' | 'pauke';
-  /** So viele Takte spielt das Stueck, bevor das naechste der Warteschlange kommt. */
-  takte: number;
+  muster: Muster;
+  trommel?: Trommel;
+  /** Eigene Teile und ihre Folge - sonst die Standardfolge (standardTeile). */
+  teile?: Record<string, Teil>;
+  folge?: string[];
 };
+
+const DUR = [0, 2, 4, 5, 7, 9, 11];
+const DORISCH = [0, 2, 3, 5, 7, 9, 10];
+const MOLL = [0, 2, 3, 5, 7, 8, 10];
+const HARM_MOLL = [0, 2, 3, 5, 7, 8, 11];
+const HIJAZ = [0, 1, 4, 5, 7, 8, 10];
+const LYDISCH = [0, 2, 4, 6, 7, 9, 11];
+const PHRYGISCH = [0, 1, 3, 5, 7, 8, 10];
+
+const ZUPF: Instrument = { art: 'triangle', laut: 0.07, anschlag: 0.005, dauer: 2.2 };
+const FLOETE: Instrument = { art: 'sine', laut: 0.09, anschlag: 0.04, dauer: 0.95, oktave: 12 };
+const BASS: Instrument = { art: 'sine', laut: 0.22, anschlag: 0.05, dauer: 7.5 };
+const FLAECHE: Instrument = { art: 'sine', laut: 0.05, anschlag: 0.3, dauer: 7.5 };
+const HARFE: Instrument = { art: 'triangle', laut: 0.06, anschlag: 0.004, dauer: 1.8 };
+const GLOCKE: Instrument = { art: 'sine', laut: 0.075, anschlag: 0.003, dauer: 2.6, oktave: 12, echo: 0.35 };
+const LAUTE: Instrument = { art: 'triangle', laut: 0.08, anschlag: 0.005, dauer: 0.7, oktave: 12 };
 
 const WANDERWEISE: Weise = [
   [[69, 2], [67, 1], [65, 1], [62, 4]],
@@ -58,25 +98,75 @@ const WANDERWEISE: Weise = [
   [[62, 6], [null, 2]],
 ];
 
-const DUR = [0, 2, 4, 5, 7, 9, 11];
-const DORISCH = [0, 2, 3, 5, 7, 9, 10];
-const MOLL = [0, 2, 3, 5, 7, 8, 10];
-const HARM_MOLL = [0, 2, 3, 5, 7, 8, 11];
-const HIJAZ = [0, 1, 4, 5, 7, 8, 10];
+/** Waldlied, Teil A - E dorisch, ueber Em A Em D Em A Bm Em. */
+const WALD_A: Weise = [
+  [[64, 2], [67, 1], [69, 1], [71, 3], [69, 1]],
+  [[73, 2], [71, 1], [69, 1], [69, 4]],
+  [[71, 2], [67, 2], [64, 2], [67, 2]],
+  [[66, 2], [69, 1], [66, 1], [62, 4]],
+  [[64, 2], [67, 1], [69, 1], [71, 2], [74, 2]],
+  [[76, 3], [73, 1], [69, 2], [71, 1], [73, 1]],
+  [[74, 2], [71, 2], [66, 2], [69, 2]],
+  [[67, 1], [66, 1], [64, 6]],
+];
 
-const ZUPF: Instrument = { art: 'triangle', laut: 0.07, anschlag: 0.005, dauer: 2.2 };
-const FLOETE: Instrument = { art: 'sine', laut: 0.09, anschlag: 0.04, dauer: 0.95, oktave: 12 };
-const BASS: Instrument = { art: 'sine', laut: 0.22, anschlag: 0.05, dauer: 7.5 };
+/** Waldlied, Teil B - hoeher, ueber G D A Em G D Bm Bm, fuehrt zurueck nach A. */
+const WALD_B: Weise = [
+  [[71, 3], [74, 1], [71, 2], [67, 2]],
+  [[69, 3], [66, 1], [62, 4]],
+  [[64, 2], [69, 2], [73, 2], [76, 2]],
+  [[74, 1], [73, 1], [71, 6]],
+  [[74, 3], [76, 1], [74, 2], [71, 2]],
+  [[74, 2], [69, 2], [66, 4]],
+  [[71, 2], [69, 1], [71, 1], [74, 2], [73, 2]],
+  [[71, 4], [null, 2], [66, 1], [69, 1]],
+];
+
+const WALD_AKK_A = [0, 3, 0, 6, 0, 3, 4, 0];
 
 export const TRACKS: readonly Track[] = [
-  { id: 1, name: 'Wanderweise', biom: 'wiese', tempo: 92, grund: 62, skala: DORISCH, akkorde: [0, 6, 5, 6], weise: WANDERWEISE, seed: 1, bass: BASS, begleit: ZUPF, lead: FLOETE, muster: 'zupf', takte: 24 },
-  { id: 2, name: 'Morgenlied', biom: 'wiese', tempo: 100, grund: 67, skala: DUR, akkorde: [0, 3, 4, 0, 5, 3, 4, 4], seed: 2, bass: BASS, begleit: { ...ZUPF, laut: 0.06 }, lead: { art: 'triangle', laut: 0.08, anschlag: 0.01, dauer: 0.8, oktave: 12 }, muster: 'zupf', takte: 24 },
-  { id: 3, name: 'Waldlied', biom: 'wald', tempo: 80, grund: 64, skala: DORISCH, akkorde: [0, 3, 0, 6, 0, 3, 4, 0], seed: 3, bass: BASS, begleit: { ...ZUPF, laut: 0.05, dauer: 3 }, lead: { ...FLOETE, laut: 0.1 }, muster: 'zupf', takte: 24 },
-  { id: 4, name: 'Moos und Farn', biom: 'wald', tempo: 72, grund: 57, skala: MOLL, akkorde: [0, 5, 3, 4], seed: 4, bass: { ...BASS, laut: 0.18 }, begleit: { art: 'sine', laut: 0.05, anschlag: 0.3, dauer: 7.5 }, lead: { art: 'sine', laut: 0.08, anschlag: 0.08, dauer: 1.2, oktave: 12 }, muster: 'akkord', takte: 16 },
-  { id: 5, name: 'Wuestenwind', biom: 'wueste', tempo: 96, grund: 62, skala: HIJAZ, akkorde: [0, 0, 6, 0, 5, 6, 1, 0], seed: 5, bass: { art: 'sine', laut: 0.2, anschlag: 0.1, dauer: 8 }, begleit: { art: 'triangle', laut: 0.08, anschlag: 0.003, dauer: 0.9 }, lead: { art: 'triangle', laut: 0.09, anschlag: 0.005, dauer: 0.7, oktave: 12 }, muster: 'bordun', trommel: 'tamburin', takte: 24 },
-  { id: 6, name: 'Sandsturm', biom: 'wueste', tempo: 112, grund: 64, skala: HIJAZ, akkorde: [0, 1, 0, 6, 0, 1, 5, 0], seed: 6, bass: { art: 'triangle', laut: 0.16, anschlag: 0.02, dauer: 1.8 }, begleit: { art: 'triangle', laut: 0.07, anschlag: 0.003, dauer: 0.6 }, lead: { art: 'square', laut: 0.035, anschlag: 0.01, dauer: 0.8, oktave: 12, filter: 1800 }, muster: 'treiben', trommel: 'tamburin', takte: 24 },
-  { id: 7, name: 'Bergklang', biom: 'berg', tempo: 70, grund: 60, skala: MOLL, akkorde: [0, 5, 2, 6, 0, 3, 4, 0], seed: 7, bass: { ...BASS, laut: 0.24 }, begleit: { art: 'sawtooth', laut: 0.035, anschlag: 0.4, dauer: 7.5, filter: 900 }, lead: { art: 'sawtooth', laut: 0.04, anschlag: 0.06, dauer: 1.6, filter: 1400 }, muster: 'akkord', trommel: 'pauke', takte: 16 },
-  { id: 8, name: 'Schleimkoenig', biom: 'boss', tempo: 132, grund: 62, skala: HARM_MOLL, akkorde: [0, 0, 5, 4, 0, 0, 3, 4], seed: 8, bass: { art: 'square', laut: 0.06, anschlag: 0.005, dauer: 0.45, filter: 700 }, begleit: { art: 'triangle', laut: 0.06, anschlag: 0.003, dauer: 0.5 }, lead: { art: 'sawtooth', laut: 0.035, anschlag: 0.01, dauer: 0.9, oktave: 12, filter: 2200 }, muster: 'treiben', trommel: 'pauke', takte: 32 },
+  { id: 1, name: 'Wanderweise', biom: 'wiese', tempo: 92, grund: 62, skala: DORISCH, akkorde: [0, 6, 5, 6], weise: WANDERWEISE, seed: 1, bass: BASS, begleit: ZUPF, lead: FLOETE, muster: 'zupf' },
+  { id: 2, name: 'Morgenlied', biom: 'wiese', tempo: 100, grund: 67, skala: DUR, akkorde: [0, 3, 4, 0, 5, 3, 4, 4], seed: 2, bass: BASS, begleit: { ...ZUPF, laut: 0.06 }, lead: LAUTE, muster: 'zupf' },
+  {
+    id: 3,
+    name: 'Waldlied',
+    biom: 'wald',
+    tempo: 80,
+    grund: 64,
+    skala: DORISCH,
+    akkorde: WALD_AKK_A,
+    seed: 3,
+    bass: BASS,
+    begleit: { ...ZUPF, laut: 0.05, dauer: 3 },
+    lead: { ...FLOETE, laut: 0.1 },
+    muster: 'zupf',
+    // Vorspiel im Moos, das Lied, dasselbe auf der Harfe mit Echo, der hohe
+    // Teil B, eine Lichtung mit neuer Weise - zusammen gut drei Minuten.
+    teile: {
+      vor: { akkorde: [0, 3, 0, 3], lead: null, muster: 'akkord', begleit: FLAECHE },
+      A: { akkorde: WALD_AKK_A, weise: WALD_A },
+      A2: { akkorde: WALD_AKK_A, weise: WALD_A, muster: 'harfe', begleit: HARFE, lead: { ...LAUTE, laut: 0.07, echo: 0.3 } },
+      B: { akkorde: [2, 6, 3, 0, 2, 6, 4, 4], weise: WALD_B, trommel: 'tamburin' },
+      lichtung: { akkorde: [0, 6, 2, 3, 0, 6, 4, 4], seed: 33, muster: 'akkord', begleit: FLAECHE, lead: { art: 'sine', laut: 0.08, anschlag: 0.06, dauer: 1.4, oktave: 12, echo: 0.4 } },
+      nach: { akkorde: [0, 3, 0, 0], lead: null, muster: 'harfe', begleit: HARFE },
+    },
+    folge: ['vor', 'A', 'A2', 'B', 'A', 'lichtung', 'B', 'A2', 'nach'],
+  },
+  { id: 4, name: 'Moos und Farn', biom: 'wald', tempo: 72, grund: 57, skala: MOLL, akkorde: [0, 5, 3, 4], seed: 4, bass: { ...BASS, laut: 0.18 }, begleit: FLAECHE, lead: { art: 'sine', laut: 0.08, anschlag: 0.08, dauer: 1.2, oktave: 12 }, muster: 'akkord' },
+  { id: 5, name: 'Wuestenwind', biom: 'wueste', tempo: 96, grund: 62, skala: HIJAZ, akkorde: [0, 0, 6, 0, 5, 6, 1, 0], seed: 5, bass: { art: 'sine', laut: 0.2, anschlag: 0.1, dauer: 8 }, begleit: { art: 'triangle', laut: 0.08, anschlag: 0.003, dauer: 0.9 }, lead: { art: 'triangle', laut: 0.09, anschlag: 0.005, dauer: 0.7, oktave: 12 }, muster: 'bordun', trommel: 'tamburin' },
+  { id: 6, name: 'Sandsturm', biom: 'wueste', tempo: 112, grund: 64, skala: HIJAZ, akkorde: [0, 1, 0, 6, 0, 1, 5, 0], seed: 6, bass: { art: 'triangle', laut: 0.16, anschlag: 0.02, dauer: 1.8 }, begleit: { art: 'triangle', laut: 0.07, anschlag: 0.003, dauer: 0.6 }, lead: { art: 'square', laut: 0.035, anschlag: 0.01, dauer: 0.8, oktave: 12, filter: 1800 }, muster: 'treiben', trommel: 'tamburin' },
+  { id: 7, name: 'Bergklang', biom: 'berg', tempo: 70, grund: 60, skala: MOLL, akkorde: [0, 5, 2, 6, 0, 3, 4, 0], seed: 7, bass: { ...BASS, laut: 0.24 }, begleit: { art: 'sawtooth', laut: 0.035, anschlag: 0.4, dauer: 7.5, filter: 900 }, lead: { art: 'sawtooth', laut: 0.04, anschlag: 0.06, dauer: 1.6, filter: 1400 }, muster: 'akkord', trommel: 'pauke' },
+  { id: 8, name: 'Schleimkoenig', biom: 'boss', fuer: 'koenig', tempo: 132, grund: 62, skala: HARM_MOLL, akkorde: [0, 0, 5, 4, 0, 0, 3, 4], seed: 8, bass: { art: 'square', laut: 0.06, anschlag: 0.005, dauer: 0.45, filter: 700 }, begleit: { art: 'triangle', laut: 0.06, anschlag: 0.003, dauer: 0.5 }, lead: { art: 'sawtooth', laut: 0.035, anschlag: 0.01, dauer: 0.9, oktave: 12, filter: 2200 }, muster: 'treiben', trommel: 'pauke' },
+  { id: 9, name: 'Feldweg', biom: 'wiese', tempo: 108, grund: 65, skala: DUR, akkorde: [0, 4, 5, 3, 0, 4, 3, 4], akkordeB: [5, 3, 0, 4, 5, 3, 1, 4], seed: 9, bass: BASS, begleit: HARFE, lead: LAUTE, muster: 'harfe', trommel: 'tamburin' },
+  { id: 10, name: 'Eulenhain', biom: 'wald', tempo: 66, grund: 62, skala: MOLL, akkorde: [0, 5, 2, 6], seed: 10, bass: { ...BASS, laut: 0.18 }, begleit: FLAECHE, lead: { art: 'sine', laut: 0.085, anschlag: 0.05, dauer: 1.3, oktave: 12, echo: 0.4 }, muster: 'akkord' },
+  { id: 11, name: 'Oase', biom: 'wueste', tempo: 84, grund: 60, skala: HIJAZ, akkorde: [0, 1, 0, 6, 0, 5, 1, 0], seed: 11, bass: { art: 'sine', laut: 0.2, anschlag: 0.1, dauer: 8 }, begleit: { art: 'triangle', laut: 0.07, anschlag: 0.003, dauer: 1.2 }, lead: { art: 'sine', laut: 0.09, anschlag: 0.03, dauer: 1, oktave: 12, echo: 0.35 }, muster: 'bordun' },
+  { id: 12, name: 'Gipfelwind', biom: 'berg', tempo: 76, grund: 55, skala: DORISCH, akkorde: [0, 6, 3, 0, 0, 6, 2, 4], seed: 12, bass: { ...BASS, laut: 0.24 }, begleit: { art: 'sawtooth', laut: 0.03, anschlag: 0.02, dauer: 0.8, filter: 1100 }, lead: { art: 'sawtooth', laut: 0.04, anschlag: 0.05, dauer: 1.4, oktave: 12, filter: 1600, echo: 0.3 }, muster: 'puls', trommel: 'pauke' },
+  { id: 13, name: 'Frostnacht', biom: 'schnee', tempo: 70, grund: 67, skala: LYDISCH, akkorde: [0, 1, 0, 4, 0, 1, 5, 4], seed: 13, bass: { ...BASS, laut: 0.18 }, begleit: HARFE, lead: GLOCKE, muster: 'harfe' },
+  { id: 14, name: 'Kristallhang', biom: 'schnee', tempo: 88, grund: 64, skala: DUR, akkorde: [0, 5, 3, 4], seed: 14, bass: BASS, begleit: { ...ZUPF, laut: 0.05 }, lead: { ...GLOCKE, echo: 0.25 }, muster: 'zupf' },
+  { id: 15, name: 'Nebelmoor', biom: 'sumpf', tempo: 64, grund: 57, skala: PHRYGISCH, akkorde: [0, 1, 0, 6, 0, 1, 3, 0], seed: 15, bass: { ...BASS, laut: 0.2 }, begleit: { art: 'sawtooth', laut: 0.03, anschlag: 0.5, dauer: 7.5, filter: 700 }, lead: { art: 'sawtooth', laut: 0.04, anschlag: 0.08, dauer: 1.5, oktave: 12, filter: 1000, echo: 0.4 }, muster: 'bordun' },
+  { id: 16, name: 'Irrlicht', biom: 'sumpf', tempo: 92, grund: 60, skala: MOLL, akkorde: [0, 5, 6, 4], seed: 16, bass: { ...BASS, laut: 0.18 }, begleit: { art: 'triangle', laut: 0.05, anschlag: 0.005, dauer: 0.6 }, lead: { art: 'triangle', laut: 0.07, anschlag: 0.01, dauer: 0.9, oktave: 12, echo: 0.35 }, muster: 'puls' },
+  { id: 17, name: 'Schattentanz', biom: 'boss', fuer: 'schatten', tempo: 140, grund: 60, skala: PHRYGISCH, akkorde: [0, 1, 0, 6, 0, 1, 5, 6], seed: 17, bass: { art: 'square', laut: 0.055, anschlag: 0.005, dauer: 0.4, filter: 600 }, begleit: { art: 'triangle', laut: 0.06, anschlag: 0.003, dauer: 0.45 }, lead: { art: 'square', laut: 0.03, anschlag: 0.01, dauer: 0.8, oktave: 12, filter: 1900, echo: 0.3 }, muster: 'treiben', trommel: 'pauke' },
+  { id: 18, name: 'Gelee-Koloss', biom: 'boss', fuer: 'koloss', tempo: 104, grund: 55, skala: HARM_MOLL, akkorde: [0, 0, 5, 5, 3, 3, 4, 4], seed: 18, bass: { art: 'sawtooth', laut: 0.05, anschlag: 0.01, dauer: 0.6, filter: 500 }, begleit: { art: 'sawtooth', laut: 0.03, anschlag: 0.02, dauer: 0.5, filter: 1200 }, lead: { art: 'sawtooth', laut: 0.04, anschlag: 0.02, dauer: 1.2, oktave: 12, filter: 1700 }, muster: 'treiben', trommel: 'marsch' },
 ];
 
 let ctx: AudioContext | null = null;
@@ -144,11 +234,15 @@ function kontext(): AudioContext | null {
 
 // --- Spieler: ein Stueck mit eigenem Ausgang (fuers Ueberblenden) ----------
 
-type Spieler = { track: Track; aus: GainNode; naechster: number; takt: number; ende: number | null; weise: Weise };
+/** Ein geplanter Takt: Akkord, Weise (oder keine) und wie begleitet wird. */
+type Takt = { akk: number; noten: [number | null, number][] | null; muster: Muster; trommel: Trommel | null; lead: Instrument; begleit: Instrument };
+
+type Spieler = { track: Track; aus: GainNode; naechster: number; takt: number; ende: number | null; plan: Takt[] };
 let spieler: Spieler[] = [];
 let biom: Biom = 'wiese';
+let bossWahl: string | undefined;
 /** Position in der Warteschlange je Biom. */
-const platz: Record<Biom, number> = { wiese: 0, wald: 0, wueste: 0, berg: 0, boss: 0 };
+const platz: Record<Biom, number> = { wiese: 0, wald: 0, wueste: 0, berg: 0, schnee: 0, sumpf: 0, boss: 0 };
 const hoerer = new Set<(t: Track | null) => void>();
 
 /** Zufall aus einem Startwert - jedes Stueck klingt bei jedem Start gleich. */
@@ -162,24 +256,29 @@ function zufall(seed: number): () => number {
   };
 }
 
-/** Eine Weise erzeugen: Akkordtoene auf den Schlaegen, Durchgaenge dazwischen. */
-function erzeugeWeise(t: Track): Weise {
-  const z = zufall(t.seed);
-  const RHYTHMEN = [[2, 2, 2, 2], [2, 1, 1, 4], [3, 1, 2, 2], [4, 2, 2], [1, 1, 2, 1, 1, 2], [2, 2, 4], [6, 2]];
-  let stufe = 4;
-  return t.akkorde.map((akk, i) => {
-    const rhythmus = RHYTHMEN[Math.floor(z() * RHYTHMEN.length)]!;
-    const takt: [number | null, number][] = [];
-    rhythmus.forEach((laenge, k) => {
-      // Auf dem ersten Schlag ein Akkordton, sonst ein kleiner Schritt.
-      if (k === 0) stufe = akk + [0, 2, 4][Math.floor(z() * 3)]!;
-      else stufe += [-2, -1, -1, 1, 1, 2][Math.floor(z() * 6)]!;
-      stufe = Math.max(-1, Math.min(9, stufe));
-      const pause = k > 0 && z() < 0.12;
-      takt.push([pause ? null : tonVon(t, stufe), laenge]);
+/**
+ * Eine Weise erzeugen: Akkordtoene auf den Schlaegen, Durchgaenge dazwischen.
+ * Je vier Takte: zwei Takte Motiv, ein freier Takt, ein ruhiger Schluss - und
+ * das Motiv kehrt in der naechsten Vierergruppe wieder, auf dem neuen Akkord.
+ */
+function erzeugeWeise(t: Track, akkorde: number[], seed: number): Weise {
+  const z = zufall(seed);
+  const RHYTHMEN = [[2, 2, 2, 2], [2, 1, 1, 4], [3, 1, 2, 2], [4, 2, 2], [1, 1, 2, 1, 1, 2], [2, 2, 4], [3, 1, 3, 1], [2, 1, 1, 2, 2]];
+  const SCHLUSS = [[4, 4], [2, 2, 4], [6, 2], [3, 1, 4]];
+  type Gestalt = { r: number[]; s: number[]; start: number };
+  const neu = (r: number[]): Gestalt => ({ r, s: r.map(() => [-2, -1, -1, 1, 1, 2][Math.floor(z() * 6)]!), start: Math.floor(z() * 3) });
+  const motiv = [neu(RHYTHMEN[Math.floor(z() * RHYTHMEN.length)]!), neu(RHYTHMEN[Math.floor(z() * RHYTHMEN.length)]!)];
+  return akkorde.map((akk, i) => {
+    const pos = i % 4;
+    const g = pos < 2 ? motiv[pos]! : neu(pos === 2 ? RHYTHMEN[Math.floor(z() * RHYTHMEN.length)]! : SCHLUSS[Math.floor(z() * SCHLUSS.length)]!);
+    let stufe = akk + [0, 2, 4][g.start]!;
+    const takt: [number | null, number][] = g.r.map((laenge, k) => {
+      if (k > 0) stufe = Math.max(-1, Math.min(9, stufe + g.s[k]!));
+      const pause = k > 0 && pos !== 3 && z() < 0.1;
+      return [pause ? null : tonVon(t, Math.min(9, stufe)), laenge];
     });
-    // Jeder vierte Takt endet ruhig.
-    if (i % 4 === 3) takt[takt.length - 1] = [tonVon(t, akk), takt[takt.length - 1]![1]];
+    // Jede Vierergruppe endet ruhig auf dem Akkordton.
+    if (pos === 3) takt[takt.length - 1] = [tonVon(t, akk), takt[takt.length - 1]![1]];
     return takt;
   });
 }
@@ -188,6 +287,60 @@ function tonVon(t: Track, stufe: number): number {
   const n = t.skala.length;
   const okt = Math.floor(stufe / n);
   return t.grund + okt * 12 + t.skala[((stufe % n) + n) % n]!;
+}
+
+/** Gegenteil B, wenn ein Stueck keines hat: Unterdominante, zurueck zur Dominante. */
+const AKKORDE_B = [3, 0, 5, 4, 3, 0, 4, 4];
+/** Auf acht Takte bringen - kurze Akkordfolgen wiederholen sich. */
+const achtTakte = (akk: number[]) => Array.from({ length: Math.max(8, akk.length) }, (_, i) => akk[i % akk.length]!);
+
+/**
+ * Die Standardfolge fuer Stuecke ohne eigene Teile: A, A, B, A, ein
+ * Zwischenspiel ohne Weise, B, und A im anderen Klang (Echo, Harfe).
+ */
+function standardTeile(t: Track): { teile: Record<string, Teil>; folge: string[] } {
+  const a = achtTakte(t.akkorde);
+  const anders: Muster = t.muster === 'harfe' ? 'zupf' : t.muster === 'treiben' ? 'treiben' : 'harfe';
+  return {
+    teile: {
+      A: { akkorde: a, weise: t.weise, seed: t.seed },
+      B: { akkorde: achtTakte(t.akkordeB ?? AKKORDE_B), seed: t.seed + 100 },
+      zwischen: { akkorde: a.slice(0, 4), lead: null, trommel: null },
+      A2: { akkorde: a, weise: t.weise, seed: t.seed, muster: anders, lead: { ...t.lead, echo: t.lead.echo ?? 0.3 } },
+    },
+    folge: ['A', 'A', 'B', 'A', 'zwischen', 'B', 'A2'],
+  };
+}
+
+/** Das ganze Stueck Takt fuer Takt - so lange spielt es, bevor das naechste kommt. */
+function planeStueck(t: Track): Takt[] {
+  const { teile, folge } = t.teile && t.folge ? { teile: t.teile, folge: t.folge } : standardTeile(t);
+  const weisen = new Map<string, Weise>();
+  const plan: Takt[] = [];
+  for (const name of folge) {
+    const teil = teile[name]!;
+    let weise = weisen.get(name);
+    if (!weise) {
+      weise = teil.weise ?? erzeugeWeise(t, teil.akkorde, teil.seed ?? t.seed);
+      weisen.set(name, weise);
+    }
+    teil.akkorde.forEach((akk, i) =>
+      plan.push({
+        akk,
+        noten: teil.lead === null ? null : weise![i % weise!.length]!,
+        muster: teil.muster ?? t.muster,
+        trommel: teil.trommel === undefined ? (t.trommel ?? null) : teil.trommel,
+        lead: teil.lead ?? t.lead,
+        begleit: teil.begleit ?? t.begleit,
+      }),
+    );
+  }
+  return plan;
+}
+
+/** Wie lange ein Stueck dauert (Sekunden) - fuer die Anzeige. */
+export function stueckDauer(t: Track): number {
+  return (planeStueck(t).length * 8 * 60) / t.tempo / 2;
 }
 
 function spiele(sp: Spieler, inst: Instrument, midi: number, t: number, laenge: number): void {
@@ -231,31 +384,45 @@ function schlag(sp: Spieler, t: number, art: 'tamburin' | 'pauke', laut: number)
 function planeTakt(sp: Spieler, t: number): void {
   const tr = sp.track;
   const achtel = 60 / tr.tempo / 2;
-  const nr = sp.takt;
-  const akk = tr.akkorde[nr % tr.akkorde.length]!;
+  const takt = sp.plan[sp.takt % sp.plan.length]!;
+  const { akk, muster, begleit } = takt;
   const grund = tonVon(tr, akk) - 24;
-  const dreiklang = [akk, akk + 2, akk + 4, akk + 7].map((x) => tonVon(tr, x) - 12);
+  const dreiklang = [akk, akk + 2, akk + 4, akk + 7, akk + 9].map((x) => tonVon(tr, x) - 12);
   // Bass und Begleitung.
-  if (tr.muster === 'treiben') {
+  if (muster === 'treiben') {
     for (let k = 0; k < 8; k++) spiele(sp, tr.bass, grund + (k % 4 === 3 ? 7 : 0), t + k * achtel, achtel);
-    [0, 2, 4, 6].forEach((k, i) => spiele(sp, tr.begleit, dreiklang[i % 3]! + 12, t + k * achtel + achtel, achtel));
+    [0, 2, 4, 6].forEach((k, i) => spiele(sp, begleit, dreiklang[i % 3]! + 12, t + k * achtel + achtel, achtel));
   } else {
     spiele(sp, tr.bass, grund, t, achtel);
-    if (tr.muster === 'zupf') [0, 1, 2, 3, 2, 1, 2, 3].forEach((i, k) => spiele(sp, tr.begleit, dreiklang[i]!, t + k * achtel, achtel));
-    else if (tr.muster === 'akkord') dreiklang.slice(0, 3).forEach((n) => spiele(sp, tr.begleit, n, t, achtel));
-    else if (tr.muster === 'bordun') {
+    if (muster === 'zupf') [0, 1, 2, 3, 2, 1, 2, 3].forEach((i, k) => spiele(sp, begleit, dreiklang[i]!, t + k * achtel, achtel));
+    else if (muster === 'akkord') dreiklang.slice(0, 3).forEach((n) => spiele(sp, begleit, n, t, achtel));
+    else if (muster === 'harfe') {
+      // Hinauf und hinab ueber gut eine Oktave.
+      [0, 1, 2, 3, 4, 3, 2, 1].forEach((i, k) => spiele(sp, begleit, dreiklang[i]!, t + k * achtel, achtel));
+    } else if (muster === 'puls') {
+      // Der Akkord auf 1, 2+ und 4 - ein ruhiges Stolpern.
+      spiele(sp, tr.bass, grund + 7, t + 4 * achtel, achtel);
+      [0, 3, 6].forEach((k) => dreiklang.slice(0, 3).forEach((n) => spiele(sp, { ...begleit, laut: begleit.laut * 0.6 }, n, t + k * achtel, achtel)));
+    } else if (muster === 'bordun') {
       // Wueste: ein liegender Grundton, die Laute zupft Grundton und Quinte im Wechsel.
-      [0, 3, 4, 6].forEach((k, i) => spiele(sp, tr.begleit, i % 2 ? grund + 31 : grund + 24, t + k * achtel, achtel));
+      [0, 3, 4, 6].forEach((k, i) => spiele(sp, begleit, i % 2 ? grund + 31 : grund + 24, t + k * achtel, achtel));
     }
   }
-  if (tr.trommel === 'tamburin') [1, 3, 5, 6, 7].forEach((k) => schlag(sp, t + k * achtel, 'tamburin', k % 2 ? 0.05 : 0.08));
-  if (tr.trommel === 'pauke') [0, 4].forEach((k) => schlag(sp, t + k * achtel, 'pauke', 0.35));
-  // Die Weise: zwei Durchgaenge, dann einer Pause.
-  const runde = Math.floor(nr / sp.weise.length);
-  if (runde % 3 === 2) return;
+  if (takt.trommel === 'tamburin') [1, 3, 5, 6, 7].forEach((k) => schlag(sp, t + k * achtel, 'tamburin', k % 2 ? 0.05 : 0.08));
+  if (takt.trommel === 'pauke') [0, 4].forEach((k) => schlag(sp, t + k * achtel, 'pauke', 0.35));
+  if (takt.trommel === 'marsch') {
+    [0, 3, 4].forEach((k) => schlag(sp, t + k * achtel, 'pauke', 0.35));
+    [2, 6].forEach((k) => schlag(sp, t + k * achtel, 'tamburin', 0.07));
+  }
+  // Die Weise - mit leisem Nachklang, wenn das Instrument ein Echo hat.
+  if (!takt.noten) return;
+  const lead = takt.lead;
   let pos = 0;
-  for (const [n, l] of sp.weise[nr % sp.weise.length]!) {
-    if (n !== null) spiele(sp, tr.lead, n, t + pos * achtel, l * achtel);
+  for (const [n, l] of takt.noten) {
+    if (n !== null) {
+      spiele(sp, lead, n, t + pos * achtel, l * achtel);
+      if (lead.echo) spiele(sp, { ...lead, laut: lead.laut * lead.echo }, n, t + (pos + 3) * achtel, l * achtel);
+    }
     pos += l;
   }
 }
@@ -274,16 +441,19 @@ function weiter(): void {
   // Ausgeblendete Stuecke wegraeumen.
   for (const sp of spieler.filter((x) => x.ende !== null && x.ende + 1 < jetzt)) sp.aus.disconnect();
   spieler = spieler.filter((x) => x.ende === null || x.ende + 1 >= jetzt);
-  // Hat das laufende Stueck genug gespielt, kommt das naechste der Warteschlange.
+  // Hat das laufende Stueck seine Folge gespielt, kommt das naechste der Warteschlange.
   const laufend = spieler.find((x) => x.ende === null);
-  if (laufend && laufend.takt >= laufend.track.takte) {
+  if (laufend && laufend.takt >= laufend.plan.length) {
     platz[biom] += 1;
-    blendeZu(trackFuer(biom));
+    blendeZu(trackFuer(biom, bossWahl));
   }
 }
 
-function trackFuer(b: Biom): Track {
-  const liste = TRACKS.filter((t) => t.biom === b);
+/** Das Stueck fuer eine Landschaft - beim Boss sein eigenes Thema, wenn es eines gibt. */
+function trackFuer(b: Biom, wahl?: string): Track {
+  const alle = TRACKS.filter((t) => t.biom === b);
+  const eigene = wahl ? alle.filter((t) => t.fuer === wahl) : [];
+  const liste = eigene.length ? eigene : alle;
   return liste[platz[b] % liste.length]!;
 }
 
@@ -302,7 +472,7 @@ function blendeZu(t: Track): void {
   aus.gain.setValueAtTime(0.0001, jetzt);
   aus.gain.linearRampToValueAtTime(0.5, jetzt + (spieler.length ? UEBERBLENDEN : 0.3));
   aus.connect(gesamtAusgang(ctx));
-  spieler.push({ track: t, aus, naechster: jetzt + 0.1, takt: 0, ende: null, weise: t.weise ?? erzeugeWeise(t) });
+  spieler.push({ track: t, aus, naechster: jetzt + 0.1, takt: 0, ende: null, plan: planeStueck(t) });
   for (const h of hoerer) h(t);
 }
 
@@ -317,11 +487,12 @@ export function beiTrack(fn: (t: Track | null) => void): () => void {
   return () => hoerer.delete(fn);
 }
 
-/** Die Landschaft des Ritters - wechselt sie, blendet ihr Thema ein. */
-export function setzeBiom(b: Biom): void {
-  if (b === biom) return;
+/** Die Landschaft des Ritters - wechselt sie, blendet ihr Thema ein. Beim Boss: welcher (bossArt). */
+export function setzeBiom(b: Biom, wahl?: string): void {
+  if (b === biom && (b !== 'boss' || wahl === bossWahl)) return;
   biom = b;
-  if (uhr !== null) blendeZu(trackFuer(b));
+  bossWahl = b === 'boss' ? wahl : undefined;
+  if (uhr !== null) blendeZu(trackFuer(b, bossWahl));
 }
 
 /** Musik starten - erst nach einer Geste (Tippen, Taste), sonst schweigt der Browser. */
@@ -331,7 +502,7 @@ export function starteMusik(): void {
     if (!kontext() || !ctx) return;
     void ctx.resume();
     uhr = window.setInterval(weiter, 120);
-    blendeZu(trackFuer(biom));
+    blendeZu(trackFuer(biom, bossWahl));
     weiter();
   } catch {
     // Kein Ton - das Spiel geht auch still.

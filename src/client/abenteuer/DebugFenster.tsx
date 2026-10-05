@@ -74,7 +74,9 @@ const SCHLEIME: {
   { art: 'spuck', name: 'Spuck' },
   { art: 'spring', name: 'Spring' },
   { art: 'panzer', name: 'Panzer' },
-  { art: 'koenig', name: 'Koenig' },
+  { art: 'gift', name: 'Gift' },
+  { art: 'teil', name: 'Teil' },
+  { art: 'geist', name: 'Geist' },
 ];
 
 export function DebugFenster({
@@ -271,7 +273,17 @@ export function DebugFenster({
                 {s.name}
               </button>
             ))}
-            <small>Legendaer</small>
+            <small>Bosse</small>
+        <button className="ab-debug-wahl" onClick={() => onAktion({ t: 'boss', art: 'koenig' })}>
+          Koenig
+        </button>
+        <button className="ab-debug-wahl" onClick={() => onAktion({ t: 'boss', art: 'schatten' })}>
+          Schatten
+        </button>
+        <button className="ab-debug-wahl" onClick={() => onAktion({ t: 'boss', art: 'koloss' })}>
+          Koloss
+        </button>
+        <small>Legendaer</small>
             <button className="ab-debug-wahl" onClick={() => onAktion({ t: 'legendaer', id: 'sololeveling' })}>
               Solo-Leveling
             </button>
