@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { istWasser } from '../src/abenteuer/welt';
 import type { Boden } from '../src/abenteuer/welt';
-import { angelbar, angeln, betretbar, kannAngeln, BOSS_LEBEN, BOSS_NACH, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden, vergleich, naechsterBoss, KREIS_DAUER, PENTA_BOSS_NACH, verkaufen, verkaufsPreis, kaufen, ansprechen, anheuern, werberAngebot, PENTA_STUFE3_NACH, BESCHWOERUNG_VOLL, beschwoeren, angeheuerte, kannNeuWuerfeln, neuWuerfeln, WUERFEL_EFFEKT } from '../src/abenteuer/regeln';
+import { angelbar, angeln, betretbar, kannAngeln, BOSS_LEBEN, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden, vergleich, naechsterBoss, KREIS_DAUER, PENTA_BOSS_NACH, verkaufen, verkaufsPreis, kaufen, ansprechen, anheuern, werberAngebot, PENTA_STUFE3_NACH, BESCHWOERUNG_VOLL, beschwoeren, angeheuerte, kannNeuWuerfeln, neuWuerfeln, WUERFEL_EFFEKT, aktZiel, waehlen, abenteuerPunkte, ruhmFuer, faehigkeitBereit, faehigkeitNutzen } from '../src/abenteuer/regeln';
 import type { Abenteuer, Taste } from '../src/abenteuer/regeln';
 import { HEX_DIRS, hexDistance, hexesInRange as hexesInRangeTest } from '../src/core/coords';
 
@@ -199,17 +199,16 @@ describe('Abenteuer', () => {
     throw new Error('kein Start neben einem Berg');
   });
 
-  it('nach acht Schleimen erwacht der Schleimkoenig - bezwungen laesst er Legendaeres fallen, und es geht weiter', () => {
+  it('Akte: nach AKT_ZIEL Gegnern erwacht der Boss des Akts - bezwungen waehlt man Legendaeres, der naechste Akt beginnt', () => {
     const a0 = neuesAbenteuer(11);
+    expect(a0.akt).toBe(1);
     let b = imZug(11, [{ id: 99, q: a0.pos.q + 1, r: a0.pos.r, leben: 1, gross: false }], 20);
-    b.erschlagen = BOSS_NACH - 1;
+    b.aktKills = aktZiel(b) - 1;
     for (let i = 0; i < 20 && b.schleime.some((x) => x.id === 99) && b.phase === 'ziehen'; i++) b = taste(b, 'd');
-    expect(b.erschlagen).toBe(BOSS_NACH);
     const koenig = b.schleime.find((x) => x.boss);
-    expect(koenig?.leben).toBe(BOSS_LEBEN);
+    expect(koenig?.bossArt).toBe('koenig');
     expect(b.bossErwacht).toBe(true);
-    expect(b.phase).not.toBe('sieg');
-    // Der Koenig faellt: Sieg.
+    // Der Koenig faellt: eine Wahl aus drei Legendaeren, dann Akt 2.
     const c = structuredClone(b);
     c.phase = 'ziehen';
     c.schritte = 30;
@@ -217,11 +216,68 @@ describe('Abenteuer', () => {
     c.schleime = [{ ...koenig!, q: c.pos.q + 1, r: c.pos.r, leben: 1, angriff: null, flaeche: null }];
     let d = c;
     for (let i = 0; i < 30 && d.schleime.some((x) => x.boss); i++) d = taste(d, 'd');
-    expect(d.schleime.some((x) => x.boss)).toBe(false);
-    expect(d.phase).not.toBe('sieg');
-    expect(d.koenige).toBe(1);
-    expect(d.legendaer?.length).toBe(1);
-    expect(d.bossErwacht).toBe(false);
+    expect(d.akt).toBe(2);
+    expect(d.aktKills).toBe(0);
+    expect(d.wahl?.art).toBe('boss');
+    expect(d.wahl?.optionen).toHaveLength(3);
+    // Solange die Wahl offen ist, ruht das Spiel.
+    expect(taste(d, 'd')).toBe(d);
+    const e = waehlen(d, 0);
+    expect(e.wahl).toBeNull();
+    expect(e.legendaer?.length ?? 0).toBeGreaterThan(0);
+    expect(naechsterBoss(e)).toBe('schatten');
+  });
+
+  it('der Endboss (Akt 3) entscheidet das Abenteuer: Sieg und Punkte', () => {
+    const a0 = neuesAbenteuer(11);
+    let b = imZug(11, [], 30);
+    b.akt = 3;
+    b.leben = 99;
+    b.schleime = [{ id: 50, q: a0.pos.q + 1, r: a0.pos.r, leben: 1, max: 22, gross: true, boss: true, bossArt: 'koloss', zaehler: 0 }];
+    const vorher = abenteuerPunkte(b);
+    for (let i = 0; i < 30 && b.schleime.some((x) => x.boss); i++) b = taste(b, 'd');
+    expect(b.phase).toBe('sieg');
+    expect(abenteuerPunkte(b)).toBeGreaterThan(vorher + 1000);
+    expect(ruhmFuer(b)).toBeGreaterThan(50);
+  });
+
+  it('Truhen bieten 1 aus 3; Akt 1 beginnt ruhig', () => {
+    let a = imZug(13, [], 10);
+    a = structuredClone(a);
+    // Eine Truhe auf dem Nachbarfeld simulieren: die Wahl direkt anbieten.
+    a.wahl = null;
+    const t = freieTaste(a);
+    const [dq, dr] = HEX_DIRS[['e', 'd', 'x', 'z', 'a', 'q'].indexOf(t)]!;
+    // Suche einen Seed mit Truhe neben dem Start.
+    for (let seed = 1; seed < 3000; seed++) {
+      const s0 = neuesAbenteuer(seed);
+      const ziel = { q: s0.pos.q + dq, r: s0.pos.r + dr };
+      if (fundAuf(s0, ziel.q, ziel.r) !== 'truhe' || !eben(gelaende(seed, ziel.q, ziel.r))) continue;
+      const b = taste(imZug(seed, [], 10), t);
+      expect(b.wahl?.art).toBe('truhe');
+      expect(new Set(b.wahl!.optionen).size).toBe(3);
+      const c = waehlen(b, 1);
+      const id = b.wahl!.optionen[1]!;
+      expect((c.inventar[id] ?? 0) + (Object.values(c.ausruestung).includes(id) ? 1 : 0)).toBeGreaterThan(0);
+      break;
+    }
+    // Kein Schleim naeher als 5 Felder am Start.
+    for (let seed = 1; seed < 30; seed++) {
+      const s0 = neuesAbenteuer(seed);
+      for (const s of s0.schleime) expect(hexDistance(s, s0.pos)).toBeGreaterThanOrEqual(5);
+    }
+  });
+
+  it('Klassen: jede beginnt anders', () => {
+    const z = neuesAbenteuer(5, { klasse: 'zwerg' });
+    expect(z.ausruestung.waffe).toBe('axt');
+    expect(z.ausruestung.kopf).toBe('helm');
+    expect(maxLebenVon(z)).toBe(7);
+    const w = neuesAbenteuer(5, { klasse: 'waldlaeufer', extras: ['kraeuter', 'geldkatze'] });
+    expect(w.ausruestung.fuesse).toBe('stiefel');
+    expect(w.inventar['kraut']).toBe(2);
+    expect(w.inventar['gold']).toBe(10);
+    expect(maxLebenVon(neuesAbenteuer(5, { klasse: 'schwarz' }))).toBe(4);
   });
 
   it('der Koenig sagt Schlag oder Ring an und handelt nur jeden zweiten Tick', () => {
@@ -351,9 +407,12 @@ describe('Abenteuer', () => {
     const zurueck = (['e', 'd', 'x', 'z', 'a', 'q'] as Taste[])[(['e', 'd', 'x', 'z', 'a', 'q'].indexOf(t) + 3) % 6]!;
     for (let i = 0; i < 6; i++) a = taste(a, i % 2 ? zurueck : t);
     expect(a.ladung).toBe(6);
-    // Der siebte Schritt fuellt den Balken: Feuerkreis um den Ritter.
+    // Der siebte Schritt fuellt den Balken - die Faehigkeit wartet auf Taste 1.
     a.schleime = [{ id: 70, q: a0.pos.q, r: a0.pos.r - 1, leben: 2, gross: false }];
     a = taste(a, i6(a, t, zurueck));
+    expect(faehigkeitBereit(a)).toBe(true);
+    expect(a.ereignisse.some((e) => e.art === 'geladen')).toBe(true);
+    a = faehigkeitNutzen(a);
     expect(a.ereignisse.some((e) => e.art === 'faehigkeit' && e.name === 'feuerkreis')).toBe(true);
     expect(a.ladung).toBe(0);
   });
@@ -775,7 +834,7 @@ describe('Abenteuer', () => {
     expect(heil.leben).toBe(3.5);
     // Funkenwuerfel: eine 6 entfesselt die Faehigkeit der Waffe (Flammenschwert: Feuerkreis).
     const funken = wurfMit('funkenwuerfel', true, (a) => (a.ausruestung = { ...a.ausruestung, waffe: 'flammenschwert' }));
-    expect(funken.ereignisse.some((e) => e.art === 'faehigkeit' && e.name === 'feuerkreis')).toBe(true);
+    expect(faehigkeitBereit(funken)).toBe(true);
     // Runenwuerfel: 5 oder 6 - Funken auf Gegner bis zwei Felder.
     const rune = wurfMit('runenwuerfel', true, (a) => (a.schleime = [{ id: 7, q: a.pos.q + 2, r: a.pos.r, leben: 3, gross: false }]));
     expect(rune.schleime[0]!.leben).toBe(2);

@@ -25,6 +25,17 @@ import type { CSSProperties } from 'react';
 import {
   FAEHIGKEIT_NAME,
   FRAKTION_FIGUR,
+  AKTE,
+  AKT_NAME,
+  KLASSEN,
+  START_EXTRAS,
+  abenteuerPunkte,
+  aktZiel,
+  faehigkeitBereit,
+  faehigkeitNutzen,
+  haendlerWaren,
+  ruhmFuer,
+  waehlen,
   WUERFEL_SEITEN,
   WUERFEL_EFFEKT,
   kannNeuWuerfeln,
@@ -35,11 +46,9 @@ import {
   angeheuerte,
   beschwoeren,
   meisterZauber,
-  BOSS_NACH,
   BOSS_NAME,
   naechsterBoss,
   GEFOLGE_MAX,
-  HAENDLER_WAREN,
   ORT_NAME,
   SOELDNER,
   anheuern,
@@ -95,6 +104,11 @@ import { DEKO, FIGUREN, KACHEL_PIX, malKachelFigur } from './symbole';
 import { hash3i } from '../../core/hash';
 import type { BeinBild, Haltung } from './symbole';
 import { DebugFenster, FIGUR_KEY, ladeWeltEinstellung, leseFigur } from './DebugFenster';
+import { Lager } from './Lager';
+import type { Aufbruch } from './Lager';
+import { aktiveExtras, ladeMeta, naechsteFreischaltung, speichereMeta } from './meta';
+import type { Meta } from './meta';
+import { Hinweis } from './Hinweis';
 
 // Die Stellschrauben der Welt aus dem Debugfenster gelten ab dem Laden.
 ladeWeltEinstellung();
@@ -526,12 +540,23 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const [laut, setLaut] = useState(lautstaerke);
   const [tipp, setTipp] = useState<Tipp>(null);
   const [legendenOffen, setLegendenOffen] = useState(false);
+  // Fortschritt ueber die Abenteuer (Ruhm, Freischaltungen) und das Lager.
+  const [meta, setMetaState] = useState<Meta>(ladeMeta);
+  const setMeta = useCallback((m: Meta) => {
+    setMetaState(m);
+    speichereMeta(m);
+  }, []);
+  // Das Lager zeigt sich, wenn kein Abenteuer laeuft - beim allerersten Mal nicht (gleich losspielen).
+  const [lager, setLager] = useState(() => lade() === null && ladeMeta().laeufe > 0);
+  const offen = useRef({ lager, legenden: legendenOffen });
+  offen.current = { lager, legenden: legendenOffen };
   const [track, setTrack] = useState(laufenderTrack);
   useEffect(() => beiTrack(setTrack), []);
   // Welche Figur der Spieler fuehrt (Debugfenster) - 'klassik' ist der bisherige Ritter.
   const [figur, setFigur] = useState(leseFigur);
   const figurRef = useRef(figur);
-  figurRef.current = figur;
+  // Die Klasse bestimmt die Figur (der Ritter behaelt die gewaehlte).
+  figurRef.current = a.klasse && a.klasse !== 'ritter' ? KLASSEN[a.klasse].figur : figur;
   // Autoroll: wer laufen will, waehrend der Wurf noch aussteht, wuerfelt gleich mit.
   const [autoroll, setAutoroll] = useState(leseAutoroll);
   const autorollRef = useRef(autoroll);
@@ -540,6 +565,24 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const mini = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => speichere(a), [a]);
+  // Am Ende eines Abenteuers: Ruhm, Bestwerte, Siege, Heldenstufe - genau einmal.
+  useEffect(() => {
+    if (a.phase !== 'tot' && a.phase !== 'sieg') return;
+    const m = ladeMeta();
+    const schluessel = `${a.seed}:${a.zug}:${a.phase}`;
+    if (m.belohnt.includes(schluessel)) return;
+    const punkte = abenteuerPunkte(a);
+    setMeta({
+      ...m,
+      ruhm: m.ruhm + ruhmFuer(a),
+      laeufe: m.laeufe + 1,
+      siege: m.siege + (a.phase === 'sieg' ? 1 : 0),
+      bester: Math.max(m.bester, punkte),
+      stufeMax: a.phase === 'sieg' ? Math.min(5, Math.max(m.stufeMax, (a.heldenstufe ?? 0) + 1)) : m.stufeMax,
+      tage: a.tag ? { ...m.tage, [a.tag]: Math.max(m.tage[a.tag] ?? 0, punkte) } : m.tage,
+      belohnt: [...m.belohnt, schluessel],
+    });
+  }, [a, setMeta]);
   useEffect(() => {
     void Promise.all([preloadTiles(), preloadUnitSprites()]).then(() => setGeladen(true));
   }, []);
@@ -605,6 +648,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
 
   const setze = useCallback((neu: Zustand) => {
     aktuell.current = neu;
+    setTipp(null);
     if (neu.ereignisse.length > 0) {
       anim.current = { start: performance.now(), ev: neu.ereignisse };
       const boss = neu.ereignisse.find((e): e is Extract<Ereignis, { art: 'boss' }> => e.art === 'boss');
@@ -615,6 +659,15 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       if (neu.ereignisse.some((e) => e.art === 'wiederbelebt')) {
         banner.current = performance.now();
         bannerText.current = 'Zweites Leben!';
+      }
+      const aktE = neu.ereignisse.find((e): e is Extract<Ereignis, { art: 'akt' }> => e.art === 'akt');
+      if (aktE) {
+        banner.current = performance.now();
+        bannerText.current = `Akt ${aktE.akt}: ${aktE.name}`;
+      }
+      if (neu.ereignisse.some((e) => e.art === 'sieg')) {
+        banner.current = performance.now();
+        bannerText.current = 'Sieg! Der Endboss ist bezwungen!';
       }
       const leg = neu.ereignisse.find((e): e is Extract<Ereignis, { art: 'legende' }> => e.art === 'legende');
       if (leg) {
@@ -718,7 +771,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const geheWeiter = useCallback(() => {
     const l = lauf.current;
     const a0 = aktuell.current;
-    if (!l || a0.phase !== 'ziehen') return halt();
+    // Ein offener Laden oder eine Wahl haelt den Weg an.
+    if (!l || a0.phase !== 'ziehen' || a0.laden != null || a0.wahl) return halt();
     const weg = wegZu(a0, l.ziel);
     const naechstes = weg[0];
     if (!naechstes) return halt();
@@ -766,6 +820,30 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       // Nach der Lage der Taste, nicht nach ihrer Aufschrift: so liegen Z und X
       // auch auf einer deutschen Tastatur (dort Y und X) links unten.
       const k = /^Key[A-Z]$/.test(e.code) ? e.code.slice(3).toLowerCase() : e.key.toLowerCase();
+      const jetzt = aktuell.current;
+      // Offene Fenster fangen die Tasten ab (Spieltest: "S lief unter dem Laden weiter").
+      if (offen.current.lager) return;
+      if (offen.current.legenden) {
+        if (k === 'escape') setLegendenOffen(false);
+        return;
+      }
+      if (jetzt.wahl) {
+        const nr = ['1', '2', '3'].indexOf(e.key);
+        if (nr >= 0) {
+          e.preventDefault();
+          setze(waehlen(jetzt, nr));
+        }
+        return;
+      }
+      if (jetzt.laden != null) {
+        if (k === 'escape') setze(ladenZu(jetzt));
+        return;
+      }
+      if (e.key === '1') {
+        e.preventDefault();
+        setze(faehigkeitNutzen(jetzt));
+        return;
+      }
       if ((TASTEN as readonly string[]).includes(k)) {
         e.preventDefault();
         drueck(k as Taste);
@@ -1233,6 +1311,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           max: s.max,
           art: s.art,
           leben: s.leben,
+          elite: !!s.elite,
           tot: null as number | null,
         })),
         ...ev.flatMap((e) =>
@@ -1246,6 +1325,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                   max: undefined,
                   art: e.schleimArt,
                   leben: 0,
+                  elite: false,
                   tot: e.takt,
                 },
               ]
@@ -1352,6 +1432,14 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
             const sw = s.boss ? 10 * f : 3 * fs;
             ctx.fillRect(sx(o.x) - sw, sy(o.y) + 3 * f, 2 * sw, f);
+            // Elite: ein goldener, flackernder Ring.
+            if (s.elite && alpha > 0.3) {
+              ctx.strokeStyle = `rgba(246, 192, 74, ${0.6 + 0.3 * Math.sin(sek * 6 + s.id)})`;
+              ctx.lineWidth = f;
+              ctx.beginPath();
+              ctx.ellipse(sx(o.x), sy(o.y) + 3 * f, 7 * f, 3 * f, 0, 0, Math.PI * 2);
+              ctx.stroke();
+            }
             if (s.boss) {
               // Die Bosse: eigene Bilder, deutlich groesser als ein Feld-Schleim; der Koloss am groessten.
               const bild = s.bossArt === 'schatten' ? SCHATTENSCHLEIM : s.bossArt === 'koloss' ? GELEEKOLOSS : s.bossArt === 'penta' ? PENTASCHLEIM : SCHLEIMKOENIG;
@@ -1564,6 +1652,12 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       figuren.push({
         y: ro.y,
         mal: () => {
+          // Das bist du: ein goldener Ring am Boden (Spieltest: "welcher Ritter bin ich?").
+          ctx.strokeStyle = `rgba(242, 201, 76, ${0.55 + 0.25 * Math.sin(sek * 3)})`;
+          ctx.lineWidth = f;
+          ctx.beginPath();
+          ctx.ellipse(sx(ro.x), sy(ro.y) + 3.5 * f, 8 * f, 3.5 * f, 0, 0, Math.PI * 2);
+          ctx.stroke();
           if (design) {
             // Die Figur im Kachelstil, mit echten Einzelbildern.
             ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
@@ -1695,9 +1789,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                     : e.schaden > 0
                       ? '#fffaf0'
                       : '#a8a090';
-            schrift(text, X, Y - 6 * f - k * 10 * f, farbe, 1.4 - k * 1.4, e.schaden > 0 ? 7 : 5);
+            schrift(text, X, Y - 6 * f - k * 10 * f, farbe, 1.4 - k * 1.4, e.schaden > 1 ? 10 : e.schaden > 0 ? 8 : 5);
           }
           if (e.ziel === 'ritter' && e.schaden > 0 && u > 0.45 && u < 1.3) rot = Math.max(rot, 1 - (u - 0.45) / 0.85);
+          // Wucht: trifft es den Ritter oder sitzt ein harter Hieb, bebt das Bild kurz.
+          if (e.schaden > 0 && (e.ziel === 'ritter' || e.schaden > 1) && u > 0.45 && u < 0.75) beben = Math.max(beben, (0.75 - u) / 0.3);
         } else if (e.art === 'angeln') {
           // Die Schnur fliegt zum Wasser, der Schwimmer tanzt - und vielleicht kommt ein Fisch.
           const z = mitte(e.feld.q, e.feld.r);
@@ -2094,11 +2190,23 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   // Gold steht als Muenzen ueber dem Inventar, nicht in einem Fach.
   const vorrat = Object.entries(a.inventar).filter(([id, n]) => n > 0 && id !== 'gold');
   const gold = a.inventar['gold'] ?? 0;
-  const neu = () => {
+  /** Aufbrechen: ein neues Abenteuer mit Klasse, Mitgift und Heldenstufe (oder das Tagesabenteuer). */
+  const aufbruch = (x: Aufbruch) => {
     halt();
     setZugTasten([]);
-    setze(neuesAbenteuer(neuerSeed()));
+    setTipp(null);
+    setLager(false);
+    setze(
+      neuesAbenteuer(x.tag ? x.tag.seed : neuerSeed(), {
+        klasse: x.klasse,
+        heldenstufe: x.tag ? 0 : x.stufe,
+        extras: x.tag ? [] : aktiveExtras(meta),
+        ...(x.tag ? { tag: x.tag.tag } : {}),
+      }),
+    );
   };
+  // Gleich nochmal: dieselbe Klasse und Heldenstufe.
+  const nochmal = () => aufbruch({ klasse: a.klasse ?? meta.klasse, stufe: a.heldenstufe ?? 0 });
   const tonUmschalten = () => {
     setzeMusik(!musik);
     setMusik(!musik);
@@ -2127,6 +2235,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       <div className="ab-kopf">
         <button className="klein" onClick={onZurueck} title="Zur Wahl des Modus">
           ‹ Modus
+        </button>
+        <button className="klein" onClick={() => setLager(true)} title="Ins Lager: Klasse waehlen, freischalten, neu aufbrechen">
+          Lager ★{meta.ruhm}
         </button>
         <div className="ab-ton-gruppe">
           <button className={musik ? 'klein ab-ton' : 'klein ab-ton aus'} onClick={tonUmschalten} title={musik ? 'Musik ausschalten' : 'Musik einschalten'}>
@@ -2189,14 +2300,30 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         <span className="ab-titel">Karte</span>
         <canvas ref={mini} width={miniGross ? 440 : 170} height={miniGross ? 330 : 130} />
         <div className="ab-zug">Zug {a.zug}</div>
-        {/* Wann der naechste Boss kommt: nach so vielen erlegten Gegnern. */}
+        {/* Der Akt und wann sein Boss erwacht: nach so vielen erlegten Gegnern. */}
         {(() => {
           const boss = a.schleime.find((x) => x.boss);
-          if (boss) return <div className="ab-zug ab-boss-weg">{BOSS_NAME[boss.bossArt ?? 'koenig']} jagt dich</div>;
-          const ziel = BOSS_NACH * (1 + (a.koenige ?? 0));
+          const akt = a.akt ?? 1;
+          const ziel = aktZiel(a);
+          const kills = Math.min(a.aktKills ?? 0, ziel);
           return (
-            <div className="ab-zug" title="Nach so vielen erlegten Gegnern erwacht der naechste Boss">
-              {BOSS_NAME[naechsterBoss(a)]}: {Math.min(a.erschlagen, ziel)}/{ziel}
+            <div className="ab-akt" title={`Akt ${akt} von ${AKTE}. Nach ${ziel} erlegten Gegnern erwacht der Boss des Akts${akt === AKTE ? ' - der Endboss' : ''}.`}>
+              <b>
+                Akt {akt}/{AKTE}
+              </b>
+              {boss ? (
+                <span className="ab-boss-weg">{BOSS_NAME[boss.bossArt ?? 'koenig']} jagt dich!</span>
+              ) : (
+                <>
+                  <span>
+                    {BOSS_NAME[naechsterBoss(a)]}
+                    {akt === AKTE ? ' (Endboss)' : ''}: {kills}/{ziel}
+                  </span>
+                  <i className="ab-akt-balken">
+                    <i style={{ width: `${(100 * kills) / ziel}%` } as CSSProperties} />
+                  </i>
+                </>
+              )}
             </div>
           );
         })()}
@@ -2345,7 +2472,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           ))}
         </div>
         <div className="ab-verlauf" title="Diesen Zug gedrueckt">
-          {zugTasten.length > 0 ? zugTasten.map((t, i) => <kbd key={i}>{t.toUpperCase()}</kbd>) : <small>Oder ein Feld antippen</small>}
+          {zugTasten.length > 0 ? zugTasten.slice(-12).map((t, i) => <kbd key={i}>{t.toUpperCase()}</kbd>) : <small>Oder ein Feld antippen</small>}
         </div>
       </div>
 
@@ -2354,27 +2481,48 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         ein Ladebalken wickelt - ist der Ring voll, leuchtet der Knopf.
         Bisher: die Beschwoerung (Pentagrammmeister Stufe 3).
       */}
-      {(a.pentaStufe ?? 1) >= 3 && (
+      {(ladungVon(a).faehigkeit || (a.pentaStufe ?? 1) >= 3) && (
         <div className="ab-faehigkeiten">
+          {/* Die Faehigkeit der Waffe: Schritte und Treffer laden sie, Taste 1 loest sie aus. */}
           {(() => {
-            const ladung = Math.min(a.beschwoerung ?? 0, BESCHWOERUNG_VOLL);
-            const voll = ladung >= BESCHWOERUNG_VOLL;
-            const art = BEGLEITER_FUER[meisterZauber(a)];
+            const { ist, voll, faehigkeit } = ladungVon(a);
+            if (!faehigkeit) return null;
+            const bereit = faehigkeitBereit(a);
             return (
               <button
-                className={voll ? 'ab-faehigkeit voll' : 'ab-faehigkeit'}
-                style={{ '--anteil': ladung / BESCHWOERUNG_VOLL, '--ring': '#b58ae0' } as CSSProperties}
-                aria-disabled={!voll}
-                onClick={() => voll && !rollt && setze(beschwoeren(aktuell.current))}
-                title={`Beschwoeren (B): ruft einen ${SOELDNER[art].name} - je nach deinem haeufigsten Zauber. ${ladung}/${BESCHWOERUNG_VOLL} - laedt sich, wenn Gegner in Pentagrammen fallen.`}
+                className={bereit ? 'ab-faehigkeit voll' : 'ab-faehigkeit'}
+                style={{ '--anteil': Math.min(1, ist / voll), '--ring': '#e8641e' } as CSSProperties}
+                aria-disabled={!bereit}
+                onClick={() => bereit && setze(faehigkeitNutzen(aktuell.current))}
+                title={`${FAEHIGKEIT_NAME[faehigkeit]} (Taste 1): ${ist}/${voll} - Schritte und Treffer laden die Waffe.`}
               >
                 <span className="ab-faehigkeit-innen">
-                  <Icon id={`begleiter_${art}`} groesse={28} />
+                  <Icon id={a.ausruestung.waffe ?? 'schwert'} groesse={28} />
                 </span>
-                <kbd>B</kbd>
+                <kbd>1</kbd>
               </button>
             );
           })()}
+          {(a.pentaStufe ?? 1) >= 3 &&
+            (() => {
+              const ladung = Math.min(a.beschwoerung ?? 0, BESCHWOERUNG_VOLL);
+              const voll = ladung >= BESCHWOERUNG_VOLL;
+              const art = BEGLEITER_FUER[meisterZauber(a)];
+              return (
+                <button
+                  className={voll ? 'ab-faehigkeit voll' : 'ab-faehigkeit'}
+                  style={{ '--anteil': ladung / BESCHWOERUNG_VOLL, '--ring': '#b58ae0' } as CSSProperties}
+                  aria-disabled={!voll}
+                  onClick={() => voll && !rollt && setze(beschwoeren(aktuell.current))}
+                  title={`Beschwoeren (B): ruft einen ${SOELDNER[art].name} - je nach deinem haeufigsten Zauber. ${ladung}/${BESCHWOERUNG_VOLL} - laedt sich, wenn Gegner in Pentagrammen fallen.`}
+                >
+                  <span className="ab-faehigkeit-innen">
+                    <Icon id={`begleiter_${art}`} groesse={28} />
+                  </span>
+                  <kbd>B</kbd>
+                </button>
+              );
+            })()}
         </div>
       )}
 
@@ -2468,7 +2616,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           funde.current = { fuer: null, karte: new Map() };
           setze(normalisiere(structuredClone(aktuell.current)));
         }}
-        onNeueWelt={neu}
+        onNeueWelt={() => aufbruch({ klasse: a.klasse ?? 'ritter', stufe: a.heldenstufe ?? 0 })}
         onAktion={(d: DebugAktion) => setze(debugAktion(aktuell.current, d))}
       />
 
@@ -2543,8 +2691,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                         {gegenstand(id)?.name}
                         {n > 1 ? ` ×${n}` : ''}
                       </span>
-                      <button className="klein" onClick={() => setze(verkaufen(aktuell.current, id))}>
-                        +{verkaufsPreis(id)} Gold
+                      <button className="klein ab-verkaufen" onClick={() => setze(verkaufen(aktuell.current, id))}>
+                        Verkaufen +{verkaufsPreis(id)}
                       </button>
                       {n > 1 && (
                         <button className="klein" onClick={() => setze(verkaufen(aktuell.current, id, true))}>
@@ -2554,15 +2702,18 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                     </div>
                   ))}
                   <small>Kaufen</small>
-                  {HAENDLER_WAREN.map((w) => (
-                    <div key={w.id} className="ab-laden-zeile" {...tippHandler(w.id, setTipp)}>
-                      <Icon id={w.id} groesse={20} />
-                      <span>{gegenstand(w.id)?.name}</span>
-                      <button className="klein" disabled={gold < w.preis} onClick={() => setze(kaufen(aktuell.current, w.id))}>
-                        {w.preis} Gold
-                      </button>
-                    </div>
-                  ))}
+                  {haendlerWaren(a, o).map((w) => {
+                    const v = vergleich(a, w.id);
+                    return (
+                      <div key={w.id} className={['ab-laden-zeile', v === 1 ? 'besser' : v === -1 ? 'schlechter' : ''].join(' ')} {...tippHandler(w.id, setTipp)}>
+                        <Icon id={w.id} groesse={20} />
+                        <span>{gegenstand(w.id)?.name}</span>
+                        <button className="klein ab-kaufen" disabled={gold < w.preis} onClick={() => setze(kaufen(aktuell.current, w.id))}>
+                          Kaufen {w.preis} Gold
+                        </button>
+                      </div>
+                    );
+                  })}
                 </>
               ) : (
                 <>
@@ -2598,25 +2749,111 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         );
       })()}
 
+      {/* Die Wahl: 1 aus 3 (Truhe, Schatz, Bossbeute). Tasten 1 2 3. */}
+      {a.wahl && (
+        <div className="ab-ende ab-legenden-huelle">
+          <div className="ab-fenster ab-wahl">
+            <h2>{a.wahl.titel}</h2>
+            <div className="ab-wahl-karten">
+              {a.wahl.optionen.map((id, nr) => {
+                const g = gegenstand(id);
+                const v = vergleich(a, id);
+                return (
+                  <button
+                    key={id}
+                    className={['ab-wahl-karte', g?.legendaer ? 'legendaer' : '', v === 1 ? 'besser' : v === -1 ? 'schlechter' : ''].filter(Boolean).join(' ')}
+                    onClick={() => setze(waehlen(aktuell.current, nr))}
+                  >
+                    <kbd>{nr + 1}</kbd>
+                    <Icon id={id === 'extraherz' ? 'herz' : id === 'goldsack' ? 'muenze' : id} groesse={40} />
+                    <b>{g?.name ?? id}</b>
+                    <span>{g?.text.replace(/^Legendaer\.\s*/, '')}</span>
+                    {v === 1 && <em>besser als deins</em>}
+                    {v === -1 && <em>schwaecher als deins</em>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Hinweis a={a} />
+
+      {lager && (
+        <Lager
+          meta={meta}
+          onMeta={setMeta}
+          onAufbruch={aufbruch}
+          onZurueck={a.phase === 'tot' || a.phase === 'sieg' ? undefined : () => setLager(false)}
+        />
+      )}
+
       <ItemTipp tipp={tipp} />
 
       {/* Was zuletzt geschah. */}
       <div className="ab-log" role="log">
-        {a.log.slice(-3).map((z, i) => (
-          <div key={`${a.log.length}-${i}`} style={{ opacity: 0.55 + i * 0.22 } as CSSProperties}>
+        {a.log.slice(-4).map((z, i) => (
+          <div key={`${a.log.length}-${i}`} style={{ opacity: 0.45 + i * 0.18 } as CSSProperties}>
             {z}
           </div>
         ))}
       </div>
 
-      {(a.phase === 'tot' || a.phase === 'sieg') && (
+      {/* Das Ende eines Abenteuers: was es wert war, der Ruhm, was als Naechstes lockt. */}
+      {(a.phase === 'tot' || a.phase === 'sieg') && !lager && (
         <div className="ab-ende">
-          <div className="ab-fenster">
-            <h2>{a.phase === 'sieg' ? 'Sieg!' : 'Der Ritter ist gefallen'}</h2>
-            {a.phase === 'sieg' && <p>Der Schleimkoenig ist bezwungen.</p>}
-            <button className="primary" onClick={neu}>
-              Neues Abenteuer
-            </button>
+          <div className="ab-fenster ab-bilanz">
+            <h2>{a.phase === 'sieg' ? 'Sieg! Der Endboss ist bezwungen.' : `${KLASSEN[a.klasse ?? 'ritter'].name} ist gefallen`}</h2>
+            <p className="ab-bilanz-akt">
+              {a.phase === 'sieg' ? `Alle ${AKTE} Akte in ${a.zug} Zuegen` : `Akt ${a.akt ?? 1} von ${AKTE}: ${AKT_NAME[(a.akt ?? 1) - 1]}`}
+              {a.tag ? ` · Tagesabenteuer ${a.tag}` : ''}
+              {(a.heldenstufe ?? 0) > 0 ? ` · Heldenstufe ${a.heldenstufe}` : ''}
+            </p>
+            <div className="ab-bilanz-werte">
+              <span>
+                <b>{a.erschlagen}</b> erlegt
+              </span>
+              <span>
+                <b>{a.koenige ?? 0}</b> Bosse
+              </span>
+              <span>
+                <b>{a.zug}</b> Zuege
+              </span>
+              <span>
+                <b>{gold}</b> Gold
+              </span>
+              {a.stufe && (
+                <span>
+                  <b>Lv {a.stufe.lv}</b>
+                </span>
+              )}
+              <span>
+                <b>{(a.legendaer ?? []).length}</b> Legendaere
+              </span>
+            </div>
+            <p className="ab-punkte">
+              {abenteuerPunkte(a)} Punkte
+              {abenteuerPunkte(a) >= meta.bester && meta.laeufe > 1 ? ' - neuer Bestwert!' : ` (Bestwert ${meta.bester})`}
+            </p>
+            <p className="ab-ruhm-plus">★ +{ruhmFuer(a)} Ruhm · jetzt {meta.ruhm}</p>
+            {(() => {
+              const n = naechsteFreischaltung(meta);
+              if (!n) return null;
+              const name = n.art === 'klasse' ? KLASSEN[n.id as keyof typeof KLASSEN].name : START_EXTRAS[n.id]?.name;
+              return (
+                <p className="ab-lockt">
+                  {meta.ruhm >= n.kosten ? `Im Lager freischaltbar: ${name}!` : `Noch ${n.kosten - meta.ruhm} Ruhm bis: ${name}`}
+                </p>
+              );
+            })()}
+            {a.phase === 'sieg' && (a.heldenstufe ?? 0) + 1 <= 5 && <p className="ab-lockt">Heldenstufe {(a.heldenstufe ?? 0) + 1} ist jetzt im Lager waehlbar.</p>}
+            <div className="ab-lager-knoepfe">
+              <button className="primary" onClick={nochmal} autoFocus>
+                Gleich nochmal
+              </button>
+              <button onClick={() => setLager(true)}>Ins Lager</button>
+            </div>
           </div>
         </div>
       )}

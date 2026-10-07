@@ -40,7 +40,7 @@ export function leseFigur(): string {
 }
 
 /** Ein kleines Bild der Figur fuer die Auswahl. */
-function FigurBild({ id }: { id: string }) {
+export function FigurBild({ id, waffe = 'schwert' }: { id: string; waffe?: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const c = ref.current;
@@ -49,8 +49,8 @@ function FigurBild({ id }: { id: string }) {
     if (!c || !ctx || !d) return;
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, c.width, c.height);
-    malKachelFigur(ctx, c.width / 2, c.height - 2, 3, d, 'steh', 'ruhe', 'schwert', 1, false, null);
-  }, [id]);
+    malKachelFigur(ctx, c.width / 2, c.height - 2, 3, d, 'steh', 'ruhe', waffe, 1, false, null);
+  }, [id, waffe]);
   return <canvas ref={ref} width={44} height={48} className="ab-debug-bild" />;
 }
 
