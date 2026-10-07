@@ -25,6 +25,9 @@ import type { CSSProperties } from 'react';
 import {
   FAEHIGKEIT_NAME,
   FRAKTION_FIGUR,
+  ALTAR_OPFER,
+  altarMoeglich,
+  opfern,
   AKTE,
   AKT_NAME,
   KLASSEN,
@@ -91,7 +94,7 @@ import {
   tasteZu,
   wuerfeln,
 } from '../../abenteuer/regeln';
-import type { Abenteuer as Zustand, DebugAktion, Ereignis, SchleimArt, Slot, Taste, Wer, Zauber } from '../../abenteuer/regeln';
+import type { AltarOpfer, Abenteuer as Zustand, DebugAktion, Ereignis, SchleimArt, Slot, Taste, Wer, Zauber } from '../../abenteuer/regeln';
 import { HEX_DIRS, hexDistance, hexKey, hexesInRange } from '../../core/coords';
 import type { Hex } from '../../core/coords';
 import { BODEN_FARBE, einstellung, feldInfo, istWasser, klima } from '../../abenteuer/welt';
@@ -112,7 +115,7 @@ import { Hinweis } from './Hinweis';
 
 // Die Stellschrauben der Welt aus dem Debugfenster gelten ab dem Laden.
 ladeWeltEinstellung();
-import { BANNER, BEGLEITER_BILD, GELEEKOLOSS, HASE, PENTASCHLEIM, SCHAF, SCHATTENSCHLEIM, STAND } from './symbole';
+import { ALTAR, BANNER, BEGLEITER_BILD, GELEEKOLOSS, HASE, PENTASCHLEIM, SCHAF, SCHATTENSCHLEIM, STAND } from './symbole';
 import { RITTER_HAND, RITTER_KOERPER, RITTER_SCHRITT, SCHLEIMKOENIG, SCHLEIM_BILD, SYMBOL, WAFFE, WAFFE_GRIFF, zeichnePixel } from './symbole';
 import { LAUT_STUFEN, beiTrack, klang, laufenderTrack, lautstaerke, setzeBiom, setzeLautstaerke } from './musik';
 import { BIOM_NAME } from './musik';
@@ -506,6 +509,11 @@ function spieleKlaenge(a: Zustand): void {
     else if (e.art === 'faehigkeit') spaeter(e.takt + 0.1, e.name === 'feuerkreis' ? 'feuer' : e.name === 'runenblitz' ? 'blitz' : 'bereit');
     else if (e.art === 'boss') spaeter(e.takt, 'beben');
     else if (e.art === 'treffen') spaeter(e.takt, 'probe');
+    else if (e.art === 'akt' || e.art === 'sieg') {
+      spaeter(e.takt + 0.2, 'legende');
+      spaeter(e.takt + 0.9, 'stufe');
+    } else if (e.art === 'wahl') spaeter(e.takt + 0.1, 'bereit');
+    else if (e.art === 'geladen') spaeter(e.takt + 0.2, 'bereit');
     else if (e.art === 'fluch') spaeter(e.takt + 0.4, 'autsch');
     else if (e.art === 'wuerfelEffekt') spaeter(e.takt + 0.35, 'bereit');
     else if (e.art === 'faellt') spaeter(e.takt + 0.5, 'autsch');
@@ -1561,7 +1569,13 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         figuren.push({
           y: m.y,
           mal: () => {
-            if (o.art === 'haendler') {
+            if (o.art === 'altar') {
+              // Der Altar flackert, solange er nicht benutzt ist.
+              const bild = o.benutzt ? ALTAR.slice(3) : ALTAR;
+              ctx.globalAlpha = o.benutzt ? 0.6 : 1;
+              zeichnePixel(ctx, bild, sx(m.x) - 5 * f, sy(m.y) + 3 * f - bild.length * f, f, KACHEL_PIX);
+              ctx.globalAlpha = 1;
+            } else if (o.art === 'haendler') {
               zeichnePixel(ctx, STAND, sx(m.x) - 8 * f, sy(m.y) - 12 * f, f, KACHEL_PIX);
               malPerson(o.id, { x: m.x, y: m.y - 4, hoch: 0 }, 'zwerg', null, false);
               zeichnePixel(ctx, STAND.slice(7), sx(m.x) - 8 * f, sy(m.y) - 5 * f, f, KACHEL_PIX);
@@ -2155,7 +2169,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           mctx.fillStyle = farbe;
           mctx.fillRect(Math.round(x), Math.round(y), z * 2, z * 2);
         };
-        for (const o of a.orte ?? []) if (erkundet.has(hexKey(o.q, o.r))) punkt(o.q, o.r, o.art === 'haendler' ? '#f6c04a' : '#6ab0ff', true);
+        for (const o of a.orte ?? []) if (erkundet.has(hexKey(o.q, o.r))) punkt(o.q, o.r, o.art === 'haendler' ? '#f6c04a' : o.art === 'werber' ? '#6ab0ff' : '#b58ae0', true);
         for (const w of a.wanderer ?? []) if (hexDistance(w, a.pos) <= sicht) punkt(w.q, w.r, w.fraktion === 'orden' ? '#dfe9f0' : '#2f7a3a');
         for (const s of a.schleime) if (s.art === 'bandit' && hexDistance(s, a.pos) <= sicht) punkt(s.q, s.r, '#8a2a2a');
         for (const g of a.gefolge ?? []) punkt(g.q, g.r, '#ffffff');
@@ -2680,7 +2694,25 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                   ×
                 </button>
               </div>
-              {o.art === 'haendler' ? (
+              {o.art === 'altar' ? (
+                <>
+                  {o.benutzt ? (
+                    <p className="ab-leer">Der Altar ist erloschen.</p>
+                  ) : (
+                    (Object.keys(ALTAR_OPFER) as AltarOpfer[]).map((op) => (
+                      <div key={op} className="ab-laden-zeile">
+                        <span>
+                          <b>{ALTAR_OPFER[op].name}</b>
+                          <small>{ALTAR_OPFER[op].text}</small>
+                        </span>
+                        <button className="klein" disabled={!altarMoeglich(a, op)} onClick={() => setze(opfern(aktuell.current, op))}>
+                          Opfern
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </>
+              ) : o.art === 'haendler' ? (
                 <>
                   <small>Verkaufen</small>
                   {ware.length === 0 && <p className="ab-leer">Nichts, was der Haendler kauft. Ausruestung, Gelee, Kraeuter und Fische nimmt er gern.</p>}

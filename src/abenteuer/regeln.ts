@@ -2035,8 +2035,8 @@ function kolossHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetzt
  *              Hasen; Banditen sind Feinde (eine Gegnerart) - sie lassen Gold
  *              fallen. Wer nah am Ritter ist, sagt manchmal etwas.
  */
-export type OrtArt = 'haendler' | 'werber';
-export type Ort = { id: number; q: number; r: number; art: OrtArt; name: string };
+export type OrtArt = 'haendler' | 'werber' | 'altar';
+export type Ort = { id: number; q: number; r: number; art: OrtArt; name: string; benutzt?: boolean };
 export type SoeldnerArt = 'zwerg' | 'soeldnerin' | 'waldlaeufer' | 'paladin' | BegleiterArt;
 /** Beschworene Begleiter des Pentagrammmeisters (Stufe 3). */
 export type BegleiterArt = 'fee' | 'golem' | 'daemon' | 'lichtgeist' | 'wolf';
@@ -2044,7 +2044,7 @@ export type Soeldner = { id: number; art: SoeldnerArt; name: string; q: number; 
 export type Fraktion = 'orden' | 'jaeger';
 export type Wanderer = { id: number; fraktion: Fraktion; name: string; q: number; r: number; leben: number; max: number; ziel?: Hex; geredet?: number };
 
-export const ORT_NAME: Record<OrtArt, string> = { haendler: 'Haendler', werber: 'Werber' };
+export const ORT_NAME: Record<OrtArt, string> = { haendler: 'Haendler', werber: 'Werber', altar: 'Altar' };
 export const FRAKTION_NAME: Record<Fraktion, string> = { orden: 'Orden der Waage', jaeger: 'Gruenwald-Jaeger' };
 /** Wie die Fraktionen aussehen (Figuren des Kachelstils). */
 export const FRAKTION_FIGUR: Record<Fraktion, string> = { orden: 'paladin', jaeger: 'waldlaeufer' };
@@ -2214,9 +2214,9 @@ function ortePlatzieren(a: Abenteuer): void {
 /** Beim Erkunden: ab und zu ein weiterer Haendler oder Werber. */
 function ortEntdecken(a: Abenteuer, h: Hex): void {
   const z = hash3i(a.seed, h.q, h.r, SALT_LEUTE + 2) % 260;
-  if (z !== 7 && z !== 77) return;
+  if (z !== 7 && z !== 77 && z !== 150 && z !== 200) return;
   if (!ortFrei(a, h) || hexDistance(h, a.pos) < 2) return;
-  const art: OrtArt = z === 7 ? 'haendler' : 'werber';
+  const art: OrtArt = z === 7 ? 'haendler' : z === 77 ? 'werber' : 'altar';
   a.orte = [...(a.orte ?? []), { id: a.naechsteId++, q: h.q, r: h.r, art, name: VORNAMEN[hash3i(a.seed, h.q, h.r, SALT_LEUTE + 1) % VORNAMEN.length]! }];
 }
 
@@ -2231,7 +2231,78 @@ export function ansprechen(alt: Abenteuer, ortId: number): Abenteuer {
   const a = structuredClone(alt);
   a.ereignisse = [{ art: 'treffen', takt: 0, ort: o.id }];
   a.laden = o.id;
-  melde(a, o.art === 'haendler' ? `${o.name}, der Haendler: "Zeig her, was du hast!"` : `${o.name}, der Werber: "Suchst du Klingen? Ich kenne die besten."`);
+  melde(
+    a,
+    o.art === 'haendler'
+      ? `${o.name}, der Haendler: "Zeig her, was du hast!"`
+      : o.art === 'werber'
+        ? `${o.name}, der Werber: "Suchst du Klingen? Ich kenne die besten."`
+        : o.benutzt
+          ? 'Der Altar ist erloschen.'
+          : 'Ein alter Altar. Er verlangt ein Opfer - und gibt dafuer.',
+  );
+  return a;
+}
+
+/**
+ * ALTAERE - Risiko gegen Belohnung (Spieltest: "keine Entscheidungen, nichts
+ * steht auf dem Spiel"). Einmal je Altar:
+ *   blut   ein Herz fuer immer opfern - dafuer ein Legendaeres waehlen
+ *   gold   12 Gold opfern - dafuer eine Truhe (1 aus 3)
+ *   ruf    volles Leben - aber drei Gegner (eine Elite) erscheinen um dich
+ */
+export type AltarOpfer = 'blut' | 'gold' | 'ruf';
+export const ALTAR_OPFER: Record<AltarOpfer, { name: string; text: string }> = {
+  blut: { name: 'Blutopfer', text: 'Ein Herz fuer immer opfern - dafuer ein Legendaeres waehlen (1 aus 3).' },
+  gold: { name: 'Goldopfer', text: '12 Gold opfern - dafuer eine Truhe (1 aus 3).' },
+  ruf: { name: 'Herausforderung', text: 'Volles Leben - aber drei Gegner (einer davon Elite) erscheinen um dich.' },
+};
+/** Geht dieses Opfer gerade? */
+export function altarMoeglich(a: Abenteuer, opfer: AltarOpfer): boolean {
+  if (opfer === 'blut') return maxLebenVon(a) > 3;
+  if (opfer === 'gold') return (a.inventar['gold'] ?? 0) >= 12;
+  return true;
+}
+export function opfern(alt: Abenteuer, opfer: AltarOpfer): Abenteuer {
+  const o = (alt.orte ?? []).find((x) => x.id === alt.laden);
+  if (!o || o.art !== 'altar' || o.benutzt || hexDistance(o, alt.pos) > 1 || !altarMoeglich(alt, opfer)) return alt;
+  const a = structuredClone(alt);
+  a.ereignisse = [];
+  a.orte = (a.orte ?? []).map((x) => (x.id === o.id ? { ...x, benutzt: true } : x));
+  a.laden = null;
+  if (opfer === 'blut') {
+    a.extraHerzen = (a.extraHerzen ?? 0) - 1;
+    a.leben = Math.min(a.leben, maxLebenVon(a));
+    a.ereignisse.push({ art: 'fluch', takt: 0 });
+    melde(a, 'Der Altar trinkt dein Blut - ein Herz weniger. Er gibt dir die Wahl.');
+    bietWahl(a, 'schatz');
+  } else if (opfer === 'gold') {
+    a.inventar = { ...a.inventar, gold: (a.inventar['gold'] ?? 0) - 12 };
+    if (!a.inventar['gold']) delete a.inventar['gold'];
+    melde(a, 'Das Gold verschwindet im Altar - eine Truhe erscheint.');
+    bietWahl(a, 'truhe');
+  } else {
+    a.leben = maxLebenVon(a);
+    a.ereignisse.push({ art: 'heil', takt: 0, leben: 1 });
+    const rng = new Rng(a.rng);
+    const plaetze = hexesInRange(a.pos, 3).filter(
+      (h) => hexDistance(h, a.pos) >= 2 && begehbar(gelaende(a.seed, h.q, h.r)) && !schleimAuf(a, h.q, h.r) && !ortAuf(a, h.q, h.r),
+    );
+    for (let i = 0; i < 3 && plaetze.length; i++) {
+      const h = plaetze.splice(rng.int(plaetze.length), 1)[0]!;
+      const id = a.naechsteId++;
+      const s = staerken(a, neuerSchleim(id, h.q, h.r, artZahl(a, rng), false), rng);
+      if (i === 0 && !s.elite) {
+        s.elite = true;
+        s.leben += 2;
+        s.max = s.leben;
+      }
+      a.schleime.push(s);
+      a.ereignisse.push({ art: 'neu', takt: 0, wer: id });
+    }
+    a.rng = rng.getState();
+    melde(a, 'Der Altar heilt dich ganz - und ruft Gegner herbei! Kaempfe!');
+  }
   return a;
 }
 

@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { istWasser } from '../src/abenteuer/welt';
 import type { Boden } from '../src/abenteuer/welt';
-import { angelbar, angeln, betretbar, kannAngeln, BOSS_LEBEN, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden, vergleich, naechsterBoss, KREIS_DAUER, PENTA_BOSS_NACH, verkaufen, verkaufsPreis, kaufen, ansprechen, anheuern, werberAngebot, PENTA_STUFE3_NACH, BESCHWOERUNG_VOLL, beschwoeren, angeheuerte, kannNeuWuerfeln, neuWuerfeln, WUERFEL_EFFEKT, aktZiel, waehlen, abenteuerPunkte, ruhmFuer, faehigkeitBereit, faehigkeitNutzen } from '../src/abenteuer/regeln';
+import { angelbar, angeln, betretbar, kannAngeln, BOSS_LEBEN, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden, vergleich, naechsterBoss, KREIS_DAUER, PENTA_BOSS_NACH, verkaufen, verkaufsPreis, kaufen, ansprechen, anheuern, werberAngebot, PENTA_STUFE3_NACH, BESCHWOERUNG_VOLL, beschwoeren, angeheuerte, kannNeuWuerfeln, neuWuerfeln, WUERFEL_EFFEKT, aktZiel, waehlen, abenteuerPunkte, ruhmFuer, faehigkeitBereit, faehigkeitNutzen, opfern } from '../src/abenteuer/regeln';
 import type { Abenteuer, Taste } from '../src/abenteuer/regeln';
 import { HEX_DIRS, hexDistance, hexesInRange as hexesInRangeTest } from '../src/core/coords';
 
@@ -842,6 +842,29 @@ describe('Abenteuer', () => {
     const bann = wurfMit('bannwuerfel', true, (a) => (a.schleime = [{ id: 7, q: a.pos.q + 3, r: a.pos.r, leben: 3, gross: false }]));
     expect(bann.schleime[0]!.gebannt).toBeGreaterThan(bann.zeit);
     expect(bann.ereignisse.some((e) => e.art === 'wuerfelEffekt')).toBe(true);
+  });
+
+  it('Altaere: Blut fuer Legendaeres, Gold fuer eine Truhe, Herausforderung - je einmal', () => {
+    const basis = () => {
+      const a = imZug(13, [], 10);
+      const h = a.orte!.find((o) => o.art === 'haendler')!;
+      // Den Haendler zum Altar machen und den Ritter daneben stellen.
+      a.orte = a.orte!.map((o) => (o.id === h.id ? { ...o, art: 'altar' as const } : o));
+      a.pos = HEX_DIRS.map(([dq, dr]) => ({ q: h.q + dq, r: h.r + dr })).find((x) => betretbar(a, x.q, x.r))!;
+      a.inventar = { gold: 20 };
+      return ansprechen(a, h.id);
+    };
+    const blut = opfern(basis(), 'blut');
+    expect(maxLebenVon(blut)).toBe(GRUND_LEBEN - 1);
+    expect(blut.wahl?.art).toBe('schatz');
+    const gold = opfern(basis(), 'gold');
+    expect(gold.inventar['gold']).toBe(8);
+    expect(gold.wahl?.art).toBe('truhe');
+    const ruf = opfern(basis(), 'ruf');
+    expect(ruf.schleime.length).toBeGreaterThanOrEqual(1);
+    expect(ruf.schleime.some((s) => s.elite)).toBe(true);
+    // Einmal benutzt ist er erloschen.
+    expect(opfern({ ...ansprechen(ruf, ruf.orte!.find((o) => o.benutzt)!.id) }, 'gold').inventar['gold']).toBe(20);
   });
 
   it('Herzen werden gleich verbraucht - bei vollem Leben bleiben sie liegen', () => {

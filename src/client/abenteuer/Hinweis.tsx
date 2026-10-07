@@ -31,8 +31,13 @@ const TIPPS: readonly Tipp[] = [
   { id: 'faehigkeit', wann: (a) => faehigkeitBereit(a), text: 'Deine Waffe ist voll geladen! Druecke 1 (oder den runden Knopf unten), um ihre Faehigkeit auszuloesen.' },
   { id: 'wenig', wann: (a) => a.leben <= 2 && a.phase !== 'tot', text: 'Wenig Leben! Kraeuter im Inventar heilen (antippen). Wartest du (S), ohne dass ein Gegner nah ist, bekommst du einmal je Zug +1 Leben.' },
   {
+    id: 'altar',
+    wann: (a) => (a.orte ?? []).some((o) => o.art === 'altar' && !o.benutzt && hexDistanceZu(o, a.pos) <= 3),
+    text: 'Ein Altar! Lauf hinein: opfere ein Herz oder Gold fuer eine Belohnung - oder fordere ihn heraus (volles Leben, aber Gegner).',
+  },
+  {
     id: 'leute',
-    wann: (a) => (a.orte ?? []).some((o) => hexDistanceZu(o, a.pos) <= 2),
+    wann: (a) => (a.orte ?? []).some((o) => o.art !== 'altar' && hexDistanceZu(o, a.pos) <= 2),
     text: 'Laufe in den Haendler, um Beute zu verkaufen und einzukaufen - oder in den Werber, um Soeldner anzuheuern.',
   },
   { id: 'akt2', wann: (a) => (a.akt ?? 1) >= 2, text: 'Akt 2! Die Gegner werden zaeher, golden umrandete Elite-Gegner lassen Gold fallen. Sieh dich beim Haendler nach besserer Ausruestung um.' },

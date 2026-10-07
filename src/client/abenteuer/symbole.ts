@@ -766,6 +766,20 @@ export const STAND: Pixelkarte = [
   '.ww..........ww.',
 ];
 
+/** Ein Altar: Steinblock mit Flamme (Kachelpalette); erloschen ohne Flamme. */
+export const ALTAR: Pixelkarte = [
+  '....FO....',
+  '...FOFO...',
+  '....OF....',
+  '..oooooo..',
+  '.onmmmmno.',
+  '.omRmmRmo.',
+  '.ommmmmmo.',
+  '.onmmmmno.',
+  'oonnnnnnoo',
+  'onnnnnnnno',
+];
+
 /** Das Banner des Werbers: ein Stab mit Fahne (Kachelpalette). */
 export const BANNER: Pixelkarte = [
   'o.......',
