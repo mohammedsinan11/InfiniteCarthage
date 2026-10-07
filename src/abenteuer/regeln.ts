@@ -319,7 +319,7 @@ function neuerSchleim(id: number, q: number, r: number, zahl: number, fern: bool
 /** Die ersten so vielen Ticks kommt kein Nachschub - ein ruhiger Anfang. */
 const NACHSCHUB_RUHE = 8;
 /** Alle wie viele Ticks Nachschub kommt: Akt 1 selten, Akt 3 oft. */
-const nachschubTakt = (a: Pick<Abenteuer, 'akt' | 'heldenstufe'>): number => Math.max(4, [NACHSCHUB, 10, 7][(a.akt ?? 1) - 1]! - (a.heldenstufe ?? 0));
+const nachschubTakt = (a: Pick<Abenteuer, 'akt' | 'heldenstufe'>): number => Math.max(4, [11, 8, 6][(a.akt ?? 1) - 1]! - (a.heldenstufe ?? 0));
 /** Welche Art kommt: in Akt 1 vor allem gewoehnliche, spaeter alle. */
 function artZahl(a: Pick<Abenteuer, 'akt'>, rng: Rng): number {
   const akt = a.akt ?? 1;
@@ -543,7 +543,7 @@ export const BOSS_LEBEN = 10;
  * gewonnen.
  */
 export const AKTE = 3;
-export const AKT_ZIEL: readonly number[] = [6, 8, 10];
+export const AKT_ZIEL: readonly number[] = [5, 7, 9];
 export const AKT_BOSS: readonly BossArt[] = ['koenig', 'schatten', 'koloss'];
 export const AKT_NAME: readonly string[] = ['Die gruenen Weiten', 'Schatten im Land', 'Der Gelee-Koloss'];
 /** Wie viele Gegner der Boss dieses Akts verlangt. */
@@ -558,8 +558,6 @@ export const GRUND_LEBEN = 6;
 const GRUND_SICHT = 3;
 /** Wie weit Schleime den Ritter wittern. */
 const WITTERUNG = 6;
-/** Alle so viele Ticks kriecht ein neuer Schleim aus dem Unbekannten. */
-const NACHSCHUB = 15;
 const SALT_FUND = 77;
 const SALT_SCHLEIM = 78;
 
@@ -682,7 +680,7 @@ export function neuesAbenteuer(seed: number, optionen: StartOptionen = {}): Aben
   for (const h of hexesInRange(start, 14)) {
     const d = hexDistance(start, h);
     if (d < 5) continue;
-    if (hash3i(seed, h.q, h.r, SALT_SCHLEIM) % (d < 9 ? 45 : 29) !== 0) continue;
+    if (hash3i(seed, h.q, h.r, SALT_SCHLEIM) % (d < 9 ? 30 : 24) !== 0) continue;
     if (!begehbar(gelaende(seed, h.q, h.r))) continue;
     const zahl = hash3i(seed, h.q, h.r, SALT_SCHLEIM + 1) % 100;
     a.schleime.push(neuerSchleim(a.naechsteId++, h.q, h.r, d < 9 ? 57 + (zahl % 43) : zahl, d > 8));
@@ -2607,7 +2605,7 @@ function ticken(a: Abenteuer, takt: number): void {
   if (a.zeit > NACHSCHUB_RUHE && a.zeit % nachschubTakt(a) === 0) {
     for (let versuch = 0; versuch < 12; versuch++) {
       const dir = HEX_DIRS[rng.int(6)]!;
-      const weit = 6 + rng.int(3);
+      const weit = 5 + rng.int(3);
       const q = a.pos.q + dir[0] * weit + (rng.int(3) - 1);
       const r = a.pos.r + dir[1] * weit + (rng.int(3) - 1);
       if (!begehbar(gelaende(a.seed, q, r)) || besetzt(q, r)) continue;
