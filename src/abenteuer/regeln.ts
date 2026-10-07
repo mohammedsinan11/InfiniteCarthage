@@ -151,7 +151,7 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
     id: 'extraleben',
     name: 'Extra-Leben',
     legendaer: true,
-    text: 'Legendaer. Faellt der Ritter, steht er mit vollem Leben wieder auf - einmal.',
+    text: 'Legendaer. Faellst du, stehst du mit vollem Leben wieder auf - einmal.',
   },
   {
     id: 'hermes',
@@ -172,9 +172,20 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
     legendaer: true,
     text: 'Legendaer. Ein Herz mehr - leer, es will erst gefuellt werden.',
   },
+  // Legendaere, die zusammenwirken (Spieltest: "keine Synergien, kein Build").
+  { id: 'blutdurst', name: 'Blutdurst', legendaer: true, text: 'Legendaer. Jeder Gegner, den du selbst faellst, heilt dich um ein halbes Herz.' },
+  { id: 'dornen', name: 'Dornenpanzer', legendaer: true, text: 'Legendaer. Wer dich trifft, nimmt selbst 1 Schaden.' },
+  { id: 'kometen', name: 'Sternschnuppe', legendaer: true, text: 'Legendaer. Jede gewuerfelte 6 laesst einen Kometen auf den naechsten Gegner (bis 5 Felder) fallen: 2 Schaden.' },
+  { id: 'glueckspilz', name: 'Glueckspilz', legendaer: true, text: 'Legendaer. Eine gewuerfelte 1 zaehlt als 6 - auch fuer Wuerfeleffekte und Sternschnuppe.' },
+  { id: 'runenmeister', name: 'Runenmeister', legendaer: true, text: 'Legendaer. Deine Waffe laedt doppelt so schnell.' },
+  { id: 'wirbelwind', name: 'Wirbelwind', legendaer: true, text: 'Legendaer. Jeder Treffer trifft auch alle anderen Gegner neben dir (1 Schaden).' },
+  { id: 'ruhepuls', name: 'Ruhepuls', legendaer: true, text: 'Legendaer. Jedes Warten (S) laedt deine Waffe um 2.' },
+  { id: 'jagdfieber', name: 'Jagdfieber', legendaer: true, text: 'Legendaer. Jeder Gegner, den du selbst faellst, schenkt dir einen Schritt.' },
+  { id: 'schatzsucher', name: 'Schatzsucher', legendaer: true, text: 'Legendaer. Truhen bieten vier statt drei Dinge, und Muenzfunde bringen doppelt.' },
   { id: 'angel', name: 'Angel', text: 'Am Wasser: in Richtung Wasser gehen (oder F) wirft die Angel aus - ein Schritt. Mit Glueck beisst ein Fisch.' },
   { id: 'fisch', name: 'Fisch', heilt: 1, text: 'Antippen: 1 Leben zurueck. Stapelt sich.' },
   { id: 'gold', name: 'Gold', text: 'Muenzen - sie stehen ueber dem Inventar. Noch kauft hier niemand etwas.' },
+  { id: 'fluchtruhe', name: 'Verfluchte Truhe', text: 'Darin liegt Legendaeres - aber ihre Waechter erwachen, wenn du sie oeffnest.' },
   { id: 'goldfisch', name: 'Goldfisch', text: 'Ein seltener Fang - der Haendler zahlt 8 Gold.' },
   { id: 'extraherz', name: 'Heilung', text: 'Sofort volles Leben.' },
   { id: 'goldsack', name: 'Goldsack', text: '15 Gold auf einmal.' },
@@ -265,6 +276,8 @@ export type Schleim = {
   gebannt?: number;
   /** Elite (ab Akt 2): zaeher, golden umrandet, laesst Gold fallen. */
   elite?: boolean;
+  /** Der Endboss rast (ab halbem Leben). */
+  rast?: boolean;
 };
 
 export type Phase = 'wuerfeln' | 'ziehen' | 'tot' | 'sieg';
@@ -328,8 +341,10 @@ function artZahl(a: Pick<Abenteuer, 'akt'>, rng: Rng): number {
 /** Spaetere Akte und Heldenstufen machen Gegner zaeher; ab Akt 2 gibt es Elite. */
 function staerken(a: Pick<Abenteuer, 'akt' | 'heldenstufe'>, s: Schleim, rng: Rng): Schleim {
   const akt = a.akt ?? 1;
-  let plus = (akt >= 3 ? 1 : 0) + Math.floor((a.heldenstufe ?? 0) / 2);
-  if (akt >= 2 && rng.int(akt === 2 ? 8 : 5) === 0) {
+  const hs = a.heldenstufe ?? 0;
+  let plus = (akt >= 3 ? 1 : 0) + (hs >= 3 ? 1 : 0);
+  const eliteSelten = (akt === 2 ? 8 : 5) / (hs >= 1 ? 2 : 1);
+  if (akt >= 2 && rng.int(Math.max(2, Math.round(eliteSelten))) === 0) {
     s.elite = true;
     plus += 2;
   }
@@ -489,6 +504,8 @@ export type Abenteuer = {
   akt?: number;
   /** Erlegte Gegner in diesem Akt - bei AKT_ZIEL erwacht sein Boss. */
   aktKills?: number;
+  /** In welchem Zug der Akt begann - nach AKT_ZUEGE Zuegen kommt der Boss so oder so. */
+  aktStart?: number;
   /** Eine offene Wahl (1 aus 3): Truhe, Schatz, Bossbeute, Altar. Solange sie offen ist, ruht das Spiel. */
   wahl?: Wahl | null;
   /** Die Klasse des Helden (Lager). */
@@ -497,6 +514,10 @@ export type Abenteuer = {
   heldenstufe?: number;
   /** Ein Tagesabenteuer (gleicher Seed fuer alle am selben Tag)? */
   tag?: string;
+  /** Im Lager freigeschaltetes Legendaeres, das in diesem Abenteuer vorkommen kann. */
+  legenden?: string[];
+  /** Beim Haendler geschaerft (Angriff) und verstaerkt (Abwehr) - je hoechstens 2. */
+  schmied?: { angriff: number; abwehr: number };
   /** Was zuletzt geschah, neueste zuletzt. */
   log: string[];
   /** Die Ereignisse der letzten Aktion - nur fuers Bild. */
@@ -607,6 +628,7 @@ export function fundAuf(a: Pick<Abenteuer, 'seed' | 'genommen'>, q: number, r: n
   // Ausruestung liegt offen da - man sieht, was es ist.
   if (h < 2) return TRUHENINHALT[hash3i(a.seed, q, r, SALT_FUND + 1) % TRUHENINHALT.length]!;
   if (h < 3) return 'truhe';
+  if (h === 199) return 'fluchtruhe';
   if (h < 8 && (t === 'wald' || t === 'wiese' || t === 'feld' || t === 'dschungel' || t === 'taiga')) return 'kraut';
   if (h < 11) return 'gold';
   if (h < 13) return 'halbherz';
@@ -618,8 +640,8 @@ export function fundAuf(a: Pick<Abenteuer, 'seed' | 'genommen'>, q: number, r: n
 
 const summe = (a: Abenteuer, f: (g: Gegenstand) => number | undefined): number =>
   SLOTS.reduce((n, s) => n + (f(gegenstand(a.ausruestung[s] ?? '') ?? ({} as Gegenstand)) ?? 0), 0);
-export const angriffVon = (a: Abenteuer) => summe(a, (g) => g.angriff) + (a.bonus?.angriff ?? 0);
-export const abwehrVon = (a: Abenteuer) => summe(a, (g) => g.abwehr) + (a.bonus?.abwehr ?? 0);
+export const angriffVon = (a: Abenteuer) => summe(a, (g) => g.angriff) + (a.bonus?.angriff ?? 0) + (a.schmied?.angriff ?? 0);
+export const abwehrVon = (a: Abenteuer) => summe(a, (g) => g.abwehr) + (a.bonus?.abwehr ?? 0) + (a.schmied?.abwehr ?? 0);
 export const maxLebenVon = (a: Abenteuer) => GRUND_LEBEN + summe(a, (g) => g.leben) + (a.bonus?.leben ?? 0) + (a.extraHerzen ?? 0);
 export const sichtVon = (a: Abenteuer) => GRUND_SICHT + summe(a, (g) => g.sicht);
 const schrittBonus = (a: Abenteuer) => summe(a, (g) => g.schritte);
@@ -674,6 +696,7 @@ export function neuesAbenteuer(seed: number, optionen: StartOptionen = {}): Aben
     geruht: false,
     akt: 1,
     aktKills: 0,
+    aktStart: 1,
   };
   // Schleime in der Umgebung - nie zu nah am Start, und nah am Start nur
   // gewoehnliche (Spieltest: "die ersten 15 Zuege ein Muenzwurf").
@@ -704,19 +727,19 @@ export type Wahl = { art: WahlArt; titel: string; optionen: string[] };
 
 /** Legendaeres, das noch in Frage kommt (Einmaliges nur einmal, Extra-Leben hoechstens EXTRALEBEN_MAX). */
 function legendaerPool(a: Abenteuer): string[] {
-  return ['sololeveling', 'hermes', 'pentagramm', 'extraleben', 'herzcontainer'].filter(
-    (x) => !(EINMALIG.includes(x) && hatLegende(a, x)) && !(x === 'extraleben' && (a.extraLeben ?? 0) >= EXTRALEBEN_MAX),
+  return [...LEGENDEN_GRUND, ...(a.legenden ?? [])].filter(
+    (x) => !(EINMALIG.includes(x) && hatLegende(a, x)) && !(x === 'extraleben' && ((a.extraLeben ?? 0) >= EXTRALEBEN_MAX || (a.heldenstufe ?? 0) >= 5)),
   );
 }
 /** Hoechstens so viele Extra-Leben auf einmal (Spieltest: fuenf machten unverwundbar). */
-export const EXTRALEBEN_MAX = 2;
+export const EXTRALEBEN_MAX = 1;
 
 /** Drei verschiedene aus einer Liste - mit dem Zufall des Spiels. */
-function dreiAus(a: Abenteuer, liste: string[]): string[] {
+function dreiAus(a: Abenteuer, liste: string[], n = 3): string[] {
   const rng = new Rng(a.rng);
   const rest = [...new Set(liste)];
   const wahl: string[] = [];
-  while (wahl.length < 3 && rest.length) wahl.push(rest.splice(rng.int(rest.length), 1)[0]!);
+  while (wahl.length < n && rest.length) wahl.push(rest.splice(rng.int(rest.length), 1)[0]!);
   a.rng = rng.getState();
   return wahl;
 }
@@ -725,7 +748,7 @@ function dreiAus(a: Abenteuer, liste: string[]): string[] {
 function bietWahl(a: Abenteuer, art: WahlArt): void {
   if (art === 'truhe') {
     // Ausruestung, Wuerfel und Vorrat - je eins aus jeder Ecke, wenn es geht.
-    const optionen = dreiAus(a, TRUHENINHALT.filter((id) => id !== a.ausruestung[gegenstand(id)?.slot ?? 'waffe']));
+    const optionen = dreiAus(a, TRUHENINHALT.filter((id) => id !== a.ausruestung[gegenstand(id)?.slot ?? 'waffe']), hatLegende(a, 'schatzsucher') ? 4 : 3);
     a.wahl = { art, titel: 'Eine Truhe! Nimm eins.', optionen };
   } else {
     const pool = legendaerPool(a);
@@ -785,7 +808,7 @@ export const KLASSEN: Record<KlasseId, { name: string; figur: string; text: stri
 };
 
 /** Was beim Aufbruch mitkommt: Klasse, freigeschaltete Extras, Heldenstufe, Tagesabenteuer. */
-export type StartOptionen = { klasse?: KlasseId; extras?: string[]; heldenstufe?: number; tag?: string };
+export type StartOptionen = { klasse?: KlasseId; extras?: string[]; heldenstufe?: number; tag?: string; legenden?: string[] };
 /** Extras aus dem Lager (mit Ruhm freigeschaltet). */
 export const START_EXTRAS: Record<string, { name: string; text: string }> = {
   kraeuter: { name: 'Kraeuterbeutel', text: 'Du beginnst mit 2 Kraeutern.' },
@@ -800,6 +823,7 @@ function startAnwenden(a: Abenteuer, o: StartOptionen): void {
   a.klasse = o.klasse ?? 'ritter';
   a.heldenstufe = o.heldenstufe ?? 0;
   if (o.tag) a.tag = o.tag;
+  if (o.legenden?.length) a.legenden = o.legenden.filter((x) => LEGENDEN_FREI.includes(x));
   a.ausruestung = { ...a.ausruestung, waffe: null, ...k.ausruestung };
   a.inventar = { ...k.inventar };
   a.extraHerzen = k.leben - GRUND_LEBEN;
@@ -880,7 +904,23 @@ function wuerfelWurf(a: Abenteuer): { wurf: number; zusatz: string } {
     zusatz = ` - der Goldwuerfel klimpert: +${gold} Gold`;
   }
   a.rng = rng.getState();
+  // Glueckspilz: eine 1 zaehlt als 6.
+  if (wurf === 1 && hatLegende(a, 'glueckspilz')) {
+    wurf = 6;
+    zusatz += ' (Glueckspilz: die 1 zaehlt als 6)';
+    a.ereignisse.push({ art: 'wuerfelEffekt', takt: 0, text: 'Glueckspilz!' });
+  }
   zusatz += wuerfelEffekt(a, id, wurf);
+  // Sternschnuppe: jede 6 ruft einen Kometen auf den naechsten Gegner.
+  if (wurf === 6 && hatLegende(a, 'kometen')) {
+    const ziel = a.schleime.filter((s) => hexDistance(s, a.pos) <= 5).sort((x, y) => hexDistance(x, a.pos) - hexDistance(y, a.pos))[0];
+    if (ziel) {
+      a.ereignisse.push({ art: 'faehigkeit', takt: 0, name: 'runenblitz', ziel: ziel.id, felder: [{ q: ziel.q, r: ziel.r }] });
+      a.ereignisse.push({ art: 'wuerfelEffekt', takt: 0, text: 'Sternschnuppe!' });
+      verwunde(a, ziel, 2, 0, 'Sternschnuppe');
+      zusatz += ' - eine Sternschnuppe schlaegt ein';
+    }
+  }
   return { wurf, zusatz };
 }
 
@@ -1133,7 +1173,10 @@ function pentagrammKill(a: Abenteuer, takt: number): void {
 }
 
 /** Legendaeres, das es nur einmal gibt. */
-const EINMALIG = ['sololeveling', 'hermes', 'pentagramm'];
+const EINMALIG = ['sololeveling', 'hermes', 'pentagramm', 'blutdurst', 'dornen', 'kometen', 'glueckspilz', 'runenmeister', 'wirbelwind', 'ruhepuls', 'jagdfieber', 'schatzsucher'];
+/** Legendaeres, das jedes Abenteuer kennt - der Rest wird im Lager freigeschaltet (StartOptionen.legenden). */
+export const LEGENDEN_GRUND = ['sololeveling', 'hermes', 'pentagramm', 'extraleben', 'herzcontainer', 'blutdurst', 'dornen', 'kometen'];
+export const LEGENDEN_FREI = ['ruhepuls', 'schatzsucher', 'glueckspilz', 'jagdfieber', 'wirbelwind', 'runenmeister'];
 
 /** So weit huepfen die Hermes-Stiefel (Spieltest: drei war zu viel). */
 export const HERMES_WEITE = 2;
@@ -1152,6 +1195,10 @@ export function taste(alt: Abenteuer, t: Taste): Abenteuer {
   a.ereignisse = [];
   if (t === 's') {
     warten(a, 0);
+    if (hatLegende(a, 'ruhepuls')) {
+      laden(a, 0);
+      laden(a, 0);
+    }
     a.schritte -= 1;
     ticken(a, 1);
     return nachDemSchritt(a);
@@ -1303,7 +1350,9 @@ export function zugBeenden(alt: Abenteuer): Abenteuer {
 function warten(a: Abenteuer, takt: number): void {
   a.ereignisse.push({ art: 'warten', takt });
   const ruhig = !a.schleime.some((s) => hexDistance(s, a.pos) <= 2);
-  if (ruhig && !a.geruht && a.leben < maxLebenVon(a)) {
+  if ((a.heldenstufe ?? 0) >= 4) {
+    if (!ruhig) melde(a, 'Du wartest.');
+  } else if (ruhig && !a.geruht && a.leben < maxLebenVon(a)) {
     a.leben += 1;
     a.geruht = true;
     a.ereignisse.push({ art: 'heil', takt, leben: 1 });
@@ -1341,6 +1390,20 @@ function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
   }
   const vorne = `Wurf ${wurf}+${angriffVon(a)}${spalt ? ', Spalthieb' : ''}`;
   verwunde(a, s, schaden, takt, vorne);
+  const gefallen = !a.schleime.some((x) => x.id === s.id);
+  if (gefallen && hatLegende(a, 'blutdurst') && a.leben < maxLebenVon(a)) {
+    const plus = Math.min(0.5, maxLebenVon(a) - a.leben);
+    a.leben += plus;
+    a.ereignisse.push({ art: 'heil', takt, leben: plus });
+  }
+  if (gefallen && hatLegende(a, 'jagdfieber') && a.phase === 'ziehen') {
+    a.schritte += 1;
+    melde(a, 'Jagdfieber: +1 Schritt.');
+  }
+  // Wirbelwind: jeder Treffer streift alle anderen Gegner neben dir.
+  if (hatLegende(a, 'wirbelwind')) {
+    for (const x of a.schleime.filter((x) => x.id !== s.id && hexDistance(x, a.pos) === 1)) verwunde(a, x, 1, takt, 'Wirbelwind');
+  }
   // Mit der Axt im Wald: wer dort einen Gegner faellt, schlaegt auch Holz.
   if (a.ausruestung.waffe === 'axt' && !a.schleime.some((x) => x.id === s.id) && istWald(gelaende(a.seed, s.q, s.r))) holzSchlagen(a, 1);
   // Ein Treffer laedt die Waffe.
@@ -1393,6 +1456,7 @@ function verwunde(a: Abenteuer, s: Schleim, schaden: number, takt: number, vorne
     // Sonst: eine von drei legendaeren Belohnungen waehlen, und der naechste Akt beginnt.
     a.akt = akt + 1;
     a.aktKills = 0;
+    a.aktStart = a.zug;
     a.ereignisse.push({ art: 'akt', takt, akt: a.akt, name: AKT_NAME[a.akt - 1] ?? '' });
     melde(a, `${vorne}: der ${schleimName(s)} zerplatzt! Akt ${a.akt}: ${AKT_NAME[a.akt - 1]} - die Welt wird gefaehrlicher.`);
     bietWahl(a, 'boss');
@@ -1431,8 +1495,26 @@ function verwunde(a: Abenteuer, s: Schleim, schaden: number, takt: number, vorne
 /** Ist der Boss des Akts faellig (und noch keiner da), erwacht er. */
 function bossPruefen(a: Abenteuer, takt: number): void {
   if (a.phase === 'tot' || a.phase === 'sieg' || a.bossErwacht || a.schleime.some((x) => x.boss && x.bossArt !== 'penta')) return;
-  if ((a.aktKills ?? 0) >= aktZiel(a)) bossErwacht(a, takt);
+  if ((a.aktKills ?? 0) >= aktZiel(a) || bossUngeduldig(a)) bossErwacht(a, takt);
 }
+
+/**
+ * Spieltest: "In Akt 2 und 3 laeuft man lange herum, um Gegner zu finden."
+ * Darum kommt der Boss spaetestens nach AKT_ZUEGE Zuegen im Akt - ungeduldig.
+ */
+export const AKT_ZUEGE = 18;
+export const zuegeBisBoss = (a: Pick<Abenteuer, 'zug' | 'aktStart'>): number => Math.max(0, AKT_ZUEGE - (a.zug - (a.aktStart ?? 1)));
+const bossUngeduldig = (a: Abenteuer): boolean => zuegeBisBoss(a) === 0;
+
+/** Heldenstufen veraendern die Regeln - jede Stufe bringt eine dazu. */
+export const HELDENSTUFE_REGEL: readonly string[] = [
+  'Normal.',
+  'Elite-Gegner kommen doppelt so oft.',
+  'Bosse haben ein Drittel mehr Leben.',
+  'Alle Gegner haben ein Leben mehr.',
+  'Verschnaufen (Warten) heilt nicht mehr.',
+  'Kein Extra-Leben aus Schaetzen und Bossen.',
+];
 
 const istWald = (b: Boden | null) => b === 'wald' || b === 'dschungel' || b === 'taiga';
 
@@ -1465,6 +1547,9 @@ export function legendaerAnwenden(a: Abenteuer, id: string, takt: number): void 
     melde(a, 'Legendaer: Pentagrammmeister! Schliesst dein Weg eine Form, wirkst du einen Zauber.');
   } else if (id === 'hermes') {
     melde(a, 'Legendaer: Hermes-Stiefel! Jeder Schritt huepft bis zu zwei Felder - auch uebers Wasser.');
+  } else {
+    const g = gegenstand(id);
+    if (g) melde(a, `Legendaer: ${g.name}! ${g.text.replace(/^Legendaer\.\s*/, '')}`);
   }
 }
 
@@ -1500,7 +1585,7 @@ export function ladungVon(a: Abenteuer): { ist: number; voll: number; faehigkeit
 function laden(a: Abenteuer, takt: number): void {
   const { voll, faehigkeit } = ladungVon(a);
   if (!voll || !faehigkeit || a.bereit === faehigkeit || (a.ladung ?? 0) >= voll) return;
-  a.ladung = (a.ladung ?? 0) + 1;
+  a.ladung = Math.min(voll, (a.ladung ?? 0) + (hatLegende(a, 'runenmeister') ? 2 : 1));
   // Voll: die Faehigkeit wartet, bis der Spieler sie ausloest (Taste 1) -
   // Spieltest: "Feuerkreis! - doch niemand steht nah genug", dutzendfach.
   if (a.ladung >= voll) {
@@ -1574,7 +1659,8 @@ function bossErwacht(a: Abenteuer, takt: number, art: BossArt = naechsterBoss(a)
   a.rng = rng.getState();
   if (!ort) return;
   const id = a.naechsteId++;
-  const leben = BOSS_GRUND[art] + (art === 'penta' ? 0 : 3 * (a.heldenstufe ?? 0));
+  const hs = a.heldenstufe ?? 0;
+  const leben = art === 'penta' ? BOSS_GRUND.penta : Math.round((BOSS_GRUND[art] + 2 * hs) * (hs >= 2 ? 4 / 3 : 1));
   a.schleime.push({ id, q: ort.q, r: ort.r, leben, max: leben, gross: true, boss: true, bossArt: art, zaehler: 0 });
   if (art === 'penta') a.pentaGerufen = true;
   else a.bossErwacht = true;
@@ -1613,6 +1699,29 @@ function aufheben(a: Abenteuer): void {
     bietWahl(a, fund);
     return;
   }
+  // Die verfluchte Truhe: Legendaeres - aber ihre Waechter erwachen (eine Elite darunter).
+  if (fund === 'fluchtruhe') {
+    const rng = new Rng(a.rng);
+    const plaetze = hexesInRange(a.pos, 2).filter(
+      (h) => hexDistance(h, a.pos) === 2 && begehbar(gelaende(a.seed, h.q, h.r)) && !schleimAuf(a, h.q, h.r) && !ortAuf(a, h.q, h.r),
+    );
+    for (let i = 0; i < 2 && plaetze.length; i++) {
+      const h = plaetze.splice(rng.int(plaetze.length), 1)[0]!;
+      const id = a.naechsteId++;
+      const s = staerken(a, neuerSchleim(id, h.q, h.r, artZahl(a, rng), false), rng);
+      if (i === 0 && !s.elite) {
+        s.elite = true;
+        s.leben += 2;
+        s.max = s.leben;
+      }
+      a.schleime.push(s);
+      a.ereignisse.push({ art: 'neu', takt: 0, wer: id });
+    }
+    a.rng = rng.getState();
+    melde(a, 'Eine verfluchte Truhe! Ihre Waechter erwachen - doch darin liegt Legendaeres.');
+    bietWahl(a, 'schatz');
+    return;
+  }
   if (gegenstand(fund)?.slot || fund === 'angel') {
     // Nicht gleich anlegen (Spieltest): im Inventar leuchtet es gruen, wenn es besser ist.
     gibGegenstand(a, fund, 'Gefunden');
@@ -1621,7 +1730,7 @@ function aufheben(a: Abenteuer): void {
   const g = gegenstand(fund);
   // Gold sind Muenzen - eins bis drei auf einmal.
   if (fund === 'gold') {
-    const n = 1 + (hash3i(a.seed, a.pos.q, a.pos.r, SALT_FUND + 9) % 3);
+    const n = (1 + (hash3i(a.seed, a.pos.q, a.pos.r, SALT_FUND + 9) % 3)) * (hatLegende(a, 'schatzsucher') ? 2 : 1);
     a.inventar = { ...a.inventar, gold: (a.inventar['gold'] ?? 0) + n };
     melde(a, `${n} ${n === 1 ? 'Goldmuenze' : 'Goldmuenzen'} gefunden.`);
     return;
@@ -1659,12 +1768,28 @@ const GIFT_DAUER = 5;
 function schleimTrifft(a: Abenteuer, s: Schleim, feld: Hex, takt: number, rng: Rng): void {
   const wurf = 1 + rng.int(6);
   if (schutzwall(a, s, feld, takt, wurf)) return;
-  const schaden = wurf <= abwehrVon(a) * 2 ? 0 : s.gross ? 2 : 1;
+  // Spaetere Akte und Elite treffen haerter (Spieltest: "ab Akt 2 keine Spannung mehr").
+  const wucht = (s.gross ? 2 : 1) + ((a.akt ?? 1) >= 3 || s.elite ? 1 : 0);
+  const schaden = abgewehrt(a, wurf) ? 0 : wucht;
   a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: 'ritter', feld, wurf, schaden });
   if (schaden > 0) {
     a.leben -= schaden;
     melde(a, `Der ${schleimName(s)} trifft dich: -${schaden} Leben.`);
-  } else melde(a, `Dein Schild faengt den ${schleimNameAkk(s)} ab.`);
+    dornen(a, s, takt);
+  } else melde(a, `Dein Schild faengt den ${schleimNameAkk(s)} ab (Wurf ${wurf}).`);
+}
+
+/** Abwehr: ein Wurf bis zu anderthalbmal der Abwehr prallt ab (Abwehr 1: eine 1, 2: bis 3, 3: bis 4). */
+const abgewehrt = (a: Abenteuer, wurf: number): boolean => wurf <= Math.floor(abwehrVon(a) * 1.5);
+/** Mit welcher Augenzahl man einen Gegner trifft (fuer die Anzeige "4+"). */
+export const trefferAb = (a: Abenteuer, s: Pick<Schleim, 'art'>): number => Math.max(1, (s.art === 'panzer' ? 5 : 4) - angriffVon(a));
+/** Wie oft die Abwehr einen Treffer abfaengt, in Augen eines W6. */
+export const abwehrAugen = (a: Abenteuer): number => Math.min(6, Math.floor(abwehrVon(a) * 1.5));
+
+/** Dornenpanzer: wer trifft, nimmt 1 Schaden. */
+function dornen(a: Abenteuer, s: Schleim, takt: number): void {
+  if (!hatLegende(a, 'dornen') || !a.schleime.includes(s)) return;
+  verwunde(a, s, 1, takt, 'Dornenpanzer');
 }
 
 /** Liegt der Ritter in gerader Linie, 2 bis 3 Felder weit? Dann die Richtung. */
@@ -1802,12 +1927,14 @@ function koenigTrifft(a: Abenteuer, s: Schleim, felder: readonly Hex[], takt: nu
     return;
   }
   if (schutzwall(a, s, feld, takt, wurf)) return;
-  const schaden = wurf <= abwehrVon(a) * 2 ? 0 : BOSS_SCHADEN;
+  // Der Endboss schlaegt haerter.
+  const schaden = abgewehrt(a, wurf) ? 0 : BOSS_SCHADEN + ((a.akt ?? 1) >= AKTE && s.bossArt !== 'penta' ? 1 : 0);
   a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: 'ritter', feld, wurf, schaden });
   if (schaden > 0) {
     a.leben -= schaden;
     melde(a, `Der ${schleimName(s)} trifft dich: -${schaden} Leben.`);
-  } else melde(a, `Dein Schild faengt den ${schleimNameAkk(s)} ab.`);
+    dornen(a, s, takt);
+  } else melde(a, `Dein Schild faengt den ${schleimNameAkk(s)} ab (Wurf ${wurf}).`);
 }
 
 /** Der Koenig handelt (nur jeden zweiten Tick, wie alle grossen Schleime). */
@@ -2114,12 +2241,13 @@ export function beschwoeren(alt: Abenteuer): Abenteuer {
   return a;
 }
 /** So viele Soeldner folgen hoechstens. */
-export const GEFOLGE_MAX = 2;
-const VORNAMEN = [
-  'Bjarne', 'Hilda', 'Odo', 'Ragna', 'Wido', 'Frida', 'Gero', 'Ilka', 'Konrad', 'Mechthild', 'Tassilo', 'Wiebke', 'Ansgar', 'Sigrun', 'Volker', 'Edda',
-  'Arnulf', 'Berta', 'Dietlind', 'Eckhart', 'Folkmar', 'Gisela', 'Hartwig', 'Irmgard', 'Jost', 'Kunigunde', 'Lambert', 'Margit', 'Notker', 'Ortrun',
-  'Poppo', 'Reinhild', 'Swanhild', 'Thankmar', 'Ulla', 'Waltraud', 'Wolfram', 'Adalbert', 'Brunhild', 'Ekkehard', 'Gundula',
-];
+export const GEFOLGE_MAX = 1;
+/** Namen - Maenner und Frauen getrennt, damit "Konrad, Klingenmeisterin" nicht vorkommt (Spieltest). */
+const MAENNER = ['Bjarne', 'Odo', 'Wido', 'Gero', 'Konrad', 'Tassilo', 'Ansgar', 'Volker', 'Arnulf', 'Eckhart', 'Folkmar', 'Hartwig', 'Jost', 'Lambert', 'Notker', 'Poppo', 'Thankmar', 'Wolfram', 'Adalbert', 'Ekkehard'];
+const FRAUEN = ['Hilda', 'Ragna', 'Frida', 'Ilka', 'Mechthild', 'Wiebke', 'Sigrun', 'Edda', 'Berta', 'Dietlind', 'Gisela', 'Irmgard', 'Kunigunde', 'Margit', 'Ortrun', 'Reinhild', 'Swanhild', 'Ulla', 'Waltraud', 'Brunhild', 'Gundula'];
+const VORNAMEN = [...MAENNER, ...FRAUEN];
+/** Welche Soeldner Frauen sind (Klingenmeisterin, Heilerin). */
+const WEIBLICH: readonly SoeldnerArt[] = ['soeldnerin', 'paladin'];
 
 const SPRUCH = {
   anheuern: ['Mein Schwert gehoert dir - solange das Gold klingt.', 'Endlich Arbeit! Wohin geht es?', 'Ich bin dabei. Lass mich vorgehen.'],
@@ -2160,15 +2288,41 @@ export const HAENDLER_WAREN: readonly { id: string; preis: number }[] = [
  * seinem eigenen Sortiment (fest je Haendler) - Ausruestung und Wuerfel,
  * je einmal. Spieltest: "jeder Haendler hat dieselben Waren, Gold haeuft sich".
  */
-export function haendlerWaren(a: Pick<Abenteuer, 'seed' | 'gekauft'>, o: Ort): { id: string; preis: number }[] {
-  const rng = new Rng(hash3i(a.seed, o.q, o.r, SALT_LEUTE + 6));
+export function haendlerWaren(a: Abenteuer, o: Ort): { id: string; preis: number }[] {
+  // Das Sortiment wechselt mit dem Akt; ab Akt 2 liegt auch ein Legendaeres aus - teuer.
+  const akt = a.akt ?? 1;
+  const rng = new Rng(hash3i(a.seed, o.q + akt * 101, o.r, SALT_LEUTE + 6));
   const pool = [...TRUHENINHALT].filter((id) => id !== 'angel');
   const sortiment: string[] = [];
   while (sortiment.length < 3 && pool.length) sortiment.push(pool.splice(rng.int(pool.length), 1)[0]!);
+  const legenden = akt >= 2 ? legendaerPool(a).filter((x) => x !== 'herzcontainer') : [];
+  if (legenden.length) sortiment.push(legenden[rng.int(legenden.length)]!);
   return [
     ...HAENDLER_WAREN,
-    ...sortiment.filter((id) => !(a.gekauft ?? []).includes(`${o.id}:${id}`)).map((id) => ({ id, preis: Math.max(6, ausruestungsWert(id) * 3) })),
+    ...sortiment
+      .filter((id) => !(a.gekauft ?? []).includes(`${o.id}:${akt}:${id}`))
+      .map((id) => ({ id, preis: gegenstand(id)?.legendaer ? 30 + 10 * (akt - 2) : Math.max(6, ausruestungsWert(id) * 3) })),
   ];
+}
+
+/**
+ * DER SCHMIED beim Haendler: Gold wird zu Staerke (Spieltest: "Gold haeuft
+ * sich, nichts lohnt sich"). Schaerfen gibt +1 Angriff, Verstaerken +1
+ * Abwehr - je hoechstens zweimal, jedes Mal teurer.
+ */
+export const SCHMIED_MAX = 2;
+export const schmiedPreis = (a: Pick<Abenteuer, 'schmied'>, was: 'angriff' | 'abwehr'): number =>
+  was === 'angriff' ? 12 + 10 * (a.schmied?.angriff ?? 0) : 10 + 10 * (a.schmied?.abwehr ?? 0);
+export function schmieden(alt: Abenteuer, was: 'angriff' | 'abwehr'): Abenteuer {
+  const preis = schmiedPreis(alt, was);
+  if (!offenerLaden(alt, 'haendler') || (alt.schmied?.[was] ?? 0) >= SCHMIED_MAX || (alt.inventar['gold'] ?? 0) < preis) return alt;
+  const a = structuredClone(alt);
+  a.ereignisse = [{ art: 'wuerfelEffekt', takt: 0, text: was === 'angriff' ? '+1 Angriff' : '+1 Abwehr' }];
+  a.schmied = { angriff: a.schmied?.angriff ?? 0, abwehr: a.schmied?.abwehr ?? 0, [was]: (a.schmied?.[was] ?? 0) + 1 };
+  a.inventar = { ...a.inventar, gold: (a.inventar['gold'] ?? 0) - preis };
+  if (!a.inventar['gold']) delete a.inventar['gold'];
+  melde(a, was === 'angriff' ? `Der Schmied schaerft deine Waffe: +1 Angriff (${preis} Gold).` : `Der Schmied verstaerkt deine Ruestung: +1 Abwehr (${preis} Gold).`);
+  return a;
 }
 
 /** Die drei Angebote eines Werbers - fest aus Seed und Ort. */
@@ -2178,11 +2332,13 @@ export function werberAngebot(a: Pick<Abenteuer, 'seed' | 'gefolge'>, o: Ort): {
   // Jeder weitere Soeldner kostet mehr.
   const aufschlag = 5 * angeheuerte(a);
   // Drei verschiedene Namen: ein Startname, dann je sieben weiter.
-  const n0 = hash3i(a.seed, o.q, o.r, SALT_LEUTE + 4) % VORNAMEN.length;
+  const n0 = hash3i(a.seed, o.q, o.r, SALT_LEUTE + 4);
   return [0, 1, 2].map((i) => {
     const h = hash3i(a.seed, o.q * 7 + i, o.r, SALT_LEUTE + 3);
     const art = arten[(h + i) % arten.length]!;
-    return { art, name: VORNAMEN[(n0 + i * 7) % VORNAMEN.length]!, preis: SOELDNER[art].preis + aufschlag };
+    // Passend zum Geschlecht, und nie der Name des Werbers selbst.
+    const liste = (WEIBLICH.includes(art) ? FRAUEN : MAENNER).filter((n) => n !== o.name);
+    return { art, name: liste[(n0 + i * 7) % liste.length]!, preis: SOELDNER[art].preis + aufschlag };
   });
 }
 
@@ -2205,7 +2361,7 @@ function ortePlatzieren(a: Abenteuer): void {
   for (const [art, weit] of [['haendler', 3], ['werber', 4]] as const) {
     const ring = hexesInRange(a.pos, weit).filter((h) => hexDistance(h, a.pos) === weit && ortFrei(a, h));
     const h = ring[hash3i(a.seed, weit, 0, SALT_LEUTE) % Math.max(1, ring.length)];
-    if (h) a.orte.push({ id: a.naechsteId++, q: h.q, r: h.r, art, name: VORNAMEN[hash3i(a.seed, h.q, h.r, SALT_LEUTE + 1) % VORNAMEN.length]! });
+    if (h) a.orte.push({ id: a.naechsteId++, q: h.q, r: h.r, art, name: MAENNER[hash3i(a.seed, h.q, h.r, SALT_LEUTE + 1) % MAENNER.length]! });
   }
 }
 
@@ -2215,7 +2371,7 @@ function ortEntdecken(a: Abenteuer, h: Hex): void {
   if (z !== 7 && z !== 77 && z !== 150 && z !== 200) return;
   if (!ortFrei(a, h) || hexDistance(h, a.pos) < 2) return;
   const art: OrtArt = z === 7 ? 'haendler' : z === 77 ? 'werber' : 'altar';
-  a.orte = [...(a.orte ?? []), { id: a.naechsteId++, q: h.q, r: h.r, art, name: VORNAMEN[hash3i(a.seed, h.q, h.r, SALT_LEUTE + 1) % VORNAMEN.length]! }];
+  a.orte = [...(a.orte ?? []), { id: a.naechsteId++, q: h.q, r: h.r, art, name: MAENNER[hash3i(a.seed, h.q, h.r, SALT_LEUTE + 1) % MAENNER.length]! }];
 }
 
 export const ortAuf = (a: Abenteuer, q: number, r: number): Ort | undefined => (a.orte ?? []).find((o) => o.q === q && o.r === r);
@@ -2338,8 +2494,10 @@ export function kaufen(alt: Abenteuer, id: string): Abenteuer {
   if (!o || !ware || (alt.inventar['gold'] ?? 0) < ware.preis) return alt;
   const a = structuredClone(alt);
   a.ereignisse = [];
-  if (!HAENDLER_WAREN.some((w) => w.id === id)) a.gekauft = [...(a.gekauft ?? []), `${o.id}:${id}`];
-  a.inventar = { ...a.inventar, gold: (a.inventar['gold'] ?? 0) - ware.preis, [id]: (a.inventar[id] ?? 0) + 1 };
+  if (!HAENDLER_WAREN.some((w) => w.id === id)) a.gekauft = [...(a.gekauft ?? []), `${o.id}:${a.akt ?? 1}:${id}`];
+  a.inventar = { ...a.inventar, gold: (a.inventar['gold'] ?? 0) - ware.preis };
+  if (gegenstand(id)?.legendaer) legendaerAnwenden(a, id, 0);
+  else a.inventar = { ...a.inventar, [id]: (a.inventar[id] ?? 0) + 1 };
   if (a.inventar['gold'] === 0) delete a.inventar['gold'];
   melde(a, `Gekauft: ${gegenstand(id)!.name} fuer ${ware.preis} Gold.`);
   return a;
@@ -2394,7 +2552,9 @@ function soeldnerLernt(a: Abenteuer, g: Soeldner, ep: number, takt: number): voi
 function helferSchlaegt(a: Abenteuer, wer: { id: number; name: string }, s: Schleim, angriff: number, rng: Rng, takt: number, fremd: boolean, wucht = 1): boolean {
   const wurf = 1 + rng.int(6);
   const noetig = s.art === 'panzer' ? 5 : 4;
-  const schaden = wurf + angriff >= noetig ? wucht : 0;
+  let schaden = wurf + angriff >= noetig ? wucht : 0;
+  // Den letzten Schlag auf einen Boss ueberlassen Helfer dem Ritter (Spieltest).
+  if (s.boss && schaden >= s.leben) schaden = Math.max(0, s.leben - 1);
   a.ereignisse.push({ art: 'hieb', takt, wer: wer.id, ziel: s.id, wurf, schaden });
   if (!schaden) return false;
   const vorher = a.schleime.length;
@@ -2593,7 +2753,14 @@ function ticken(a: Abenteuer, takt: number): void {
   const neue: Schleim[] = [];
   for (const s of a.schleime) {
     if ((s.gebannt ?? 0) > a.zeit) continue;
-    if ((s.gross || s.art === 'panzer') && a.zeit % 2 === 1) continue;
+    // Der Endboss rast ab halbem Leben: er handelt in jedem Tick.
+    const rast = s.boss && s.bossArt !== 'penta' && (a.akt ?? 1) >= AKTE && s.leben <= (s.max ?? 0) / 2;
+    if (rast && !s.rast) {
+      s.rast = true;
+      a.ereignisse.push({ art: 'boss', takt, wer: s.id, name: `${BOSS_NAME[s.bossArt ?? 'koenig']} rast` });
+      melde(a, `Der ${schleimName(s)} rast - er handelt jetzt in jedem Takt!`);
+    }
+    if ((s.gross || s.art === 'panzer') && a.zeit % 2 === 1 && !rast) continue;
     if (s.boss) {
       koenigHandelt(a, s, takt, rng, besetzt, neue);
       continue;

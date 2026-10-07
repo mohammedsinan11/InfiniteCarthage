@@ -5,17 +5,18 @@
  * Bestwert je Tag).
  */
 
-import { AKTE, KLASSEN, START_EXTRAS } from '../../abenteuer/regeln';
+import { AKTE, HELDENSTUFE_REGEL, KLASSEN, START_EXTRAS, gegenstand } from '../../abenteuer/regeln';
 import type { KlasseId } from '../../abenteuer/regeln';
 import { FigurBild } from './DebugFenster';
-import { FREISCHALTUNGEN, freischalten, heute, istFrei } from './meta';
+import { ERFOLGE, FREISCHALTUNGEN, freischalten, heute, istFrei } from './meta';
+import type { FreiArt } from './meta';
 import type { Meta } from './meta';
 
 export type Aufbruch = { klasse: KlasseId; stufe: number; tag?: { tag: string; seed: number } };
 
 export function Lager({ meta, onMeta, onAufbruch, onZurueck }: { meta: Meta; onMeta: (m: Meta) => void; onAufbruch: (x: Aufbruch) => void; onZurueck?: () => void }) {
   const klassen = Object.keys(KLASSEN) as KlasseId[];
-  const kosten = (art: 'klasse' | 'extra', id: string) => FREISCHALTUNGEN.find((f) => f.art === art && f.id === id)?.kosten ?? 0;
+  const kosten = (art: FreiArt, id: string) => FREISCHALTUNGEN.find((f) => f.art === art && f.id === id)?.kosten ?? 0;
   const tag = heute();
   const tagBest = meta.tage[tag.tag];
   return (
@@ -79,6 +80,30 @@ export function Lager({ meta, onMeta, onAufbruch, onZurueck }: { meta: Meta; onM
           })}
         </div>
 
+        <small>Legendaeres (kommt danach in Truhen, Schaetzen und Bossbeute vor)</small>
+        <div className="ab-extras">
+          {FREISCHALTUNGEN.filter((f) => f.art === 'legende').map((f) => {
+            const frei = istFrei(meta, 'legende', f.id);
+            const g = gegenstand(f.id);
+            return (
+              <button
+                key={f.id}
+                className={frei ? 'ab-extra frei legendaer' : 'ab-extra legendaer'}
+                disabled={frei || meta.ruhm < f.kosten}
+                onClick={() => onMeta(freischalten(meta, 'legende', f.id))}
+                title={g?.text}
+              >
+                <b>
+                  {frei ? '✓ ' : ''}
+                  {g?.name}
+                </b>
+                <span>{g?.text.replace(/^Legendaer\.\s*/, '')}</span>
+                {!frei && <em>★ {f.kosten}</em>}
+              </button>
+            );
+          })}
+        </div>
+
         {meta.stufeMax > 0 && (
           <div className="ab-heldenstufe">
             <small>Heldenstufe</small>
@@ -89,9 +114,24 @@ export function Lager({ meta, onMeta, onAufbruch, onZurueck }: { meta: Meta; onM
             <button className="klein" disabled={meta.stufe >= meta.stufeMax} onClick={() => onMeta({ ...meta, stufe: meta.stufe + 1 })}>
               +
             </button>
-            <span>{meta.stufe === 0 ? 'normal' : `Gegner zaeher und zahlreicher - Punkte ×${(1 + 0.3 * meta.stufe).toFixed(1)}`}</span>
+            <span>
+              {meta.stufe === 0
+                ? 'normal'
+                : `${HELDENSTUFE_REGEL.slice(1, meta.stufe + 1).join(' ')} Gegner kommen oefter. Punkte ×${(1 + 0.3 * meta.stufe).toFixed(1)}`}
+            </span>
           </div>
         )}
+
+        <small>
+          Erfolge ({meta.erfolge.length}/{ERFOLGE.length})
+        </small>
+        <div className="ab-erfolge">
+          {ERFOLGE.map((e) => (
+            <span key={e.id} className={meta.erfolge.includes(e.id) ? 'ab-erfolg da' : 'ab-erfolg'} title={`${e.text} +${e.ruhm} Ruhm`}>
+              {meta.erfolge.includes(e.id) ? '★' : '☆'} <b>{e.name}</b> <i>{e.text}</i> <em>+{e.ruhm}</em>
+            </span>
+          ))}
+        </div>
 
         <div className="ab-lager-knoepfe">
           <button className="primary" onClick={() => onAufbruch({ klasse: meta.klasse, stufe: meta.stufe })}>

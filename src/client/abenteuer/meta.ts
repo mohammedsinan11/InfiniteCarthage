@@ -7,7 +7,8 @@
  * (Schwierigkeit mit mehr Punkten). Dazu Bestwerte und das Tagesabenteuer.
  */
 
-import type { KlasseId } from '../../abenteuer/regeln';
+import { abenteuerPunkte, LEGENDEN_FREI } from '../../abenteuer/regeln';
+import type { Abenteuer, KlasseId } from '../../abenteuer/regeln';
 
 const META = 'infinitecarthage.abenteuer.meta';
 
@@ -27,9 +28,15 @@ export type Meta = {
   tage: Record<string, number>;
   /** Welche Abenteuer schon belohnt sind (Seed:Zug) - kein doppelter Ruhm. */
   belohnt: string[];
+  /** Erreichte Erfolge. */
+  erfolge: string[];
+  /** Mit welchen Klassen schon gewonnen wurde. */
+  siegKlassen: string[];
+  /** Was das letzte Abenteuer neu gebracht hat (Erfolge, Heldenstufe) - fuer den Endbildschirm. */
+  zuletzt: string[];
 };
 
-const LEER: Meta = { ruhm: 0, frei: [], klasse: 'ritter', stufe: 0, stufeMax: 0, bester: 0, laeufe: 0, siege: 0, tage: {}, belohnt: [] };
+const LEER: Meta = { ruhm: 0, frei: [], klasse: 'ritter', stufe: 0, stufeMax: 0, bester: 0, laeufe: 0, siege: 0, tage: {}, belohnt: [], erfolge: [], siegKlassen: [], zuletzt: [] };
 
 export function ladeMeta(): Meta {
   try {
@@ -49,29 +56,89 @@ export function speichereMeta(m: Meta): void {
 }
 
 /** Was man im Lager freischalten kann - mit Ruhm. */
-export const FREISCHALTUNGEN: readonly { id: string; art: 'klasse' | 'extra'; kosten: number }[] = [
-  { id: 'kraeuter', art: 'extra', kosten: 10 },
-  { id: 'waldlaeufer', art: 'klasse', kosten: 20 },
-  { id: 'geldkatze', art: 'extra', kosten: 25 },
-  { id: 'zwerg', art: 'klasse', kosten: 40 },
-  { id: 'karte', art: 'extra', kosten: 45 },
-  { id: 'bleiwuerfel', art: 'extra', kosten: 60 },
-  { id: 'paladin', art: 'klasse', kosten: 70 },
-  { id: 'herz', art: 'extra', kosten: 90 },
-  { id: 'schwarz', art: 'klasse', kosten: 120 },
+export type FreiArt = 'klasse' | 'extra' | 'legende';
+/**
+ * Spieltest: "nach zwei Siegen ist alles freigeschaltet". Darum mehr und
+ * teurer - und Legendaeres, das erst ins Spiel kommt, wenn man es hier
+ * freischaltet (neue Builds).
+ */
+export const FREISCHALTUNGEN: readonly { id: string; art: FreiArt; kosten: number }[] = [
+  { id: 'kraeuter', art: 'extra', kosten: 15 },
+  { id: 'waldlaeufer', art: 'klasse', kosten: 40 },
+  { id: 'ruhepuls', art: 'legende', kosten: 50 },
+  { id: 'geldkatze', art: 'extra', kosten: 60 },
+  { id: 'schatzsucher', art: 'legende', kosten: 80 },
+  { id: 'zwerg', art: 'klasse', kosten: 100 },
+  { id: 'glueckspilz', art: 'legende', kosten: 120 },
+  { id: 'karte', art: 'extra', kosten: 130 },
+  { id: 'jagdfieber', art: 'legende', kosten: 150 },
+  { id: 'paladin', art: 'klasse', kosten: 180 },
+  { id: 'bleiwuerfel', art: 'extra', kosten: 200 },
+  { id: 'wirbelwind', art: 'legende', kosten: 230 },
+  { id: 'herz', art: 'extra', kosten: 260 },
+  { id: 'runenmeister', art: 'legende', kosten: 300 },
+  { id: 'schwarz', art: 'klasse', kosten: 350 },
 ];
 
-export const istFrei = (m: Meta, art: 'klasse' | 'extra', id: string): boolean => (art === 'klasse' && id === 'ritter') || m.frei.includes(`${art}:${id}`);
+export const istFrei = (m: Meta, art: FreiArt, id: string): boolean => (art === 'klasse' && id === 'ritter') || m.frei.includes(`${art}:${id}`);
+
+/** Das freigeschaltete Legendaere - es kommt in den Pool jedes Abenteuers. */
+export const freieLegenden = (m: Meta): string[] => LEGENDEN_FREI.filter((id) => istFrei(m, 'legende', id));
+
+/**
+ * ERFOLGE - Ziele ueber viele Abenteuer, jeder bringt einmal Ruhm.
+ */
+export const ERFOLGE: readonly { id: string; name: string; text: string; ruhm: number; pruefe: (a: Abenteuer, m: Meta) => boolean }[] = [
+  { id: 'erster', name: 'Erster Schritt', text: 'Besiege den ersten Boss.', ruhm: 15, pruefe: (a) => (a.koenige ?? 0) >= 1 },
+  { id: 'sieg', name: 'Held', text: 'Gewinne ein Abenteuer.', ruhm: 40, pruefe: (a) => a.phase === 'sieg' },
+  { id: 'allein', name: 'Einsamer Wolf', text: 'Gewinne ohne Gefolge.', ruhm: 50, pruefe: (a) => a.phase === 'sieg' && (a.gefolge ?? []).length === 0 },
+  { id: 'schnell', name: 'Eilbote', text: 'Gewinne in hoechstens 60 Zuegen.', ruhm: 50, pruefe: (a) => a.phase === 'sieg' && a.zug <= 60 },
+  { id: 'jaeger', name: 'Schleimjaeger', text: 'Erlege 50 Gegner in einem Abenteuer.', ruhm: 30, pruefe: (a) => a.erschlagen >= 50 },
+  { id: 'reich', name: 'Pfeffersack', text: 'Besitze 60 Gold auf einmal.', ruhm: 20, pruefe: (a) => (a.inventar['gold'] ?? 0) >= 60 },
+  { id: 'pentagramm', name: 'Erzmagier', text: 'Erreiche Pentagrammmeister Stufe 3.', ruhm: 40, pruefe: (a) => (a.pentaStufe ?? 1) >= 3 },
+  { id: 'schwarz', name: 'Schwarze Legende', text: 'Gewinne als Schwarzer Ritter.', ruhm: 80, pruefe: (a) => a.phase === 'sieg' && a.klasse === 'schwarz' },
+  { id: 'held2', name: 'Bewaehrt', text: 'Gewinne auf Heldenstufe 2.', ruhm: 60, pruefe: (a) => a.phase === 'sieg' && (a.heldenstufe ?? 0) >= 2 },
+  { id: 'held4', name: 'Unbeugsam', text: 'Gewinne auf Heldenstufe 4.', ruhm: 120, pruefe: (a) => a.phase === 'sieg' && (a.heldenstufe ?? 0) >= 4 },
+  { id: 'tag', name: 'Taeglich Brot', text: 'Schliesse ein Tagesabenteuer ab.', ruhm: 15, pruefe: (a) => !!a.tag },
+  { id: 'alle', name: 'Meister aller Klassen', text: 'Gewinne mit allen fuenf Klassen.', ruhm: 200, pruefe: (a, m) => new Set([...m.siegKlassen, ...(a.phase === 'sieg' ? [a.klasse ?? 'ritter'] : [])]).size >= 5 },
+];
+
+/** Am Ende eines Abenteuers: Ruhm, Erfolge, Bestwerte, Heldenstufe - als neuer Meta-Stand. */
+export function belohne(m0: Meta, a: Abenteuer, ruhm: number): Meta {
+  const m = { ...LEER, ...m0 };
+  const punkte = abenteuerPunkte(a);
+  const neu: string[] = [];
+  let plus = ruhm;
+  for (const e of ERFOLGE) {
+    if (m.erfolge.includes(e.id) || !e.pruefe(a, m)) continue;
+    neu.push(`Erfolg: ${e.name} (+${e.ruhm} Ruhm)`);
+    plus += e.ruhm;
+  }
+  const stufeNeu = a.phase === 'sieg' && (a.heldenstufe ?? 0) + 1 > m.stufeMax && (a.heldenstufe ?? 0) + 1 <= 5;
+  if (stufeNeu) neu.push(`Heldenstufe ${(a.heldenstufe ?? 0) + 1} ist im Lager waehlbar`);
+  return {
+    ...m,
+    ruhm: m.ruhm + plus,
+    laeufe: m.laeufe + 1,
+    siege: m.siege + (a.phase === 'sieg' ? 1 : 0),
+    bester: Math.max(m.bester, punkte),
+    stufeMax: stufeNeu ? (a.heldenstufe ?? 0) + 1 : m.stufeMax,
+    tage: a.tag ? { ...m.tage, [a.tag]: Math.max(m.tage[a.tag] ?? 0, punkte) } : m.tage,
+    erfolge: [...m.erfolge, ...ERFOLGE.filter((e) => !m.erfolge.includes(e.id) && e.pruefe(a, m)).map((e) => e.id)],
+    siegKlassen: a.phase === 'sieg' ? [...new Set([...m.siegKlassen, a.klasse ?? 'ritter'])] : m.siegKlassen,
+    zuletzt: neu,
+  };
+}
 
 /** Freischalten, wenn der Ruhm reicht. */
-export function freischalten(m: Meta, art: 'klasse' | 'extra', id: string): Meta {
+export function freischalten(m: Meta, art: FreiArt, id: string): Meta {
   const f = FREISCHALTUNGEN.find((x) => x.id === id && x.art === art);
   if (!f || istFrei(m, art, id) || m.ruhm < f.kosten) return m;
   return { ...m, ruhm: m.ruhm - f.kosten, frei: [...m.frei, `${art}:${id}`], ...(art === 'klasse' ? { klasse: id as KlasseId } : {}) };
 }
 
 /** Die naechste Freischaltung, die man sich (fast) leisten kann - als Anreiz auf dem Endbildschirm. */
-export function naechsteFreischaltung(m: Meta): { id: string; art: 'klasse' | 'extra'; kosten: number } | null {
+export function naechsteFreischaltung(m: Meta): { id: string; art: FreiArt; kosten: number } | null {
   return FREISCHALTUNGEN.filter((f) => !istFrei(m, f.art, f.id)).sort((x, y) => x.kosten - y.kosten)[0] ?? null;
 }
 

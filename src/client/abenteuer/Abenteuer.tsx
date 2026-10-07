@@ -25,6 +25,12 @@ import type { CSSProperties } from 'react';
 import {
   FAEHIGKEIT_NAME,
   FRAKTION_FIGUR,
+  abwehrAugen,
+  trefferAb,
+  zuegeBisBoss,
+  schmieden,
+  schmiedPreis,
+  SCHMIED_MAX,
   ALTAR_OPFER,
   altarMoeglich,
   opfern,
@@ -109,7 +115,7 @@ import type { BeinBild, Haltung } from './symbole';
 import { DebugFenster, FIGUR_KEY, ladeWeltEinstellung, leseFigur } from './DebugFenster';
 import { Lager } from './Lager';
 import type { Aufbruch } from './Lager';
-import { aktiveExtras, ladeMeta, naechsteFreischaltung, speichereMeta } from './meta';
+import { aktiveExtras, belohne, freieLegenden, ladeMeta, naechsteFreischaltung, speichereMeta } from './meta';
 import type { Meta } from './meta';
 import { Hinweis } from './Hinweis';
 
@@ -283,6 +289,8 @@ function wegZu(a: Zustand, ziel: Hex): Hex[] {
   const erkundet = new Set(a.erkundet);
   if (!erkundet.has(zielK)) return [];
   const besetzt = new Set(a.schleime.map((s) => hexKey(s.q, s.r)));
+  // Leute, Tiere und Wanderer stehen im Weg - der Weg fuehrt um sie herum (Spieltest).
+  const hindernis = new Set([...(a.orte ?? []), ...(a.wanderer ?? []), ...(a.tiere ?? [])].map((x) => hexKey(x.q, x.r)));
   const kosten = new Map<string, number>([[hexKey(a.pos.q, a.pos.r), 0]]);
   const vor = new Map<string, Hex>();
   const offen: { h: Hex; k: number }[] = [{ h: a.pos, k: 0 }];
@@ -295,7 +303,7 @@ function wegZu(a: Zustand, ziel: Hex): Hex[] {
     for (const [dq, dr] of HEX_DIRS) {
       const n = { q: h.q + dq, r: h.r + dr };
       const nk = hexKey(n.q, n.r);
-      if (!erkundet.has(nk) || !betretbar(a, n.q, n.r)) continue;
+      if (!erkundet.has(nk) || !betretbar(a, n.q, n.r) || (hindernis.has(nk) && nk !== zielK)) continue;
       if (besetzt.has(nk) && nk !== zielK) continue;
       const nk2 = k + (besetzt.has(nk) ? 1 : schrittKosten(a, n.q, n.r));
       if (nk2 < (kosten.get(nk) ?? Infinity)) {
@@ -579,17 +587,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     const m = ladeMeta();
     const schluessel = `${a.seed}:${a.zug}:${a.phase}`;
     if (m.belohnt.includes(schluessel)) return;
-    const punkte = abenteuerPunkte(a);
-    setMeta({
-      ...m,
-      ruhm: m.ruhm + ruhmFuer(a),
-      laeufe: m.laeufe + 1,
-      siege: m.siege + (a.phase === 'sieg' ? 1 : 0),
-      bester: Math.max(m.bester, punkte),
-      stufeMax: a.phase === 'sieg' ? Math.min(5, Math.max(m.stufeMax, (a.heldenstufe ?? 0) + 1)) : m.stufeMax,
-      tage: a.tag ? { ...m.tage, [a.tag]: Math.max(m.tage[a.tag] ?? 0, punkte) } : m.tage,
-      belohnt: [...m.belohnt, schluessel],
-    });
+    const neu = belohne(m, a, ruhmFuer(a));
+    setMeta({ ...neu, belohnt: [...m.belohnt, schluessel] });
   }, [a, setMeta]);
   useEffect(() => {
     void Promise.all([preloadTiles(), preloadUnitSprites()]).then(() => setGeladen(true));
@@ -662,7 +661,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       const boss = neu.ereignisse.find((e): e is Extract<Ereignis, { art: 'boss' }> => e.art === 'boss');
       if (boss) {
         banner.current = performance.now();
-        bannerText.current = `Der ${boss.name ?? 'Schleimkoenig'} erwacht!`;
+        bannerText.current = boss.name?.endsWith('rast') ? `Der ${boss.name}!` : `Der ${boss.name ?? 'Schleimkoenig'} erwacht!`;
       }
       if (neu.ereignisse.some((e) => e.art === 'wiederbelebt')) {
         banner.current = performance.now();
@@ -676,6 +675,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       if (neu.ereignisse.some((e) => e.art === 'sieg')) {
         banner.current = performance.now();
         bannerText.current = 'Sieg! Der Endboss ist bezwungen!';
+        fallBis.current = performance.now() + 7000;
       }
       const leg = neu.ereignisse.find((e): e is Extract<Ereignis, { art: 'legende' }> => e.art === 'legende');
       if (leg) {
@@ -1465,6 +1465,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               }
               ctx.restore();
               if (holtAus && alpha > 0.3) schrift('!', X + 12 * kf, Y - 10 * kf, '#ff4a3a', 1, 8);
+              const bossJetzt = a.schleime.find((x) => x.id === s.id);
+              if (still && bossJetzt && a.phase === 'ziehen' && hexDistance(bossJetzt, a.pos) === 1) schrift(`${trefferAb(a, s)}+`, X - 14 * kf, Y - 10 * kf, '#f2e7d0', 0.9, 6);
               return;
             }
             if (s.art === 'bandit') {
@@ -1472,6 +1474,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               if (s.tot === null) malPerson(s.id, { x: o.x, y: o.y, hoch: o0.hoch }, 'schwarz', 'axt', wu.blitz);
               if (alpha > 0.3 && lebenJetzt > 0) balken(X, sy(o.y) - 15 * f, lebenJetzt, max);
               if (holtAus) schrift('!', X + 8 * f, sy(o.y) - 14 * f, '#ff4a3a', 1, 7);
+              const banditJetzt = a.schleime.find((x) => x.id === s.id);
+              if (still && banditJetzt && a.phase === 'ziehen' && hexDistance(banditJetzt, a.pos) === 1) schrift(`${trefferAb(a, s)}+`, X - 9 * f, sy(o.y) - 14 * f, '#f2e7d0', 0.9, 5);
               return;
             }
             malSchleim(s.art, X, Y + f, fs, {
@@ -1482,6 +1486,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             });
             if (alpha > 0.3 && lebenJetzt > 0) balken(X, Y - (hoehe + 2) * fs, lebenJetzt, max);
             if (holtAus && alpha > 0.3) schrift('!', X + 9 * f, Y - (hoehe + 2) * fs, '#ff4a3a', 1, 7);
+            // Was man zum Treffen braucht - ueber jedem Gegner nebenan (Spieltest: "die Zielzahl sieht man nie").
+            const echt = a.schleime.find((x) => x.id === s.id);
+            if (still && echt && a.phase === 'ziehen' && hexDistance(echt, a.pos) === 1) schrift(`${trefferAb(a, s)}+`, X - 9 * f, Y - (hoehe + 1) * fs, '#f2e7d0', 0.9, 5);
           },
         });
       }
@@ -1739,6 +1746,17 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         },
       });
       figuren.sort((x, y) => x.y - y.y).forEach((fi) => fi.mal());
+      // Ein kleiner goldener Pfeil ueber dem Ritter - auch hinter Baeumen und Bossen findet man sich.
+      {
+        const kopf = ort('ritter');
+        const hub = Math.round(Math.sin(sek * 3) * 1);
+        ctx.fillStyle = '#f2c94c';
+        const kx = sx(kopf.x);
+        const ky = sy(kopf.y) - (24 + hub) * f;
+        ctx.fillRect(kx - 2 * f, ky, 5 * f, f);
+        ctx.fillRect(kx - f, ky + f, 3 * f, f);
+        ctx.fillRect(kx, ky + 2 * f, f, f);
+      }
 
 
       // Der Ladebalken der Waffe unter dem Ritter - und eine Aura, wenn eine Faehigkeit wartet.
@@ -2070,6 +2088,18 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         ctx.globalAlpha = 1;
         schrift(bannerText.current, c.width / 2, c.height * 0.43, '#f2c94c', al, w < 700 ? 7 : 9);
       }
+      // Sieg: goldenes Konfetti regnet ein paar Sekunden.
+      if (a.phase === 'sieg' && banner.current > 0 && seitBanner < 7) {
+        for (let i = 0; i < 90; i++) {
+          const x0 = (((i * 7919) % 1000) / 1000) * c.width;
+          const fallend = ((seitBanner * (0.25 + (i % 7) * 0.05) + (i % 13) / 13) % 1) * c.height;
+          const wackel = Math.sin(seitBanner * 4 + i) * 6 * f;
+          ctx.globalAlpha = Math.min(1, (7 - seitBanner) / 2);
+          ctx.fillStyle = ['#f2c94c', '#e8641e', '#7fd05a', '#5aa0d8', '#e8d4ff'][i % 5]!;
+          ctx.fillRect(x0 + wackel, fallend, 2 * f, (i % 2 ? 1 : 2) * f);
+        }
+        ctx.globalAlpha = 1;
+      }
       // Ein roter Rand, wenn der Ritter getroffen wird.
       if (rot > 0) {
         const g = ctx.createRadialGradient(
@@ -2215,6 +2245,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         klasse: x.klasse,
         heldenstufe: x.tag ? 0 : x.stufe,
         extras: x.tag ? [] : aktiveExtras(meta),
+        legenden: x.tag ? [] : freieLegenden(meta),
         ...(x.tag ? { tag: x.tag.tag } : {}),
       }),
     );
@@ -2333,6 +2364,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                     {BOSS_NAME[naechsterBoss(a)]}
                     {akt === AKTE ? ' (Endboss)' : ''}: {kills}/{ziel}
                   </span>
+                  <small className="ab-akt-uhr">oder in {zuegeBisBoss(a)} Zuegen</small>
                   <i className="ab-akt-balken">
                     <i style={{ width: `${(100 * kills) / ziel}%` } as CSSProperties} />
                   </i>
@@ -2365,12 +2397,12 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               {
                 id: 'schwert',
                 wert: `+${angriffVon(a)}`,
-                titel: 'Angriff: so viel kommt auf jeden Angriffswurf',
+                titel: `Angriff: so viel kommt auf jeden Angriffswurf. Du triffst Schleime ab einer ${Math.max(1, 4 - angriffVon(a))} (Panzer ab ${Math.max(1, 5 - angriffVon(a))}).`,
               },
               {
                 id: 'schild',
                 wert: `+${abwehrVon(a)}`,
-                titel: 'Abwehr: jeder Punkt faengt jeden dritten Schleim-Hieb ab',
+                titel: abwehrAugen(a) > 0 ? `Abwehr: Hiebe mit Wurf 1 bis ${abwehrAugen(a)} prallen ab (${Math.round((100 * abwehrAugen(a)) / 6)} %).` : 'Abwehr: keine - jeder Hieb trifft. Schild, Helm und Ruestung helfen.',
               },
               { id: 'herz', wert: `${maxLeben}`, titel: 'Hoechstes Leben' },
               {
@@ -2391,20 +2423,6 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             ))}
           </div>
         </div>
-        {(() => {
-          const lad = ladungVon(a);
-          if (!lad.voll || !lad.faehigkeit) return null;
-          return (
-            <div className="ab-fenster ab-ladung" title={`${FAEHIGKEIT_NAME[lad.faehigkeit]}: jeder Schritt und jeder Treffer laedt eins`}>
-              <span className="ab-titel">{FAEHIGKEIT_NAME[lad.faehigkeit]}</span>
-              <div className={`ab-ladung-balken ${lad.faehigkeit}${a.bereit ? ' bereit' : ''}`}>
-                {Array.from({ length: lad.voll }, (_, i) => (
-                  <i key={i} className={a.bereit || i < lad.ist ? 'an' : ''} />
-                ))}
-              </div>
-            </div>
-          );
-        })()}
         <div className="ab-fenster ab-ausruestung">
           <span className="ab-titel">Ausruestung</span>
           <div className="ab-slots">
@@ -2495,8 +2513,23 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         ein Ladebalken wickelt - ist der Ring voll, leuchtet der Knopf.
         Bisher: die Beschwoerung (Pentagrammmeister Stufe 3).
       */}
-      {(ladungVon(a).faehigkeit || (a.pentaStufe ?? 1) >= 3) && (
+      {(ladungVon(a).faehigkeit || (a.pentaStufe ?? 1) >= 3 || a.ausruestung.wuerfel === 'glueckswuerfel') && (
         <div className="ab-faehigkeiten">
+          {/* Glueckswuerfel: einmal je Zug neu wuerfeln - der Ring ist voll, solange es geht. */}
+          {a.ausruestung.wuerfel === 'glueckswuerfel' && (
+            <button
+              className={kannNeuWuerfeln(a) && !rollt ? 'ab-faehigkeit voll' : 'ab-faehigkeit'}
+              style={{ '--anteil': kannNeuWuerfeln(a) ? 1 : 0, '--ring': '#6aa85a' } as CSSProperties}
+              aria-disabled={!kannNeuWuerfeln(a)}
+              onClick={() => kannNeuWuerfeln(a) && neuWurf()}
+              title="Glueckswuerfel (R): einmal je Zug neu wuerfeln, solange du noch keinen Schritt gegangen bist. Das neue Ergebnis gilt."
+            >
+              <span className="ab-faehigkeit-innen">
+                <Icon id="glueckswuerfel" groesse={26} />
+              </span>
+              <kbd>R</kbd>
+            </button>
+          )}
           {/* Die Faehigkeit der Waffe: Schritte und Treffer laden sie, Taste 1 loest sie aus. */}
           {(() => {
             const { ist, voll, faehigkeit } = ladungVon(a);
@@ -2598,11 +2631,6 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               title="Die Angel ins Wasser werfen (F) - ein Schritt"
             >
               Angeln (F)
-            </button>
-          )}
-          {kannNeuWuerfeln(a) && !rollt && (
-            <button className="ab-wurf ab-neuwurf" onClick={() => neuWurf()} title="Glueckswuerfel: einmal je Zug neu wuerfeln (R)">
-              Neu wuerfeln (R)
             </button>
           )}
           {a.phase !== 'ziehen' && (
@@ -2733,6 +2761,23 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                       )}
                     </div>
                   ))}
+                  <small>Schmied</small>
+                  {(['angriff', 'abwehr'] as const).map((was) => {
+                    const stufe = a.schmied?.[was] ?? 0;
+                    const preis = schmiedPreis(a, was);
+                    return (
+                      <div key={was} className="ab-laden-zeile">
+                        <Icon id={was === 'angriff' ? 'schwert' : 'schild'} groesse={20} />
+                        <span>
+                          {was === 'angriff' ? 'Waffe schaerfen' : 'Ruestung verstaerken'} ({stufe}/{SCHMIED_MAX})
+                          <small>{was === 'angriff' ? '+1 Angriff fuer dieses Abenteuer.' : '+1 Abwehr fuer dieses Abenteuer.'}</small>
+                        </span>
+                        <button className="klein ab-kaufen" disabled={stufe >= SCHMIED_MAX || gold < preis} onClick={() => setze(schmieden(aktuell.current, was))}>
+                          {stufe >= SCHMIED_MAX ? 'Fertig' : `${preis} Gold`}
+                        </button>
+                      </div>
+                    );
+                  })}
                   <small>Kaufen</small>
                   {haendlerWaren(a, o).map((w) => {
                     const v = vergleich(a, w.id);
@@ -2872,14 +2917,18 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             {(() => {
               const n = naechsteFreischaltung(meta);
               if (!n) return null;
-              const name = n.art === 'klasse' ? KLASSEN[n.id as keyof typeof KLASSEN].name : START_EXTRAS[n.id]?.name;
+              const name = n.art === 'klasse' ? KLASSEN[n.id as keyof typeof KLASSEN].name : n.art === 'legende' ? `${gegenstand(n.id)?.name} (Legendaer)` : START_EXTRAS[n.id]?.name;
               return (
                 <p className="ab-lockt">
                   {meta.ruhm >= n.kosten ? `Im Lager freischaltbar: ${name}!` : `Noch ${n.kosten - meta.ruhm} Ruhm bis: ${name}`}
                 </p>
               );
             })()}
-            {a.phase === 'sieg' && (a.heldenstufe ?? 0) + 1 <= 5 && <p className="ab-lockt">Heldenstufe {(a.heldenstufe ?? 0) + 1} ist jetzt im Lager waehlbar.</p>}
+            {meta.zuletzt.map((z) => (
+              <p key={z} className="ab-erfolg-neu">
+                ★ {z}
+              </p>
+            ))}
             <div className="ab-lager-knoepfe">
               <button className="primary" onClick={nochmal} autoFocus>
                 Gleich nochmal

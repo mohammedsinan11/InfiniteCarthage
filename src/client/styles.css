@@ -7805,9 +7805,9 @@ em.off {
 }
 .ab-links {
   position: absolute;
-  top: 50%;
+  /* Fest oben statt mittig: waechst das Gefolge, rutscht nichts unter die Steuerung (Spieltest). */
+  top: 96px;
   left: 10px;
-  transform: translateY(-50%);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -9177,4 +9177,54 @@ em.off {
     top: auto;
     bottom: 180px;
   }
+}
+.ab-extra.legendaer b {
+  color: #f2c94c;
+}
+.ab-erfolge {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 4px;
+}
+.ab-erfolg {
+  padding: 4px 6px;
+  font-size: 11px;
+  color: #8a7a60;
+  background: #1a120c;
+  border: 1px solid #2b2418;
+}
+.ab-erfolg b {
+  color: #c8b898;
+}
+.ab-erfolg i {
+  font-style: normal;
+}
+.ab-erfolg em {
+  font-style: normal;
+  color: #a8801f;
+}
+.ab-erfolg.da {
+  color: #e8dcc0;
+  border-color: #a8801f;
+}
+.ab-erfolg.da b {
+  color: #f2c94c;
+}
+.ab-erfolg-neu {
+  margin: 0;
+  text-align: center;
+  color: #f6e07a;
+  font-weight: bold;
+  animation: ab-erfolg-ein 0.6s ease-out;
+}
+@keyframes ab-erfolg-ein {
+  from {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+
+.ab-akt-uhr {
+  color: #a89878;
+  font-size: 10px;
 }

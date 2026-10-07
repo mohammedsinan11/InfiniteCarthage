@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { istWasser } from '../src/abenteuer/welt';
 import type { Boden } from '../src/abenteuer/welt';
-import { angelbar, angeln, betretbar, kannAngeln, BOSS_LEBEN, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden, vergleich, naechsterBoss, KREIS_DAUER, PENTA_BOSS_NACH, verkaufen, verkaufsPreis, kaufen, ansprechen, anheuern, werberAngebot, PENTA_STUFE3_NACH, BESCHWOERUNG_VOLL, beschwoeren, angeheuerte, kannNeuWuerfeln, neuWuerfeln, WUERFEL_EFFEKT, aktZiel, waehlen, abenteuerPunkte, ruhmFuer, faehigkeitBereit, faehigkeitNutzen, opfern } from '../src/abenteuer/regeln';
+import { angelbar, angeln, betretbar, kannAngeln, BOSS_LEBEN, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden, vergleich, naechsterBoss, KREIS_DAUER, PENTA_BOSS_NACH, verkaufen, verkaufsPreis, kaufen, ansprechen, anheuern, werberAngebot, PENTA_STUFE3_NACH, BESCHWOERUNG_VOLL, beschwoeren, angeheuerte, kannNeuWuerfeln, neuWuerfeln, WUERFEL_EFFEKT, aktZiel, waehlen, abenteuerPunkte, ruhmFuer, faehigkeitBereit, faehigkeitNutzen, opfern, AKT_ZUEGE, schmieden, legendaerAnwenden } from '../src/abenteuer/regeln';
 import type { Abenteuer, Taste } from '../src/abenteuer/regeln';
 import { HEX_DIRS, hexDistance, hexesInRange as hexesInRangeTest } from '../src/core/coords';
 
@@ -865,6 +865,61 @@ describe('Abenteuer', () => {
     expect(ruf.schleime.some((s) => s.elite)).toBe(true);
     // Einmal benutzt ist er erloschen.
     expect(opfern({ ...ansprechen(ruf, ruf.orte!.find((o) => o.benutzt)!.id) }, 'gold').inventar['gold']).toBe(20);
+  });
+
+  it('Iteration 2: Boss nach AKT_ZUEGE Zuegen, Soeldner lassen den letzten Schlag, Schmied, Legendaere mit Synergien', () => {
+    // Der Boss kommt auch ohne Kills, wenn der Akt lange genug dauert.
+    let a = imZug(13, [], 10);
+    a.aktStart = a.zug - AKT_ZUEGE;
+    a = taste(a, 's');
+    expect(a.schleime.some((s) => s.boss)).toBe(true);
+    // Ein Soeldner neben einem Boss mit 1 Leben laesst ihn leben.
+    const a0 = neuesAbenteuer(13);
+    let b = imZug(13, [{ id: 50, q: a0.pos.q + 3, r: a0.pos.r, leben: 1, max: 10, gross: true, boss: true, bossArt: 'koenig', zaehler: 0 }], 30);
+    b.gefolge = [{ id: 600, art: 'soeldnerin', name: 'Hilda', q: a0.pos.q + 2, r: a0.pos.r, leben: 9, max: 9, lv: 5, ep: 0 }];
+    b.leben = 99;
+    for (let i = 0; i < 8; i++) b = taste(b, 's');
+    expect(b.schleime.some((s) => s.boss)).toBe(true);
+    // Schmied: +1 Angriff fuer Gold.
+    let c = imZug(13, [], 10);
+    const h = c.orte!.find((o) => o.art === 'haendler')!;
+    c.pos = HEX_DIRS.map(([dq, dr]) => ({ q: h.q + dq, r: h.r + dr })).find((x) => betretbar(c, x.q, x.r))!;
+    c.inventar = { gold: 50 };
+    c = ansprechen(c, h.id);
+    const vorher = angriffVon(c);
+    c = schmieden(c, 'angriff');
+    expect(angriffVon(c)).toBe(vorher + 1);
+    expect(c.inventar['gold']).toBe(38);
+    // Glueckspilz + Sternschnuppe: eine 1 wird zur 6, und ein Komet faellt.
+    for (let seed = 1; seed < 300; seed++) {
+      const d = structuredClone(neuesAbenteuer(seed));
+      d.legendaer = ['glueckspilz', 'kometen'];
+      d.schleime = [{ id: 7, q: d.pos.q + 3, r: d.pos.r, leben: 5, gross: false }];
+      const e = wuerfeln(structuredClone(d));
+      const ohne = wuerfeln(structuredClone({ ...d, legendaer: [] }));
+      if (ohne.wurf !== 1) continue;
+      expect(e.wurf).toBe(6);
+      expect(e.schleime[0]!.leben).toBe(3);
+      break;
+    }
+    // Extra-Leben gibt es hoechstens einmal.
+    const f = structuredClone(neuesAbenteuer(3));
+    f.ereignisse = [];
+    legendaerAnwenden(f, 'extraleben', 0);
+    legendaerAnwenden(f, 'extraleben', 0);
+    expect(f.extraLeben).toBe(1);
+  });
+
+  it('Werber: Namen passen zum Geschlecht und sind nie der eigene', () => {
+    for (let seed = 1; seed < 40; seed++) {
+      const a = neuesAbenteuer(seed);
+      const w = a.orte!.find((o) => o.art === 'werber');
+      if (!w) continue;
+      for (const an of werberAngebot(a, w)) {
+        expect(an.name).not.toBe(w.name);
+        if (an.art === 'soeldnerin' || an.art === 'paladin') expect(['Konrad', 'Odo', 'Bjarne', 'Arnulf']).not.toContain(an.name);
+      }
+    }
   });
 
   it('Herzen werden gleich verbraucht - bei vollem Leben bleiben sie liegen', () => {
