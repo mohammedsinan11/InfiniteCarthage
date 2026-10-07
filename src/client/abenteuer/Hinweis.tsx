@@ -28,6 +28,11 @@ const TIPPS: readonly Tipp[] = [
     wann: (a) => a.schleime.some((s) => (s.angriff || s.flaeche) && hexDistanceZu(s, a.pos) <= 4),
     text: 'Rot = angesagter Angriff! Er trifft erst im naechsten Takt. Geh vom roten Feld - oder schlag vorher zu, indem du in den Gegner laeufst.',
   },
+  {
+    id: 'fokus',
+    wann: (a) => a.zug >= 3 && a.schleime.some((s) => hexDistanceZu(s, a.pos) <= 2),
+    text: 'Tipp: Warten (S) sammelt Fokus (bis 3, kleine Flammen ueber dir). Dein naechster Hieb bekommt ihn auf den Wurf - mit vollem Fokus macht er +1 Schaden. Gehen bricht den Fokus.',
+  },
   { id: 'faehigkeit', wann: (a) => faehigkeitBereit(a), text: 'Deine Waffe ist voll geladen! Druecke 1 (oder den runden Knopf unten), um ihre Faehigkeit auszuloesen.' },
   { id: 'wenig', wann: (a) => a.leben <= 2 && a.phase !== 'tot', text: 'Wenig Leben! Kraeuter im Inventar heilen (antippen). Wartest du (S), ohne dass ein Gegner nah ist, bekommst du einmal je Zug +1 Leben.' },
   {

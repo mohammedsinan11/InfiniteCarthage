@@ -498,6 +498,8 @@ export type Abenteuer = {
   wanderer?: Wanderer[];
   /** Mit wem der Ritter gerade spricht (Ort-Id) - dann ist ein Laden offen. */
   laden?: number | null;
+  /** Fokus (0 bis FOKUS_MAX): Warten sammelt ihn, der naechste Hieb nutzt ihn, Gehen bricht ihn. */
+  fokus?: number;
   /** Beim Haendler gekaufte Einzelstuecke ("ortId:id"). */
   gekauft?: string[];
   /** Der Akt (1 bis AKTE): jeder endet mit seinem Boss, der dritte mit dem Endboss. */
@@ -1195,6 +1197,8 @@ export function taste(alt: Abenteuer, t: Taste): Abenteuer {
   a.ereignisse = [];
   if (t === 's') {
     warten(a, 0);
+    // Warten sammelt Fokus fuer den naechsten Hieb (Spieltest: "die Zuege sind nur Laufen").
+    if ((a.fokus ?? 0) < FOKUS_MAX) a.fokus = (a.fokus ?? 0) + 1;
     if (hatLegende(a, 'ruhepuls')) {
       laden(a, 0);
       laden(a, 0);
@@ -1260,6 +1264,7 @@ export function taste(alt: Abenteuer, t: Taste): Abenteuer {
       return a;
     }
     a.ereignisse.push({ art: 'gehen', takt: 0, wer: 'ritter', von: a.pos, nach: landung, sprung: hexDistance(a.pos, landung) > 1 });
+    a.fokus = 0;
     // Was auf den uebersprungenen Feldern liegt, nimmt der Ritter im Flug mit.
     const weit = hexDistance(a.pos, landung);
     for (let k = 1; k < weit; k++) {
@@ -1286,6 +1291,7 @@ export function taste(alt: Abenteuer, t: Taste): Abenteuer {
   // eine 1 fiel.
   const k = Math.min(kosten(g), a.schritte);
   a.ereignisse.push({ art: 'gehen', takt: 0, wer: 'ritter', von: a.pos, nach: ziel });
+  a.fokus = 0;
   a.pos = ziel;
   a.schritte -= k;
   a.pfad = [...a.pfad, ziel];
@@ -1372,11 +1378,15 @@ function nachDemSchritt(a: Abenteuer): Abenteuer {
 
 function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
   const wurf = w6(a);
-  const summeWurf = wurf + angriffVon(a);
+  // Fokus: wer vorher gewartet hat, schlaegt sicherer - und mit vollem Fokus haerter.
+  const fokus = a.fokus ?? 0;
+  a.fokus = 0;
+  const summeWurf = wurf + angriffVon(a) + fokus;
   const krit = gegenstand(a.ausruestung.waffe ?? '')?.krit ?? 2;
   // Der Panzer will einen kraeftigeren Hieb.
   const noetig = s.art === 'panzer' ? 5 : 4;
-  let schaden = summeWurf >= noetig ? (wurf === 6 ? krit : 1) : 0;
+  let schaden = summeWurf >= noetig ? (wurf === 6 ? krit : 1) + (fokus >= FOKUS_MAX ? 1 : 0) : 0;
+  if (fokus > 0) melde(a, fokus >= FOKUS_MAX ? `Voller Fokus: +${fokus} auf den Wurf und ein Wuchtschlag (+1 Schaden)!` : `Fokus: +${fokus} auf den Wurf.`);
   // Ein geladener Spalthieb legt beim naechsten Treffer zwei drauf.
   const spalt = schaden > 0 && a.bereit === 'spalthieb';
   if (spalt) {
@@ -1778,6 +1788,14 @@ function schleimTrifft(a: Abenteuer, s: Schleim, feld: Hex, takt: number, rng: R
     dornen(a, s, takt);
   } else melde(a, `Dein Schild faengt den ${schleimNameAkk(s)} ab (Wurf ${wurf}).`);
 }
+
+/**
+ * FOKUS. Jedes Warten (S) sammelt einen Punkt, hoechstens FOKUS_MAX. Der
+ * naechste eigene Hieb bekommt ihn auf den Wurf; mit vollem Fokus macht er
+ * einen Schaden mehr. Ein Schritt bricht die Konzentration. So wird Warten
+ * eine Entscheidung: den Gegner kommen lassen und hart zuschlagen - oder gehen.
+ */
+export const FOKUS_MAX = 3;
 
 /** Abwehr: ein Wurf bis zu anderthalbmal der Abwehr prallt ab (Abwehr 1: eine 1, 2: bis 3, 3: bis 4). */
 const abgewehrt = (a: Abenteuer, wurf: number): boolean => wurf <= Math.floor(abwehrVon(a) * 1.5);

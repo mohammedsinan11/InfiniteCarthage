@@ -922,6 +922,24 @@ describe('Abenteuer', () => {
     }
   });
 
+  it('Fokus: Warten sammelt ihn, der naechste Hieb nutzt ihn, Gehen bricht ihn', () => {
+    let a = imZug(13, [], 10);
+    a = taste(a, 's');
+    a = taste(a, 's');
+    expect(a.fokus).toBe(2);
+    a = taste(a, freieTaste(a));
+    expect(a.fokus).toBe(0);
+    const a0 = neuesAbenteuer(13);
+    let b = imZug(13, [{ id: 7, q: a0.pos.q + 3, r: a0.pos.r, leben: 9, gross: false }], 10);
+    b.leben = 99;
+    b.fokus = 3;
+    b.schleime = [{ id: 7, q: a0.pos.q + 1, r: a0.pos.r, leben: 9, gross: false }];
+    b = taste(b, 'd');
+    const hieb = b.ereignisse.find((e) => e.art === 'hieb' && e.wer === 'ritter');
+    expect(hieb && hieb.art === 'hieb' && hieb.schaden).toBeGreaterThanOrEqual(2);
+    expect(b.fokus).toBe(0);
+  });
+
   it('Herzen werden gleich verbraucht - bei vollem Leben bleiben sie liegen', () => {
     // Ein Herz direkt neben den Start legen: das Feld suchen, auf dem eines liegt.
     let seed = 0;

@@ -1756,6 +1756,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         ctx.fillRect(kx - 2 * f, ky, 5 * f, f);
         ctx.fillRect(kx - f, ky + f, 3 * f, f);
         ctx.fillRect(kx, ky + 2 * f, f, f);
+        // Fokus: kleine Flammen neben dem Pfeil - je gesammeltem Punkt eine.
+        for (let i = 0; i < (a.fokus ?? 0); i++) {
+          ctx.fillStyle = (a.fokus ?? 0) >= 3 ? '#ff7a3a' : '#f6c04a';
+          ctx.fillRect(kx + (5 + i * 3) * f, ky + f - ((i + Math.floor(sek * 4)) % 2) * f, 2 * f, 2 * f);
+        }
       }
 
 
