@@ -151,7 +151,7 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
     id: 'extraleben',
     name: 'Extra-Leben',
     legendaer: true,
-    text: 'Legendaer. Faellst du, stehst du mit vollem Leben wieder auf - einmal.',
+    text: 'Legendaer. Faellst du, stehst du mit halbem Leben wieder auf - einmal.',
   },
   {
     id: 'hermes',
@@ -174,7 +174,7 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
   },
   // Legendaere, die zusammenwirken (Spieltest: "keine Synergien, kein Build").
   { id: 'blutdurst', name: 'Blutdurst', legendaer: true, text: 'Legendaer. Jeder Gegner, den du selbst faellst, heilt dich um ein halbes Herz.' },
-  { id: 'dornen', name: 'Dornenpanzer', legendaer: true, text: 'Legendaer. Wer dich trifft, nimmt selbst 1 Schaden.' },
+  { id: 'dornen', name: 'Dornenpanzer', legendaer: true, text: 'Legendaer. Wer dich trifft, nimmt selbst 1 Schaden (Bosse nicht).' },
   { id: 'kometen', name: 'Sternschnuppe', legendaer: true, text: 'Legendaer. Jede gewuerfelte 6 laesst einen Kometen auf den naechsten Gegner (bis 5 Felder) fallen: 2 Schaden.' },
   { id: 'glueckspilz', name: 'Glueckspilz', legendaer: true, text: 'Legendaer. Zeigt dein Schritt-Wuerfel eine 1, zaehlt sie als 6 - auch fuer Wuerfeleffekte und Sternschnuppe (nicht beim Zuschlagen).' },
   { id: 'runenmeister', name: 'Runenmeister', legendaer: true, text: 'Legendaer. Deine Waffe laedt doppelt so schnell.' },
@@ -289,6 +289,8 @@ export type Schleim = {
   gebannt?: number;
   /** Elite (ab Akt 2): zaeher, golden umrandet, laesst Gold fallen. */
   elite?: boolean;
+  /** Wann der Boss seine laufende Ansage gemacht hat (Takt). */
+  angesagt?: number | null;
   /** Der Endboss rast (ab halbem Leben). */
   rast?: boolean;
 };
@@ -1367,8 +1369,8 @@ export function taste(alt: Abenteuer, t: Taste): Abenteuer {
   a.ereignisse = [];
   const decken = a.deckenModus === true;
   delete a.deckenModus;
-  // Deckung haelt bis zur naechsten eigenen Handlung.
-  a.deckung = decken;
+  // Deckung haelt auch beim Gehen - bis sie einen Treffer abfaengt oder du selbst zuschlaegst (Spieltest 10).
+  if (decken) a.deckung = true;
   if (t === 's') {
     warten(a, 0);
     // Warten sammelt Fokus fuer den naechsten Hieb (Spieltest: "die Zuege sind nur Laufen") - oder Deckung (G).
@@ -1561,6 +1563,7 @@ function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
   // Fokus: wer vorher gewartet hat, schlaegt sicherer - und mit vollem Fokus haerter.
   const fokus = a.fokus ?? 0;
   a.fokus = 0;
+  a.deckung = false;
   const summeWurf = wurf + angriffVon(a) + fokus;
   const krit = gegenstand(a.ausruestung.waffe ?? '')?.krit ?? 2;
   // Der Panzer will einen kraeftigeren Hieb; spaetere Akte und Elite auch. Eine 1 verfehlt, eine 6 trifft.
@@ -1581,8 +1584,8 @@ function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
   }
   a.ereignisse.push({ art: 'hieb', takt, wer: 'ritter', ziel: s.id, wurf, schaden });
   if (schaden === 0) {
-    // Pech gleicht sich aus: ein Fehlschlag gibt einen Punkt Fokus fuer den naechsten Hieb.
-    a.fokus = 1;
+    // Pech gleicht sich aus: der Fokus bleibt und waechst um eins (Spieltest 10: "eine 1 frisst den ganzen Fokus").
+    a.fokus = Math.min(FOKUS_MAX, fokus + 1);
     melde(
       a,
       `Wurf ${wurf}${wurf === 1 ? ' (eine 1 verfehlt immer)' : `+${angriffVon(a)}${fokus > 0 ? `+${fokus} Fokus` : ''} = ${summeWurf}, noetig ${noetig}`}: ${s.art === 'panzer' ? 'prallt am Steinpanzer ab' : 'daneben'} - +1 Fokus fuer den naechsten Hieb.`,
@@ -1659,6 +1662,8 @@ function verwunde(a: Abenteuer, s: Schleim, schaden: number, takt: number, vorne
     a.aktKills = 0;
     a.aktStart = a.zug;
     a.bossBald = null;
+    // Ein Atemzug zwischen den Akten: mindestens halbes Leben (Spieltest 10: "Akt 2 mit 1 Herz").
+    a.leben = Math.max(a.leben, Math.ceil(maxLebenVon(a) / 2));
     a.ereignisse.push({ art: 'akt', takt, akt: a.akt, name: AKT_NAME[a.akt - 1] ?? '' });
     melde(
       a,
@@ -2040,7 +2045,8 @@ export const abwehrAugen = (a: Abenteuer): number => Math.min(ABWEHR_MAX, Math.f
 
 /** Dornenpanzer: wer trifft, nimmt 1 Schaden. */
 function dornen(a: Abenteuer, s: Schleim, takt: number): void {
-  if (!hatLegende(a, 'dornen') || !a.schleime.includes(s)) return;
+  // Bosse spueren die Dornen nicht (Spieltest 10: "Dornen erledigen die Bosse").
+  if (!hatLegende(a, 'dornen') || !a.schleime.includes(s) || s.boss) return;
   verwunde(a, s, 1, takt, 'Dornenpanzer');
 }
 
@@ -2577,7 +2583,8 @@ export function verkaufsPreis(id: string): number {
   if (!g || g.legendaer || id === 'gold') return 0;
   if (g.slot) return Math.max(1, Math.round(ausruestungsWert(id) * 0.8));
   if (id === 'extraherz' || id === 'goldsack') return 0;
-  return id === 'angel' ? 3 : id === 'holz' ? 2 : id === 'goldfisch' ? 8 : 1;
+  // Spieltest 10: "Gold ist zu knapp" - Gelee bringt 2.
+  return id === 'angel' ? 3 : id === 'holz' || id === 'gelee' ? 2 : id === 'goldfisch' ? 8 : 1;
 }
 /** Was der Haendler verkauft. */
 export const HAENDLER_WAREN: readonly { id: string; preis: number }[] = [
@@ -3209,7 +3216,11 @@ function ticken(a: Abenteuer, takt: number): void {
     }
     if ((s.gross || s.art === 'panzer') && a.zeit % 2 === 1 && !rast) continue;
     if (s.boss) {
+      // Spieltest 10: "Der rasende Koloss blaeht sich auf - und trifft, bevor ich weg bin."
+      // Eine Ansage loest fruehestens zwei Takte spaeter aus, auch wenn der Boss rast.
+      if ((s.angriff || s.flaeche) && s.angesagt != null && a.zeit - s.angesagt < 2) continue;
       koenigHandelt(a, s, takt, rng, besetzt, neue);
+      s.angesagt = s.angriff || s.flaeche ? (s.angesagt ?? a.zeit) : null;
       continue;
     }
     schleimHandelt(a, s, takt, rng, besetzt);

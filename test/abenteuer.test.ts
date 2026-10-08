@@ -622,9 +622,9 @@ describe('Abenteuer', () => {
     expect(a.schritte).toBe(10);
     a = verkaufen(a, 'gelee', true);
     expect(a.inventar['gelee']).toBeUndefined();
-    expect(a.inventar['gold']).toBe(3);
+    expect(a.inventar['gold']).toBe(6);
     a = verkaufen(a, 'axt');
-    expect(a.inventar['gold']).toBe(3 + verkaufsPreis('axt'));
+    expect(a.inventar['gold']).toBe(6 + verkaufsPreis('axt'));
     a = kaufen(a, 'kraut');
     expect(a.inventar['kraut']).toBe(1);
     // Legendaeres kauft er nicht.

@@ -28,6 +28,7 @@ import {
   gelaendeBonus,
   abwehrAugen,
   OMEN,
+  gelaende,
   rasten,
   decken,
   synergien,
@@ -644,6 +645,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const logRef = useRef<HTMLDivElement | null>(null);
   const [lager, setLager] = useState(() => lade() === null && ladeMeta().laeufe > 0);
   const [hilfeOffen, setHilfeOffen] = useState(false);
+  const [abbruchFrage, setAbbruchFrage] = useState<Aufbruch | null>(null);
   const ladenZeilen = useRef<{ laden: number | null; ids: string[] }>({ laden: null, ids: [] });
   const offen = useRef({ lager, legenden: legendenOffen, hilfe: hilfeOffen });
   offen.current = { lager, legenden: legendenOffen, hilfe: hilfeOffen };
@@ -742,6 +744,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   miniGrossRef.current = miniGross;
 
   const setze = useCallback((neu: Zustand) => {
+    // Die Info-Box gilt dem Feld unter der Maus - zieht die Kamera weiter, verschwindet sie (Spieltest 10).
+    if (neu.pos.q !== aktuell.current.pos.q || neu.pos.r !== aktuell.current.pos.r) zeiger.current = null;
     aktuell.current = neu;
     setTipp(null);
     if (neu.ereignisse.length > 0) {
@@ -888,7 +892,12 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     const zielSchleim = a0.schleime.some((s) => s.q === l.ziel.q && s.r === l.ziel.r);
     // Ein Schleim nebenan haelt den Lauf an - dann entscheidet der Spieler.
     const gefahr = neu.schleime.some((s) => hexDistance(s, neu.pos) === 1);
-    if (amZiel || zielSchleim || gefahr || neu.phase !== 'ziehen') return halt();
+    if (gefahr && !amZiel && !zielSchleim && neu.phase === 'ziehen') {
+      halt();
+      setze({ ...neu, ereignisse: [], log: [...neu.log, 'Ein Gegner steht neben dir - der Lauf haelt an. Du entscheidest.'].slice(-30) });
+      return;
+    }
+    if (amZiel || zielSchleim || neu.phase !== 'ziehen') return halt();
     l.timer = window.setTimeout(geheWeiter, (letzterTakt(neu.ereignisse) + 1) * TAKT_MS + 30);
   }, [halt, schritt]);
 
@@ -1937,10 +1946,17 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           const nr = a.pos.r + d[1];
           // Kein Buchstabe auf Wasser und Unbetretbarem - ausser dort steht jemand (Spieltest).
           if (!betretbar(a, nq, nr) && !a.schleime.some((x) => x.q === nq && x.r === nr)) continue;
-          const pz = zentrum(nq, nr);
+          const pz0 = zentrum(nq, nr);
+          const feindDa = a.schleime.some((x) => x.q === nq && x.r === nr);
+          // Steht dort jemand, wird der Buchstabe ein kleines Schild unten links - die Figur bleibt sichtbar (Spieltest 10).
+          const belegt =
+            feindDa || [...(a.orte ?? []), ...(a.wanderer ?? []), ...(a.gefolge ?? []), ...(a.tiere ?? [])].some((x) => x.q === nq && x.r === nr);
+          const g = belegt ? 3 * f : 4 * f;
+          const pz = belegt ? { x: pz0.x - 9 * f, y: pz0.y + 6 * f } : pz0;
+          ctx.font = `${(belegt ? 4 : 5) * f}px monospace`;
           // Steht dort ein Gegner, ist die Taste ein Angriff - rot (Spieltest 9: "D griff an, ohne dass ich es sah").
-          ctx.fillStyle = a.schleime.some((x) => x.q === nq && x.r === nr) ? 'rgba(170, 30, 20, 0.9)' : 'rgba(18, 14, 9, 0.75)';
-          ctx.fillRect(pz.x - 4 * f, pz.y - 4 * f, 8 * f, 8 * f);
+          ctx.fillStyle = feindDa ? 'rgba(170, 30, 20, 0.9)' : 'rgba(18, 14, 9, 0.75)';
+          ctx.fillRect(pz.x - g, pz.y - g, 2 * g, 2 * g);
           ctx.fillStyle = '#f2e7d0';
           ctx.fillText(t.toUpperCase(), pz.x, pz.y + f * 0.5);
         }
@@ -2430,7 +2446,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       const sichtbar = unter && still && erkundet.has(hexKey(unter.q, unter.r)) && hexDistance(unter, a.pos) <= sicht;
       const ortH = sichtbar && !feind && !wand && !helfer ? (a.orte ?? []).find((x) => x.q === unter.q && x.r === unter.r) : undefined;
       const fund = sichtbar && !feind && !wand && !helfer && !ortH ? fundAuf(a, unter.q, unter.r) : null;
-      const info = feind ?? wand ?? helfer ?? ortH ?? (fund && unter ? unter : undefined);
+      const wasser = sichtbar && !feind && !wand && !helfer && !ortH && !fund && unter && !betretbar(a, unter.q, unter.r) ? unter : undefined;
+      const info = feind ?? wand ?? helfer ?? ortH ?? (fund && unter ? unter : undefined) ?? wasser;
       if (info) {
         const o = mitte(info.q, info.r);
         const ortZeilen = (x: NonNullable<typeof ortH>): string[] =>
@@ -2449,7 +2466,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           ? [
               `${schleimName(feind)}${feind.elite ? ' (Elite)' : ''}`,
               `Leben ${feind.leben}${feind.max ? `/${feind.max}` : ''}`,
-              `Trifft dich: -${gegnerWucht(a, feind)}${abwehrAugen(a) > 0 ? ` (Schild haelt Wurf 1-${abwehrAugen(a)})` : ' (kein Schild)'}`,
+              `Trifft dich: -${gegnerWucht(a, feind)}${abwehrAugen(a) > 0 ? ` - dein Schild blockt bei Wurf ${abwehrAugen(a) === 1 ? '1' : `1 bis ${abwehrAugen(a)}`} von 6` : ' (kein Schild)'}`,
               `Du triffst ab ${trefferAb(a, feind)}+ (Augen des Wuerfels)`,
             ]
           : wand
@@ -2463,7 +2480,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               ? [`${helfer.name} - ${SOELDNER[helfer.art].name}`, `Leben ${helfer.leben}/${helfer.max} · Level ${helfer.lv}`, 'Dein Gefolge: folgt dir und kaempft mit.']
               : ortH
                 ? ortZeilen(ortH)
-                : fundZeilen(fund!);
+                : fund
+                  ? fundZeilen(fund)
+                  : [istWasser(gelaende(a.seed, info.q, info.r)) ? 'Wasser' : 'Unwegsam', 'Hier kommst du nicht hin.'];
         ctx.save();
         ctx.font = `bold ${5 * f}px monospace`;
         ctx.textAlign = 'left';
@@ -2564,7 +2583,16 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const vorrat = Object.entries(a.inventar).filter(([id, n]) => n > 0 && id !== 'gold');
   const gold = a.inventar['gold'] ?? 0;
   /** Aufbrechen: ein neues Abenteuer mit Klasse, Mitgift und Heldenstufe (oder das Tagesabenteuer). */
-  const aufbruch = (x: Aufbruch) => {
+  const aufbruch = (x: Aufbruch, bestaetigt = false) => {
+    // Spieltest 10: "Aufbrechen im Lager warf mein laufendes Abenteuer weg." Erst fragen - und der Lauf bringt seinen Ruhm.
+    const laeuft = a.phase !== 'tot' && a.phase !== 'sieg' && a.zug > 1;
+    if (laeuft && !bestaetigt) return setAbbruchFrage(x);
+    setAbbruchFrage(null);
+    if (laeuft) {
+      const m = ladeMeta();
+      const schluessel = `${a.seed}:${a.zug}:aufgegeben`;
+      if (!m.belohnt.includes(schluessel)) setMeta({ ...belohne(m, a, ruhmFuer(a)), belohnt: [...m.belohnt, schluessel] });
+    }
     halt();
     setZugTasten([]);
     setTipp(null);
@@ -3294,6 +3322,23 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           onAufbruch={aufbruch}
           onZurueck={a.phase === 'tot' || a.phase === 'sieg' ? undefined : () => setLager(false)}
         />
+      )}
+
+      {abbruchFrage && (
+        <div className="ab-ende ab-frage-huelle">
+          <div className="ab-fenster ab-frage">
+            <h2>Laufendes Abenteuer aufgeben?</h2>
+            <p>
+              Du bist in Akt {a.akt ?? 1}, Zug {a.zug}. Brichst du neu auf, endet es - du bekommst seinen Ruhm (+{ruhmFuer(a)}).
+            </p>
+            <div className="ab-lager-knoepfe">
+              <button className="primary" onClick={() => setAbbruchFrage(null)}>
+                Weiterspielen
+              </button>
+              <button onClick={() => aufbruch(abbruchFrage, true)}>Aufgeben und neu aufbrechen</button>
+            </div>
+          </div>
+        </div>
       )}
 
       <ItemTipp tipp={tipp} />

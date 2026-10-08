@@ -91,7 +91,7 @@ export const freieLegenden = (m: Meta): string[] => LEGENDEN_FREI.filter((id) =>
 export const ERFOLGE: readonly { id: string; name: string; text: string; ruhm: number; pruefe: (a: Abenteuer, m: Meta) => boolean }[] = [
   { id: 'erster', name: 'Erster Schritt', text: 'Besiege den ersten Boss.', ruhm: 15, pruefe: (a) => (a.koenige ?? 0) >= 1 },
   { id: 'sieg', name: 'Held', text: 'Gewinne ein Abenteuer.', ruhm: 40, pruefe: (a) => a.phase === 'sieg' },
-  { id: 'allein', name: 'Einsamer Wolf', text: 'Gewinne ohne Gefolge.', ruhm: 50, pruefe: (a) => a.phase === 'sieg' && (a.gefolge ?? []).length === 0 },
+  { id: 'allein', name: 'Einsamer Wolf', text: 'Gewinne ohne Gefolge.', ruhm: 50, pruefe: (a) => a.phase === 'sieg' && (a.gefolge ?? []).length === 0 && (a.angeheuert ?? []).length === 0 },
   { id: 'schnell', name: 'Eilbote', text: 'Gewinne in hoechstens 60 Zuegen.', ruhm: 50, pruefe: (a) => a.phase === 'sieg' && a.zug <= 60 },
   { id: 'jaeger', name: 'Schleimjaeger', text: 'Erlege 50 Gegner in einem Abenteuer.', ruhm: 30, pruefe: (a) => a.erschlagen >= 50 },
   { id: 'reich', name: 'Pfeffersack', text: 'Besitze 60 Gold auf einmal.', ruhm: 20, pruefe: (a) => (a.inventar['gold'] ?? 0) >= 60 },

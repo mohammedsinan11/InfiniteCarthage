@@ -9163,7 +9163,8 @@ em.off {
 }
 .ab-hinweis {
   position: absolute;
-  top: 132px;
+  /* Unten ueber der Faehigkeitenleiste - nicht mehr ueber dem Log (Spieltest 10). */
+  bottom: 112px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 8;
@@ -9363,4 +9364,13 @@ em.off {
 .ab-boss-bald {
   color: #ff8a6a;
   font-weight: bold;
+}
+.ab-frage-huelle {
+  z-index: 60;
+}
+.ab-frage {
+  position: static;
+  width: min(460px, calc(100vw - 32px));
+  text-align: center;
+  border-color: #d9a441;
 }
