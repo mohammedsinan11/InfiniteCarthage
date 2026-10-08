@@ -27,7 +27,7 @@ describe('Abenteuer-Meta', () => {
     let m: Meta = { ...leer, ruhm: 60 };
     expect(naechsteFreischaltung(m)?.id).toBe('kraeuter');
     m = freischalten(m, 'legende', 'ruhepuls');
-    expect(m.ruhm).toBe(10);
+    expect(m.ruhm).toBe(25);
     expect(freieLegenden(m)).toEqual(['ruhepuls']);
     // Zu teuer: nichts passiert.
     expect(freischalten(m, 'klasse', 'schwarz')).toBe(m);

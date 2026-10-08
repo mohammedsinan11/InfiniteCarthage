@@ -29,12 +29,17 @@ const TIPPS: readonly Tipp[] = [
     text: 'Rot = angesagter Angriff! Er trifft erst im naechsten Takt. Geh vom roten Feld - oder schlag vorher zu, indem du in den Gegner laeufst.',
   },
   {
+    id: 'trefferzahl',
+    wann: (a) => a.phase === 'ziehen' && a.schleime.some((s) => hexDistanceZu(s, a.pos) === 1),
+    text: 'Die Zahl ueber dem Gegner (z. B. 3+) zeigt, ab welcher Augenzahl dein Hieb trifft. Lauf in ihn hinein, um zuzuschlagen. Schlaegt er ins Leere, taumelt er - ein freier Hieb!',
+  },
+  {
     id: 'fokus',
     wann: (a) => a.zug >= 3 && a.schleime.some((s) => hexDistanceZu(s, a.pos) <= 2),
     text: 'Tipp: Warten (S) sammelt Fokus (bis 3, kleine Flammen ueber dir). Dein naechster Hieb bekommt ihn auf den Wurf - mit vollem Fokus macht er +1 Schaden. Gehen bricht den Fokus.',
   },
   { id: 'faehigkeit', wann: (a) => faehigkeitBereit(a), text: 'Deine Waffe ist voll geladen! Druecke 1 (oder den runden Knopf unten), um ihre Faehigkeit auszuloesen.' },
-  { id: 'wenig', wann: (a) => a.leben <= 2 && a.phase !== 'tot', text: 'Wenig Leben! Kraeuter im Inventar heilen (antippen). Wartest du (S), ohne dass ein Gegner nah ist, bekommst du einmal je Zug +1 Leben.' },
+  { id: 'wenig', wann: (a) => a.leben <= 2 && a.phase !== 'tot', text: 'Wenig Leben! Druecke H (oder den roten Knopf unten), um ein Kraut zu essen. Wartest du (S), ohne dass ein Gegner nah ist, bekommst du einmal je Zug +1 Leben.' },
   {
     id: 'altar',
     wann: (a) => (a.orte ?? []).some((o) => o.art === 'altar' && !o.benutzt && hexDistanceZu(o, a.pos) <= 3),
@@ -45,7 +50,7 @@ const TIPPS: readonly Tipp[] = [
     wann: (a) => (a.orte ?? []).some((o) => o.art !== 'altar' && hexDistanceZu(o, a.pos) <= 2),
     text: 'Laufe in den Haendler, um Beute zu verkaufen und einzukaufen - oder in den Werber, um Soeldner anzuheuern.',
   },
-  { id: 'akt2', wann: (a) => (a.akt ?? 1) >= 2, text: 'Akt 2! Die Gegner werden zaeher, golden umrandete Elite-Gegner lassen Gold fallen. Sieh dich beim Haendler nach besserer Ausruestung um.' },
+  { id: 'akt2', wann: (a) => (a.akt ?? 1) >= 2, text: 'Akt 2! Die Gegner werden zaeher, golden umrandete Elite-Gegner lassen Gold fallen. Beim Haendler schaerft der Schmied deine Waffe. Tipp: im Wald hast du +1 Abwehr, auf Huegeln +1 Angriff.' },
 ];
 
 function gesehen(): string[] {

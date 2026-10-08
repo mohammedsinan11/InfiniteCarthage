@@ -63,21 +63,21 @@ export type FreiArt = 'klasse' | 'extra' | 'legende';
  * freischaltet (neue Builds).
  */
 export const FREISCHALTUNGEN: readonly { id: string; art: FreiArt; kosten: number }[] = [
-  { id: 'kraeuter', art: 'extra', kosten: 15 },
-  { id: 'waldlaeufer', art: 'klasse', kosten: 40 },
-  { id: 'ruhepuls', art: 'legende', kosten: 50 },
-  { id: 'geldkatze', art: 'extra', kosten: 60 },
-  { id: 'schatzsucher', art: 'legende', kosten: 80 },
-  { id: 'zwerg', art: 'klasse', kosten: 100 },
-  { id: 'glueckspilz', art: 'legende', kosten: 120 },
-  { id: 'karte', art: 'extra', kosten: 130 },
-  { id: 'jagdfieber', art: 'legende', kosten: 150 },
-  { id: 'paladin', art: 'klasse', kosten: 180 },
-  { id: 'bleiwuerfel', art: 'extra', kosten: 200 },
-  { id: 'wirbelwind', art: 'legende', kosten: 230 },
-  { id: 'herz', art: 'extra', kosten: 260 },
-  { id: 'runenmeister', art: 'legende', kosten: 300 },
-  { id: 'schwarz', art: 'klasse', kosten: 350 },
+  { id: 'kraeuter', art: 'extra', kosten: 10 },
+  { id: 'waldlaeufer', art: 'klasse', kosten: 25 },
+  { id: 'ruhepuls', art: 'legende', kosten: 35 },
+  { id: 'geldkatze', art: 'extra', kosten: 40 },
+  { id: 'schatzsucher', art: 'legende', kosten: 55 },
+  { id: 'zwerg', art: 'klasse', kosten: 70 },
+  { id: 'glueckspilz', art: 'legende', kosten: 85 },
+  { id: 'karte', art: 'extra', kosten: 95 },
+  { id: 'jagdfieber', art: 'legende', kosten: 110 },
+  { id: 'paladin', art: 'klasse', kosten: 130 },
+  { id: 'bleiwuerfel', art: 'extra', kosten: 150 },
+  { id: 'wirbelwind', art: 'legende', kosten: 170 },
+  { id: 'herz', art: 'extra', kosten: 190 },
+  { id: 'runenmeister', art: 'legende', kosten: 220 },
+  { id: 'schwarz', art: 'klasse', kosten: 260 },
 ];
 
 export const istFrei = (m: Meta, art: FreiArt, id: string): boolean => (art === 'klasse' && id === 'ritter') || m.frei.includes(`${art}:${id}`);

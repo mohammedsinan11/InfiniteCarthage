@@ -25,6 +25,7 @@ import type { CSSProperties } from 'react';
 import {
   FAEHIGKEIT_NAME,
   FRAKTION_FIGUR,
+  gelaendeBonus,
   abwehrAugen,
   trefferAb,
   zuegeBisBoss,
@@ -167,6 +168,10 @@ function speichere(a: Zustand): void {
 }
 
 const neuerSeed = () => (Math.random() * 2 ** 31) | 0;
+
+/** Was heilt, in dieser Reihenfolge (Taste H). */
+const HEILMITTEL = ['kraut', 'fisch', 'herz', 'halbherz'] as const;
+const heilmittel = (a: Zustand): string | null => HEILMITTEL.find((id) => (a.inventar[id] ?? 0) > 0) ?? null;
 
 /** Pfeil je Taste fuer die Steuerung. */
 const PFEIL: Record<Taste, string> = {
@@ -643,6 +648,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   /** Wann ein Feld zum ersten Mal ins Bild kam - neue Kacheln fallen hinein. */
   const enthuellt = useRef<Map<string, number> | null>(null);
   const fallBis = useRef(0);
+  /** Die Kamera (Welt-Punkt in der Bildmitte) - sie folgt dem Ritter weich. */
+  const kamera = useRef<{ x: number; y: number } | null>(null);
+  const kameraFaehrt = useRef(false);
   /** Seit wann das Banner "Der Schleimkoenig erwacht" steht. */
   const banner = useRef(0);
   const bannerText = useRef('Der Schleimkoenig erwacht!');
@@ -852,6 +860,12 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         setze(faehigkeitNutzen(jetzt));
         return;
       }
+      if (k === 'h') {
+        e.preventDefault();
+        const id = heilmittel(jetzt);
+        if (id) setze(benutzen(jetzt, id));
+        return;
+      }
       if ((TASTEN as readonly string[]).includes(k)) {
         e.preventDefault();
         drueck(k as Taste);
@@ -892,7 +906,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       // Steht alles wieder still (nur Zahlen steigen noch), zeigen sich Tasten und Wege.
       const still = p >= letzterTakt(ev) + 1;
       // In Ruhe genuegen zwoelf Bilder je Sekunde fuers Atmen - ausser Kacheln fallen gerade.
-      if (!bewegt && jetzt > fallBis.current && jetzt - zuletzt < 80) return;
+      if (!bewegt && !kameraFaehrt.current && jetzt > fallBis.current && jetzt - zuletzt < 80) return;
       zuletzt = jetzt;
       const sek = jetzt / 1000;
 
@@ -980,8 +994,21 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       };
 
       const ritter = ort('ritter');
-      const camX = ritter.x;
-      const camY = ritter.y;
+      // Ruhigere Kamera (Spieltest: "die ganze Karte springt bei jedem Schritt"):
+      // sie folgt erst, wenn der Ritter ein Stueck aus der Mitte laeuft, und dann weich.
+      const kam = kamera.current;
+      if (!kam || Math.hypot(ritter.x - kam.x, ritter.y - kam.y) > 160) kamera.current = { x: ritter.x, y: ritter.y };
+      else {
+        const RAND_X = 26;
+        const RAND_Y = 18;
+        const zielX = Math.min(Math.max(kam.x, ritter.x - RAND_X), ritter.x + RAND_X);
+        const zielY = Math.min(Math.max(kam.y, ritter.y - RAND_Y), ritter.y + RAND_Y);
+        kam.x += (zielX - kam.x) * 0.2;
+        kam.y += (zielY - kam.y) * 0.2;
+        kameraFaehrt.current = Math.abs(zielX - kam.x) + Math.abs(zielY - kam.y) > 0.3;
+      }
+      const camX = kamera.current!.x;
+      const camY = kamera.current!.y;
       ansicht.current = { camX, camY, f, dpr, w: c.width, h: c.height };
       const sx = (x: number) => Math.round((x - camX) * f + c.width / 2);
       const sy = (y: number) => Math.round((y - camY) * f + c.height / 2);
@@ -2402,12 +2429,14 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               {
                 id: 'schwert',
                 wert: `+${angriffVon(a)}`,
-                titel: `Angriff: so viel kommt auf jeden Angriffswurf. Du triffst Schleime ab einer ${Math.max(1, 4 - angriffVon(a))} (Panzer ab ${Math.max(1, 5 - angriffVon(a))}).`,
+                titel: `Angriff +${angriffVon(a)}${gelaendeBonus(a, 'angriff') ? ' (davon +1 Huegel)' : ''}: Wurf + Angriff muss 4 erreichen. Du triffst Schleime mit einer ${Math.max(1, 4 - angriffVon(a))} oder mehr (${Math.round((100 * (7 - Math.max(1, 4 - angriffVon(a)))) / 6)} %), Panzer ab ${Math.max(1, 5 - angriffVon(a))}. Warten (S) gibt Fokus.`,
               },
               {
                 id: 'schild',
                 wert: `+${abwehrVon(a)}`,
-                titel: abwehrAugen(a) > 0 ? `Abwehr: Hiebe mit Wurf 1 bis ${abwehrAugen(a)} prallen ab (${Math.round((100 * abwehrAugen(a)) / 6)} %).` : 'Abwehr: keine - jeder Hieb trifft. Schild, Helm und Ruestung helfen.',
+                titel:
+                  (abwehrAugen(a) > 0 ? `Abwehr: Hiebe mit Wurf 1 bis ${abwehrAugen(a)} prallen ab (${Math.round((100 * abwehrAugen(a)) / 6)} %).` : 'Abwehr: keine - jeder Hieb trifft. Schild, Ruestung und Wald helfen.') +
+                  (gelaendeBonus(a, 'abwehr') ? ' Der Wald gibt dir gerade +1.' : ''),
               },
               { id: 'herz', wert: `${maxLeben}`, titel: 'Hoechstes Leben' },
               {
@@ -2518,8 +2547,28 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         ein Ladebalken wickelt - ist der Ring voll, leuchtet der Knopf.
         Bisher: die Beschwoerung (Pentagrammmeister Stufe 3).
       */}
-      {(ladungVon(a).faehigkeit || (a.pentaStufe ?? 1) >= 3 || a.ausruestung.wuerfel === 'glueckswuerfel') && (
+      {(ladungVon(a).faehigkeit || (a.pentaStufe ?? 1) >= 3 || a.ausruestung.wuerfel === 'glueckswuerfel' || heilmittel(a)) && (
         <div className="ab-faehigkeiten">
+          {/* Heilen (H): das naechste Heilmittel - leuchtet rot, wenn das Leben knapp wird. */}
+          {heilmittel(a) &&
+            (() => {
+              const id = heilmittel(a)!;
+              const knapp = a.leben <= Math.max(2, maxLebenVon(a) / 3);
+              return (
+                <button
+                  className={knapp ? 'ab-faehigkeit voll' : 'ab-faehigkeit'}
+                  style={{ '--anteil': 1, '--ring': knapp ? '#d0503a' : '#7fd05a' } as CSSProperties}
+                  onClick={() => setze(benutzen(aktuell.current, id))}
+                  title={`Heilen (H): ${gegenstand(id)?.name} - ${gegenstand(id)?.text}`}
+                >
+                  <span className="ab-faehigkeit-innen">
+                    <Icon id={id} groesse={26} />
+                    {(a.inventar[id] ?? 0) > 1 && <span className="ab-anzahl">{a.inventar[id]}</span>}
+                  </span>
+                  <kbd>H</kbd>
+                </button>
+              );
+            })()}
           {/* Glueckswuerfel: einmal je Zug neu wuerfeln - der Ring ist voll, solange es geht. */}
           {a.ausruestung.wuerfel === 'glueckswuerfel' && (
             <button
@@ -2847,7 +2896,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                     onClick={() => setze(waehlen(aktuell.current, nr))}
                   >
                     <kbd>{nr + 1}</kbd>
-                    <Icon id={id === 'extraherz' ? 'herz' : id === 'goldsack' ? 'muenze' : id} groesse={40} />
+                    <Icon id={id === 'extraherz' ? 'herz' : id === 'goldsack' ? 'muenze' : id === 'fluch_oeffnen' ? 'fluchtruhe' : id === 'fluch_lassen' ? 'stiefel' : id} groesse={40} />
                     <b>{g?.name ?? id}</b>
                     <span>{g?.text.replace(/^Legendaer\.\s*/, '')}</span>
                     {v === 1 && <em>besser als deins</em>}

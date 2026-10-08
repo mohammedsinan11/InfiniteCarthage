@@ -186,6 +186,8 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
   { id: 'fisch', name: 'Fisch', heilt: 1, text: 'Antippen: 1 Leben zurueck. Stapelt sich.' },
   { id: 'gold', name: 'Gold', text: 'Muenzen - sie stehen ueber dem Inventar. Noch kauft hier niemand etwas.' },
   { id: 'fluchtruhe', name: 'Verfluchte Truhe', text: 'Darin liegt Legendaeres - aber ihre Waechter erwachen, wenn du sie oeffnest.' },
+  { id: 'fluch_oeffnen', name: 'Oeffnen', text: 'Die Waechter erwachen - kaempfe, dann waehle ein Legendaeres.' },
+  { id: 'fluch_lassen', name: 'Stehen lassen', text: 'Lieber nicht. Du kannst spaeter wiederkommen.' },
   { id: 'goldfisch', name: 'Goldfisch', text: 'Ein seltener Fang - der Haendler zahlt 8 Gold.' },
   { id: 'extraherz', name: 'Heilung', text: 'Sofort volles Leben.' },
   { id: 'goldsack', name: 'Goldsack', text: '15 Gold auf einmal.' },
@@ -323,7 +325,7 @@ function neuerSchleim(id: number, q: number, r: number, zahl: number, fern: bool
   if (zahl < 24) return { id, q, r, leben: 2, gross: false, art: 'spring' };
   if (zahl < 33) return { id, q, r, leben: 3, gross: false, art: 'panzer' };
   if (zahl < 42) return { id, q, r, leben: 2, gross: false, art: 'gift' };
-  if (zahl < 50) return { id, q, r, leben: 3, gross: false, art: 'teil' };
+  if (zahl < 50) return { id, q, r, leben: 2, gross: false, art: 'teil' };
   if (zahl < 57) return { id, q, r, leben: 2, gross: false, art: 'geist' };
   const gross = fern && zahl % 3 === 0;
   return { id, q, r, leben: gross ? 4 : 2, gross };
@@ -373,7 +375,7 @@ export function schleimNameAkk(s: Pick<Schleim, 'boss' | 'art' | 'gross'> & { bo
 export function schleimMaxLeben(s: Pick<Schleim, 'boss' | 'art' | 'gross'> & { max?: number }): number {
   if (s.boss) return s.max ?? BOSS_LEBEN;
   if (s.max) return s.max;
-  if (s.art === 'panzer' || s.art === 'teil' || s.art === 'bandit') return 3;
+  if (s.art === 'panzer' || s.art === 'bandit') return 3;
   return s.gross ? 4 : 2;
 }
 
@@ -498,6 +500,8 @@ export type Abenteuer = {
   wanderer?: Wanderer[];
   /** Mit wem der Ritter gerade spricht (Ort-Id) - dann ist ein Laden offen. */
   laden?: number | null;
+  /** Legendaeres, das in diesem Abenteuer schon angeboten wurde. */
+  angeboten?: string[];
   /** Fokus (0 bis FOKUS_MAX): Warten sammelt ihn, der naechste Hieb nutzt ihn, Gehen bricht ihn. */
   fokus?: number;
   /** Beim Haendler gekaufte Einzelstuecke ("ortId:id"). */
@@ -566,7 +570,7 @@ export const BOSS_LEBEN = 10;
  * gewonnen.
  */
 export const AKTE = 3;
-export const AKT_ZIEL: readonly number[] = [5, 7, 9];
+export const AKT_ZIEL: readonly number[] = [5, 6, 7];
 export const AKT_BOSS: readonly BossArt[] = ['koenig', 'schatten', 'koloss'];
 export const AKT_NAME: readonly string[] = ['Die gruenen Weiten', 'Schatten im Land', 'Der Gelee-Koloss'];
 /** Wie viele Gegner der Boss dieses Akts verlangt. */
@@ -642,8 +646,17 @@ export function fundAuf(a: Pick<Abenteuer, 'seed' | 'genommen'>, q: number, r: n
 
 const summe = (a: Abenteuer, f: (g: Gegenstand) => number | undefined): number =>
   SLOTS.reduce((n, s) => n + (f(gegenstand(a.ausruestung[s] ?? '') ?? ({} as Gegenstand)) ?? 0), 0);
-export const angriffVon = (a: Abenteuer) => summe(a, (g) => g.angriff) + (a.bonus?.angriff ?? 0) + (a.schmied?.angriff ?? 0);
-export const abwehrVon = (a: Abenteuer) => summe(a, (g) => g.abwehr) + (a.bonus?.abwehr ?? 0) + (a.schmied?.abwehr ?? 0);
+export const angriffVon = (a: Abenteuer) => summe(a, (g) => g.angriff) + (a.bonus?.angriff ?? 0) + (a.schmied?.angriff ?? 0) + gelaendeBonus(a, 'angriff');
+export const abwehrVon = (a: Abenteuer) => summe(a, (g) => g.abwehr) + (a.bonus?.abwehr ?? 0) + (a.schmied?.abwehr ?? 0) + gelaendeBonus(a, 'abwehr');
+/**
+ * Gelaende im Kampf (Spieltest: "Bewegung ist nur Ausweichen"): im Wald
+ * (auch Dschungel, Taiga) +1 Abwehr, auf Huegeln und Bergen +1 Angriff.
+ */
+export function gelaendeBonus(a: Pick<Abenteuer, 'seed' | 'pos'>, was: 'angriff' | 'abwehr'): number {
+  const b = gelaende(a.seed, a.pos.q, a.pos.r);
+  if (was === 'abwehr') return b === 'wald' || b === 'dschungel' || b === 'taiga' ? 1 : 0;
+  return b === 'huegel' || b === 'berg' ? 1 : 0;
+}
 export const maxLebenVon = (a: Abenteuer) => GRUND_LEBEN + summe(a, (g) => g.leben) + (a.bonus?.leben ?? 0) + (a.extraHerzen ?? 0);
 export const sichtVon = (a: Abenteuer) => GRUND_SICHT + summe(a, (g) => g.sicht);
 const schrittBonus = (a: Abenteuer) => summe(a, (g) => g.schritte);
@@ -724,7 +737,7 @@ export function neuesAbenteuer(seed: number, optionen: StartOptionen = {}): Aben
  * Truhen, goldene Schaetze und die Beute der Bosse bieten DREI Dinge an, der
  * Spieler waehlt eines. Solange die Wahl offen ist, ruht das Spiel.
  */
-export type WahlArt = 'truhe' | 'schatz' | 'boss';
+export type WahlArt = 'truhe' | 'schatz' | 'boss' | 'fluch';
 export type Wahl = { art: WahlArt; titel: string; optionen: string[] };
 
 /** Legendaeres, das noch in Frage kommt (Einmaliges nur einmal, Extra-Leben hoechstens EXTRALEBEN_MAX). */
@@ -753,9 +766,13 @@ function bietWahl(a: Abenteuer, art: WahlArt): void {
     const optionen = dreiAus(a, TRUHENINHALT.filter((id) => id !== a.ausruestung[gegenstand(id)?.slot ?? 'waffe']), hatLegende(a, 'schatzsucher') ? 4 : 3);
     a.wahl = { art, titel: 'Eine Truhe! Nimm eins.', optionen };
   } else {
-    const pool = legendaerPool(a);
+    // Was in diesem Abenteuer schon angeboten wurde, kommt erst wieder, wenn nichts anderes bleibt (Spieltest).
+    const alle = legendaerPool(a);
+    const frisch = alle.filter((x) => !(a.angeboten ?? []).includes(x));
+    const pool = frisch.length >= 3 ? frisch : alle;
     // Ist der Pool klein, fuellen Herzcontainer auf - die gibt es immer.
     const optionen = dreiAus(a, pool.length >= 3 ? pool : [...pool, 'herzcontainer', 'extraherz', 'goldsack']);
+    a.angeboten = [...new Set([...(a.angeboten ?? []), ...optionen])];
     a.wahl = { art, titel: art === 'boss' ? 'Die Beute des Bosses - waehle ein Legendaeres.' : 'Ein goldener Schatz! Waehle ein Legendaeres.', optionen };
   }
   a.ereignisse.push({ art: 'wahl', takt: 0 });
@@ -769,6 +786,15 @@ export function waehlen(alt: Abenteuer, nr: number): Abenteuer {
   const a = structuredClone(alt);
   a.ereignisse = [];
   a.wahl = null;
+  if (id === 'fluch_oeffnen') {
+    a.genommen = [...a.genommen, hexKey(a.pos.q, a.pos.r)];
+    fluchtruheOeffnen(a);
+    return a;
+  }
+  if (id === 'fluch_lassen') {
+    melde(a, 'Du laesst die verfluchte Truhe stehen.');
+    return a;
+  }
   if (id === 'extraherz') {
     a.leben = maxLebenVon(a);
     melde(a, 'Du waehlst die Heilung: volles Leben.');
@@ -778,6 +804,31 @@ export function waehlen(alt: Abenteuer, nr: number): Abenteuer {
   } else if (gegenstand(id)?.legendaer) legendaerAnwenden(a, id, 0);
   else gibGegenstand(a, id, 'Aus der Truhe');
   return a;
+}
+
+/** Die verfluchte Truhe oeffnen: Waechter erwachen, dann ein Legendaeres waehlen. */
+function fluchtruheOeffnen(a: Abenteuer): void {
+  {
+    const rng = new Rng(a.rng);
+    const plaetze = hexesInRange(a.pos, 2).filter(
+      (h) => hexDistance(h, a.pos) === 2 && begehbar(gelaende(a.seed, h.q, h.r)) && !schleimAuf(a, h.q, h.r) && !ortAuf(a, h.q, h.r),
+    );
+    for (let i = 0; i < 2 && plaetze.length; i++) {
+      const h = plaetze.splice(rng.int(plaetze.length), 1)[0]!;
+      const id = a.naechsteId++;
+      const s = staerken(a, neuerSchleim(id, h.q, h.r, artZahl(a, rng), false), rng);
+      if (i === 0 && !s.elite) {
+        s.elite = true;
+        s.leben += 2;
+        s.max = s.leben;
+      }
+      a.schleime.push(s);
+      a.ereignisse.push({ art: 'neu', takt: 0, wer: id });
+    }
+    a.rng = rng.getState();
+    melde(a, 'Eine verfluchte Truhe! Ihre Waechter erwachen - doch darin liegt Legendaeres.');
+    bietWahl(a, 'schatz');
+  }
 }
 
 /** Einen Gegenstand bekommen: Ausruestung in einen leeren Platz, sonst ins Inventar. */
@@ -1395,7 +1446,9 @@ function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
   }
   a.ereignisse.push({ art: 'hieb', takt, wer: 'ritter', ziel: s.id, wurf, schaden });
   if (schaden === 0) {
-    melde(a, `Wurf ${wurf}+${angriffVon(a)}: ${s.art === 'panzer' ? 'prallt am Steinpanzer ab (ab 5)' : 'daneben'}.`);
+    // Pech gleicht sich aus: ein Fehlschlag gibt einen Punkt Fokus fuer den naechsten Hieb.
+    a.fokus = 1;
+    melde(a, `Wurf ${wurf}+${angriffVon(a)}: ${s.art === 'panzer' ? 'prallt am Steinpanzer ab (ab 5)' : 'daneben'} - +1 Fokus fuer den naechsten Hieb.`);
     return;
   }
   const vorne = `Wurf ${wurf}+${angriffVon(a)}${spalt ? ', Spalthieb' : ''}`;
@@ -1512,7 +1565,7 @@ function bossPruefen(a: Abenteuer, takt: number): void {
  * Spieltest: "In Akt 2 und 3 laeuft man lange herum, um Gegner zu finden."
  * Darum kommt der Boss spaetestens nach AKT_ZUEGE Zuegen im Akt - ungeduldig.
  */
-export const AKT_ZUEGE = 18;
+export const AKT_ZUEGE = 15;
 export const zuegeBisBoss = (a: Pick<Abenteuer, 'zug' | 'aktStart'>): number => Math.max(0, AKT_ZUEGE - (a.zug - (a.aktStart ?? 1)));
 const bossUngeduldig = (a: Abenteuer): boolean => zuegeBisBoss(a) === 0;
 
@@ -1701,6 +1754,12 @@ function aufheben(a: Abenteuer): void {
     melde(a, `${herz.name}: +${lebenText(plus)} Leben.`);
     return;
   }
+  // Die verfluchte Truhe fragt erst (Spieltest: "sie hat mich ohne Warnung getoetet").
+  if (fund === 'fluchtruhe') {
+    a.wahl = { art: 'fluch', titel: 'Eine verfluchte Truhe: zwei Waechter (einer Elite) erwachen, wenn du sie oeffnest. Darin liegt Legendaeres.', optionen: ['fluch_oeffnen', 'fluch_lassen'] };
+    a.ereignisse.push({ art: 'wahl', takt: 0 });
+    return;
+  }
   a.genommen = [...a.genommen, hexKey(a.pos.q, a.pos.r)];
   a.ereignisse.push({ art: 'fund', takt: 0, id: fund });
   // Schatz und Truhe: eine Wahl, 1 aus 3.
@@ -1710,28 +1769,6 @@ function aufheben(a: Abenteuer): void {
     return;
   }
   // Die verfluchte Truhe: Legendaeres - aber ihre Waechter erwachen (eine Elite darunter).
-  if (fund === 'fluchtruhe') {
-    const rng = new Rng(a.rng);
-    const plaetze = hexesInRange(a.pos, 2).filter(
-      (h) => hexDistance(h, a.pos) === 2 && begehbar(gelaende(a.seed, h.q, h.r)) && !schleimAuf(a, h.q, h.r) && !ortAuf(a, h.q, h.r),
-    );
-    for (let i = 0; i < 2 && plaetze.length; i++) {
-      const h = plaetze.splice(rng.int(plaetze.length), 1)[0]!;
-      const id = a.naechsteId++;
-      const s = staerken(a, neuerSchleim(id, h.q, h.r, artZahl(a, rng), false), rng);
-      if (i === 0 && !s.elite) {
-        s.elite = true;
-        s.leben += 2;
-        s.max = s.leben;
-      }
-      a.schleime.push(s);
-      a.ereignisse.push({ art: 'neu', takt: 0, wer: id });
-    }
-    a.rng = rng.getState();
-    melde(a, 'Eine verfluchte Truhe! Ihre Waechter erwachen - doch darin liegt Legendaeres.');
-    bietWahl(a, 'schatz');
-    return;
-  }
   if (gegenstand(fund)?.slot || fund === 'angel') {
     // Nicht gleich anlegen (Spieltest): im Inventar leuchtet es gruen, wenn es besser ist.
     gibGegenstand(a, fund, 'Gefunden');
@@ -1819,6 +1856,19 @@ function linieZum(s: Hex, ziel: Hex): number | null {
   return null;
 }
 
+/**
+ * Spieltest: "Ein Rudel sagt jeden Schritt einen Angriff an - kein Fenster zum
+ * Zurueckschlagen." Darum: wer ins Leere schlaegt, taumelt einen Takt lang
+ * (ein freier Hieb), und hoechstens ANSAGEN_MAX Gegner zielen zugleich auf den Ritter.
+ */
+const ANSAGEN_MAX = 2;
+function taumeln(a: Abenteuer, s: Schleim): void {
+  s.gebannt = Math.max(s.gebannt ?? 0, a.zeit + 2);
+}
+function zuVieleAnsagen(a: Abenteuer): boolean {
+  return a.schleime.filter((x) => !x.boss && (x.angriff || x.flaeche)).length >= ANSAGEN_MAX;
+}
+
 /** Einen Schritt (oder Sprung) gehen - mit Spur und Ereignis. Der Giftschleim hinterlaesst eine Pfuetze. */
 function zieheSchleim(a: Abenteuer, s: Schleim, ziel: Hex, takt: number, sprung = false): void {
   if (s.art === 'gift') a.gift = [...(a.gift ?? []).filter((g) => g.bis > a.zeit), { q: s.q, r: s.r, bis: a.zeit + GIFT_DAUER }];
@@ -1842,7 +1892,8 @@ function schleimHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetz
     if (drauf) schleimTrifft(a, s, drauf, takt, rng);
     else {
       a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: null, feld: felder[felder.length - 1]!, wurf: 0, schaden: 0 });
-      melde(a, 'Ausgewichen! Der Spuckschleim trifft nur Erde.');
+      taumeln(a, s);
+      melde(a, 'Ausgewichen! Der Spuckschleim trifft nur Erde - und taumelt.');
     }
     return;
   }
@@ -1863,14 +1914,16 @@ function schleimHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetz
       } else if (frei(feld)) {
         a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: null, feld, wurf: 0, schaden: 0 });
         zieheSchleim(a, s, feld, takt, true);
-        melde(a, 'Ausgewichen! Der Springschleim landet ins Leere.');
+        taumeln(a, s);
+        melde(a, 'Ausgewichen! Der Springschleim landet ins Leere - und taumelt.');
       }
       return;
     }
     if (!getroffen && helferGetroffen(a, s, feld, takt, rng)) return;
     if (!getroffen) {
       a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: null, feld, wurf: 0, schaden: 0 });
-      melde(a, `Ausgewichen! Der ${schleimName(s)} klatscht ins Leere.`);
+      taumeln(a, s);
+      melde(a, `Ausgewichen! Der ${schleimName(s)} klatscht ins Leere - und taumelt: ein freier Hieb!`);
       return;
     }
     schleimTrifft(a, s, feld, takt, rng);
@@ -1896,6 +1949,8 @@ function schleimHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetz
     a.ereignisse.push({ art: 'ansage', takt, wer: s.id, feld: helfer });
     return;
   }
+  // Hoechstens ANSAGEN_MAX Gegner sagen zugleich einen Angriff auf den Ritter an - die anderen lauern.
+  if (d <= 3 && zuVieleAnsagen(a)) return;
   // Der Springschleim: bis drei Felder weit sagt er sein Landefeld an.
   if ((s.art === 'spring' && d <= 3) || d === 1) {
     s.angriff = { q: a.pos.q, r: a.pos.r };
@@ -3053,5 +3108,5 @@ export function abenteuerPunkte(a: Abenteuer): number {
     (a.phase === 'sieg' ? 1000 + Math.max(0, 400 - a.zug * 4) : 0);
   return Math.round(roh * (1 + 0.3 * (a.heldenstufe ?? 0)));
 }
-/** Ruhm fuer das Lager: ein Fuenfzehntel der Punkte, mindestens 5. */
-export const ruhmFuer = (a: Abenteuer): number => Math.max(5, Math.floor(abenteuerPunkte(a) / 15));
+/** Ruhm fuer das Lager: 10 fuer jedes Abenteuer und ein Zwoelftel der Punkte (Spieltest: "Ruhm kommt zu langsam"). */
+export const ruhmFuer = (a: Abenteuer): number => 10 + Math.floor(abenteuerPunkte(a) / 12);

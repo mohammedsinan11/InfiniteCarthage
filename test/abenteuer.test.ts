@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { istWasser } from '../src/abenteuer/welt';
 import type { Boden } from '../src/abenteuer/welt';
-import { angelbar, angeln, betretbar, kannAngeln, BOSS_LEBEN, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden, vergleich, naechsterBoss, KREIS_DAUER, PENTA_BOSS_NACH, verkaufen, verkaufsPreis, kaufen, ansprechen, anheuern, werberAngebot, PENTA_STUFE3_NACH, BESCHWOERUNG_VOLL, beschwoeren, angeheuerte, kannNeuWuerfeln, neuWuerfeln, WUERFEL_EFFEKT, aktZiel, waehlen, abenteuerPunkte, ruhmFuer, faehigkeitBereit, faehigkeitNutzen, opfern, AKT_ZUEGE, schmieden, legendaerAnwenden } from '../src/abenteuer/regeln';
+import { angelbar, angeln, betretbar, kannAngeln, BOSS_LEBEN, GRUND_LEBEN, angriffVon, maxLebenVon, benutzen, debugAktion, ladungVon, gegenstand, normalisiere, fundAuf, gelaende, neuesAbenteuer, taste, tasteZu, wuerfeln, zugBeenden, vergleich, naechsterBoss, KREIS_DAUER, PENTA_BOSS_NACH, verkaufen, verkaufsPreis, kaufen, ansprechen, anheuern, werberAngebot, PENTA_STUFE3_NACH, BESCHWOERUNG_VOLL, beschwoeren, angeheuerte, kannNeuWuerfeln, neuWuerfeln, WUERFEL_EFFEKT, aktZiel, waehlen, abenteuerPunkte, ruhmFuer, faehigkeitBereit, faehigkeitNutzen, opfern, AKT_ZUEGE, schmieden, legendaerAnwenden, abwehrVon } from '../src/abenteuer/regeln';
 import type { Abenteuer, Taste } from '../src/abenteuer/regeln';
 import { HEX_DIRS, hexDistance, hexesInRange as hexesInRangeTest } from '../src/core/coords';
 
@@ -938,6 +938,33 @@ describe('Abenteuer', () => {
     const hieb = b.ereignisse.find((e) => e.art === 'hieb' && e.wer === 'ritter');
     expect(hieb && hieb.art === 'hieb' && hieb.schaden).toBeGreaterThanOrEqual(2);
     expect(b.fokus).toBe(0);
+  });
+
+  it('Iteration 3: wer ins Leere schlaegt, taumelt; hoechstens zwei Ansagen zugleich; Fehlschlag gibt Fokus', () => {
+    const a0 = neuesAbenteuer(13);
+    const t = freieTaste(a0);
+    let a = imZug(13, [{ id: 7, q: a0.pos.q, r: a0.pos.r - 1, leben: 9, gross: false, angriff: { ...a0.pos } }], 10);
+    a.leben = 99;
+    a = taste(a, t);
+    expect(a.ereignisse.some((e) => e.art === 'hieb' && e.wer === 7 && e.ziel === null)).toBe(true);
+    expect(a.schleime[0]!.gebannt).toBeGreaterThan(a.zeit);
+    // Fuenf Schleime rundum: hoechstens zwei sagen an.
+    let b = imZug(13, [], 10);
+    b.leben = 99;
+    b.schleime = HEX_DIRS.slice(0, 5).map(([dq, dr], i) => ({ id: 30 + i, q: a0.pos.q + dq, r: a0.pos.r + dr, leben: 9, gross: false }));
+    b = taste(b, 's');
+    expect(b.schleime.filter((s) => s.angriff || s.flaeche).length).toBeLessThanOrEqual(2);
+  });
+
+  it('Gelaende: im Wald +1 Abwehr, auf Huegeln +1 Angriff', () => {
+    for (let seed = 1; seed < 200; seed++) {
+      const a = neuesAbenteuer(seed);
+      const wald = hexesInRangeTest(a.pos, 6).find((h) => gelaende(seed, h.q, h.r) === 'wald');
+      const wiese = hexesInRangeTest(a.pos, 6).find((h) => gelaende(seed, h.q, h.r) === 'wiese');
+      if (!wald || !wiese) continue;
+      expect(abwehrVon({ ...a, pos: wald })).toBe(abwehrVon({ ...a, pos: wiese }) + 1);
+      return;
+    }
   });
 
   it('Herzen werden gleich verbraucht - bei vollem Leben bleiben sie liegen', () => {
