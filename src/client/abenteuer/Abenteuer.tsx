@@ -28,6 +28,7 @@ import {
   gelaendeBonus,
   abwehrAugen,
   OMEN,
+  synergien,
   ereignisMoeglich,
   omenFuer,
   EREIGNIS,
@@ -400,7 +401,7 @@ const WAHL_BILD: Record<string, string> = {
   ev_trinken: 'heilwuerfel',
   ev_fuellen: 'kraut',
   ev_karte: 'auge',
-  ev_omen: 'blitz',
+  ev_omen: 'runenwuerfel',
 };
 
 function Icon({ id, groesse = 22 }: { id: string; groesse?: number }) {
@@ -617,7 +618,7 @@ type Ansicht = {
 };
 
 export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
-  const [a, setA] = useState<Zustand>(() => lade() ?? neuesAbenteuer(neuerSeed()));
+  const [a, setA] = useState<Zustand>(() => lade() ?? neuesAbenteuer(neuerSeed(), { omen: true }));
   const [geladen, setGeladen] = useState(false);
   const [gedrueckt, setGedrueckt] = useState<{
     taste: Taste;
@@ -1509,7 +1510,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         } else if (s.art === 'geist') {
           // Schwebt und flackert - von weitem kaum zu sehen.
           hoch += 1.5 + Math.sin(sek * 2 + s.id) * 1.5;
-          alpha = hexDistance(feldBei(o0.x, o0.y), a.pos) <= 2 ? 0.85 : 0.3 + 0.1 * Math.sin(sek * 5 + s.id);
+          // Spieltest 7: "Geister fast unsichtbar" - halb durchsichtig, aber deutlich.
+          alpha = hexDistance(feldBei(o0.x, o0.y), a.pos) <= 2 ? 0.9 : 0.55 + 0.1 * Math.sin(sek * 5 + s.id);
         } else if (s.art === 'teil') {
           // Die zwei Lappen wackeln gegeneinander.
           skx = 1 + Math.sin(sek * 6 + s.id) * 0.07;
@@ -1918,7 +1920,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           const dir = richtungFuer(t);
           if (dir === null) continue;
           const d = HEX_DIRS[dir]!;
-          const pz = zentrum(a.pos.q + d[0], a.pos.r + d[1]);
+          const nq = a.pos.q + d[0];
+          const nr = a.pos.r + d[1];
+          // Kein Buchstabe auf Wasser und Unbetretbarem - ausser dort steht jemand (Spieltest).
+          if (!betretbar(a, nq, nr) && !a.schleime.some((x) => x.q === nq && x.r === nr)) continue;
+          const pz = zentrum(nq, nr);
           ctx.fillStyle = 'rgba(18, 14, 9, 0.75)';
           ctx.fillRect(pz.x - 4 * f, pz.y - 4 * f, 8 * f, 8 * f);
           ctx.fillStyle = '#f2e7d0';
@@ -3167,6 +3173,18 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                     <span>{g?.text.replace(/^Legendaer\.\s*/, '')}</span>
                     {v === 1 && <em>besser als deins</em>}
                     {v === -1 && <em>schwaecher als deins</em>}
+                    {synergien(a, id).length > 0 && (
+                      <i className="ab-synergie">
+                        Passt zu:{' '}
+                        {synergien(a, id).map((x, k) => (
+                          <span key={x.id} className={x.hast ? 'hast' : ''}>
+                            {k > 0 ? ', ' : ''}
+                            {gegenstand(x.id)?.name}
+                            {x.hast ? ' (hast du!)' : ''}
+                          </span>
+                        ))}
+                      </i>
+                    )}
                   </button>
                 );
               })}
@@ -3235,6 +3253,24 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                 <b>{(a.legendaer ?? []).length}</b> Legendaere
               </span>
             </div>
+            {/* Spieltest 7: "Woran bin ich gestorben?" - der letzte Treffer und ein Tipp. */}
+            {a.phase === 'tot' &&
+              (() => {
+                const grund = [...a.log].reverse().find((z) => /trifft dich|Gift|Leben\)/.test(z));
+                const viele = a.schleime.filter((x) => hexDistance(x, a.pos) <= 2).length;
+                const tipp =
+                  viele >= 3
+                    ? 'Tipp: Gegen mehrere zieh dich zurueck, bis nur einer folgt - und lass ihn ins Leere schlagen.'
+                    : !(a.inventar['kraut'] ?? 0)
+                      ? 'Tipp: Kauf Kraeuter beim Haendler und iss sie, bevor die Gegner nah sind.'
+                      : 'Tipp: Warte (S) neben einem Gegner, der ausholt, nicht - geh vom roten Feld und schlag dann mit Fokus zu.';
+                return (
+                  <>
+                    {grund && <p className="ab-tod-grund">Zuletzt: {grund}</p>}
+                    <p className="ab-tod-tipp">{tipp}</p>
+                  </>
+                );
+              })()}
             {/* Spieltest: "Siege fuehlen sich gleich an" - der Build dieses Abenteuers. */}
             {((a.legendaer ?? []).length > 0 || (a.gefolge ?? []).length > 0) && (
               <div className="ab-bilanz-build">

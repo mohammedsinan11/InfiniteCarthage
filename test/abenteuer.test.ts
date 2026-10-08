@@ -363,6 +363,7 @@ describe('Abenteuer', () => {
     const a0 = neuesAbenteuer(13);
     let a = imZug(13, [{ id: 7, q: a0.pos.q + 3, r: a0.pos.r, leben: 2, gross: false, art: 'gift' }], 10);
     a.leben = 99;
+    a.zeit = 10;
     for (let i = 0; i < 4 && !(a.gift ?? []).length; i++) a = taste(a, 's');
     expect((a.gift ?? []).length).toBeGreaterThan(0);
   });

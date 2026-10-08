@@ -51,11 +51,12 @@ export function ItemTipp({ tipp }: { tipp: Tipp }) {
   if (!g) return null;
   const breite = 240;
   const links = Math.min(tipp.x + 16, window.innerWidth - breite - 8);
-  const oben = Math.max(8, Math.min(tipp.y - 10, window.innerHeight - 180));
+  // Ueber dem Zeiger, nicht darunter - so verdeckt er nicht die naechsten Zeilen und Knoepfe (Spieltest).
+  const unten = Math.max(8, Math.min(window.innerHeight - tipp.y + 14, window.innerHeight - 140));
   // Nur der Beschreibungsteil, der nicht schon als Wert dasteht.
   const text = g.text.replace(/^Legendaer\.\s*/, '');
   return (
-    <div className={g.legendaer ? 'ab-tipp legendaer' : 'ab-tipp'} style={{ left: links, top: oben, width: breite }} role="tooltip">
+    <div className={g.legendaer ? 'ab-tipp legendaer' : 'ab-tipp'} style={{ left: links, bottom: unten, width: breite }} role="tooltip">
       <b>{g.name}</b>
       <small>{artVon(tipp.id)}</small>
       {statZeilen(tipp.id).map((z, i) => (

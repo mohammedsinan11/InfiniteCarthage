@@ -194,7 +194,7 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
   { id: 'ev_helfen', name: 'Helfen', text: 'Ein Herz kostet es dich - zum Dank darfst du aus seinem Gepaeck waehlen.' },
   { id: 'ev_ausrauben', name: 'Ausrauben', text: '+8 Gold. Niemand sieht es ... hoffentlich.' },
   { id: 'ev_wetten', name: 'Wetten (5 Gold)', text: 'Die Haelfte der Zeit gewinnst du 12 Gold.' },
-  { id: 'ev_hoch', name: 'Hoch wetten (1 Herz)', text: 'Gewinnst du, waehlst du ein Legendaeres. Verlierst du, ist das Herz weg.' },
+  { id: 'ev_hoch', name: 'Hoch wetten (1 Herz)', text: 'Gewinnst du, waehlst du ein Legendaeres. Verlierst du, verlierst du 1 Leben.' },
   { id: 'ev_trinken', name: 'Trinken', text: 'Heilung, volle Ladung - oder Gift. Wer weiss?' },
   { id: 'ev_fuellen', name: 'Flasche fuellen', text: 'Zwei Kraeuter fuer spaeter.' },
   { id: 'ev_karte', name: 'Die Gegend (3 Gold)', text: 'Die Seherin zeigt dir alles bis 10 Felder weit.' },
@@ -757,6 +757,31 @@ export function neuesAbenteuer(seed: number, optionen: StartOptionen = {}): Aben
  */
 export type WahlArt = 'truhe' | 'schatz' | 'boss' | 'fluch' | 'ereignis';
 export type Wahl = { art: WahlArt; titel: string; optionen: string[]; ort?: number };
+
+/**
+ * SYNERGIEN - was gut zusammenpasst (Spieltest: "kaum Synergien sichtbar").
+ * Auf den Wahlkarten steht "Passt zu ...", und gruen, wenn man den Partner schon hat.
+ */
+export const SYNERGIEN: readonly [string, string][] = [
+  ['glueckspilz', 'kometen'],
+  ['dornen', 'blutdurst'],
+  ['runenmeister', 'ruhepuls'],
+  ['wirbelwind', 'jagdfieber'],
+  ['sololeveling', 'jagdfieber'],
+  ['schatzsucher', 'goldwuerfel'],
+  ['wirbelwind', 'blutdurst'],
+  ['ruhepuls', 'runenklinge'],
+  ['runenmeister', 'flammenschwert'],
+  ['dornen', 'herzcontainer'],
+  ['kometen', 'zwillingswuerfel'],
+];
+export function synergien(a: Abenteuer, id: string): { id: string; hast: boolean }[] {
+  const hat = (x: string) => hatLegende(a, x) || Object.values(a.ausruestung).includes(x) || (a.inventar[x] ?? 0) > 0;
+  return SYNERGIEN.filter(([x, y]) => x === id || y === id).map(([x, y]) => {
+    const partner = x === id ? y : x;
+    return { id: partner, hast: hat(partner) };
+  });
+}
 
 /** Legendaeres, das noch in Frage kommt (Einmaliges nur einmal, Extra-Leben hoechstens EXTRALEBEN_MAX). */
 function legendaerPool(a: Abenteuer): string[] {
@@ -1644,8 +1669,8 @@ function bossPruefen(a: Abenteuer, takt: number): void {
  * Darum kommt der Boss spaetestens nach AKT_ZUEGE Zuegen im Akt - ungeduldig.
  */
 export const AKT_ZUEGE = 15;
-export const zuegeBisBoss = (a: Pick<Abenteuer, 'zug' | 'aktStart' | 'omen'>): number =>
-  Math.max(0, (hatOmen(a, 'eile') ? 10 : AKT_ZUEGE) - (a.zug - (a.aktStart ?? 1)));
+export const zuegeBisBoss = (a: Pick<Abenteuer, 'zug' | 'aktStart' | 'omen' | 'akt'>): number =>
+  Math.max(0, (hatOmen(a, 'eile') ? 10 : (a.akt ?? 1) >= 3 ? AKT_ZUEGE - 3 : AKT_ZUEGE) - (a.zug - (a.aktStart ?? 1)));
 /** Punkte je Zug Vorsprung auf den Boss-Zeitplan. */
 export const EILE_PUNKTE = 8;
 const bossUngeduldig = (a: Abenteuer): boolean => zuegeBisBoss(a) === 0;
@@ -1954,7 +1979,8 @@ function linieZum(s: Hex, ziel: Hex): number | null {
  */
 const ANSAGEN_MAX = 2;
 function taumeln(a: Abenteuer, s: Schleim): void {
-  s.gebannt = Math.max(s.gebannt ?? 0, a.zeit + 2);
+  // Drei Takte: auch wer erst einen Schritt heran muss, bekommt seinen freien Hieb (Spieltest 7).
+  s.gebannt = Math.max(s.gebannt ?? 0, a.zeit + 3);
 }
 function zuVieleAnsagen(a: Abenteuer): boolean {
   return a.schleime.filter((x) => !x.boss && (x.angriff || x.flaeche)).length >= ANSAGEN_MAX;
@@ -1967,6 +1993,21 @@ function zieheSchleim(a: Abenteuer, s: Schleim, ziel: Hex, takt: number, sprung 
   a.spuren = { ...a.spuren, [s.id]: [...(a.spuren[s.id] ?? [{ q: s.q, r: s.r }]), ziel] };
   s.q = ziel.q;
   s.r = ziel.r;
+}
+
+/**
+ * RUDEL. Spieltest 7: "In Akt 1 entscheidet ein Schwarm in Zug 3 das Abenteuer."
+ * In Akt 1 jagen hoechstens RUDEL_AKT1 Gegner zugleich den Ritter - die naechsten;
+ * die anderen warten, bis einer faellt.
+ */
+export const RUDEL_AKT1 = 3;
+function jagtMit(a: Abenteuer, s: Schleim): boolean {
+  if ((a.akt ?? 1) > 1 || s.boss) return true;
+  const jaeger = a.schleime
+    .filter((x) => !x.boss && hexDistance(x, a.pos) <= WITTERUNG)
+    .sort((x, y) => hexDistance(x, a.pos) - hexDistance(y, a.pos) || x.id - y.id)
+    .slice(0, RUDEL_AKT1);
+  return jaeger.some((x) => x.id === s.id);
 }
 
 /** Ein gewoehnlicher, grosser oder besonderer Schleim in seinem Tick. */
@@ -2052,7 +2093,7 @@ function schleimHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetz
   let ziel: Hex | null = null;
   let sprung = false;
   // Ein ruhiger Anfang: in den ersten Takten schlummern die Schleime noch, solange der Ritter nicht nah ist.
-  if (d <= WITTERUNG && (a.zeit >= 6 || d <= 2)) {
+  if (d <= WITTERUNG && (a.zeit >= 6 || d <= 2) && jagtMit(a, s)) {
     if (s.art === 'spring') {
       // Zwei Felder weit auf einmal.
       const weit = hexesInRange(s, 2).filter((h) => hexDistance(h, s) === 2 && frei(h) && hexDistance(h, a.pos) >= 1);
@@ -2076,7 +2117,8 @@ function schleimHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetz
   } else if (rng.int(3) === 0) {
     const [dq, dr] = HEX_DIRS[rng.int(6)]!;
     const n = { q: s.q + dq, r: s.r + dr };
-    if (frei(n)) ziel = n;
+    // Wer im Rudel warten muss, schleicht nicht heimlich naeher.
+    if (frei(n) && (d > WITTERUNG || hexDistance(n, a.pos) >= d)) ziel = n;
   }
   if (ziel) zieheSchleim(a, s, ziel, takt, sprung);
 }
@@ -2568,7 +2610,9 @@ function neuerOrt(a: Abenteuer, h: Hex, art: OrtArt): Ort {
 }
 
 /** Waechter rufen: n Gegner um den Ritter, der erste eine Elite (Altar, Schrein). */
-function waechterRufen(a: Abenteuer, n: number): void {
+function waechterRufen(a: Abenteuer, n0: number): void {
+  // Stehen schon Gegner nah, kommen weniger Waechter (Spieltest 7: "Waechter stapeln sich auf den Schwarm").
+  const n = Math.max(1, n0 - a.schleime.filter((x) => hexDistance(x, a.pos) <= 3).length);
   const rng = new Rng(a.rng);
   const plaetze = hexesInRange(a.pos, 3).filter(
     (h) => hexDistance(h, a.pos) >= 2 && begehbar(gelaende(a.seed, h.q, h.r)) && !schleimAuf(a, h.q, h.r) && !ortAuf(a, h.q, h.r),
@@ -2850,9 +2894,15 @@ export const angeheuerte = (a: Pick<Abenteuer, 'gefolge'>): number => (a.gefolge
 const soeldnerAngriff = (g: Soeldner) => SOELDNER[g.art].angriff + Math.floor((g.lv - 1) / 2);
 /** Erfahrung bis zum naechsten Level eines Soeldners. */
 export const soeldnerEp = (lv: number) => 3 + lv * 2;
+export const SOELDNER_MAX_LV = 4;
 
 function soeldnerLernt(a: Abenteuer, g: Soeldner, ep: number, takt: number): void {
   g.ep += ep;
+  // Spieltest 7: "Das Gefolge traegt alles" - hoechstens Level SOELDNER_MAX_LV.
+  if (g.lv >= SOELDNER_MAX_LV) {
+    g.ep = 0;
+    return;
+  }
   if (g.ep < soeldnerEp(g.lv)) return;
   g.ep -= soeldnerEp(g.lv);
   g.lv += 1;
@@ -3377,4 +3427,5 @@ export function abenteuerPunkte(a: Abenteuer): number {
   return Math.round(roh * (1 + 0.3 * (a.heldenstufe ?? 0)) * (a.omen ? OMEN[a.omen].punkte : 1));
 }
 /** Ruhm fuer das Lager: 10 fuer jedes Abenteuer und ein Zwoelftel der Punkte (Spieltest: "Ruhm kommt zu langsam"). */
-export const ruhmFuer = (a: Abenteuer): number => 10 + Math.floor(abenteuerPunkte(a) / 12);
+// Spieltest 7: "Ein Sieg kauft das halbe Lager" - ein Zwanzigstel der Punkte.
+export const ruhmFuer = (a: Abenteuer): number => 10 + Math.floor(abenteuerPunkte(a) / 20);

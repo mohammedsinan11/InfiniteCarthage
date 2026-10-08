@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { istWasser } from '../src/abenteuer/welt';
 import { abenteuerPunkte, gelaende, neuesAbenteuer, OMEN, OMEN_IDS, omenFuer, sichtVon, taste, wuerfeln, zuegeBisBoss, SCHRITTE_MIN } from '../src/abenteuer/regeln';
 import type { Abenteuer, Taste } from '../src/abenteuer/regeln';
-import { HEX_DIRS } from '../src/core/coords';
+import { HEX_DIRS, hexDistance } from '../src/core/coords';
 
 const TASTE_DIR: Taste[] = ['e', 'd', 'x', 'z', 'a', 'q'];
 function freieTaste(a: Abenteuer): Taste {
@@ -88,5 +88,28 @@ describe('Abenteuer Iteration 6', () => {
       expect(ansprechen(d, o.id)).toBe(d);
     }
     expect(gefunden).toBeGreaterThan(20);
+  });
+});
+
+describe('Abenteuer Iteration 8', () => {
+  it('Rudel: in Akt 1 jagen hoechstens drei Gegner zugleich', async () => {
+    const { RUDEL_AKT1 } = await import('../src/abenteuer/regeln');
+    const a0 = wuerfeln(neuesAbenteuer(13));
+    const a = structuredClone(a0);
+    a.zeit = 10;
+    a.leben = 99;
+    a.schritte = 6;
+    const ring = HEX_DIRS.map(([dq, dr]) => ({ q: a.pos.q + dq * 4, r: a.pos.r + dr * 4 })).filter((h) => {
+      const g = gelaende(a.seed, h.q, h.r);
+      return g && !istWasser(g);
+    });
+    a.schleime = ring.map((h, i) => ({ id: 500 + i, q: h.q, r: h.r, leben: 2, gross: false }));
+    const b = taste(a, 's');
+    const naeher = b.schleime.filter((s) => {
+      const vorher = a.schleime.find((x) => x.id === s.id);
+      if (!vorher) return false;
+      return hexDistance(s, b.pos) < hexDistance(vorher, a.pos);
+    });
+    expect(naeher.length).toBeLessThanOrEqual(RUDEL_AKT1);
   });
 });
