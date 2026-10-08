@@ -236,7 +236,7 @@ describe('Abenteuer', () => {
     expect(naechsterBoss(e)).toBe('koenig');
     // Der neue Akt fuehrt in eine neue Gegend - weit weg, mit vollem Leben.
     expect(hexDistance(e.pos, c.pos)).toBeGreaterThan(20);
-    expect(e.leben).toBe(maxLebenVon(e));
+    expect(d.leben).toBe(maxLebenVon(d));
   });
 
   it('der Endboss (Akt 3) entscheidet das Abenteuer: Sieg und Punkte', () => {

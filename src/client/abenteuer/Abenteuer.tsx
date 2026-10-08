@@ -416,8 +416,10 @@ const WAHL_BILD: Record<string, string> = {
   ev_omen: 'runenwuerfel',
 };
 
+/** Bilder fuer Neues, das (noch) kein eigenes hat. */
+const BILD_ERSATZ: Record<string, string> = { konter: 'schild', durchschlag: 'breitschwert', hinterhalt: 'kraut' };
 function Icon({ id, groesse = 22 }: { id: string; groesse?: number }) {
-  const karte = SYMBOL[id];
+  const karte = SYMBOL[id] ?? SYMBOL[BILD_ERSATZ[id] ?? ''];
   if (!karte) return null;
   const b = Math.max(...karte.map((z) => z.length));
   return (
@@ -901,7 +903,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     const amZiel = neu.pos.q === l.ziel.q && neu.pos.r === l.ziel.r;
     const zielSchleim = a0.schleime.some((s) => s.q === l.ziel.q && s.r === l.ziel.r);
     // Ein Schleim nebenan haelt den Lauf an - dann entscheidet der Spieler.
-    const gefahr = neu.schleime.some((s) => hexDistance(s, neu.pos) === 1);
+    // Nur eine NEUE Gefahr haelt an - wer schon vorher neben einem Gegner stand, laeuft weiter (Spieltest 12).
+    const nebenVorher = new Set(a0.schleime.filter((s) => hexDistance(s, a0.pos) === 1).map((s) => s.id));
+    const gefahr = neu.schleime.some((s) => hexDistance(s, neu.pos) === 1 && !nebenVorher.has(s.id));
     if (gefahr && !amZiel && !zielSchleim && neu.phase === 'ziehen') {
       halt();
       setze({ ...neu, ereignisse: [], log: [...neu.log, 'Ein Gegner steht neben dir - der Lauf haelt an. Du entscheidest.'].slice(-30) });
@@ -999,7 +1003,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         if (!rolltRef.current) setze(decken(aktuell.current));
       } else if (k === 't') {
         e.preventDefault();
-        if (!rolltRef.current) setze(rasten(aktuell.current));
+        if (!rolltRef.current) {
+          const j = aktuell.current;
+          if (j.phase !== 'ziehen') setze({ ...j, ereignisse: [], log: [...j.log, 'Rasten geht erst nach dem Wuerfeln.'].slice(-30) });
+          else setze(rasten(j));
+        }
       } else if (k === 'r') {
         e.preventDefault();
         neuWurf();
@@ -1987,7 +1995,10 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             const mx = c.width / 2;
             const my = c.height / 2;
             const w = Math.atan2(byp - my, bxp - mx);
-            const r = Math.min((c.width / 2 - rand) / Math.abs(Math.cos(w) || 1e-6), (c.height / 2 - rand) / Math.abs(Math.sin(w) || 1e-6));
+            // Innerhalb des freien Bereichs: weg von Leiste unten und Bossbalken oben (Spieltest 12).
+            const randX = 200 * dpr;
+            const randY = 170 * dpr;
+            const r = Math.min((c.width / 2 - randX) / Math.abs(Math.cos(w) || 1e-6), (c.height / 2 - randY) / Math.abs(Math.sin(w) || 1e-6));
             const px = mx + Math.cos(w) * r;
             const py = my + Math.sin(w) * r;
             const k = 7 * f;
@@ -2404,6 +2415,15 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         ctx.fillRect(0, 0, c.width, c.height);
       }
 
+      // Wenig Leben: der Rand pulsiert rot (Spieltest 12: "kritische Lage sieht man nicht").
+      if (a.leben <= 2 && a.phase !== 'tot' && a.phase !== 'sieg') {
+        const puls = 0.5 + 0.5 * Math.sin(sek * 4);
+        const g = ctx.createRadialGradient(c.width / 2, c.height / 2, Math.min(c.width, c.height) * 0.38, c.width / 2, c.height / 2, Math.max(c.width, c.height) * 0.7);
+        g.addColorStop(0, 'rgba(200, 30, 20, 0)');
+        g.addColorStop(1, `rgba(200, 30, 20, ${0.18 + 0.14 * puls})`);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, c.width, c.height);
+      }
       // Sprechblasen ueber Soeldnern, Wanderern, Haendlern - mit Schwaenzchen nach unten; zuletzt, damit nichts sie verdeckt.
       {
         const jetztMs = performance.now();

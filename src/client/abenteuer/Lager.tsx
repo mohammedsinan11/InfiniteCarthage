@@ -55,6 +55,7 @@ export function Lager({ meta, onMeta, onAufbruch, onZurueck }: { meta: Meta; onM
                 <b>{kl.name}</b>
                 <span>{kl.text}</span>
                 {!frei && <em>★ {kosten('klasse', k)} freischalten</em>}
+                {frei && meta.siegKlassen.includes(k) && <em className="ab-sieg-abzeichen">Gewonnen ✓</em>}
               </button>
             );
           })}
@@ -80,7 +81,7 @@ export function Lager({ meta, onMeta, onAufbruch, onZurueck }: { meta: Meta; onM
           })}
         </div>
 
-        <small>Legendaeres (kommt danach in Truhen, Schaetzen und Bossbeute vor)</small>
+        <small>Legendaeres - einmal freigeschaltet, kann es ab jetzt in Truhen, Schaetzen und Bossbeute erscheinen (es wirkt erst, wenn du es findest)</small>
         <div className="ab-extras">
           {FREISCHALTUNGEN.filter((f) => f.art === 'legende').map((f) => {
             const frei = istFrei(meta, 'legende', f.id);

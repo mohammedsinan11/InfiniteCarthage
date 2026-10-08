@@ -181,6 +181,9 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
   { id: 'wirbelwind', name: 'Wirbelwind', legendaer: true, text: 'Legendaer. Jeder Treffer trifft auch alle anderen Gegner neben dir (1 Schaden).' },
   { id: 'ruhepuls', name: 'Ruhepuls', legendaer: true, text: 'Legendaer. Jedes Warten (S) laedt deine Waffe um 2.' },
   { id: 'jagdfieber', name: 'Jagdfieber', legendaer: true, text: 'Legendaer. Jeder Gegner, den du selbst faellst, schenkt dir einen Schritt.' },
+  { id: 'konter', name: 'Konter', legendaer: true, text: 'Legendaer. Schlaegt ein Gegner neben dir ins Leere, triffst du ihn sofort (1 Schaden).' },
+  { id: 'durchschlag', name: 'Durchschlag', legendaer: true, text: 'Legendaer. Ein Hieb mit vollem Fokus trifft auch den Gegner dahinter (2 Schaden).' },
+  { id: 'hinterhalt', name: 'Hinterhalt', legendaer: true, text: 'Legendaer. Aus dem Wald heraus macht jeder deiner Treffer 1 Schaden mehr.' },
   { id: 'schatzsucher', name: 'Schatzsucher', legendaer: true, text: 'Legendaer. Truhen bieten vier statt drei Dinge, und Muenzfunde bringen doppelt.' },
   { id: 'angel', name: 'Angel', text: 'Am Wasser: in Richtung Wasser gehen (oder F) wirft die Angel aus - ein Schritt. Mit Glueck beisst ein Fisch.' },
   { id: 'fisch', name: 'Fisch', heilt: 1, text: 'Antippen: 1 Leben zurueck. Stapelt sich.' },
@@ -718,7 +721,12 @@ function startFeld(seed: number, o: Hex = { q: 0, r: 0 }): Hex {
       if (!begehbar(t) || kosten(t) > 1) continue;
       notfall ??= h;
       const nachbarn = HEX_DIRS.filter(([dq, dr]) => begehbar(gelaende(seed, h.q + dq, h.r + dr))).length;
-      if (nachbarn >= 3) return h;
+      // Spieltest 12: "zwischen Bergen eingesperrt" - ringsum genug flaches Land.
+      const flach = hexesInRange(h, 3).filter((x) => {
+        const b = gelaende(seed, x.q, x.r);
+        return begehbar(b) && kosten(b) <= 1;
+      }).length;
+      if (nachbarn >= 3 && flach >= 22) return h;
     }
   }
   return notfall ?? o;
@@ -830,6 +838,12 @@ export const SYNERGIEN: readonly [string, string][] = [
   ['runenmeister', 'flammenschwert'],
   ['dornen', 'herzcontainer'],
   ['kometen', 'zwillingswuerfel'],
+  ['konter', 'dornen'],
+  ['konter', 'wirbelwind'],
+  ['durchschlag', 'ruhepuls'],
+  ['durchschlag', 'runenmeister'],
+  ['hinterhalt', 'jagdfieber'],
+  ['hinterhalt', 'blutdurst'],
 ];
 export function synergien(a: Abenteuer, id: string): { id: string; hast: boolean }[] {
   const hat = (x: string) => hatLegende(a, x) || Object.values(a.ausruestung).includes(x) || (a.inventar[x] ?? 0) > 0;
@@ -1371,9 +1385,9 @@ function pentagrammKill(a: Abenteuer, takt: number): void {
 }
 
 /** Legendaeres, das es nur einmal gibt. */
-const EINMALIG = ['sololeveling', 'hermes', 'pentagramm', 'blutdurst', 'dornen', 'kometen', 'glueckspilz', 'runenmeister', 'wirbelwind', 'ruhepuls', 'jagdfieber', 'schatzsucher'];
+const EINMALIG = ['sololeveling', 'hermes', 'pentagramm', 'blutdurst', 'dornen', 'kometen', 'glueckspilz', 'runenmeister', 'wirbelwind', 'ruhepuls', 'jagdfieber', 'schatzsucher', 'konter', 'durchschlag', 'hinterhalt'];
 /** Legendaeres, das jedes Abenteuer kennt - der Rest wird im Lager freigeschaltet (StartOptionen.legenden). */
-export const LEGENDEN_GRUND = ['sololeveling', 'hermes', 'pentagramm', 'extraleben', 'herzcontainer', 'blutdurst', 'dornen', 'kometen'];
+export const LEGENDEN_GRUND = ['sololeveling', 'hermes', 'pentagramm', 'extraleben', 'herzcontainer', 'blutdurst', 'dornen', 'kometen', 'konter', 'durchschlag', 'hinterhalt'];
 export const LEGENDEN_FREI = ['ruhepuls', 'schatzsucher', 'glueckspilz', 'jagdfieber', 'wirbelwind', 'runenmeister'];
 
 /** So weit huepfen die Hermes-Stiefel (Spieltest: drei war zu viel). */
@@ -1620,7 +1634,13 @@ function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
   const trifft = sicher || ((wurf !== 1 || wehrlos) && (wurf === 6 || summeWurf >= noetig || (wehrlos && wurf === 1 && summeWurf >= noetig - 1)));
   a.fehlschlaege = trifft ? 0 : (a.fehlschlaege ?? 0) + 1;
   if (sicher && wurf !== 1) melde(a, 'Pech gleicht sich aus: dieser Hieb trifft sicher.');
-  let schaden = trifft ? (wurf === 6 ? krit : 1) + (fokus >= FOKUS_MAX ? 1 : 0) + (s.boss && wehrlos ? 1 : 0) : 0;
+  const ausDemWald = hatLegende(a, 'hinterhalt') && istWald(gelaende(a.seed, a.pos.q, a.pos.r));
+  let schaden = trifft ? (wurf === 6 ? krit : 1) + (fokus >= FOKUS_MAX ? 1 : 0) + (s.boss && wehrlos ? 1 : 0) + (ausDemWald ? 1 : 0) : 0;
+  // Durchschlag: mit vollem Fokus trifft der Hieb auch den Gegner dahinter.
+  if (trifft && fokus >= FOKUS_MAX && hatLegende(a, 'durchschlag')) {
+    const hinter = schleimAuf(a, s.q + (s.q - a.pos.q), s.r + (s.r - a.pos.r));
+    if (hinter) verwunde(a, hinter, 2, takt, 'Durchschlag');
+  }
   if (trifft && s.boss && wehrlos) melde(a, 'Der Boss taumelt - dein Hieb trifft ihn mit voller Wucht (+1).');
   if (trifft && wurf === 1) melde(a, sicher ? 'Pech gleicht sich aus: dieser Hieb trifft sicher.' : 'Der Gegner taumelt - auch eine 1 trifft.');
   if (fokus > 0) melde(a, fokus >= FOKUS_MAX ? `Voller Fokus: +${fokus} auf den Wurf und ein Wuchtschlag (+1 Schaden)!` : `Fokus: +${fokus} auf den Wurf.`);
@@ -2115,6 +2135,11 @@ function linieZum(s: Hex, ziel: Hex): number | null {
  */
 const ANSAGEN_MAX = 2;
 function taumeln(a: Abenteuer, s: Schleim): void {
+  // Konter: wer neben dir ins Leere schlaegt, bekommt sofort einen Hieb.
+  if (hatLegende(a, 'konter') && hexDistance(s, a.pos) <= 1 && a.schleime.includes(s)) {
+    verwunde(a, s, 1, 0, 'Konter');
+    if (!a.schleime.includes(s)) return;
+  }
   // Drei Takte: auch wer erst einen Schritt heran muss, bekommt seinen freien Hieb (Spieltest 7).
   s.gebannt = Math.max(s.gebannt ?? 0, a.zeit + 3);
 }
@@ -2138,7 +2163,16 @@ function zieheSchleim(a: Abenteuer, s: Schleim, ziel: Hex, takt: number, sprung 
  */
 export const RUDEL_AKT1 = 3;
 function jagtMit(a: Abenteuer, s: Schleim): boolean {
-  if ((a.akt ?? 1) > 1 || s.boss) return true;
+  if (s.boss) return true;
+  // Spieltest 12: "In Akt 3 kommen zehn auf einmal" - auch spaeter jagen nicht alle zugleich.
+  if ((a.akt ?? 1) > 1) {
+    const grenze = (a.akt ?? 1) === 2 ? 4 : 5;
+    return a.schleime
+      .filter((x) => !x.boss && hexDistance(x, a.pos) <= WITTERUNG)
+      .sort((x, y) => hexDistance(x, a.pos) - hexDistance(y, a.pos) || x.id - y.id)
+      .slice(0, grenze)
+      .some((x) => x.id === s.id);
+  }
   const jaeger = a.schleime
     .filter((x) => !x.boss && hexDistance(x, a.pos) <= WITTERUNG)
     .sort((x, y) => hexDistance(x, a.pos) - hexDistance(y, a.pos) || x.id - y.id)
@@ -2741,7 +2775,12 @@ function ortEntdecken(a: Abenteuer, h: Hex): void {
 }
 
 function neuerOrt(a: Abenteuer, h: Hex, art: OrtArt): Ort {
-  const o: Ort = { id: a.naechsteId++, q: h.q, r: h.r, art, name: MAENNER[hash3i(a.seed, h.q, h.r, SALT_LEUTE + 1) % MAENNER.length]! };
+  // Jeder Name nur einmal (Spieltest 12: "Notker war Haendler, Ritter und Werber").
+  const vergeben = new Set([...(a.orte ?? []).map((x) => x.name), ...(a.wanderer ?? []).map((x) => x.name), ...(a.gefolge ?? []).map((x) => x.name)]);
+  const start = hash3i(a.seed, h.q, h.r, SALT_LEUTE + 1) % MAENNER.length;
+  let name = MAENNER[start]!;
+  for (let i = 0; i < MAENNER.length && vergeben.has(name); i++) name = MAENNER[(start + i) % MAENNER.length]!;
+  const o: Ort = { id: a.naechsteId++, q: h.q, r: h.r, art, name };
   if (art === 'ereignis') o.ereignis = EREIGNIS_ARTEN[hash3i(a.seed, h.q, h.r, SALT_LEUTE + 3) % EREIGNIS_ARTEN.length]!;
   return o;
 }

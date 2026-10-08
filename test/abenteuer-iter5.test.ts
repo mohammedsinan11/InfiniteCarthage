@@ -50,7 +50,8 @@ describe('Abenteuer Iteration 5', () => {
     const vorher = { ...a.pos };
     const b = taste(a, t);
     expect(b.pos).toEqual({ q: vorher.q + d[0], r: vorher.r + d[1] });
-    expect(b.tiere!.find((x) => x.id === 999)).toMatchObject(vorher);
+    // Das Schaf hat Platz gemacht (es kann danach weitergrasen).
+    expect(b.tiere!.find((x) => x.id === 999)).not.toMatchObject(b.pos);
   });
 
   it('Der Boss taumelt, wenn man seinem Schlag ausweicht', () => {
@@ -144,5 +145,24 @@ describe('Abenteuer Iteration 9', () => {
     const a = neuesAbenteuer(3);
     const b = faehigkeitNutzen(a);
     expect(b.log[b.log.length - 1]).toMatch(/laedt noch/);
+  });
+});
+
+describe('Abenteuer Iteration 13', () => {
+  it('Konter: wer neben dir ins Leere schlaegt, nimmt sofort Schaden', async () => {
+    const { legendaerAnwenden } = await import('../src/abenteuer/regeln');
+    const a0 = wuerfeln(neuesAbenteuer(13));
+    const t = freieTaste(a0);
+    const d = HEX_DIRS[TASTE_DIR.indexOf(t)]!;
+    let a = structuredClone(a0);
+    legendaerAnwenden(a, 'konter', 0);
+    a.leben = 99;
+    a.schritte = 6;
+    a.zeit = 10;
+    // Der Gegner steht so, dass er nach dem Schritt neben dem Ritter ins Leere schlaegt.
+    a.schleime = [{ id: 7, q: a.pos.q + d[0] * 2, r: a.pos.r + d[1] * 2, leben: 9, gross: false, angriff: { ...a.pos } }];
+    a = taste(a, t);
+    const s = a.schleime.find((x) => x.id === 7);
+    expect(s?.leben ?? 0).toBeLessThan(9);
   });
 });
