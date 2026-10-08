@@ -28,6 +28,7 @@ import {
   gelaendeBonus,
   abwehrAugen,
   OMEN,
+  FRAKTION_NAME,
   EILE_PUNKTE,
   gegnerWucht,
   trefferAb,
@@ -826,6 +827,14 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     setze(wuerfeln(alt));
   }, [halt, setze]);
   wirfRef.current = wirf;
+  // Autoroll wuerfelt von selbst, sobald ein neuer Zug ansteht (Spieltest: "Autoroll tut nichts").
+  useEffect(() => {
+    if (!autoroll || a.phase !== 'wuerfeln' || a.wahl || a.laden != null || lager) return;
+    const t = window.setTimeout(() => {
+      if (autorollRef.current && aktuell.current.phase === 'wuerfeln' && !aktuell.current.wahl && aktuell.current.laden == null) wirfRef.current();
+    }, 450);
+    return () => window.clearTimeout(t);
+  }, [autoroll, a.phase, a.wahl, a.laden, a.zug, lager]);
 
   /** Den Weg zu einem Feld gehen, Schritt fuer Schritt, im Takt der Bilder. */
   const geheWeiter = useCallback(() => {
@@ -2293,14 +2302,27 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       // Gegner-Info unter der Maus: Name, Leben, wie hart er trifft, ab wann man ihn trifft.
       const unter = zeiger.current;
       const feind = unter && still ? a.schleime.find((s) => s.q === unter.q && s.r === unter.r && hexDistance(s, a.pos) <= sicht) : undefined;
-      if (feind) {
-        const o = mitte(feind.q, feind.r);
-        const zeilen = [
-          `${schleimName(feind)}${feind.elite ? ' (Elite)' : ''}`,
-          `Leben ${feind.leben}${feind.max ? `/${feind.max}` : ''}`,
-          `Trifft dich: -${gegnerWucht(a, feind)}${abwehrAugen(a) > 0 ? ` (Schild haelt Wurf 1-${abwehrAugen(a)})` : ' (kein Schild)'}`,
-          `Du triffst ab ${trefferAb(a, feind)}+`,
-        ];
+      // Spieltest: "Fremde Ritter kaempfen mit - wer ist das?" - auch Wanderer und Gefolge zeigen sich.
+      const wand = unter && still && !feind ? (a.wanderer ?? []).find((w) => w.q === unter.q && w.r === unter.r && hexDistance(w, a.pos) <= sicht) : undefined;
+      const helfer = unter && still && !feind && !wand ? (a.gefolge ?? []).find((g) => g.q === unter.q && g.r === unter.r) : undefined;
+      const info = feind ?? wand ?? helfer;
+      if (info) {
+        const o = mitte(info.q, info.r);
+        const zeilen = feind
+          ? [
+              `${schleimName(feind)}${feind.elite ? ' (Elite)' : ''}`,
+              `Leben ${feind.leben}${feind.max ? `/${feind.max}` : ''}`,
+              `Trifft dich: -${gegnerWucht(a, feind)}${abwehrAugen(a) > 0 ? ` (Schild haelt Wurf 1-${abwehrAugen(a)})` : ' (kein Schild)'}`,
+              `Du triffst ab ${trefferAb(a, feind)}+ (Augen des Wuerfels)`,
+            ]
+          : wand
+            ? [
+                `${wand.name} - ${FRAKTION_NAME[wand.fraktion]}`,
+                `Leben ${wand.leben}/${wand.max}`,
+                wand.fraktion === 'orden' ? 'Wanderritter: kaempft gegen Banditen' : 'Jaeger: jagt Hasen',
+                'und gegen jeden, der angreift. Nicht dein Gefolge.',
+              ]
+            : [`${helfer!.name} - ${SOELDNER[helfer!.art].name}`, `Leben ${helfer!.leben}/${helfer!.max} · Level ${helfer!.lv}`, 'Dein Gefolge: folgt dir und kaempft mit.'];
         ctx.save();
         ctx.font = `bold ${5 * f}px monospace`;
         ctx.textAlign = 'left';
@@ -2312,11 +2334,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         const by = Math.min(c.height - hoeheB - 2 * f, Math.max(2 * f, Math.round(sy(o.y) - hoeheB / 2)));
         ctx.fillStyle = 'rgba(18, 13, 8, 0.92)';
         ctx.fillRect(bx, by, breite, hoeheB);
-        ctx.strokeStyle = feind.boss ? '#ff4a3a' : '#c8a35a';
+        ctx.strokeStyle = feind?.boss ? '#ff4a3a' : feind ? '#c8a35a' : '#7ab0d8';
         ctx.lineWidth = f;
         ctx.strokeRect(bx, by, breite, hoeheB);
         zeilen.forEach((z, i) => {
-          ctx.fillStyle = i === 0 ? '#f6c04a' : i === 2 ? '#ff8a6a' : '#f2e7d0';
+          ctx.fillStyle = i === 0 ? '#f6c04a' : i === 2 && feind ? '#ff8a6a' : '#f2e7d0';
           ctx.fillText(z, bx + 4 * f, by + 2 * f + (i + 0.5) * zeileH);
         });
         ctx.restore();

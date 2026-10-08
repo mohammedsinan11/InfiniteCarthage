@@ -878,7 +878,7 @@ export type StartOptionen = { klasse?: KlasseId; extras?: string[]; heldenstufe?
  */
 export type OmenId = 'goldrausch' | 'blutmond' | 'eile' | 'nebel' | 'segen' | 'wildnis';
 export const OMEN: Record<OmenId, { name: string; text: string; punkte: number }> = {
-  goldrausch: { name: 'Goldrausch', text: 'Alles Gold zaehlt doppelt.', punkte: 1 },
+  goldrausch: { name: 'Goldrausch', text: 'Gefundenes und erbeutetes Gold zaehlt doppelt.', punkte: 1 },
   blutmond: { name: 'Blutmond', text: 'Elite-Gegner schon ab Akt 1 und oefter. +25 % Punkte.', punkte: 1.25 },
   eile: { name: 'Eile', text: 'Die Bosse kommen schon nach 10 Zuegen. +20 % Punkte.', punkte: 1.2 },
   nebel: { name: 'Nebel', text: 'Ein Feld weniger Sicht. +15 % Punkte.', punkte: 1.15 },
@@ -886,7 +886,7 @@ export const OMEN: Record<OmenId, { name: string; text: string; punkte: number }
   wildnis: { name: 'Wildnis', text: 'Gegner kommen schneller nach. +15 % Punkte.', punkte: 1.15 },
 };
 export const OMEN_IDS = Object.keys(OMEN) as OmenId[];
-export const omenFuer = (seed: number): OmenId => OMEN_IDS[(seed >>> 0) % 7 % OMEN_IDS.length]!;
+export const omenFuer = (seed: number): OmenId => OMEN_IDS[(Math.imul(seed ^ 0x9e3779b9, 0x85ebca6b) >>> 7) % OMEN_IDS.length]!;
 const hatOmen = (a: Pick<Abenteuer, 'omen'>, o: OmenId): boolean => a.omen === o;
 /** Gold dazu - der Goldrausch verdoppelt es. */
 function goldDazu(a: Abenteuer, n: number): number {
@@ -1729,8 +1729,15 @@ export function faehigkeitNutzen(alt: Abenteuer): Abenteuer {
   if (!faehigkeitBereit(alt) || alt.phase === 'tot' || alt.phase === 'sieg' || alt.wahl) return alt;
   const a = structuredClone(alt);
   a.ereignisse = [];
+  // Spieltest: "Die Ladung verpufft ohne Ziel" - ohne Gegner in Reichweite bleibt sie.
+  const f = ladungVon(a).faehigkeit!;
+  const weite = f === 'feuerkreis' ? 1 : f === 'runenblitz' ? 3 : 0;
+  if (weite > 0 && !a.schleime.some((s) => hexDistance(s, a.pos) <= weite)) {
+    melde(a, f === 'feuerkreis' ? 'Feuerkreis wartet: kein Gegner direkt neben dir.' : 'Runenblitz wartet: kein Gegner bis 3 Felder weit.');
+    return a;
+  }
   a.ladung = 0;
-  entfessle(a, ladungVon(a).faehigkeit!, 0);
+  entfessle(a, f, 0);
   return a;
 }
 
