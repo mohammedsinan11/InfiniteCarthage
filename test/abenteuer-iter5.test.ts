@@ -67,3 +67,26 @@ describe('Abenteuer Iteration 5', () => {
     expect(a.schleime[0]!.gebannt ?? 0).toBeGreaterThan(a.zeit);
   });
 });
+
+describe('Abenteuer Iteration 6', () => {
+  it('Begegnungen: eine nahe am Start, sie oeffnet eine Wahl und ist danach vorbei', async () => {
+    const { ansprechen, waehlen } = await import('../src/abenteuer/regeln');
+    let gefunden = 0;
+    for (let seed = 1; seed < 30; seed++) {
+      const a = neuesAbenteuer(seed);
+      const o = (a.orte ?? []).find((x) => x.art === 'ereignis');
+      if (!o) continue;
+      gefunden++;
+      expect(o.ereignis).toBeTruthy();
+      const b = structuredClone(a);
+      b.pos = { q: o.q + 1, r: o.r };
+      b.inventar = { ...b.inventar, gold: 20 };
+      const c = ansprechen(b, o.id);
+      expect(c.wahl?.art).toBe('ereignis');
+      const d = waehlen(c, 0);
+      expect(d.orte!.find((x) => x.id === o.id)!.benutzt).toBe(true);
+      expect(ansprechen(d, o.id)).toBe(d);
+    }
+    expect(gefunden).toBeGreaterThan(20);
+  });
+});

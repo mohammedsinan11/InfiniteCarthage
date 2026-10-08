@@ -28,6 +28,8 @@ import {
   gelaendeBonus,
   abwehrAugen,
   OMEN,
+  omenFuer,
+  EREIGNIS,
   FRAKTION_NAME,
   EILE_PUNKTE,
   gegnerWucht,
@@ -303,7 +305,7 @@ function erreichbar(a: Zustand): Set<string> {
   if (alt) return alt;
   const erkundet = new Set(a.erkundet);
   const besetzt = new Set(a.schleime.map((s) => hexKey(s.q, s.r)));
-  const hindernis = new Set((a.orte ?? []).filter((o) => !(o.art === 'altar' && o.benutzt)).map((x) => hexKey(x.q, x.r)));
+  const hindernis = new Set((a.orte ?? []).filter((o) => !((o.art === 'altar' || o.art === 'ereignis') && o.benutzt)).map((x) => hexKey(x.q, x.r)));
   const kosten = new Map<string, number>([[hexKey(a.pos.q, a.pos.r), 0]]);
   const offen: { h: Hex; k: number }[] = [{ h: a.pos, k: 0 }];
   while (offen.length > 0) {
@@ -334,7 +336,7 @@ function wegZu(a: Zustand, ziel: Hex): Hex[] {
   const besetzt = new Set(a.schleime.map((s) => hexKey(s.q, s.r)));
   // Leute, Tiere und Wanderer stehen im Weg - der Weg fuehrt um sie herum (Spieltest).
   // Schafe und Wanderer machen Platz, erloschene Altaere sind begehbar.
-  const hindernis = new Set([...(a.orte ?? []).filter((o) => !(o.art === 'altar' && o.benutzt)), ...(a.tiere ?? []).filter((t) => t.art !== 'schaf')].map((x) => hexKey(x.q, x.r)));
+  const hindernis = new Set([...(a.orte ?? []).filter((o) => !((o.art === 'altar' || o.art === 'ereignis') && o.benutzt)), ...(a.tiere ?? []).filter((t) => t.art !== 'schaf')].map((x) => hexKey(x.q, x.r)));
   const kosten = new Map<string, number>([[hexKey(a.pos.q, a.pos.r), 0]]);
   const vor = new Map<string, Hex>();
   const offen: { h: Hex; k: number }[] = [{ h: a.pos, k: 0 }];
@@ -372,6 +374,25 @@ const sanft = (u: number) => u * u * (3 - 2 * u);
 const klemme = (u: number) => Math.max(0, Math.min(1, u));
 
 // --- Kleine Bilder -----------------------------------------------------------
+
+/** Bilder fuer Wahl-Moeglichkeiten, die kein Gegenstand sind. */
+const WAHL_BILD: Record<string, string> = {
+  extraherz: 'herz',
+  goldsack: 'muenze',
+  fluch_oeffnen: 'fluchtruhe',
+  fluch_lassen: 'stiefel',
+  ev_beten: 'herz',
+  ev_pluendern: 'muenze',
+  ev_weiter: 'stiefel',
+  ev_helfen: 'kraut',
+  ev_ausrauben: 'beutel',
+  ev_wetten: 'wuerfel',
+  ev_hoch: 'glueckswuerfel',
+  ev_trinken: 'heilwuerfel',
+  ev_fuellen: 'kraut',
+  ev_karte: 'auge',
+  ev_omen: 'blitz',
+};
 
 function Icon({ id, groesse = 22 }: { id: string; groesse?: number }) {
   const karte = SYMBOL[id];
@@ -610,8 +631,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const [logOffen, setLogOffen] = useState(false);
   const logRef = useRef<HTMLDivElement | null>(null);
   const [lager, setLager] = useState(() => lade() === null && ladeMeta().laeufe > 0);
-  const offen = useRef({ lager, legenden: legendenOffen });
-  offen.current = { lager, legenden: legendenOffen };
+  const [hilfeOffen, setHilfeOffen] = useState(false);
+  const offen = useRef({ lager, legenden: legendenOffen, hilfe: hilfeOffen });
+  offen.current = { lager, legenden: legendenOffen, hilfe: hilfeOffen };
   const [track, setTrack] = useState(laufenderTrack);
   useEffect(() => beiTrack(setTrack), []);
   // Welche Figur der Spieler fuehrt (Debugfenster) - 'klassik' ist der bisherige Ritter.
@@ -894,6 +916,15 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       if (offen.current.lager) return;
       if (offen.current.legenden) {
         if (k === 'escape') setLegendenOffen(false);
+        return;
+      }
+      if (offen.current.hilfe) {
+        if (k === 'escape' || e.key === '?') setHilfeOffen(false);
+        return;
+      }
+      if (e.key === '?') {
+        e.preventDefault();
+        setHilfeOffen(true);
         return;
       }
       if (jetzt.wahl) {
@@ -1703,14 +1734,32 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               zeichnePixel(ctx, STAND, sx(m.x) - 8 * f, sy(m.y) - 12 * f, f, KACHEL_PIX);
               malPerson(o.id, { x: m.x, y: m.y - 4, hoch: 0 }, 'zwerg', null, false);
               zeichnePixel(ctx, STAND.slice(7), sx(m.x) - 8 * f, sy(m.y) - 5 * f, f, KACHEL_PIX);
+            } else if (o.art === 'ereignis') {
+              // Begegnungen: je ihr eigenes Bild, solange sie nicht vorbei sind ein huepfendes "?".
+              ctx.globalAlpha = o.benutzt ? 0.45 : 1;
+              if (o.ereignis === 'schrein') zeichnePixel(ctx, ALTAR.slice(3), sx(m.x) - 5 * f, sy(m.y) + 3 * f - (ALTAR.length - 3) * f, f, KACHEL_PIX);
+              else if (o.ereignis === 'quelle') {
+                ctx.fillStyle = '#2d5f8a';
+                ctx.beginPath();
+                ctx.ellipse(sx(m.x), sy(m.y), 7 * f, 3 * f, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = `rgba(150, 220, 255, ${0.5 + 0.3 * Math.sin(sek * 3)})`;
+                ctx.fillRect(sx(m.x) - 3 * f, sy(m.y) - f, 4 * f, f);
+              } else {
+                const bild = o.ereignis === 'verletzter' ? 'kachel' : o.ereignis === 'spieler' ? 'zwerg' : 'waldlaeufer';
+                malPerson(o.id, { x: m.x, y: m.y, hoch: 0 }, bild, null, false);
+              }
+              ctx.globalAlpha = 1;
+              if (!o.benutzt) schrift('?', sx(m.x) + 7 * f, sy(m.y) - (15 + Math.round(Math.sin(sek * 4))) * f, '#f6c04a', 1, 8);
             } else {
               zeichnePixel(ctx, BANNER, sx(m.x) + 4 * f, sy(m.y) - 14 * f, f, KACHEL_PIX);
               malPerson(o.id, { x: m.x - 2, y: m.y, hoch: 0 }, 'soeldnerin', 'breitschwert', false);
             }
             const nah = hexDistance(o, a.pos) <= 1;
             // Spieltest: "benutzte Altaere sehen aus wie neue".
-            const erloschen = o.art === 'altar' && o.benutzt;
-            schrift(erloschen ? 'Altar (erloschen)' : ORT_NAME[o.art], sx(m.x), sy(m.y) - 20 * f, erloschen ? '#8a8070' : nah ? '#f2c94c' : '#e8dcc0', erloschen ? 0.55 : nah ? 1 : 0.75, 5);
+            const erloschen = (o.art === 'altar' || o.art === 'ereignis') && o.benutzt;
+            const name = o.art === 'ereignis' && o.ereignis ? EREIGNIS[o.ereignis].name : ORT_NAME[o.art];
+            schrift(erloschen ? `${name} (vorbei)` : name, sx(m.x), sy(m.y) - 20 * f, erloschen ? '#8a8070' : nah ? '#f2c94c' : '#e8dcc0', erloschen ? 0.55 : nah ? 1 : 0.75, 5);
           },
         });
       }
@@ -1892,7 +1941,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         );
         if (droht > 0 && still && a.phase !== 'tot') {
           const puls = 0.75 + 0.25 * Math.sin(sek * 8);
-          schrift(`-${droht}`, kx - 9 * f, ky - f, droht >= a.leben ? '#ff2a1a' : '#ff6a4a', puls, droht >= a.leben ? 8 : 7);
+          schrift(`-${droht}${droht >= a.leben ? '!' : ''}`, kx - 11 * f, ky - f, droht >= a.leben ? '#ff2a1a' : '#ff6a4a', puls, droht >= a.leben ? 11 : 9);
         }
       }
 
@@ -2190,8 +2239,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           }
         }
       }
-      // Ist Wuerfeln dran, huepft ein Wuerfel ueber dem Ritter.
-      if (a.phase === 'wuerfeln' && still) {
+      // Ist Wuerfeln dran, huepft ein Wuerfel ueber dem Ritter - nicht, wenn Gegner nah sind (Spieltest: "verdeckt Gegner").
+      if (a.phase === 'wuerfeln' && still && !a.schleime.some((x) => hexDistance(x, a.pos) <= 2)) {
         const hops = Math.abs(Math.sin(sek * 3.2)) * 4;
         const X = sx(ritter.x);
         const Y = sy(ritter.y) - Math.round(26 + hops) * f;
@@ -2426,8 +2475,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     setZugTasten([]);
     setTipp(null);
     setLager(false);
+    // Nicht zweimal dasselbe Vorzeichen hintereinander (Spieltest: "dreimal Segen").
+    let seed = x.tag ? x.tag.seed : neuerSeed();
+    for (let i = 0; !x.tag && i < 20 && omenFuer(seed) === a.omen; i++) seed = neuerSeed();
     setze(
-      neuesAbenteuer(x.tag ? x.tag.seed : neuerSeed(), {
+      neuesAbenteuer(seed, {
         klasse: x.klasse,
         heldenstufe: x.tag ? 0 : x.stufe,
         extras: x.tag ? [] : aktiveExtras(meta),
@@ -2470,6 +2522,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         </button>
         <button className="klein" onClick={() => setLager(true)} title="Ins Lager: Klasse waehlen, freischalten, neu aufbrechen">
           Lager ★{meta.ruhm}
+        </button>
+        <button className="klein" onClick={() => setHilfeOffen(true)} title="Wie spielt man? (Taste ?)">
+          ?
         </button>
         <div className="ab-ton-gruppe">
           <button className={musik ? 'klein ab-ton' : 'klein ab-ton aus'} onClick={tonUmschalten} title={musik ? 'Musik ausschalten' : 'Musik einschalten'}>
@@ -2876,6 +2931,44 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         onAktion={(d: DebugAktion) => setze(debugAktion(aktuell.current, d))}
       />
 
+      {/* Spieltest: "Wichtige Regeln werden nie erklaert" - alles Wichtige auf einer Seite (? oder Knopf). */}
+      {hilfeOffen && (
+        <div className="ab-ende ab-legenden-huelle" onClick={() => setHilfeOffen(false)}>
+          <div className="ab-fenster ab-hilfe" onClick={(e) => e.stopPropagation()}>
+            <div className="ab-debug-kopf">
+              <span className="ab-titel">Wie spielt man?</span>
+              <button className="klein" onClick={() => setHilfeOffen(false)} title="Schliessen (Esc)">
+                ×
+              </button>
+            </div>
+            <dl>
+              <dt>Ziel</dt>
+              <dd>Drei Akte. Erlege Gegner, bis der Boss des Akts erwacht (Zaehler unter der Karte) - oder er kommt nach einigen Zuegen von selbst. Wer schneller ist, bekommt Eile-Punkte. Der dritte Boss ist der Endboss.</dd>
+              <dt>Zug</dt>
+              <dd>Wuerfeln (Enter), dann so viele Schritte gehen (mindestens 2): Q E A D Z X oder ein Feld anklicken. Helle Felder erreichst du noch. S wartet einen Schritt. Jeder Schritt laesst die Gegner ziehen.</dd>
+              <dt>Kampf</dt>
+              <dd>Lauf in einen Gegner, um zuzuschlagen. Die Zahl ueber ihm (z. B. 3+) ist die Augenzahl, die dein Wuerfel mindestens zeigen muss. Maus ueber einen Gegner: alles ueber ihn.</dd>
+              <dt>Rote Felder</dt>
+              <dd>Ein angesagter Angriff - er trifft im naechsten Takt. Geh weg! Steht ueber dir eine rote Zahl, trifft dich so viel. Wer ins Leere schlaegt, taumelt: freie Hiebe.</dd>
+              <dt>Fokus</dt>
+              <dd>Warten (S) sammelt Fokus (bis 3): er kommt auf deinen naechsten Hieb, voll gibt er +1 Schaden. Gehen bricht ihn, ein Fehlschlag gibt 1.</dd>
+              <dt>Heilen</dt>
+              <dd>H isst ein Kraut. Wartest du ohne Gegner in der Naehe, heilst du einmal je Zug +1.</dd>
+              <dt>Waffe</dt>
+              <dd>Treffer laden die Waffe. Voll: Taste 1 loest ihre Faehigkeit aus (nur mit Gegner in Reichweite).</dd>
+              <dt>Gelaende</dt>
+              <dd>Wald: +1 Abwehr. Huegel und Berge: +1 Angriff (* in den Werten). Berge und Sumpf kosten mehr Schritte.</dd>
+              <dt>Unterwegs</dt>
+              <dd>Truhen (1 aus 3), verfluchte Truhen, Altaere, Haendler mit Schmied, Werber fuer Gefolge, goldene "?" sind Begegnungen. Fremde Ritter kaempfen fuer sich - nicht fuer dich.</dd>
+              <dt>Lager</dt>
+              <dd>Jedes Abenteuer bringt Ruhm: damit schaltest du Klassen, Start-Extras und Legendaeres frei. Ein Sieg oeffnet die naechste Heldenstufe. Jedes Abenteuer hat ein Vorzeichen.</dd>
+              <dt>Tasten</dt>
+              <dd>Enter wuerfeln · QEADZX gehen · S warten · 1 Faehigkeit · H heilen · R neu wuerfeln · B beschwoeren · F angeln · L Log · ? diese Hilfe</dd>
+            </dl>
+          </div>
+        </div>
+      )}
+
       {legendenOffen && (
         <div className="ab-ende ab-legenden-huelle" onClick={() => setLegendenOffen(false)}>
           <div className="ab-fenster ab-legenden" onClick={(e) => e.stopPropagation()}>
@@ -2956,6 +3049,36 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                 </>
               ) : o.art === 'haendler' ? (
                 <>
+                  <small>Kaufen</small>
+                  {haendlerWaren(a, o).map((w) => {
+                    const v = vergleich(a, w.id);
+                    return (
+                      <div key={w.id} className={['ab-laden-zeile', w.weg ? 'weg' : v === 1 ? 'besser' : v === -1 ? 'schlechter' : ''].join(' ')} {...tippHandler(w.id, setTipp)}>
+                        <Icon id={w.id} groesse={20} />
+                        <span>{gegenstand(w.id)?.name}</span>
+                        <button className="klein ab-kaufen" disabled={w.weg || gold < w.preis} onClick={() => setze(kaufen(aktuell.current, w.id))}>
+                          {w.weg ? 'Verkauft' : `Kaufen ${w.preis} Gold`}
+                        </button>
+                      </div>
+                    );
+                  })}
+                  <small>Schmied</small>
+                  {(['angriff', 'abwehr'] as const).map((was) => {
+                    const stufe = a.schmied?.[was] ?? 0;
+                    const preis = schmiedPreis(a, was);
+                    return (
+                      <div key={was} className="ab-laden-zeile">
+                        <Icon id={was === 'angriff' ? 'schwert' : 'schild'} groesse={20} />
+                        <span>
+                          {was === 'angriff' ? 'Waffe schaerfen' : 'Ruestung verstaerken'} ({stufe}/{SCHMIED_MAX})
+                          <small>{was === 'angriff' ? '+1 Angriff fuer dieses Abenteuer.' : '+1 Abwehr fuer dieses Abenteuer.'}</small>
+                        </span>
+                        <button className="klein ab-kaufen" disabled={stufe >= SCHMIED_MAX || gold < preis} onClick={() => setze(schmieden(aktuell.current, was))}>
+                          {stufe >= SCHMIED_MAX ? 'Fertig' : `${preis} Gold`}
+                        </button>
+                      </div>
+                    );
+                  })}
                   <small>Verkaufen</small>
                   {ware.length === 0 && <p className="ab-leer">Nichts, was der Haendler kauft. Ausruestung, Gelee, Kraeuter und Fische nimmt er gern.</p>}
                   {ware.map(([id, n]) => (
@@ -2975,36 +3098,6 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                       )}
                     </div>
                   ))}
-                  <small>Schmied</small>
-                  {(['angriff', 'abwehr'] as const).map((was) => {
-                    const stufe = a.schmied?.[was] ?? 0;
-                    const preis = schmiedPreis(a, was);
-                    return (
-                      <div key={was} className="ab-laden-zeile">
-                        <Icon id={was === 'angriff' ? 'schwert' : 'schild'} groesse={20} />
-                        <span>
-                          {was === 'angriff' ? 'Waffe schaerfen' : 'Ruestung verstaerken'} ({stufe}/{SCHMIED_MAX})
-                          <small>{was === 'angriff' ? '+1 Angriff fuer dieses Abenteuer.' : '+1 Abwehr fuer dieses Abenteuer.'}</small>
-                        </span>
-                        <button className="klein ab-kaufen" disabled={stufe >= SCHMIED_MAX || gold < preis} onClick={() => setze(schmieden(aktuell.current, was))}>
-                          {stufe >= SCHMIED_MAX ? 'Fertig' : `${preis} Gold`}
-                        </button>
-                      </div>
-                    );
-                  })}
-                  <small>Kaufen</small>
-                  {haendlerWaren(a, o).map((w) => {
-                    const v = vergleich(a, w.id);
-                    return (
-                      <div key={w.id} className={['ab-laden-zeile', v === 1 ? 'besser' : v === -1 ? 'schlechter' : ''].join(' ')} {...tippHandler(w.id, setTipp)}>
-                        <Icon id={w.id} groesse={20} />
-                        <span>{gegenstand(w.id)?.name}</span>
-                        <button className="klein ab-kaufen" disabled={gold < w.preis} onClick={() => setze(kaufen(aktuell.current, w.id))}>
-                          Kaufen {w.preis} Gold
-                        </button>
-                      </div>
-                    );
-                  })}
                 </>
               ) : (
                 <>
@@ -3056,7 +3149,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                     onClick={() => setze(waehlen(aktuell.current, nr))}
                   >
                     <kbd>{nr + 1}</kbd>
-                    <Icon id={id === 'extraherz' ? 'herz' : id === 'goldsack' ? 'muenze' : id === 'fluch_oeffnen' ? 'fluchtruhe' : id === 'fluch_lassen' ? 'stiefel' : id} groesse={40} />
+                    <Icon id={WAHL_BILD[id] ?? id} groesse={40} />
                     <b>{g?.name ?? id}</b>
                     <span>{g?.text.replace(/^Legendaer\.\s*/, '')}</span>
                     {v === 1 && <em>besser als deins</em>}

@@ -51,8 +51,13 @@ const TIPPS: readonly Tipp[] = [
   },
   {
     id: 'leute',
-    wann: (a) => (a.orte ?? []).some((o) => o.art !== 'altar' && hexDistanceZu(o, a.pos) <= 2),
+    wann: (a) => (a.orte ?? []).some((o) => (o.art === 'haendler' || o.art === 'werber') && hexDistanceZu(o, a.pos) <= 2),
     text: 'Laufe in den Haendler, um Beute zu verkaufen und einzukaufen - oder in den Werber, um Soeldner anzuheuern.',
+  },
+  {
+    id: 'ereignis',
+    wann: (a) => (a.orte ?? []).some((o) => o.art === 'ereignis' && !o.benutzt && hexDistanceZu(o, a.pos) <= 3),
+    text: 'Ein goldenes "?" ist eine Begegnung: lauf hinein und entscheide - Belohnung oder Risiko. Jede gibt es nur einmal.',
   },
   { id: 'akt2', wann: (a) => (a.akt ?? 1) >= 2, text: 'Akt 2! Die Gegner werden zaeher, golden umrandete Elite-Gegner lassen Gold fallen. Beim Haendler schaerft der Schmied deine Waffe. Tipp: im Wald hast du +1 Abwehr, auf Huegeln +1 Angriff.' },
 ];

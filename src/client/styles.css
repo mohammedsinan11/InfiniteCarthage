@@ -9267,3 +9267,27 @@ em.off {
   font-size: 10px;
   opacity: 0.75;
 }
+/* Die Hilfe: alles Wichtige auf einer Seite. */
+.ab-hilfe {
+  position: static;
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100vh - 60px);
+  overflow-y: auto;
+  text-align: left;
+  border-color: #d9a441;
+}
+.ab-hilfe dl {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 6px 12px;
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.ab-hilfe dt {
+  color: #f2c94c;
+  font-weight: bold;
+}
+.ab-hilfe dd {
+  margin: 0;
+}
