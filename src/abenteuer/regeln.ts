@@ -128,7 +128,7 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
   { id: 'schildwuerfel', name: 'Schildwuerfel', slot: 'wuerfel', wuerfelWert: 2, text: 'Eine 1 oder 2 ruft einen Schutzwall: der naechste Treffer prallt ab.' },
   { id: 'heilwuerfel', name: 'Heilwuerfel', slot: 'wuerfel', wuerfelWert: 3, text: 'Jede gerade Zahl heilt ein halbes Herz.' },
   { id: 'bannwuerfel', name: 'Bannwuerfel', slot: 'wuerfel', wuerfelWert: 3, text: 'Eine 6 bannt alle Gegner bis 3 Felder fuer zwei Takte.' },
-  { id: 'schwert', name: 'Schwert', slot: 'waffe', angriff: 1, text: '+1 auf jeden Angriffswurf.' },
+  { id: 'schwert', name: 'Schwert', slot: 'waffe', angriff: 1, ladung: 7, faehigkeit: 'spalthieb', text: '+1 auf jeden Angriffswurf. Ladung 7: Spalthieb - der naechste Treffer macht 2 Schaden mehr.' },
   { id: 'axt', name: 'Streitaxt', slot: 'waffe', angriff: 2, ladung: 5, faehigkeit: 'spalthieb', text: '+2 auf jeden Angriffswurf. Ladung 5: Spalthieb - der naechste Treffer macht 2 Schaden mehr.' },
   { id: 'breitschwert', name: 'Breitschwert', slot: 'waffe', angriff: 2, ladung: 6, faehigkeit: 'schutzwall', text: '+2 auf jeden Angriffswurf. Ladung 6: Schutzwall - der naechste Treffer gegen dich wird abgefangen.' },
   { id: 'runenklinge', name: 'Runenklinge', slot: 'waffe', angriff: 2, krit: 3, ladung: 5, faehigkeit: 'runenblitz', text: '+2 auf jeden Angriffswurf; eine 6 trifft dreifach. Ladung 5: Runenblitz - 2 Schaden am naechsten Gegner (bis 3 Felder).' },
@@ -540,6 +540,12 @@ export type Abenteuer = {
   omen?: OmenId;
   /** Eile: Zuege, die man dem Boss-Zeitplan voraus war - bringt Punkte. */
   eile?: number;
+  /** Der Boss ist angekuendigt: in diesem Zug erwacht er (Vorwarnung). */
+  bossBald?: number | null;
+  /** Deckung (G): der naechste Treffer macht einen Schaden weniger. */
+  deckung?: boolean;
+  /** Intern: dieses Warten ist Deckung, kein Fokus. */
+  deckenModus?: boolean;
   /** Beim Haendler geschaerft (Angriff) und verstaerkt (Abwehr) - je hoechstens 2. */
   schmied?: { angriff: number; abwehr: number };
   /** Was zuletzt geschah, neueste zuletzt. */
@@ -1330,14 +1336,28 @@ export const schrittKosten = (a: Abenteuer, q: number, r: number): number => kos
  * Eine Taste im Zug: gehen, angreifen oder warten. Jeder Schritt ist ein Tick
  * der Spieluhr - danach huepfen die Schleime.
  */
+/**
+ * DECKUNG (G). Spieltest 8: "Uebrige Schritte sind nur S, S, S." Wie Warten ein
+ * Schritt - aber statt Fokus faengt die Deckung beim naechsten Treffer einen Schaden ab.
+ */
+export function decken(alt: Abenteuer): Abenteuer {
+  if (alt.phase !== 'ziehen' || alt.wahl) return alt;
+  return taste({ ...alt, deckenModus: true }, 's');
+}
+
 export function taste(alt: Abenteuer, t: Taste): Abenteuer {
   if (alt.phase !== 'ziehen' || alt.wahl) return alt;
   const a = structuredClone(alt);
   a.ereignisse = [];
+  const decken = a.deckenModus === true;
+  delete a.deckenModus;
+  // Deckung haelt bis zur naechsten eigenen Handlung.
+  a.deckung = decken;
   if (t === 's') {
     warten(a, 0);
-    // Warten sammelt Fokus fuer den naechsten Hieb (Spieltest: "die Zuege sind nur Laufen").
-    if ((a.fokus ?? 0) < FOKUS_MAX) a.fokus = (a.fokus ?? 0) + 1;
+    // Warten sammelt Fokus fuer den naechsten Hieb (Spieltest: "die Zuege sind nur Laufen") - oder Deckung (G).
+    if (decken) melde(a, 'Du gehst in Deckung: der naechste Treffer macht einen Schaden weniger.');
+    else if ((a.fokus ?? 0) < FOKUS_MAX) a.fokus = (a.fokus ?? 0) + 1;
     if (hatLegende(a, 'ruhepuls')) {
       laden(a, 0);
       laden(a, 0);
@@ -1527,9 +1547,10 @@ function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
   a.fokus = 0;
   const summeWurf = wurf + angriffVon(a) + fokus;
   const krit = gegenstand(a.ausruestung.waffe ?? '')?.krit ?? 2;
-  // Der Panzer will einen kraeftigeren Hieb.
-  const noetig = s.art === 'panzer' ? 5 : 4;
-  let schaden = summeWurf >= noetig ? (wurf === 6 ? krit : 1) + (fokus >= FOKUS_MAX ? 1 : 0) : 0;
+  // Der Panzer will einen kraeftigeren Hieb; spaetere Akte und Elite auch. Eine 1 verfehlt, eine 6 trifft.
+  const noetig = noetigFuer(a, s);
+  const trifft = wurf !== 1 && (wurf === 6 || summeWurf >= noetig);
+  let schaden = trifft ? (wurf === 6 ? krit : 1) + (fokus >= FOKUS_MAX ? 1 : 0) : 0;
   if (fokus > 0) melde(a, fokus >= FOKUS_MAX ? `Voller Fokus: +${fokus} auf den Wurf und ein Wuchtschlag (+1 Schaden)!` : `Fokus: +${fokus} auf den Wurf.`);
   // Ein geladener Spalthieb legt beim naechsten Treffer zwei drauf.
   const spalt = schaden > 0 && a.bereit === 'spalthieb';
@@ -1541,7 +1562,10 @@ function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
   if (schaden === 0) {
     // Pech gleicht sich aus: ein Fehlschlag gibt einen Punkt Fokus fuer den naechsten Hieb.
     a.fokus = 1;
-    melde(a, `Wurf ${wurf}+${angriffVon(a)}${fokus > 0 ? `+${fokus} Fokus` : ''}: ${s.art === 'panzer' ? 'prallt am Steinpanzer ab (ab 5)' : 'daneben'} - +1 Fokus fuer den naechsten Hieb.`);
+    melde(
+      a,
+      `Wurf ${wurf}${wurf === 1 ? ' (eine 1 verfehlt immer)' : `+${angriffVon(a)}${fokus > 0 ? `+${fokus} Fokus` : ''} = ${summeWurf}, noetig ${noetig}`}: ${s.art === 'panzer' ? 'prallt am Steinpanzer ab' : 'daneben'} - +1 Fokus fuer den naechsten Hieb.`,
+    );
     return;
   }
   const vorne = `Wurf ${wurf}+${angriffVon(a)}${fokus > 0 ? `+${fokus} Fokus` : ''}${spalt ? ', Spalthieb' : ''}`;
@@ -1613,6 +1637,7 @@ function verwunde(a: Abenteuer, s: Schleim, schaden: number, takt: number, vorne
     a.akt = akt + 1;
     a.aktKills = 0;
     a.aktStart = a.zug;
+    a.bossBald = null;
     a.ereignisse.push({ art: 'akt', takt, akt: a.akt, name: AKT_NAME[a.akt - 1] ?? '' });
     melde(
       a,
@@ -1653,14 +1678,24 @@ function verwunde(a: Abenteuer, s: Schleim, schaden: number, takt: number, vorne
 /** Ist der Boss des Akts faellig (und noch keiner da), erwacht er. */
 function bossPruefen(a: Abenteuer, takt: number): void {
   if (a.phase === 'tot' || a.phase === 'sieg' || a.bossErwacht || a.schleime.some((x) => x.boss && x.bossArt !== 'penta')) return;
+  // Spieltest 8: "Der Boss erwacht ohne Vorwarnung, wenn ich am Boden bin." Darum zwei Zuege Vorwarnung.
+  if (a.bossBald != null) {
+    if (a.zug >= a.bossBald) {
+      a.bossBald = null;
+      bossErwacht(a, takt);
+    }
+    return;
+  }
   if ((a.aktKills ?? 0) >= aktZiel(a)) {
     // Schneller als der Zeitplan: jeder gesparte Zug bringt Punkte (Spieltest: "Warten ist die sichere, langweilige Loesung").
-    const vorsprung = zuegeBisBoss(a);
+    const vorsprung = Math.min(EILE_MAX, zuegeBisBoss(a));
     if (vorsprung > 0) {
       a.eile = (a.eile ?? 0) + vorsprung;
       melde(a, `Eile: ${vorsprung} ${vorsprung === 1 ? 'Zug' : 'Zuege'} vor dem Boss-Zeitplan - +${vorsprung * EILE_PUNKTE} Punkte.`);
     }
-    bossErwacht(a, takt);
+    a.bossBald = a.zug + BOSS_VORWARNUNG;
+    melde(a, `Der Boden bebt! In ${BOSS_VORWARNUNG} Zuegen erwacht der ${BOSS_NAME[naechsterBoss(a)]} - heile dich und mach dich bereit.`);
+    a.ereignisse.push({ art: 'wuerfelEffekt', takt, text: 'Der Boden bebt!' });
   } else if (bossUngeduldig(a)) bossErwacht(a, takt);
 }
 
@@ -1673,6 +1708,10 @@ export const zuegeBisBoss = (a: Pick<Abenteuer, 'zug' | 'aktStart' | 'omen' | 'a
   Math.max(0, (hatOmen(a, 'eile') ? 10 : (a.akt ?? 1) >= 3 ? AKT_ZUEGE - 3 : AKT_ZUEGE) - (a.zug - (a.aktStart ?? 1)));
 /** Punkte je Zug Vorsprung auf den Boss-Zeitplan. */
 export const EILE_PUNKTE = 8;
+/** Hoechstens so viele Eile-Zuege je Akt. */
+export const EILE_MAX = 6;
+/** So viele Zuege warnt das Beben, bevor der Boss erwacht. */
+export const BOSS_VORWARNUNG = 2;
 const bossUngeduldig = (a: Abenteuer): boolean => zuegeBisBoss(a) === 0;
 
 /** Heldenstufen veraendern die Regeln - jede Stufe bringt eine dazu. */
@@ -1771,7 +1810,13 @@ export const faehigkeitBereit = (a: Abenteuer): boolean => {
 
 /** Die geladene Faehigkeit der Waffe ausloesen (Taste 1) - kostet keinen Schritt. */
 export function faehigkeitNutzen(alt: Abenteuer): Abenteuer {
-  if (!faehigkeitBereit(alt) || alt.phase === 'tot' || alt.phase === 'sieg' || alt.wahl) return alt;
+  if (alt.phase === 'tot' || alt.phase === 'sieg' || alt.wahl) return alt;
+  if (!faehigkeitBereit(alt)) {
+    // Spieltest 8: "1 tut nichts" - sagen, wie weit die Waffe ist.
+    const l = ladungVon(alt);
+    if (!l.faehigkeit) return { ...alt, ereignisse: [], log: [...alt.log, 'Deine Waffe hat keine Faehigkeit.'].slice(-30) };
+    return { ...alt, ereignisse: [], log: [...alt.log, `${FAEHIGKEIT_NAME[l.faehigkeit]} laedt noch: ${l.ist}/${l.voll}. Treffer laden die Waffe.`].slice(-30) };
+  }
   const a = structuredClone(alt);
   a.ereignisse = [];
   // Spieltest: "Die Ladung verpufft ohne Ziel" - ohne Gegner in Reichweite bleibt sie.
@@ -1930,13 +1975,13 @@ function schleimTrifft(a: Abenteuer, s: Schleim, feld: Hex, takt: number, rng: R
   if (schutzwall(a, s, feld, takt, wurf)) return;
   // Spaetere Akte und Elite treffen haerter (Spieltest: "ab Akt 2 keine Spannung mehr").
   const wucht = (s.gross ? 2 : 1) + ((a.akt ?? 1) >= 3 || s.elite ? 1 : 0);
-  const schaden = abgewehrt(a, wurf) ? 0 : wucht;
+  const schaden = abgewehrt(a, wurf) ? 0 : deckungFaengt(a, wucht);
   a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: 'ritter', feld, wurf, schaden });
   if (schaden > 0) {
     a.leben -= schaden;
     melde(a, `Der ${schleimName(s)} trifft dich: -${schaden} Leben.`);
     dornen(a, s, takt);
-  } else melde(a, `Dein Schild faengt den ${schleimNameAkk(s)} ab (Wurf ${wurf}).`);
+  } else if (abgewehrt(a, wurf)) melde(a, `Dein Schild faengt den ${schleimNameAkk(s)} ab (Wurf ${wurf}).`);
 }
 
 /**
@@ -1947,10 +1992,23 @@ function schleimTrifft(a: Abenteuer, s: Schleim, feld: Hex, takt: number, rng: R
  */
 export const FOKUS_MAX = 3;
 
+/** Deckung faengt einen Schaden ab - und ist dann verbraucht. */
+function deckungFaengt(a: Abenteuer, schaden: number): number {
+  if (!a.deckung || schaden <= 0) return schaden;
+  a.deckung = false;
+  melde(a, 'Deine Deckung faengt einen Schaden ab.');
+  return schaden - 1;
+}
 /** Abwehr: ein Wurf bis zu anderthalbmal der Abwehr prallt ab (Abwehr 1: eine 1, 2: bis 3, 3: bis 4). */
 const abgewehrt = (a: Abenteuer, wurf: number): boolean => wurf <= Math.floor(abwehrVon(a) * 1.5);
 /** Mit welcher Augenzahl man einen Gegner trifft (fuer die Anzeige "4+"). */
-export const trefferAb = (a: Abenteuer, s: Pick<Schleim, 'art'>): number => Math.max(1, (s.art === 'panzer' ? 5 : 4) - angriffVon(a));
+/**
+ * Was ein Hieb erreichen muss: 4 (Panzer 5), ab Akt 2 einer mehr, ab Akt 3 zwei, Elite einen mehr.
+ * Spieltest 8: "Fast alles trifft ab 1+ - der Wurf ist egal." Darum: eine 1 verfehlt immer, eine 6 trifft immer.
+ */
+export const noetigFuer = (a: Pick<Abenteuer, 'akt'>, s: Pick<Schleim, 'art'> & { elite?: boolean }): number =>
+  (s.art === 'panzer' ? 5 : 4) + ((a.akt ?? 1) - 1) + (s.elite ? 1 : 0);
+export const trefferAb = (a: Abenteuer, s: Pick<Schleim, 'art'> & { elite?: boolean }): number => Math.min(6, Math.max(2, noetigFuer(a, s) - angriffVon(a)));
 /** So viel Schaden macht ein Gegner, wenn er trifft (fuer Vorschau und Info). */
 export const gegnerWucht = (a: Abenteuer, s: Pick<Schleim, 'boss' | 'gross' | 'elite' | 'bossArt'>): number =>
   s.boss ? BOSS_SCHADEN + ((a.akt ?? 1) >= AKTE && s.bossArt !== 'penta' ? 1 : 0) : (s.gross ? 2 : 1) + ((a.akt ?? 1) >= 3 || s.elite ? 1 : 0);
@@ -2137,13 +2195,13 @@ function koenigTrifft(a: Abenteuer, s: Schleim, felder: readonly Hex[], takt: nu
   }
   if (schutzwall(a, s, feld, takt, wurf)) return;
   // Der Endboss schlaegt haerter.
-  const schaden = abgewehrt(a, wurf) ? 0 : BOSS_SCHADEN + ((a.akt ?? 1) >= AKTE && s.bossArt !== 'penta' ? 1 : 0);
+  const schaden = abgewehrt(a, wurf) ? 0 : deckungFaengt(a, BOSS_SCHADEN + ((a.akt ?? 1) >= AKTE && s.bossArt !== 'penta' ? 1 : 0));
   a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: 'ritter', feld, wurf, schaden });
   if (schaden > 0) {
     a.leben -= schaden;
     melde(a, `Der ${schleimName(s)} trifft dich: -${schaden} Leben.`);
     dornen(a, s, takt);
-  } else melde(a, `Dein Schild faengt den ${schleimNameAkk(s)} ab (Wurf ${wurf}).`);
+  } else if (abgewehrt(a, wurf)) melde(a, `Dein Schild faengt den ${schleimNameAkk(s)} ab (Wurf ${wurf}).`);
 }
 
 /** Der Koenig handelt (nur jeden zweiten Tick, wie alle grossen Schleime). */
@@ -2915,8 +2973,9 @@ function soeldnerLernt(a: Abenteuer, g: Soeldner, ep: number, takt: number): voi
 /** Ein Schlag eines Soeldners oder Wanderers auf einen Gegner. */
 function helferSchlaegt(a: Abenteuer, wer: { id: number; name: string }, s: Schleim, angriff: number, rng: Rng, takt: number, fremd: boolean, wucht = 1): boolean {
   const wurf = 1 + rng.int(6);
-  const noetig = s.art === 'panzer' ? 5 : 4;
-  let schaden = wurf + angriff >= noetig ? wucht : 0;
+  // Gegen Bosse muessen Helfer hoeher wuerfeln (Spieltest 8: "das Gefolge macht den halben Bossschaden").
+  const noetig = (s.art === 'panzer' ? 5 : 4) + (s.boss ? 2 : 0);
+  let schaden = wurf + angriff >= noetig ? (s.boss ? 1 : wucht) : 0;
   // Den letzten Schlag auf einen Boss ueberlassen Helfer dem Ritter (Spieltest).
   if (s.boss && schaden >= s.leben) schaden = Math.max(0, s.leben - 1);
   a.ereignisse.push({ art: 'hieb', takt, wer: wer.id, ziel: s.id, wurf, schaden });

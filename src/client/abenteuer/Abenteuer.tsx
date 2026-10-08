@@ -28,6 +28,7 @@ import {
   gelaendeBonus,
   abwehrAugen,
   OMEN,
+  decken,
   synergien,
   ereignisMoeglich,
   omenFuer,
@@ -968,6 +969,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       } else if (k === 'l') {
         e.preventDefault();
         setLogOffen((x) => !x);
+      } else if (k === 'g') {
+        e.preventDefault();
+        if (!rolltRef.current) setze(decken(aktuell.current));
       } else if (k === 'r') {
         e.preventDefault();
         neuWurf();
@@ -1754,7 +1758,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             const erloschen = (o.art === 'altar' || o.art === 'ereignis') && o.benutzt;
             const name = o.art === 'ereignis' && o.ereignis ? EREIGNIS[o.ereignis].name : ORT_NAME[o.art];
             // Spieltest: "Namen verdecken den Helden" - direkt daneben keine Schrift.
-            if (hexDistance(o, a.pos) <= 1 && a.phase !== 'wuerfeln') return;
+            if (hexDistance(o, a.pos) <= (a.phase === 'wuerfeln' ? 2 : 1)) return;
             const tief = o.art === 'ereignis' && (o.ereignis === 'quelle' || o.ereignis === 'schrein');
             schrift(erloschen ? `${name} (vorbei)` : name, sx(m.x), sy(m.y) - (tief ? 11 : 20) * f, erloschen ? '#8a8070' : nah ? '#f2c94c' : '#e8dcc0', erloschen ? 0.55 : nah ? 1 : 0.75, 5);
           },
@@ -1932,6 +1936,19 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         }
       }
 
+      // Gebannte und taumelnde Gegner: kreisende Sterne ueber dem Kopf (Spieltest 8: "man sieht nicht, wer gebannt ist").
+      if (still) {
+        for (const x of a.schleime) {
+          if ((x.gebannt ?? 0) <= a.zeit || hexDistance(x, a.pos) > sicht) continue;
+          const o = ort(x.id);
+          const hoehe = x.boss ? 30 : x.gross ? 16 : 12;
+          for (let i = 0; i < 3; i++) {
+            const w = sek * 4 + (i * Math.PI * 2) / 3;
+            ctx.fillStyle = i === 0 ? '#f6c04a' : '#f2e7d0';
+            ctx.fillRect(sx(o.x) + Math.round(Math.cos(w) * 5) * f - f, sy(o.y) - (hoehe + Math.round(Math.sin(w) * 1.5)) * f, 2 * f, 2 * f);
+          }
+        }
+      }
       // Ein kleiner goldener Pfeil ueber dem Ritter - auch hinter Baeumen und Bossen findet man sich.
       {
         const kopf = ort('ritter');
@@ -1956,7 +1973,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               ? gegnerWucht(a, s)
               : 0),
           0,
-        );
+        ) - (a.deckung ? 1 : 0);
         if (droht > 0 && still && a.phase !== 'tot') {
           const puls = 0.75 + 0.25 * Math.sin(sek * 8);
           schrift(`-${droht}${droht >= a.leben ? '!' : ''}`, kx - 11 * f, ky - f, droht >= a.leben ? '#ff2a1a' : '#ff6a4a', puls, droht >= a.leben ? 11 : 9);
@@ -2372,9 +2389,25 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       // Spieltest: "Fremde Ritter kaempfen mit - wer ist das?" - auch Wanderer und Gefolge zeigen sich.
       const wand = unter && still && !feind ? (a.wanderer ?? []).find((w) => w.q === unter.q && w.r === unter.r && hexDistance(w, a.pos) <= sicht) : undefined;
       const helfer = unter && still && !feind && !wand ? (a.gefolge ?? []).find((g) => g.q === unter.q && g.r === unter.r) : undefined;
-      const info = feind ?? wand ?? helfer;
+      // Spieltest 8: "Info nur fuer Gegner" - auch Orte und Funde am Boden.
+      const sichtbar = unter && still && erkundet.has(hexKey(unter.q, unter.r)) && hexDistance(unter, a.pos) <= sicht;
+      const ortH = sichtbar && !feind && !wand && !helfer ? (a.orte ?? []).find((x) => x.q === unter.q && x.r === unter.r) : undefined;
+      const fund = sichtbar && !feind && !wand && !helfer && !ortH ? fundAuf(a, unter.q, unter.r) : null;
+      const info = feind ?? wand ?? helfer ?? ortH ?? (fund && unter ? unter : undefined);
       if (info) {
         const o = mitte(info.q, info.r);
+        const ortZeilen = (x: NonNullable<typeof ortH>): string[] =>
+          x.art === 'haendler'
+            ? [`${x.name}, Haendler`, 'Kauft Beute, verkauft Kraeuter und Ausruestung.', 'Der Schmied schaerft Waffe und Ruestung.']
+            : x.art === 'werber'
+              ? [`${x.name}, Werber`, 'Hier heuerst du Soeldner an (Gold).']
+              : x.art === 'altar'
+                ? ['Altar', x.benutzt ? 'Erloschen.' : 'Opfere Herz oder Gold - oder fordere ihn heraus.']
+                : [x.ereignis ? EREIGNIS[x.ereignis].name : 'Begegnung', x.benutzt ? 'Vorbei.' : 'Lauf hinein und entscheide.'];
+        const fundZeilen = (id: string): string[] => {
+          const g = gegenstand(id);
+          return [g?.name ?? id, ...(g?.text ? [g.text.replace(/^Legendaer\.\s*/, '').slice(0, 60)] : []), 'Drauflaufen: aufheben.'];
+        };
         const zeilen = feind
           ? [
               `${schleimName(feind)}${feind.elite ? ' (Elite)' : ''}`,
@@ -2389,7 +2422,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                 wand.fraktion === 'orden' ? 'Wanderritter: kaempft gegen Banditen' : 'Jaeger: jagt Hasen',
                 'und gegen jeden, der angreift. Nicht dein Gefolge.',
               ]
-            : [`${helfer!.name} - ${SOELDNER[helfer!.art].name}`, `Leben ${helfer!.leben}/${helfer!.max} · Level ${helfer!.lv}`, 'Dein Gefolge: folgt dir und kaempft mit.'];
+            : helfer
+              ? [`${helfer.name} - ${SOELDNER[helfer.art].name}`, `Leben ${helfer.leben}/${helfer.max} · Level ${helfer.lv}`, 'Dein Gefolge: folgt dir und kaempft mit.']
+              : ortH
+                ? ortZeilen(ortH)
+                : fundZeilen(fund!);
         ctx.save();
         ctx.font = `bold ${5 * f}px monospace`;
         ctx.textAlign = 'left';
@@ -2624,7 +2661,13 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                     {BOSS_NAME[naechsterBoss(a)]}
                     {akt === AKTE ? ' (Endboss)' : ''}: {kills}/{ziel}
                   </span>
-                  <small className="ab-akt-uhr">oder in {zuegeBisBoss(a)} Zuegen</small>
+                  {a.bossBald != null ? (
+                    <small className="ab-akt-uhr ab-boss-bald">Der Boden bebt! Boss in {Math.max(0, a.bossBald - a.zug)} {a.bossBald - a.zug === 1 ? 'Zug' : 'Zuegen'}</small>
+                  ) : (
+                    <small className="ab-akt-uhr">
+                      {aktZiel(a) - kills === 1 ? 'noch 1 Gegner' : `noch ${aktZiel(a) - kills} Gegner`} - oder in {zuegeBisBoss(a)} Zuegen
+                    </small>
+                  )}
                   <i className="ab-akt-balken">
                     <i style={{ width: `${(100 * kills) / ziel}%` } as CSSProperties} />
                   </i>
@@ -2771,7 +2814,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           ))}
         </div>
         <div className="ab-verlauf" title="Diesen Zug gedrueckt">
-          {zugTasten.length > 0 ? zugTasten.slice(-12).map((t, i) => <kbd key={i}>{t.toUpperCase()}</kbd>) : <small>Oder ein Feld antippen</small>}
+          {zugTasten.length > 0 ? zugTasten.slice(-12).map((t, i) => <kbd key={i}>{t.toUpperCase()}</kbd>) : <small>Oder ein Feld antippen · S Fokus · G Deckung</small>}
         </div>
       </div>
 
@@ -2968,6 +3011,10 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               <dd>Lauf in einen Gegner, um zuzuschlagen. Die Zahl ueber ihm (z. B. 3+) ist die Augenzahl, die dein Wuerfel mindestens zeigen muss. Maus ueber einen Gegner: alles ueber ihn.</dd>
               <dt>Rote Felder</dt>
               <dd>Ein angesagter Angriff - er trifft im naechsten Takt. Geh weg! Steht ueber dir eine rote Zahl, trifft dich so viel. Wer ins Leere schlaegt, taumelt: freie Hiebe.</dd>
+              <dt>Treffen</dt>
+              <dd>Wurf + Angriff (+ Fokus) muss die Schwelle erreichen: 4, ab Akt 2 hoeher, Panzer und Elite mehr. Eine 1 verfehlt immer, eine 6 trifft immer.</dd>
+              <dt>Deckung</dt>
+              <dd>G: ein Schritt wie Warten - statt Fokus faengt die Deckung beim naechsten Treffer einen Schaden ab.</dd>
               <dt>Fokus</dt>
               <dd>Warten (S) sammelt Fokus (bis 3): er kommt auf deinen naechsten Hieb, voll gibt er +1 Schaden. Gehen bricht ihn, ein Fehlschlag gibt 1.</dd>
               <dt>Heilen</dt>
@@ -3209,8 +3256,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       {/* Was zuletzt geschah. */}
       {/* Spieltest: "das Log ist zu kurz, man verpasst was". Aufklappbar mit L oder dem Knopf. */}
       <div ref={logRef} className={logOffen ? 'ab-log offen' : 'ab-log'} role="log">
-        {(logOffen ? a.log.slice(-30) : a.log.slice(-4)).map((z, i, alle) => (
-          <div key={`${a.log.length}-${i}`} className={logFarbe(z)} style={{ opacity: logOffen ? 1 : 0.45 + (i + 4 - alle.length) * 0.18 } as CSSProperties}>
+        {(logOffen ? a.log.slice(-30) : a.log.slice(-6)).map((z, i, alle) => (
+          <div key={`${a.log.length}-${i}`} className={logFarbe(z)} style={{ opacity: logOffen ? 1 : 0.4 + (i + 6 - alle.length) * 0.12 } as CSSProperties}>
             {z}
           </div>
         ))}

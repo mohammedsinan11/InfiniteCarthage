@@ -31,7 +31,7 @@ const TIPPS: readonly Tipp[] = [
   {
     id: 'trefferzahl',
     wann: (a) => a.phase === 'ziehen' && a.schleime.some((s) => hexDistanceZu(s, a.pos) === 1),
-    text: 'Die Zahl ueber dem Gegner (z. B. 3+) zeigt, ab welcher Augenzahl dein Hieb trifft. Lauf in ihn hinein, um zuzuschlagen. Schlaegt er ins Leere, taumelt er - ein freier Hieb!',
+    text: 'Die Zahl ueber dem Gegner (z. B. 3+) zeigt, ab welcher Augenzahl dein Hieb trifft - eine 1 verfehlt immer. Lauf in ihn hinein, um zuzuschlagen. Schlaegt er ins Leere, taumelt er (Sterne): freie Hiebe!',
   },
   {
     id: 'fokus',

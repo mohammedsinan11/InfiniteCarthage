@@ -113,3 +113,36 @@ describe('Abenteuer Iteration 8', () => {
     expect(naeher.length).toBeLessThanOrEqual(RUDEL_AKT1);
   });
 });
+
+describe('Abenteuer Iteration 9', () => {
+  it('Trefferschwellen: eine 1 verfehlt, spaetere Akte und Elite sind schwerer', async () => {
+    const { trefferAb, noetigFuer } = await import('../src/abenteuer/regeln');
+    const a = neuesAbenteuer(3);
+    expect(noetigFuer({ akt: 1 }, {})).toBe(4);
+    expect(noetigFuer({ akt: 3 }, { elite: true })).toBe(7);
+    a.ausruestung = { ...a.ausruestung, waffe: 'flammenschwert' };
+    expect(trefferAb(a, {})).toBe(2);
+    expect(trefferAb({ ...a, akt: 3 }, { art: 'panzer', elite: true })).toBe(5);
+  });
+
+  it('Deckung (G): ein Schritt ohne Fokus, der naechste Treffer macht einen Schaden weniger', async () => {
+    const { decken } = await import('../src/abenteuer/regeln');
+    const a = structuredClone(wuerfeln(neuesAbenteuer(13)));
+    a.schritte = 4;
+    a.leben = 6;
+    a.zeit = 10;
+    a.schleime = [{ id: 7, q: a.pos.q, r: a.pos.r - 1, leben: 9, gross: false, angriff: { ...a.pos } }];
+    const b = decken(a);
+    expect(b.fokus ?? 0).toBe(0);
+    expect(b.schritte).toBe(3);
+    const hieb = b.ereignisse.find((e) => e.art === 'hieb' && e.wer === 7);
+    if (hieb && hieb.art === 'hieb' && hieb.wurf > 0) expect(hieb.schaden).toBeLessThanOrEqual(0);
+  });
+
+  it('Taste 1 ohne volle Ladung sagt, wie weit die Waffe ist', async () => {
+    const { faehigkeitNutzen } = await import('../src/abenteuer/regeln');
+    const a = neuesAbenteuer(3);
+    const b = faehigkeitNutzen(a);
+    expect(b.log[b.log.length - 1]).toMatch(/laedt noch/);
+  });
+});

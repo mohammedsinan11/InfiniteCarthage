@@ -207,6 +207,11 @@ describe('Abenteuer', () => {
     let b = imZug(11, [{ id: 99, q: a0.pos.q + 1, r: a0.pos.r, leben: 1, gross: false }], 20);
     b.aktKills = aktZiel(b) - 1;
     for (let i = 0; i < 20 && b.schleime.some((x) => x.id === 99) && b.phase === 'ziehen'; i++) b = taste(b, 'd');
+    // Erst bebt der Boden (Vorwarnung), zwei Zuege spaeter erwacht der Boss.
+    expect(b.bossBald).toBe(b.zug + 2);
+    expect(b.schleime.some((x) => x.boss)).toBe(false);
+    b = { ...structuredClone(b), zug: b.bossBald!, phase: 'ziehen', schritte: 5 };
+    b = taste(b, 's');
     const koenig = b.schleime.find((x) => x.boss);
     expect(koenig?.bossArt).toBe('koenig');
     expect(b.bossErwacht).toBe(true);
