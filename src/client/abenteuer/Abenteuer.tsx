@@ -28,6 +28,7 @@ import {
   gelaendeBonus,
   abwehrAugen,
   OMEN,
+  ereignisMoeglich,
   omenFuer,
   EREIGNIS,
   FRAKTION_NAME,
@@ -374,6 +375,14 @@ const sanft = (u: number) => u * u * (3 - 2 * u);
 const klemme = (u: number) => Math.max(0, Math.min(1, u));
 
 // --- Kleine Bilder -----------------------------------------------------------
+
+/** Farbe einer Logzeile: Schaden an dir rot, Beute gold, eigene Treffer gruen (Spieltest). */
+function logFarbe(z: string): string {
+  if (/trifft dich|-\d+ Leben|Gift!|Verloren/.test(z)) return 'log-schaden';
+  if (/Gold|gefunden|Legendaer|Truhe/.test(z)) return 'log-beute';
+  if (/Treffer|faellt|zerplatzt|zerfaellt|Ausgewichen/.test(z)) return 'log-treffer';
+  return '';
+}
 
 /** Bilder fuer Wahl-Moeglichkeiten, die kein Gegenstand sind. */
 const WAHL_BILD: Record<string, string> = {
@@ -1398,23 +1407,6 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         }
       }
 
-      // Die Nachbarfelder tragen im Zug ihre Taste - so sieht man, welche wohin fuehrt.
-      if (a.phase === 'ziehen' && still) {
-        ctx.font = `${5 * f}px monospace`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        for (const t of TASTEN) {
-          const dir = richtungFuer(t);
-          if (dir === null) continue;
-          const d = HEX_DIRS[dir]!;
-          const pz = zentrum(a.pos.q + d[0], a.pos.r + d[1]);
-          ctx.fillStyle = 'rgba(18, 14, 9, 0.75)';
-          ctx.fillRect(pz.x - 4 * f, pz.y - 4 * f, 8 * f, 8 * f);
-          ctx.fillStyle = '#f2e7d0';
-          ctx.fillText(t.toUpperCase(), pz.x, pz.y + f * 0.5);
-        }
-      }
-
       const schrift = (text: string, x: number, y: number, farbe: string, alpha: number, groesse = 6) => {
         ctx.globalAlpha = klemme(alpha);
         ctx.font = `bold ${groesse * f}px monospace`;
@@ -1750,7 +1742,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                 malPerson(o.id, { x: m.x, y: m.y, hoch: 0 }, bild, null, false);
               }
               ctx.globalAlpha = 1;
-              if (!o.benutzt) schrift('?', sx(m.x) + 7 * f, sy(m.y) - (15 + Math.round(Math.sin(sek * 4))) * f, '#f6c04a', 1, 8);
+              if (!o.benutzt) schrift('?', sx(m.x) + 7 * f, sy(m.y) - ((o.ereignis === 'quelle' || o.ereignis === 'schrein' ? 6 : 15) + Math.round(Math.sin(sek * 4))) * f, '#f6c04a', 1, 8);
             } else {
               zeichnePixel(ctx, BANNER, sx(m.x) + 4 * f, sy(m.y) - 14 * f, f, KACHEL_PIX);
               malPerson(o.id, { x: m.x - 2, y: m.y, hoch: 0 }, 'soeldnerin', 'breitschwert', false);
@@ -1759,7 +1751,10 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             // Spieltest: "benutzte Altaere sehen aus wie neue".
             const erloschen = (o.art === 'altar' || o.art === 'ereignis') && o.benutzt;
             const name = o.art === 'ereignis' && o.ereignis ? EREIGNIS[o.ereignis].name : ORT_NAME[o.art];
-            schrift(erloschen ? `${name} (vorbei)` : name, sx(m.x), sy(m.y) - 20 * f, erloschen ? '#8a8070' : nah ? '#f2c94c' : '#e8dcc0', erloschen ? 0.55 : nah ? 1 : 0.75, 5);
+            // Spieltest: "Namen verdecken den Helden" - direkt daneben keine Schrift.
+            if (hexDistance(o, a.pos) <= 1 && a.phase !== 'wuerfeln') return;
+            const tief = o.art === 'ereignis' && (o.ereignis === 'quelle' || o.ereignis === 'schrein');
+            schrift(erloschen ? `${name} (vorbei)` : name, sx(m.x), sy(m.y) - (tief ? 11 : 20) * f, erloschen ? '#8a8070' : nah ? '#f2c94c' : '#e8dcc0', erloschen ? 0.55 : nah ? 1 : 0.75, 5);
           },
         });
       }
@@ -1914,6 +1909,23 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         },
       });
       figuren.sort((x, y) => x.y - y.y).forEach((fi) => fi.mal());
+      // Die Nachbarfelder tragen im Zug ihre Taste - ueber den Figuren, damit grosse Bosse sie nicht verdecken (Spieltest).
+      if (a.phase === 'ziehen' && still) {
+        ctx.font = `${5 * f}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        for (const t of TASTEN) {
+          const dir = richtungFuer(t);
+          if (dir === null) continue;
+          const d = HEX_DIRS[dir]!;
+          const pz = zentrum(a.pos.q + d[0], a.pos.r + d[1]);
+          ctx.fillStyle = 'rgba(18, 14, 9, 0.75)';
+          ctx.fillRect(pz.x - 4 * f, pz.y - 4 * f, 8 * f, 8 * f);
+          ctx.fillStyle = '#f2e7d0';
+          ctx.fillText(t.toUpperCase(), pz.x, pz.y + f * 0.5);
+        }
+      }
+
       // Ein kleiner goldener Pfeil ueber dem Ritter - auch hinter Baeumen und Bossen findet man sich.
       {
         const kopf = ort('ritter');
@@ -2953,9 +2965,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               <dt>Fokus</dt>
               <dd>Warten (S) sammelt Fokus (bis 3): er kommt auf deinen naechsten Hieb, voll gibt er +1 Schaden. Gehen bricht ihn, ein Fehlschlag gibt 1.</dd>
               <dt>Heilen</dt>
-              <dd>H isst ein Kraut. Wartest du ohne Gegner in der Naehe, heilst du einmal je Zug +1.</dd>
+              <dd>H isst ein Kraut. Sind Gegner nah (bis 3 Felder), kostet das einen Schritt - und sie ziehen. Wartest du ohne Gegner in der Naehe, heilst du einmal je Zug +1. Kraeuter werden je Akt teurer.</dd>
               <dt>Waffe</dt>
-              <dd>Treffer laden die Waffe. Voll: Taste 1 loest ihre Faehigkeit aus (nur mit Gegner in Reichweite).</dd>
+              <dd>Treffer laden die Waffe. Voll: Taste 1 loest ihre Faehigkeit aus (nur mit Gegner in Reichweite). Jeder Boss rast ab halbem Leben - dann schlaegt er in jedem Takt.</dd>
               <dt>Gelaende</dt>
               <dd>Wald: +1 Abwehr. Huegel und Berge: +1 Angriff (* in den Werten). Berge und Sumpf kosten mehr Schritte.</dd>
               <dt>Unterwegs</dt>
@@ -3020,7 +3032,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             <div className="ab-fenster ab-laden" onClick={(e) => e.stopPropagation()}>
               <div className="ab-debug-kopf">
                 <span className="ab-titel">
-                  {o.name}, {ORT_NAME[o.art]}
+                  {o.art === 'altar' ? 'Ein alter Altar' : `${o.name}, ${ORT_NAME[o.art]}`}
                 </span>
                 <span className="ab-laden-gold">
                   <Icon id="muenze" groesse={14} /> {gold}
@@ -3146,6 +3158,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                   <button
                     key={id}
                     className={['ab-wahl-karte', g?.legendaer ? 'legendaer' : '', v === 1 ? 'besser' : v === -1 ? 'schlechter' : ''].filter(Boolean).join(' ')}
+                    disabled={a.wahl!.art === 'ereignis' && !ereignisMoeglich(a, id)}
                     onClick={() => setze(waehlen(aktuell.current, nr))}
                   >
                     <kbd>{nr + 1}</kbd>
@@ -3179,7 +3192,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       {/* Spieltest: "das Log ist zu kurz, man verpasst was". Aufklappbar mit L oder dem Knopf. */}
       <div ref={logRef} className={logOffen ? 'ab-log offen' : 'ab-log'} role="log">
         {(logOffen ? a.log.slice(-30) : a.log.slice(-4)).map((z, i, alle) => (
-          <div key={`${a.log.length}-${i}`} style={{ opacity: logOffen ? 1 : 0.45 + (i + 4 - alle.length) * 0.18 } as CSSProperties}>
+          <div key={`${a.log.length}-${i}`} className={logFarbe(z)} style={{ opacity: logOffen ? 1 : 0.45 + (i + 4 - alle.length) * 0.18 } as CSSProperties}>
             {z}
           </div>
         ))}
@@ -3222,6 +3235,26 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                 <b>{(a.legendaer ?? []).length}</b> Legendaere
               </span>
             </div>
+            {/* Spieltest: "Siege fuehlen sich gleich an" - der Build dieses Abenteuers. */}
+            {((a.legendaer ?? []).length > 0 || (a.gefolge ?? []).length > 0) && (
+              <div className="ab-bilanz-build">
+                {[...new Set(a.legendaer ?? [])].map((id) => (
+                  <span key={id} title={gegenstand(id)?.text}>
+                    <Icon id={id} groesse={16} /> {gegenstand(id)?.name}
+                  </span>
+                ))}
+                {a.ausruestung.waffe && (
+                  <span>
+                    <Icon id={a.ausruestung.waffe} groesse={16} /> {gegenstand(a.ausruestung.waffe)?.name}
+                  </span>
+                )}
+                {(a.gefolge ?? []).map((g) => (
+                  <span key={g.id}>
+                    {g.name} ({SOELDNER[g.art].name})
+                  </span>
+                ))}
+              </div>
+            )}
             <p className="ab-punkte">
               {abenteuerPunkte(a)} Punkte
               {abenteuerPunkte(a) >= meta.bester && meta.laeufe > 1 ? ' - neuer Bestwert!' : ` (Bestwert ${meta.bester})`}

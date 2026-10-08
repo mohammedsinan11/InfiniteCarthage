@@ -9291,3 +9291,40 @@ em.off {
 .ab-hilfe dd {
   margin: 0;
 }
+/* Log: Schaden rot, Beute gold, eigene Treffer gruen. */
+.ab-log .log-schaden {
+  color: #ff8a6a;
+}
+.ab-log .log-beute {
+  color: #f2c94c;
+}
+.ab-log .log-treffer {
+  color: #9ad87a;
+}
+/* Der Build eines Abenteuers auf dem Endbildschirm. */
+.ab-bilanz-build {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 10px;
+  font-size: 11px;
+  color: #e8dcc0;
+}
+.ab-bilanz-build span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ab-wahl-karte:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+/* Spieltest: "Aufbrechen liegt unter dem Rand" - die Knoepfe bleiben unten sichtbar. */
+.ab-lager .ab-lager-knoepfe {
+  position: sticky;
+  bottom: -8px;
+  z-index: 2;
+  padding: 8px 0;
+  background: rgba(23, 18, 12, 0.97);
+  border-top: 1px solid var(--line);
+}

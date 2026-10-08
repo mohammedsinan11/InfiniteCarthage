@@ -176,7 +176,7 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
   { id: 'blutdurst', name: 'Blutdurst', legendaer: true, text: 'Legendaer. Jeder Gegner, den du selbst faellst, heilt dich um ein halbes Herz.' },
   { id: 'dornen', name: 'Dornenpanzer', legendaer: true, text: 'Legendaer. Wer dich trifft, nimmt selbst 1 Schaden.' },
   { id: 'kometen', name: 'Sternschnuppe', legendaer: true, text: 'Legendaer. Jede gewuerfelte 6 laesst einen Kometen auf den naechsten Gegner (bis 5 Felder) fallen: 2 Schaden.' },
-  { id: 'glueckspilz', name: 'Glueckspilz', legendaer: true, text: 'Legendaer. Eine gewuerfelte 1 zaehlt als 6 - auch fuer Wuerfeleffekte und Sternschnuppe.' },
+  { id: 'glueckspilz', name: 'Glueckspilz', legendaer: true, text: 'Legendaer. Zeigt dein Schritt-Wuerfel eine 1, zaehlt sie als 6 - auch fuer Wuerfeleffekte und Sternschnuppe (nicht beim Zuschlagen).' },
   { id: 'runenmeister', name: 'Runenmeister', legendaer: true, text: 'Legendaer. Deine Waffe laedt doppelt so schnell.' },
   { id: 'wirbelwind', name: 'Wirbelwind', legendaer: true, text: 'Legendaer. Jeder Treffer trifft auch alle anderen Gegner neben dir (1 Schaden).' },
   { id: 'ruhepuls', name: 'Ruhepuls', legendaer: true, text: 'Legendaer. Jedes Warten (S) laedt deine Waffe um 2.' },
@@ -195,10 +195,10 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
   { id: 'ev_ausrauben', name: 'Ausrauben', text: '+8 Gold. Niemand sieht es ... hoffentlich.' },
   { id: 'ev_wetten', name: 'Wetten (5 Gold)', text: 'Die Haelfte der Zeit gewinnst du 12 Gold.' },
   { id: 'ev_hoch', name: 'Hoch wetten (1 Herz)', text: 'Gewinnst du, waehlst du ein Legendaeres. Verlierst du, ist das Herz weg.' },
-  { id: 'ev_trinken', name: 'Trinken', text: 'Heilung, Kraft - oder Gift. Wer weiss?' },
+  { id: 'ev_trinken', name: 'Trinken', text: 'Heilung, volle Ladung - oder Gift. Wer weiss?' },
   { id: 'ev_fuellen', name: 'Flasche fuellen', text: 'Zwei Kraeuter fuer spaeter.' },
   { id: 'ev_karte', name: 'Die Gegend (3 Gold)', text: 'Die Seherin zeigt dir alles bis 10 Felder weit.' },
-  { id: 'ev_omen', name: 'Die Zukunft (8 Gold)', text: 'Deine Waffe wird voll geladen und du bekommst 3 Fokus.' },
+  { id: 'ev_omen', name: 'Die Zukunft (8 Gold)', text: 'Deine Waffe wird voll geladen und du heilst 2 Leben.' },
   { id: 'goldfisch', name: 'Goldfisch', text: 'Ein seltener Fang - der Haendler zahlt 8 Gold.' },
   { id: 'extraherz', name: 'Heilung', text: 'Sofort volles Leben.' },
   { id: 'goldsack', name: 'Goldsack', text: '15 Gold auf einmal.' },
@@ -329,7 +329,7 @@ export type BossArt = 'koenig' | 'schatten' | 'koloss' | 'penta';
 export const BOSS_NAME: Record<BossArt, string> = { koenig: 'Schleimkoenig', schatten: 'Schattenschleim', koloss: 'Gelee-Koloss', penta: 'Pentagrammschleim' };
 const BOSS_FOLGE: readonly BossArt[] = ['koenig', 'schatten', 'koloss'];
 // Spieltest: "Bosskaempfe in Akt 1 und 2 ziehen sich" - darum weniger Leben.
-const BOSS_GRUND: Record<BossArt, number> = { koenig: 8, schatten: 11, koloss: 22, penta: 16 };
+const BOSS_GRUND: Record<BossArt, number> = { koenig: 8, schatten: 11, koloss: 19, penta: 16 };
 
 /** Ein neuer Schleim: die Art aus einer Zahl 0..99 - gut die Haelfte gewoehnlich. */
 function neuerSchleim(id: number, q: number, r: number, zahl: number, fern: boolean): Schleim {
@@ -590,7 +590,7 @@ export const BOSS_LEBEN = 10;
 export const AKTE = 3;
 export const AKT_ZIEL: readonly number[] = [5, 6, 7];
 export const AKT_BOSS: readonly BossArt[] = ['koenig', 'schatten', 'koloss'];
-export const AKT_NAME: readonly string[] = ['Die gruenen Weiten', 'Schatten im Land', 'Der Gelee-Koloss'];
+export const AKT_NAME: readonly string[] = ['Der Aufbruch', 'Schatten im Land', 'Der Gelee-Koloss'];
 /** Wie viele Gegner der Boss dieses Akts verlangt. */
 export const aktZiel = (a: Pick<Abenteuer, 'akt'>): number => AKT_ZIEL[(a.akt ?? 1) - 1] ?? 10;
 /** Jeder weitere Koenig hat vier Leben mehr. */
@@ -805,6 +805,7 @@ export function waehlen(alt: Abenteuer, nr: number): Abenteuer {
   a.ereignisse = [];
   a.wahl = null;
   if (w.art === 'ereignis') {
+    if (!ereignisMoeglich(alt, id)) return alt;
     ereignisWaehlen(a, id, w.ort);
     return a;
   }
@@ -995,7 +996,12 @@ function wuerfelWurf(a: Abenteuer): { wurf: number; zusatz: string } {
     zusatz = ` (Blei: ${wurf} wird 3)`;
     wurf = 3;
   } else if (id === 'zwillingswuerfel') {
-    const zweiter = seite(6);
+    let zweiter = seite(6);
+    // Glueckspilz gilt fuer jeden der beiden.
+    if (hatLegende(a, 'glueckspilz')) {
+      if (wurf === 1) wurf = 6;
+      if (zweiter === 1) zweiter = 6;
+    }
     a.zweiterWurf = zweiter;
     zusatz = ` (Zwillinge: ${wurf} und ${zweiter})`;
     wurf = Math.max(wurf, zweiter);
@@ -1768,7 +1774,8 @@ export function entfessle(a: Abenteuer, f: Faehigkeit, takt: number): void {
   if (f === 'runenblitz') {
     const ziel = a.schleime
       .filter((s) => hexDistance(s, a.pos) <= 3)
-      .sort((x, y) => hexDistance(x, a.pos) - hexDistance(y, a.pos) || x.leben - y.leben)[0];
+      // Ein Boss in Reichweite geht vor (Spieltest: "trifft immer die kleinen").
+      .sort((x, y) => (y.boss ? 1 : 0) - (x.boss ? 1 : 0) || hexDistance(x, a.pos) - hexDistance(y, a.pos) || x.leben - y.leben)[0];
     a.ereignisse.push({ art: 'faehigkeit', takt, name: f, ...(ziel ? { ziel: ziel.id, felder: [{ q: ziel.q, r: ziel.r }] } : {}) });
     if (!ziel) {
       melde(a, 'Runenblitz! - doch kein Gegner in Reichweite.');
@@ -2470,7 +2477,8 @@ export function haendlerWaren(a: Abenteuer, o: Ort): { id: string; preis: number
   const legenden = akt >= 2 ? legendaerPool(a).filter((x) => x !== 'herzcontainer') : [];
   if (legenden.length) sortiment.push(legenden[rng.int(legenden.length)]!);
   return [
-    ...HAENDLER_WAREN,
+    // Kraeuter werden je Akt teurer (Spieltest: "Heilung ist zu billig").
+    ...HAENDLER_WAREN.map((w) => (w.id === 'kraut' ? { ...w, preis: w.preis + 2 * (akt - 1) } : w)),
     // Gekauftes bleibt als "verkauft" stehen - die Zeilen verrutschen nicht (Spieltest).
     ...sortiment.map((id) => ({
       id,
@@ -2548,6 +2556,8 @@ function ortEntdecken(a: Abenteuer, h: Hex): void {
   if (z !== 7 && z !== 77 && z !== 150 && z !== 200 && !ereignis) return;
   if (!ortFrei(a, h) || hexDistance(h, a.pos) < 2) return;
   const art: OrtArt = ereignis ? 'ereignis' : z === 7 ? 'haendler' : z === 77 ? 'werber' : 'altar';
+  // Spieltest: "Haendler auf jedem Bildschirm" - Laeden sind rar.
+  if ((art === 'haendler' || art === 'werber') && (a.orte ?? []).some((o) => o.art === art && hexDistance(o, h) < 20)) return;
   a.orte = [...(a.orte ?? []), neuerOrt(a, h, art)];
 }
 
@@ -2576,6 +2586,15 @@ function waechterRufen(a: Abenteuer, n: number): void {
     a.ereignisse.push({ art: 'neu', takt: 0, wer: id });
   }
   a.rng = rng.getState();
+}
+
+/** Kann man diese Moeglichkeit einer Begegnung bezahlen? */
+export function ereignisMoeglich(a: Abenteuer, id: string): boolean {
+  const gold = a.inventar['gold'] ?? 0;
+  if (id === 'ev_wetten') return gold >= 5;
+  if (id === 'ev_karte') return gold >= 3;
+  if (id === 'ev_omen') return gold >= 8;
+  return true;
 }
 
 /** Eine Begegnung waehlen - danach ist sie vorbei. */
@@ -2631,10 +2650,10 @@ function ereignisWaehlen(a: Abenteuer, id: string, ortId: number | undefined): v
       return void melde(a, 'Das Wasser heilt dich ganz.');
     }
     if (glueck < 75) {
-      a.fokus = FOKUS_MAX;
       const { voll } = ladungVon(a);
       if (voll > 0) a.ladung = voll;
-      return void melde(a, 'Kraft durchstroemt dich: voller Fokus und volle Ladung!');
+      a.leben = Math.min(maxLebenVon(a), a.leben + 1);
+      return void melde(a, 'Kraft durchstroemt dich: volle Ladung und +1 Leben!');
     }
     a.leben = Math.max(0.5, a.leben - 1);
     a.ereignisse.push({ art: 'fluch', takt: 0 });
@@ -2655,10 +2674,10 @@ function ereignisWaehlen(a: Abenteuer, id: string, ortId: number | undefined): v
   if (id === 'ev_omen') {
     if (gold < 8) return void melde(a, 'Die Seherin schweigt - die Zukunft kostet 8 Gold.');
     zahle(8);
-    a.fokus = FOKUS_MAX;
+    a.leben = Math.min(maxLebenVon(a), a.leben + 2);
     const { voll } = ladungVon(a);
     if (voll > 0) a.ladung = voll;
-    return void melde(a, 'Die Seherin fluestert dir den naechsten Kampf zu: voller Fokus und volle Ladung.');
+    return void melde(a, 'Die Seherin fluestert dir den naechsten Kampf zu: volle Ladung und +2 Leben.');
   }
 }
 
@@ -3049,7 +3068,8 @@ function ticken(a: Abenteuer, takt: number): void {
   for (const s of a.schleime) {
     if ((s.gebannt ?? 0) > a.zeit) continue;
     // Der Endboss rast ab halbem Leben: er handelt in jedem Tick.
-    const rast = s.boss && s.bossArt !== 'penta' && (a.akt ?? 1) >= AKTE && s.leben <= (s.max ?? 0) / 2;
+    // Spieltest: "Jeder Boss ist derselbe Tanz" - jeder Aktboss rast ab halbem Leben (zweite Phase).
+    const rast = s.boss && s.bossArt !== 'penta' && s.leben <= (s.max ?? 0) / 2;
     if (rast && !s.rast) {
       s.rast = true;
       a.ereignisse.push({ art: 'boss', takt, wer: s.id, name: `${BOSS_NAME[s.bossArt ?? 'koenig']} rast` });
@@ -3135,9 +3155,10 @@ function ticken(a: Abenteuer, takt: number): void {
       a.extraLeben = (a.extraLeben ?? 0) - 1;
       const i = (a.legendaer ?? []).indexOf('extraleben');
       if (i >= 0) a.legendaer = (a.legendaer ?? []).filter((_, j) => j !== i);
-      a.leben = maxLebenVon(a);
+      // Spieltest: "Das Extra-Leben nimmt jede Gefahr" - man steht mit halbem Leben auf.
+      a.leben = Math.max(1, Math.ceil(maxLebenVon(a) / 2));
       a.ereignisse.push({ art: 'wiederbelebt', takt });
-      melde(a, `${KLASSEN[a.klasse ?? 'ritter'].name}: du faellst - und stehst wieder auf! Das Extra-Leben ist verbraucht.`);
+      melde(a, `${KLASSEN[a.klasse ?? 'ritter'].name}: du faellst - und stehst wieder auf, mit halbem Leben! Das Extra-Leben ist verbraucht.`);
       return;
     }
     a.leben = 0;
@@ -3176,6 +3197,8 @@ export function normalisiere(a: Abenteuer): Abenteuer {
 }
 
 /** Einen Gegenstand aus dem Inventar benutzen: Kraut heilt, Ausruestung wird angelegt. */
+/** So nah muss ein Gegner sein, damit Essen einen Schritt kostet. */
+export const HEIL_KAMPF = 3;
 export function benutzen(alt: Abenteuer, id: string): Abenteuer {
   if (alt.phase === 'tot' || alt.phase === 'sieg' || !(alt.inventar[id] ?? 0)) return alt;
   const g = gegenstand(id);
@@ -3190,11 +3213,24 @@ export function benutzen(alt: Abenteuer, id: string): Abenteuer {
   };
   if (g.heilt) {
     if (a.leben >= maxLebenVon(a)) return alt;
+    // Spieltest: "Heilen ist gratis und unbegrenzt" - im Kampf (Gegner bis 3 Felder) kostet Essen einen Schritt, und die Gegner ziehen.
+    const imKampf = a.schleime.some((s) => hexDistance(s, a.pos) <= HEIL_KAMPF);
+    if (imKampf && a.phase !== 'ziehen') {
+      a.ereignisse = [];
+      melde(a, 'Gegner sind nah - essen kannst du erst nach dem Wuerfeln (es kostet einen Schritt).');
+      return a;
+    }
     const plus = Math.min(g.heilt, maxLebenVon(a) - a.leben);
     a.leben += plus;
     weg();
     a.ereignisse = [{ art: 'heil', takt: 0, leben: plus }];
-    melde(a, `${g.name}: +${lebenText(plus)} Leben.`);
+    melde(a, `${g.name}: +${lebenText(plus)} Leben${imKampf ? ' - das kostet einen Schritt' : ''}.`);
+    if (imKampf) {
+      a.schritte = Math.max(0, a.schritte - 1);
+      a.fokus = 0;
+      ticken(a, 1);
+      return nachDemSchritt(a);
+    }
     return a;
   }
   if (g.slot) {

@@ -469,7 +469,7 @@ describe('Abenteuer', () => {
     a.leben = 1;
     a = taste(a, 's');
     expect(a.phase).toBe('ziehen');
-    expect(a.leben).toBe(maxLebenVon(a));
+    expect(a.leben).toBe(Math.max(1, Math.ceil(maxLebenVon(a) / 2)));
     expect(a.ereignisse.some((e) => e.art === 'wiederbelebt')).toBe(true);
     expect(a.extraLeben).toBe(0);
   });
