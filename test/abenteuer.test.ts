@@ -213,7 +213,8 @@ describe('Abenteuer', () => {
     b = { ...structuredClone(b), zug: b.bossBald!, phase: 'ziehen', schritte: 5 };
     b = taste(b, 's');
     const koenig = b.schleime.find((x) => x.boss);
-    expect(koenig?.bossArt).toBe('koenig');
+    // Seed 11 ist ungerade: Akt 1 und 2 tauschen ihre Bosse.
+    expect(koenig?.bossArt).toBe('schatten');
     expect(b.bossErwacht).toBe(true);
     // Der Koenig faellt: eine Wahl aus drei Legendaeren, dann Akt 2.
     const c = structuredClone(b);
@@ -232,7 +233,10 @@ describe('Abenteuer', () => {
     const e = waehlen(d, 0);
     expect(e.wahl).toBeNull();
     expect(e.legendaer?.length ?? 0).toBeGreaterThan(0);
-    expect(naechsterBoss(e)).toBe('schatten');
+    expect(naechsterBoss(e)).toBe('koenig');
+    // Der neue Akt fuehrt in eine neue Gegend - weit weg, mit vollem Leben.
+    expect(hexDistance(e.pos, c.pos)).toBeGreaterThan(20);
+    expect(e.leben).toBe(maxLebenVon(e));
   });
 
   it('der Endboss (Akt 3) entscheidet das Abenteuer: Sieg und Punkte', () => {

@@ -604,10 +604,20 @@ export const AKT_NAME: readonly string[] = ['Der Aufbruch', 'Schatten im Land', 
 /** Wie viele Gegner der Boss dieses Akts verlangt. */
 export const aktZiel = (a: Pick<Abenteuer, 'akt'>): number => AKT_ZIEL[(a.akt ?? 1) - 1] ?? 10;
 /** Jeder weitere Koenig hat vier Leben mehr. */
-export const koenigLeben = (a: Pick<Abenteuer, 'koenige' | 'akt' | 'heldenstufe'>): number => BOSS_GRUND[naechsterBoss(a)] + 3 * (a.heldenstufe ?? 0);
+export const koenigLeben = (a: Pick<Abenteuer, 'koenige' | 'akt' | 'heldenstufe'> & { seed?: number }): number => bossGrund(a, naechsterBoss(a)) + 3 * (a.heldenstufe ?? 0);
 /** Welcher Boss als naechster kommt: der Boss des Akts. */
-export const naechsterBoss = (a: Pick<Abenteuer, 'koenige' | 'akt'>): BossArt =>
-  a.akt !== undefined ? (AKT_BOSS[a.akt - 1] ?? 'koloss') : BOSS_FOLGE[(a.koenige ?? 0) % BOSS_FOLGE.length]!;
+/**
+ * Spieltest 11: "Immer dieselben drei Bosse in derselben Reihenfolge." Akt 1 und 2
+ * tauschen je nach Seed ihre Bosse; ihr Leben richtet sich nach dem Akt, nicht nach der Art.
+ */
+export const naechsterBoss = (a: Pick<Abenteuer, 'koenige' | 'akt'> & { seed?: number }): BossArt => {
+  if (a.akt === undefined) return BOSS_FOLGE[(a.koenige ?? 0) % BOSS_FOLGE.length]!;
+  const tausch = a.seed !== undefined && (a.seed >>> 0) % 2 === 1 && a.akt <= 2;
+  return tausch ? (a.akt === 1 ? 'schatten' : 'koenig') : (AKT_BOSS[a.akt - 1] ?? 'koloss');
+};
+const AKT_BOSS_LEBEN = [8, 11, 19];
+const bossGrund = (a: Pick<Abenteuer, 'akt'>, art: BossArt): number =>
+  art === 'penta' ? BOSS_GRUND.penta : a.akt !== undefined ? (AKT_BOSS_LEBEN[a.akt - 1] ?? BOSS_GRUND[art]) : BOSS_GRUND[art];
 const BOSS_SCHADEN = 2;
 export const GRUND_LEBEN = 6;
 const GRUND_SICHT = 3;
@@ -655,7 +665,8 @@ export function fundAuf(a: Pick<Abenteuer, 'seed' | 'genommen'>, q: number, r: n
   const t = gelaende(a.seed, q, r);
   if (!begehbar(t)) return null;
   // Ganz selten eine goldene Schatztruhe mit einem legendaeren Fund.
-  if (hash3i(a.seed, q, r, SALT_FUND + 7) % 400 === 0) return 'schatz';
+  // Spieltest 11: "sieben Legendaere bis Zug 40" - Schatztruhen halb so oft.
+  if (hash3i(a.seed, q, r, SALT_FUND + 7) % 800 === 0) return 'schatz';
   // Spieltest: "Beute liegt ueberall, nichts ist knapp." Weniger, dafuer
   // Truhen mit Wahl (1 aus 3).
   const h = hash3i(a.seed, q, r, SALT_FUND) % 200;
@@ -741,21 +752,56 @@ export function neuesAbenteuer(seed: number, optionen: StartOptionen = {}): Aben
     aktKills: 0,
     aktStart: 1,
   };
-  // Schleime in der Umgebung - nie zu nah am Start, und nah am Start nur
-  // gewoehnliche (Spieltest: "die ersten 15 Zuege ein Muenzwurf").
-  for (const h of hexesInRange(start, 14)) {
-    const d = hexDistance(start, h);
-    if (d < 5) continue;
-    if (hash3i(seed, h.q, h.r, SALT_SCHLEIM) % (d < 9 ? 30 : 24) !== 0) continue;
-    if (!begehbar(gelaende(seed, h.q, h.r))) continue;
-    const zahl = hash3i(seed, h.q, h.r, SALT_SCHLEIM + 1) % 100;
-    a.schleime.push(neuerSchleim(a.naechsteId++, h.q, h.r, d < 9 ? 57 + (zahl % 43) : zahl, d > 8));
-  }
+  ansiedeln(a, start);
+  a.orte = [];
   ortePlatzieren(a);
   a.schleime = a.schleime.filter((s) => !ortAuf(a, s.q, s.r));
   startAnwenden(a, optionen);
   sehen(a);
   return a;
+}
+
+/**
+ * Schleime in der Umgebung - nie zu nah am Start, und nah am Start nur
+ * gewoehnliche (Spieltest: "die ersten 15 Zuege ein Muenzwurf").
+ */
+function ansiedeln(a: Abenteuer, start: Hex): void {
+  for (const h of hexesInRange(start, 14)) {
+    const d = hexDistance(start, h);
+    if (d < 5) continue;
+    if (hash3i(a.seed, h.q, h.r, SALT_SCHLEIM) % (d < 9 ? 30 : 24) !== 0) continue;
+    if (!begehbar(gelaende(a.seed, h.q, h.r))) continue;
+    const zahl = hash3i(a.seed, h.q, h.r, SALT_SCHLEIM + 1) % 100;
+    a.schleime.push(staerken(a, neuerSchleim(a.naechsteId++, h.q, h.r, d < 9 ? 57 + (zahl % 43) : zahl, d > 8), new Rng(hash3i(a.seed, h.q, h.r, 77))));
+  }
+}
+
+/**
+ * NEUE GEGEND. Spieltest 11: "Alle drei Akte auf derselben Karte." Nach jedem
+ * Boss zieht der Held weit weiter - in ein neues Land mit eigenen Leuten,
+ * Begegnungen und Gegnern. Das Gefolge kommt mit.
+ */
+export const GEGEND_WEIT = 45;
+function neueGegend(a: Abenteuer): void {
+  const [dq, dr] = HEX_DIRS[((a.seed >>> 0) + (a.akt ?? 1)) % 6]!;
+  const ziel = startFeld(a.seed, { q: a.pos.q + dq * GEGEND_WEIT, r: a.pos.r + dr * GEGEND_WEIT });
+  a.pos = ziel;
+  a.pfad = [ziel];
+  a.spuren = {};
+  a.gift = [];
+  a.kreise = [];
+  a.schleime = [];
+  const frei = HEX_DIRS.map(([x, y]) => ({ q: ziel.q + x, r: ziel.r + y })).filter((h) => begehbar(gelaende(a.seed, h.q, h.r)));
+  (a.gefolge ?? []).forEach((g, i) => {
+    const h = frei[i % Math.max(1, frei.length)] ?? ziel;
+    g.q = h.q;
+    g.r = h.r;
+  });
+  ansiedeln(a, ziel);
+  ortePlatzieren(a);
+  a.schleime = a.schleime.filter((s) => !ortAuf(a, s.q, s.r));
+  sehen(a);
+  melde(a, 'Du ziehst weiter - in ein neues Land. Neue Leute, neue Gegner.');
 }
 
 // --- Wahl: 1 aus 3 --------------------------------------------------------
@@ -1132,12 +1178,12 @@ export function wuerfeln(alt: Abenteuer): Abenteuer {
   a.neuGewuerfelt = false;
   melde(
     a,
-    `Gewuerfelt: ${a.wurf}${zusatz}${schrittBonus(a) > 0 ? ` (+${schrittBonus(a)} Stiefel)` : ''}${a.wurf + schrittBonus(a) < SCHRITTE_MIN ? ' (mindestens 2)' : ''} - ${a.schritte} ${a.schritte === 1 ? 'Schritt' : 'Schritte'}.`,
+    `Gewuerfelt: ${a.wurf}${zusatz}${schrittBonus(a) > 0 ? ` (+${schrittBonus(a)} Stiefel)` : ''}${a.wurf + schrittBonus(a) < SCHRITTE_MIN ? ` (mindestens ${SCHRITTE_MIN})` : ''} - ${a.schritte} ${a.schritte === 1 ? 'Schritt' : 'Schritte'}.`,
   );
   return a;
 }
 /** So viele Schritte gibt jeder Wurf mindestens. */
-export const SCHRITTE_MIN = 2;
+export const SCHRITTE_MIN = 3;
 
 /** Glueckswuerfel: neu wuerfeln - einmal je Zug, solange noch kein Schritt getan ist. */
 export const kannNeuWuerfeln = (a: Abenteuer): boolean =>
@@ -1573,8 +1619,10 @@ function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
   const wehrlos = (s.gebannt ?? 0) > a.zeit;
   const trifft = sicher || ((wurf !== 1 || wehrlos) && (wurf === 6 || summeWurf >= noetig || (wehrlos && wurf === 1 && summeWurf >= noetig - 1)));
   a.fehlschlaege = trifft ? 0 : (a.fehlschlaege ?? 0) + 1;
-  if (sicher) melde(a, 'Pech gleicht sich aus: dieser Hieb trifft sicher.');
-  let schaden = trifft ? (wurf === 6 ? krit : 1) + (fokus >= FOKUS_MAX ? 1 : 0) : 0;
+  if (sicher && wurf !== 1) melde(a, 'Pech gleicht sich aus: dieser Hieb trifft sicher.');
+  let schaden = trifft ? (wurf === 6 ? krit : 1) + (fokus >= FOKUS_MAX ? 1 : 0) + (s.boss && wehrlos ? 1 : 0) : 0;
+  if (trifft && s.boss && wehrlos) melde(a, 'Der Boss taumelt - dein Hieb trifft ihn mit voller Wucht (+1).');
+  if (trifft && wurf === 1) melde(a, sicher ? 'Pech gleicht sich aus: dieser Hieb trifft sicher.' : 'Der Gegner taumelt - auch eine 1 trifft.');
   if (fokus > 0) melde(a, fokus >= FOKUS_MAX ? `Voller Fokus: +${fokus} auf den Wurf und ein Wuchtschlag (+1 Schaden)!` : `Fokus: +${fokus} auf den Wurf.`);
   // Ein geladener Spalthieb legt beim naechsten Treffer zwei drauf.
   const spalt = schaden > 0 && a.bereit === 'spalthieb';
@@ -1662,13 +1710,14 @@ function verwunde(a: Abenteuer, s: Schleim, schaden: number, takt: number, vorne
     a.aktKills = 0;
     a.aktStart = a.zug;
     a.bossBald = null;
-    // Ein Atemzug zwischen den Akten: mindestens halbes Leben (Spieltest 10: "Akt 2 mit 1 Herz").
-    a.leben = Math.max(a.leben, Math.ceil(maxLebenVon(a) / 2));
+    // Ein Atemzug zwischen den Akten: volles Leben (Spieltest 10/11: "Akt 2 mit 1 Herz").
+    a.leben = maxLebenVon(a);
     a.ereignisse.push({ art: 'akt', takt, akt: a.akt, name: AKT_NAME[a.akt - 1] ?? '' });
     melde(
       a,
       `${vorne}: der ${schleimName(s)} zerplatzt! Akt ${a.akt}: ${AKT_NAME[a.akt - 1]} - ${a.akt === 2 ? 'Banditen ziehen durchs Land, Elite-Gegner tragen Gold.' : 'Geister spuken, die Gegner schlagen haerter.'}`,
     );
+    neueGegend(a);
     bietWahl(a, 'boss');
     return;
   }
@@ -1908,7 +1957,7 @@ function bossErwacht(a: Abenteuer, takt: number, art: BossArt = naechsterBoss(a)
   if (!ort) return;
   const id = a.naechsteId++;
   const hs = a.heldenstufe ?? 0;
-  const leben = art === 'penta' ? BOSS_GRUND.penta : Math.round((BOSS_GRUND[art] + 2 * hs) * (hs >= 2 ? 4 / 3 : 1));
+  const leben = art === 'penta' ? BOSS_GRUND.penta : Math.round((bossGrund(a, art) + 2 * hs) * (hs >= 2 ? 4 / 3 : 1));
   a.schleime.push({ id, q: ort.q, r: ort.r, leben, max: leben, gross: true, boss: true, bossArt: art, zaehler: 0 });
   if (art === 'penta') a.pentaGerufen = true;
   else a.bossErwacht = true;
@@ -2671,11 +2720,11 @@ function ortFrei(a: Abenteuer, h: Hex): boolean {
 
 /** Am Start: ein Haendler und ein Werber in der Naehe. */
 function ortePlatzieren(a: Abenteuer): void {
-  a.orte = [];
+  a.orte ??= [];
   for (const [art, weit] of [['haendler', 3], ['werber', 4], ['ereignis', 6]] as const) {
     const ring = hexesInRange(a.pos, weit).filter((h) => hexDistance(h, a.pos) === weit && ortFrei(a, h));
     const h = ring[hash3i(a.seed, weit, 0, SALT_LEUTE) % Math.max(1, ring.length)];
-    if (h) a.orte.push(neuerOrt(a, h, art));
+    if (h) a.orte!.push(neuerOrt(a, h, art));
   }
 }
 
@@ -2731,7 +2780,8 @@ export function ereignisMoeglich(a: Abenteuer, id: string): boolean {
 
 /** Eine Begegnung waehlen - danach ist sie vorbei. */
 function ereignisWaehlen(a: Abenteuer, id: string, ortId: number | undefined): void {
-  if (ortId !== undefined) a.orte = (a.orte ?? []).map((x) => (x.id === ortId ? { ...x, benutzt: true } : x));
+  // Weitergehen laesst die Begegnung stehen - man kann wiederkommen (Spieltest 11: Seherin ohne Gold).
+  if (ortId !== undefined && id !== 'ev_weiter') a.orte = (a.orte ?? []).map((x) => (x.id === ortId ? { ...x, benutzt: true } : x));
   const gold = a.inventar['gold'] ?? 0;
   const zahle = (n: number) => {
     a.inventar = { ...a.inventar, gold: gold - n };
@@ -2740,7 +2790,7 @@ function ereignisWaehlen(a: Abenteuer, id: string, ortId: number | undefined): v
   const rng = new Rng(a.rng);
   const glueck = rng.int(100);
   a.rng = rng.getState();
-  if (id === 'ev_weiter') return void melde(a, 'Du ziehst weiter.');
+  if (id === 'ev_weiter') return void melde(a, 'Du ziehst weiter - die Begegnung bleibt, du kannst wiederkommen.');
   if (id === 'ev_beten') {
     a.leben = maxLebenVon(a);
     a.ereignisse.push({ art: 'heil', takt: 0, leben: 1 });
@@ -3228,7 +3278,7 @@ function ticken(a: Abenteuer, takt: number): void {
   a.schleime.push(...neue);
   // Nachschub: je spaeter der Akt (und je hoeher die Heldenstufe), desto oefter und zaeher.
   // Waehrend ein Boss des Akts lebt, kommt kein Nachschub - der Kampf bleibt lesbar.
-  if (a.zeit > NACHSCHUB_RUHE && a.zeit % nachschubTakt(a) === 0 && !a.schleime.some((x) => x.boss && x.bossArt !== 'penta')) {
+  if (a.zeit > NACHSCHUB_RUHE && a.zug - (a.aktStart ?? 1) >= 3 && a.zeit % nachschubTakt(a) === 0 && !a.schleime.some((x) => x.boss && x.bossArt !== 'penta')) {
     for (let versuch = 0; versuch < 12; versuch++) {
       const dir = HEX_DIRS[rng.int(6)]!;
       const weit = 5 + rng.int(3);
@@ -3382,6 +3432,7 @@ export function benutzen(alt: Abenteuer, id: string): Abenteuer {
     if (vorher) a.inventar = { ...a.inventar, [vorher]: (a.inventar[vorher] ?? 0) + 1 };
     a.ausruestung = { ...a.ausruestung, [g.slot]: id };
     if (g.slot === 'waffe') {
+      if ((a.ladung ?? 0) > 0 || a.bereit) melde(a, 'Waffe gewechselt - die Ladung der alten Waffe ist verloren.');
       a.ladung = 0;
       a.bereit = null;
     }

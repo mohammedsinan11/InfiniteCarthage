@@ -153,7 +153,16 @@ function leseAutoroll(): boolean {
   }
 }
 /** So lange dauert ein Tick der Spieluhr im Bild. */
-const TAKT_MS = 170;
+const SCHNELL = 'infinitecarthage.abenteuer.schnell';
+const leseSchnell = (): boolean => {
+  try {
+    return localStorage.getItem(SCHNELL) === 'an';
+  } catch {
+    return false;
+  }
+};
+/** Ein Takt der Animation - im schnellen Modus halb so lang (Spieltest 11: "die Gegnerzuege bremsen"). */
+let TAKT_MS = leseSchnell() ? 85 : 170;
 /** So lange steigen Zahlen noch nach ihrem Takt auf (in Takten). */
 const NACHKLANG = 5;
 /** So lange rollt der Wuerfel. */
@@ -645,6 +654,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const logRef = useRef<HTMLDivElement | null>(null);
   const [lager, setLager] = useState(() => lade() === null && ladeMeta().laeufe > 0);
   const [hilfeOffen, setHilfeOffen] = useState(false);
+  const [schnell, setSchnell] = useState(leseSchnell);
   const [abbruchFrage, setAbbruchFrage] = useState<Aufbruch | null>(null);
   const ladenZeilen = useRef<{ laden: number | null; ids: string[] }>({ laden: null, ids: [] });
   const offen = useRef({ lager, legenden: legendenOffen, hilfe: hilfeOffen });
@@ -1120,8 +1130,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       const kam = kamera.current;
       if (!kam || Math.hypot(ritter.x - kam.x, ritter.y - kam.y) > 160) kamera.current = { x: ritter.x, y: ritter.y };
       else {
-        const RAND_X = 26;
-        const RAND_Y = 18;
+        // Ein breiterer ruhiger Bereich: erst nach etwa zwei Feldern faehrt sie nach (Spieltest 11: Mausspiel).
+        const RAND_X = 50;
+        const RAND_Y = 34;
         const zielX = Math.min(Math.max(kam.x, ritter.x - RAND_X), ritter.x + RAND_X);
         const zielY = Math.min(Math.max(kam.y, ritter.y - RAND_Y), ritter.y + RAND_Y);
         kam.x += (zielX - kam.x) * 0.2;
@@ -1778,7 +1789,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             // Spieltest: "Namen verdecken den Helden" - direkt daneben keine Schrift.
             if (hexDistance(o, a.pos) <= (a.phase === 'wuerfeln' ? 2 : 1)) return;
             const tief = o.art === 'ereignis' && (o.ereignis === 'quelle' || o.ereignis === 'schrein');
-            schrift(erloschen ? `${name} (vorbei)` : name, sx(m.x), sy(m.y) - (tief ? 11 : 20) * f, erloschen ? '#8a8070' : nah ? '#f2c94c' : '#e8dcc0', erloschen ? 0.55 : nah ? 1 : 0.75, 5);
+            // Vorbei ist vorbei - keine Schrift mehr (Spieltest 11: "(vorbei) ueberall").
+            if (erloschen) return;
+            schrift(name, sx(m.x), sy(m.y) - (tief ? 11 : 20) * f, erloschen ? '#8a8070' : nah ? '#f2c94c' : '#e8dcc0', erloschen ? 0.55 : nah ? 1 : 0.75, 5);
           },
         });
       }
@@ -2460,7 +2473,14 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                 : [x.ereignis ? EREIGNIS[x.ereignis].name : 'Begegnung', x.benutzt ? 'Vorbei.' : 'Lauf hinein und entscheide.'];
         const fundZeilen = (id: string): string[] => {
           const g = gegenstand(id);
-          return [g?.name ?? id, ...(g?.text ? [g.text.replace(/^Legendaer\.\s*/, '').slice(0, 60)] : []), 'Drauflaufen: aufheben.'];
+          // In Zeilen von hoechstens 46 Zeichen umbrechen (Spieltest 11: abgeschnittener Text).
+          const zeilenAus: string[] = [];
+          for (const wort of (g?.text ?? '').replace(/^Legendaer\.\s*/, '').split(' ')) {
+            const z = zeilenAus[zeilenAus.length - 1];
+            if (z !== undefined && (z + ' ' + wort).length <= 46) zeilenAus[zeilenAus.length - 1] = z + ' ' + wort;
+            else if (wort) zeilenAus.push(wort);
+          }
+          return [g?.name ?? id, ...zeilenAus, 'Drauflaufen: aufheben.'];
         };
         const zeilen = feind
           ? [
@@ -2647,6 +2667,22 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         </button>
         <button className="klein" onClick={() => setHilfeOffen(true)} title="Wie spielt man? (Taste ?)">
           ?
+        </button>
+        <button
+          className={schnell ? 'klein an' : 'klein'}
+          onClick={() => {
+            const neu = !schnell;
+            TAKT_MS = neu ? 85 : 170;
+            try {
+              localStorage.setItem(SCHNELL, neu ? 'an' : 'aus');
+            } catch {
+              // nur fuer jetzt
+            }
+            setSchnell(neu);
+          }}
+          title="Schnelle Gegnerzuege: Animationen doppelt so schnell"
+        >
+          {schnell ? '»» schnell' : '» normal'}
         </button>
         <div className="ab-ton-gruppe">
           <button className={musik ? 'klein ab-ton' : 'klein ab-ton aus'} onClick={tonUmschalten} title={musik ? 'Musik ausschalten' : 'Musik einschalten'}>
@@ -3073,15 +3109,15 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             </div>
             <dl>
               <dt>Ziel</dt>
-              <dd>Drei Akte. Erlege Gegner, bis der Boss des Akts erwacht (Zaehler unter der Karte) - oder er kommt nach einigen Zuegen von selbst. Wer schneller ist, bekommt Eile-Punkte. Der dritte Boss ist der Endboss.</dd>
+              <dd>Drei Akte, jeder in einem neuen Land. Erlege Gegner, bis der Boden bebt und der Boss erwacht (Zaehler unter der Karte) - oder er kommt nach einigen Zuegen von selbst. Nach jedem Boss: volles Leben und weiter. Wer schneller ist, bekommt Eile-Punkte. Der dritte Boss ist der Endboss.</dd>
               <dt>Zug</dt>
-              <dd>Wuerfeln (Enter), dann so viele Schritte gehen (mindestens 2): Q E A D Z X oder ein Feld anklicken. Helle Felder erreichst du noch. S wartet einen Schritt. Jeder Schritt laesst die Gegner ziehen.</dd>
+              <dd>Wuerfeln (Enter), dann so viele Schritte gehen (mindestens 3): Q E A D Z X oder ein Feld anklicken. Helle Felder erreichst du noch. S wartet einen Schritt. Jeder Schritt laesst die Gegner ziehen.</dd>
               <dt>Kampf</dt>
               <dd>Lauf in einen Gegner, um zuzuschlagen. Die Zahl ueber ihm (z. B. 3+) ist die Augenzahl, die dein Wuerfel mindestens zeigen muss. Maus ueber einen Gegner: alles ueber ihn.</dd>
               <dt>Rote Felder</dt>
               <dd>Ein angesagter Angriff - er trifft im naechsten Takt. Geh weg! Steht ueber dir eine rote Zahl, trifft dich so viel. Wer ins Leere schlaegt, taumelt: freie Hiebe.</dd>
               <dt>Treffen</dt>
-              <dd>Wurf + Angriff (+ Fokus) muss die Schwelle erreichen: 4, ab Akt 2 hoeher, Panzer und Elite mehr. Eine 1 verfehlt immer, eine 6 trifft immer.</dd>
+              <dd>Zum Zuschlagen wird eigens gewuerfelt (nicht der Schritt-Wuerfel). Wurf + Angriff (+ Fokus) muss die Schwelle erreichen: 4, ab Akt 2 hoeher, Panzer und Elite mehr. Eine 1 verfehlt immer, eine 6 trifft immer.</dd>
               <dt>Rasten</dt>
               <dd>T wartet die uebrigen Schritte ab, solange kein Gegner nah ist. Nach zwei Fehlschlaegen in Folge trifft dein naechster Hieb sicher.</dd>
               <dt>Deckung</dt>
