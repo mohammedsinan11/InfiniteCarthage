@@ -103,6 +103,8 @@ describe('Abenteuer', () => {
     const a0 = neuesAbenteuer(7);
     const s = { id: 99, q: a0.pos.q + 4, r: a0.pos.r, leben: 2, gross: false };
     const a = imZug(7, [s]);
+    // Nach dem ruhigen Anfang (die ersten Takte schlummern die Schleime).
+    a.zeit = 10;
     const b = taste(a, 's');
     expect(b.zeit).toBe(a.zeit + 1);
     expect(b.schritte).toBe(5);

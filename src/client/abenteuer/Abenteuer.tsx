@@ -27,6 +27,7 @@ import {
   FRAKTION_FIGUR,
   gelaendeBonus,
   abwehrAugen,
+  gegnerWucht,
   trefferAb,
   zuegeBisBoss,
   schmieden,
@@ -568,6 +569,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     speichereMeta(m);
   }, []);
   // Das Lager zeigt sich, wenn kein Abenteuer laeuft - beim allerersten Mal nicht (gleich losspielen).
+  const [logOffen, setLogOffen] = useState(false);
+  const logRef = useRef<HTMLDivElement | null>(null);
   const [lager, setLager] = useState(() => lade() === null && ladeMeta().laeufe > 0);
   const offen = useRef({ lager, legenden: legendenOffen });
   offen.current = { lager, legenden: legendenOffen };
@@ -586,6 +589,10 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const mini = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => speichere(a), [a]);
+  // Das offene Log zeigt immer das Neueste unten.
+  useEffect(() => {
+    if (logOffen && logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, [a.log.length, logOffen]);
   // Am Ende eines Abenteuers: Ruhm, Bestwerte, Siege, Heldenstufe - genau einmal.
   useEffect(() => {
     if (a.phase !== 'tot' && a.phase !== 'sieg') return;
@@ -869,6 +876,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       if ((TASTEN as readonly string[]).includes(k)) {
         e.preventDefault();
         drueck(k as Taste);
+      } else if (k === 'l') {
+        e.preventDefault();
+        setLogOffen((x) => !x);
       } else if (k === 'r') {
         e.preventDefault();
         neuWurf();
@@ -1276,6 +1286,25 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         ctx.closePath();
         ctx.fill();
       }
+      // Spieltest: "Welches Feld ist der Koloss?" - das Feld eines Bosses hat einen roten Rahmen,
+      // angreifbare Nachbarn einen hellen (das Ziel eines Hiebs).
+      if (still) {
+        for (const s of a.schleime) {
+          const d = hexDistance(s, a.pos);
+          if (d > sicht) continue;
+          if (s.boss) {
+            feldUmriss(s.q, s.r);
+            ctx.strokeStyle = `rgba(255, 70, 50, ${0.65 + 0.25 * Math.sin(sek * 4)})`;
+            ctx.lineWidth = Math.max(2, f);
+            ctx.stroke();
+          } else if (d === 1 && a.phase === 'ziehen') {
+            feldUmriss(s.q, s.r);
+            ctx.strokeStyle = 'rgba(242, 231, 208, 0.75)';
+            ctx.lineWidth = Math.max(1, Math.round(f * 0.7));
+            ctx.stroke();
+          }
+        }
+      }
 
       // Die Nachbarfelder tragen im Zug ihre Taste - so sieht man, welche wohin fuehrt.
       if (a.phase === 'ziehen' && still) {
@@ -1478,7 +1507,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             if (s.boss) {
               // Die Bosse: eigene Bilder, deutlich groesser als ein Feld-Schleim; der Koloss am groessten.
               const bild = s.bossArt === 'schatten' ? SCHATTENSCHLEIM : s.bossArt === 'koloss' ? GELEEKOLOSS : s.bossArt === 'penta' ? PENTASCHLEIM : SCHLEIMKOENIG;
-              const kf = Math.round(f * (s.bossArt === 'koloss' ? 1.9 : 1.6));
+              const kf = Math.max(1, Math.round(f * (s.bossArt === 'koloss' ? 1.5 : 1.35)));
               const kb = bild[0]!.length;
               ctx.save();
               ctx.globalAlpha = alpha;
@@ -1606,7 +1635,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             if (o.art === 'altar') {
               // Der Altar flackert, solange er nicht benutzt ist.
               const bild = o.benutzt ? ALTAR.slice(3) : ALTAR;
-              ctx.globalAlpha = o.benutzt ? 0.6 : 1;
+              ctx.globalAlpha = o.benutzt ? 0.4 : 1;
               zeichnePixel(ctx, bild, sx(m.x) - 5 * f, sy(m.y) + 3 * f - bild.length * f, f, KACHEL_PIX);
               ctx.globalAlpha = 1;
             } else if (o.art === 'haendler') {
@@ -1618,7 +1647,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               malPerson(o.id, { x: m.x - 2, y: m.y, hoch: 0 }, 'soeldnerin', 'breitschwert', false);
             }
             const nah = hexDistance(o, a.pos) <= 1;
-            schrift(ORT_NAME[o.art], sx(m.x), sy(m.y) - 20 * f, nah ? '#f2c94c' : '#e8dcc0', nah ? 1 : 0.75, 5);
+            // Spieltest: "benutzte Altaere sehen aus wie neue".
+            const erloschen = o.art === 'altar' && o.benutzt;
+            schrift(erloschen ? 'Altar (erloschen)' : ORT_NAME[o.art], sx(m.x), sy(m.y) - 20 * f, erloschen ? '#8a8070' : nah ? '#f2c94c' : '#e8dcc0', erloschen ? 0.55 : nah ? 1 : 0.75, 5);
           },
         });
       }
@@ -1787,6 +1818,20 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         for (let i = 0; i < (a.fokus ?? 0); i++) {
           ctx.fillStyle = (a.fokus ?? 0) >= 3 ? '#ff7a3a' : '#f6c04a';
           ctx.fillRect(kx + (5 + i * 3) * f, ky + f - ((i + Math.floor(sek * 4)) % 2) * f, 2 * f, 2 * f);
+        }
+        // Schadensvorschau: zielen angesagte Angriffe auf das eigene Feld, steht der drohende Schaden ueber dem Kopf.
+        // Spieltest: "Schaden kommt ohne Vorwarnung".
+        const droht = a.schleime.reduce(
+          (n, s) =>
+            n +
+            ((s.angriff && s.angriff.q === a.pos.q && s.angriff.r === a.pos.r) || (s.flaeche ?? []).some((h) => h.q === a.pos.q && h.r === a.pos.r)
+              ? gegnerWucht(a, s)
+              : 0),
+          0,
+        );
+        if (droht > 0 && still && a.phase !== 'tot') {
+          const puls = 0.75 + 0.25 * Math.sin(sek * 8);
+          schrift(`-${droht}`, kx - 9 * f, ky - f, droht >= a.leben ? '#ff2a1a' : '#ff6a4a', puls, droht >= a.leben ? 8 : 7);
         }
       }
 
@@ -2191,6 +2236,38 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         }
       }
 
+      // Gegner-Info unter der Maus: Name, Leben, wie hart er trifft, ab wann man ihn trifft.
+      const unter = zeiger.current;
+      const feind = unter && still ? a.schleime.find((s) => s.q === unter.q && s.r === unter.r && hexDistance(s, a.pos) <= sicht) : undefined;
+      if (feind) {
+        const o = mitte(feind.q, feind.r);
+        const zeilen = [
+          `${schleimName(feind)}${feind.elite ? ' (Elite)' : ''}`,
+          `Leben ${feind.leben}${feind.max ? `/${feind.max}` : ''}`,
+          `Trifft dich: -${gegnerWucht(a, feind)}${abwehrAugen(a) > 0 ? ` (Schild haelt Wurf 1-${abwehrAugen(a)})` : ' (kein Schild)'}`,
+          `Du triffst ab ${trefferAb(a, feind)}+`,
+        ];
+        ctx.save();
+        ctx.font = `bold ${5 * f}px monospace`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        const breite = Math.max(...zeilen.map((z) => ctx.measureText(z).width)) + 8 * f;
+        const zeileH = 6 * f;
+        const hoeheB = zeilen.length * zeileH + 4 * f;
+        const bx = Math.min(c.width - breite - 2 * f, Math.max(2 * f, Math.round(sx(o.x) + 10 * f)));
+        const by = Math.min(c.height - hoeheB - 2 * f, Math.max(2 * f, Math.round(sy(o.y) - hoeheB / 2)));
+        ctx.fillStyle = 'rgba(18, 13, 8, 0.92)';
+        ctx.fillRect(bx, by, breite, hoeheB);
+        ctx.strokeStyle = feind.boss ? '#ff4a3a' : '#c8a35a';
+        ctx.lineWidth = f;
+        ctx.strokeRect(bx, by, breite, hoeheB);
+        zeilen.forEach((z, i) => {
+          ctx.fillStyle = i === 0 ? '#f6c04a' : i === 2 ? '#ff8a6a' : '#f2e7d0';
+          ctx.fillText(z, bx + 4 * f, by + 2 * f + (i + 0.5) * zeileH);
+        });
+        ctx.restore();
+      }
+
       // Uebersichtskarte.
       const m = mini.current;
       const mctx = m?.getContext('2d');
@@ -2428,15 +2505,15 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             {[
               {
                 id: 'schwert',
-                wert: `+${angriffVon(a)}`,
-                titel: `Angriff +${angriffVon(a)}${gelaendeBonus(a, 'angriff') ? ' (davon +1 Huegel)' : ''}: Wurf + Angriff muss 4 erreichen. Du triffst Schleime mit einer ${Math.max(1, 4 - angriffVon(a))} oder mehr (${Math.round((100 * (7 - Math.max(1, 4 - angriffVon(a)))) / 6)} %), Panzer ab ${Math.max(1, 5 - angriffVon(a))}. Warten (S) gibt Fokus.`,
+                wert: `+${angriffVon(a)}${gelaendeBonus(a, 'angriff') ? '*' : ''}`,
+                titel: `Angriff +${angriffVon(a)}${gelaendeBonus(a, 'angriff') ? ' (* davon +1 vom Huegel - nur solange du hier stehst)' : ''}: Wurf + Angriff muss 4 erreichen. Du triffst Schleime mit einer ${Math.max(1, 4 - angriffVon(a))} oder mehr (${Math.round((100 * (7 - Math.max(1, 4 - angriffVon(a)))) / 6)} %), Panzer ab ${Math.max(1, 5 - angriffVon(a))}. Warten (S) gibt Fokus.`,
               },
               {
                 id: 'schild',
-                wert: `+${abwehrVon(a)}`,
+                wert: `+${abwehrVon(a)}${gelaendeBonus(a, 'abwehr') ? '*' : ''}`,
                 titel:
                   (abwehrAugen(a) > 0 ? `Abwehr: Hiebe mit Wurf 1 bis ${abwehrAugen(a)} prallen ab (${Math.round((100 * abwehrAugen(a)) / 6)} %).` : 'Abwehr: keine - jeder Hieb trifft. Schild, Ruestung und Wald helfen.') +
-                  (gelaendeBonus(a, 'abwehr') ? ' Der Wald gibt dir gerade +1.' : ''),
+                  (gelaendeBonus(a, 'abwehr') ? ' * Der Wald gibt dir gerade +1 (nur solange du hier stehst).' : ''),
               },
               { id: 'herz', wert: `${maxLeben}`, titel: 'Hoechstes Leben' },
               {
@@ -2923,12 +3000,16 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       <ItemTipp tipp={tipp} />
 
       {/* Was zuletzt geschah. */}
-      <div className="ab-log" role="log">
-        {a.log.slice(-4).map((z, i) => (
-          <div key={`${a.log.length}-${i}`} style={{ opacity: 0.45 + i * 0.18 } as CSSProperties}>
+      {/* Spieltest: "das Log ist zu kurz, man verpasst was". Aufklappbar mit L oder dem Knopf. */}
+      <div ref={logRef} className={logOffen ? 'ab-log offen' : 'ab-log'} role="log">
+        {(logOffen ? a.log.slice(-30) : a.log.slice(-4)).map((z, i, alle) => (
+          <div key={`${a.log.length}-${i}`} style={{ opacity: logOffen ? 1 : 0.45 + (i + 4 - alle.length) * 0.18 } as CSSProperties}>
             {z}
           </div>
         ))}
+        <button className="ab-log-knopf" onClick={() => setLogOffen((x) => !x)} title="Log auf- oder zuklappen (L)">
+          {logOffen ? 'weniger' : 'mehr (L)'}
+        </button>
       </div>
 
       {/* Das Ende eines Abenteuers: was es wert war, der Ruhm, was als Naechstes lockt. */}

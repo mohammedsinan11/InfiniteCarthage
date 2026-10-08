@@ -1269,9 +1269,10 @@ export function taste(alt: Abenteuer, t: Taste): Abenteuer {
   // Ein Wanderer anderer Fraktion steht im Weg - er gruesst.
   const wand = wandererAuf(a, ziel.q, ziel.r);
   if (wand) {
-    a.ereignisse.push({ art: 'spruch', takt: 0, wer: wand.id, text: SPRUCH[wand.fraktion][a.zeit % SPRUCH[wand.fraktion].length]! });
-    melde(a, `${wand.name} vom ${FRAKTION_NAME[wand.fraktion]} steht dir im Weg.`);
-    return a;
+    // Freundlich: er macht Platz (tauscht mit dir).
+    a.ereignisse.push({ art: 'gehen', takt: 0, wer: wand.id, von: { q: wand.q, r: wand.r }, nach: { q: a.pos.q, r: a.pos.r } });
+    wand.q = a.pos.q;
+    wand.r = a.pos.r;
   }
   // Ein Soeldner im Weg: Platz tauschen.
   const kamerad = soeldnerAuf(a, ziel.q, ziel.r);
@@ -1493,7 +1494,11 @@ function verwunde(a: Abenteuer, s: Schleim, schaden: number, takt: number, vorne
   });
   // Erlegt eine andere Fraktion den Gegner, bekommt der Ritter nichts.
   if (fremd) {
-    melde(a, `${vorne} erlegt den ${schleimNameAkk(s)}.`);
+    // Faellt der Gegner in deiner Naehe, zaehlt er fuer den Akt (Spieltest: "die Abenteurer nehmen mir die Kills").
+    if (hexDistance(s, a.pos) <= 4 && !s.boss) {
+      a.aktKills = (a.aktKills ?? 0) + 1;
+      bossPruefen(a, takt);
+    }
     return;
   }
   erfahrung(a, s.boss ? 10 : s.gross || s.art ? 2 : 1, takt);
@@ -1838,6 +1843,9 @@ export const FOKUS_MAX = 3;
 const abgewehrt = (a: Abenteuer, wurf: number): boolean => wurf <= Math.floor(abwehrVon(a) * 1.5);
 /** Mit welcher Augenzahl man einen Gegner trifft (fuer die Anzeige "4+"). */
 export const trefferAb = (a: Abenteuer, s: Pick<Schleim, 'art'>): number => Math.max(1, (s.art === 'panzer' ? 5 : 4) - angriffVon(a));
+/** So viel Schaden macht ein Gegner, wenn er trifft (fuer Vorschau und Info). */
+export const gegnerWucht = (a: Abenteuer, s: Pick<Schleim, 'boss' | 'gross' | 'elite' | 'bossArt'>): number =>
+  s.boss ? BOSS_SCHADEN + ((a.akt ?? 1) >= AKTE && s.bossArt !== 'penta' ? 1 : 0) : (s.gross ? 2 : 1) + ((a.akt ?? 1) >= 3 || s.elite ? 1 : 0);
 /** Wie oft die Abwehr einen Treffer abfaengt, in Augen eines W6. */
 export const abwehrAugen = (a: Abenteuer): number => Math.min(6, Math.floor(abwehrVon(a) * 1.5));
 
@@ -1960,7 +1968,8 @@ function schleimHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetz
   }
   let ziel: Hex | null = null;
   let sprung = false;
-  if (d <= WITTERUNG) {
+  // Ein ruhiger Anfang: in den ersten Takten schlummern die Schleime noch, solange der Ritter nicht nah ist.
+  if (d <= WITTERUNG && (a.zeit >= 6 || d <= 2)) {
     if (s.art === 'spring') {
       // Zwei Felder weit auf einmal.
       const weit = hexesInRange(s, 2).filter((h) => hexDistance(h, s) === 2 && frei(h) && hexDistance(h, a.pos) >= 1);
@@ -2184,10 +2193,12 @@ function kolossHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetzt
   if (bossLoestEin(a, s, takt, rng)) return;
   s.zaehler = (s.zaehler ?? 0) + 1;
   const d = hexDistance(s, a.pos);
-  if (s.zaehler % 4 === 0) {
+  // Hoechstens ein kleiner Schleim, und nur, wenn kaum welche um ihn sind (Spieltest: "Akt 3 ist ein Gewimmel").
+  const umIhn = a.schleime.filter((x) => !x.boss && hexDistance(x, s) <= 4).length + neue.length;
+  if (s.zaehler % 4 === 0 && umIhn < 2) {
     const plaetze = HEX_DIRS.map(([dq, dr]) => ({ q: s.q + dq, r: s.r + dr }))
       .filter((h) => begehbar(gelaende(a.seed, h.q, h.r)) && !besetzt(h.q, h.r) && !neue.some((x) => x.q === h.q && x.r === h.r))
-      .slice(0, 2);
+      .slice(0, 1);
     for (const h of plaetze) {
       const id = a.naechsteId++;
       neue.push({ id, q: h.q, r: h.r, leben: 2, gross: false });
@@ -2407,8 +2418,9 @@ export function werberAngebot(a: Pick<Abenteuer, 'seed' | 'gefolge'>, o: Ort): {
   // Drei verschiedene Namen: ein Startname, dann je sieben weiter.
   const n0 = hash3i(a.seed, o.q, o.r, SALT_LEUTE + 4);
   return [0, 1, 2].map((i) => {
-    const h = hash3i(a.seed, o.q * 7 + i, o.r, SALT_LEUTE + 3);
-    const art = arten[(h + i) % arten.length]!;
+    // Drei verschiedene Rollen (Spieltest: "zwei gleiche Heilerinnen im Angebot").
+    const h0 = hash3i(a.seed, o.q, o.r, SALT_LEUTE + 3);
+    const art = arten[(h0 + i) % arten.length]!;
     // Passend zum Geschlecht, und nie der Name des Werbers selbst.
     const liste = (WEIBLICH.includes(art) ? FRAUEN : MAENNER).filter((n) => n !== o.name);
     return { art, name: liste[(n0 + i * 7) % liste.length]!, preis: SOELDNER[art].preis + aufschlag };
@@ -2842,7 +2854,8 @@ function ticken(a: Abenteuer, takt: number): void {
   }
   a.schleime.push(...neue);
   // Nachschub: je spaeter der Akt (und je hoeher die Heldenstufe), desto oefter und zaeher.
-  if (a.zeit > NACHSCHUB_RUHE && a.zeit % nachschubTakt(a) === 0) {
+  // Waehrend ein Boss des Akts lebt, kommt kein Nachschub - der Kampf bleibt lesbar.
+  if (a.zeit > NACHSCHUB_RUHE && a.zeit % nachschubTakt(a) === 0 && !a.schleime.some((x) => x.boss && x.bossArt !== 'penta')) {
     for (let versuch = 0; versuch < 12; versuch++) {
       const dir = HEX_DIRS[rng.int(6)]!;
       const weit = 5 + rng.int(3);
@@ -2906,12 +2919,12 @@ function ticken(a: Abenteuer, takt: number): void {
       if (i >= 0) a.legendaer = (a.legendaer ?? []).filter((_, j) => j !== i);
       a.leben = maxLebenVon(a);
       a.ereignisse.push({ art: 'wiederbelebt', takt });
-      melde(a, 'Der Ritter faellt - und steht wieder auf! Das Extra-Leben ist verbraucht.');
+      melde(a, `${KLASSEN[a.klasse ?? 'ritter'].name}: du faellst - und stehst wieder auf! Das Extra-Leben ist verbraucht.`);
       return;
     }
     a.leben = 0;
     a.phase = 'tot';
-    melde(a, 'Der Ritter faellt. Das Abenteuer ist zu Ende.');
+    melde(a, `${KLASSEN[a.klasse ?? 'ritter'].name}: du faellst. Das Abenteuer ist zu Ende.`);
   }
 }
 

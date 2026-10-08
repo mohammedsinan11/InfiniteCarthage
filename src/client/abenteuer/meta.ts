@@ -99,7 +99,7 @@ export const ERFOLGE: readonly { id: string; name: string; text: string; ruhm: n
   { id: 'schwarz', name: 'Schwarze Legende', text: 'Gewinne als Schwarzer Ritter.', ruhm: 80, pruefe: (a) => a.phase === 'sieg' && a.klasse === 'schwarz' },
   { id: 'held2', name: 'Bewaehrt', text: 'Gewinne auf Heldenstufe 2.', ruhm: 60, pruefe: (a) => a.phase === 'sieg' && (a.heldenstufe ?? 0) >= 2 },
   { id: 'held4', name: 'Unbeugsam', text: 'Gewinne auf Heldenstufe 4.', ruhm: 120, pruefe: (a) => a.phase === 'sieg' && (a.heldenstufe ?? 0) >= 4 },
-  { id: 'tag', name: 'Taeglich Brot', text: 'Schliesse ein Tagesabenteuer ab.', ruhm: 15, pruefe: (a) => !!a.tag },
+  { id: 'tag', name: 'Taeglich Brot', text: 'Besiege im Tagesabenteuer den ersten Boss.', ruhm: 15, pruefe: (a) => !!a.tag && (a.koenige ?? 0) >= 1 },
   { id: 'alle', name: 'Meister aller Klassen', text: 'Gewinne mit allen fuenf Klassen.', ruhm: 200, pruefe: (a, m) => new Set([...m.siegKlassen, ...(a.phase === 'sieg' ? [a.klasse ?? 'ritter'] : [])]).size >= 5 },
 ];
 

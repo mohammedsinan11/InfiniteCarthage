@@ -39,7 +39,11 @@ const TIPPS: readonly Tipp[] = [
     text: 'Tipp: Warten (S) sammelt Fokus (bis 3, kleine Flammen ueber dir). Dein naechster Hieb bekommt ihn auf den Wurf - mit vollem Fokus macht er +1 Schaden. Gehen bricht den Fokus.',
   },
   { id: 'faehigkeit', wann: (a) => faehigkeitBereit(a), text: 'Deine Waffe ist voll geladen! Druecke 1 (oder den runden Knopf unten), um ihre Faehigkeit auszuloesen.' },
-  { id: 'wenig', wann: (a) => a.leben <= 2 && a.phase !== 'tot', text: 'Wenig Leben! Druecke H (oder den roten Knopf unten), um ein Kraut zu essen. Wartest du (S), ohne dass ein Gegner nah ist, bekommst du einmal je Zug +1 Leben.' },
+  {
+    id: 'wenig',
+    wann: (a) => a.leben <= 2 && a.phase !== 'tot',
+    text: 'Wenig Leben! Geh auf Abstand zu den Gegnern: Wartest du (S), ohne dass ein Gegner nah ist, bekommst du einmal je Zug +1 Leben. Hast du Kraeuter, heilt H (oder der rote Knopf unten).',
+  },
   {
     id: 'altar',
     wann: (a) => (a.orte ?? []).some((o) => o.art === 'altar' && !o.benutzt && hexDistanceZu(o, a.pos) <= 3),
