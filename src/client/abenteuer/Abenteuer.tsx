@@ -28,6 +28,7 @@ import {
   gelaendeBonus,
   abwehrAugen,
   OMEN,
+  rasten,
   decken,
   synergien,
   ereignisMoeglich,
@@ -643,6 +644,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const logRef = useRef<HTMLDivElement | null>(null);
   const [lager, setLager] = useState(() => lade() === null && ladeMeta().laeufe > 0);
   const [hilfeOffen, setHilfeOffen] = useState(false);
+  const ladenZeilen = useRef<{ laden: number | null; ids: string[] }>({ laden: null, ids: [] });
   const offen = useRef({ lager, legenden: legendenOffen, hilfe: hilfeOffen });
   offen.current = { lager, legenden: legendenOffen, hilfe: hilfeOffen };
   const [track, setTrack] = useState(laufenderTrack);
@@ -924,7 +926,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       const k = /^Key[A-Z]$/.test(e.code) ? e.code.slice(3).toLowerCase() : e.key.toLowerCase();
       const jetzt = aktuell.current;
       // Offene Fenster fangen die Tasten ab (Spieltest: "S lief unter dem Laden weiter").
-      if (offen.current.lager) return;
+      if (offen.current.lager) {
+        // Esc schliesst das Lager, wenn ein Abenteuer laeuft (Spieltest 9).
+        if (k === 'escape' && jetzt.phase !== 'tot' && jetzt.phase !== 'sieg') setLager(false);
+        return;
+      }
       if (offen.current.legenden) {
         if (k === 'escape') setLegendenOffen(false);
         return;
@@ -972,6 +978,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       } else if (k === 'g') {
         e.preventDefault();
         if (!rolltRef.current) setze(decken(aktuell.current));
+      } else if (k === 't') {
+        e.preventDefault();
+        if (!rolltRef.current) setze(rasten(aktuell.current));
       } else if (k === 'r') {
         e.preventDefault();
         neuWurf();
@@ -1929,13 +1938,41 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           // Kein Buchstabe auf Wasser und Unbetretbarem - ausser dort steht jemand (Spieltest).
           if (!betretbar(a, nq, nr) && !a.schleime.some((x) => x.q === nq && x.r === nr)) continue;
           const pz = zentrum(nq, nr);
-          ctx.fillStyle = 'rgba(18, 14, 9, 0.75)';
+          // Steht dort ein Gegner, ist die Taste ein Angriff - rot (Spieltest 9: "D griff an, ohne dass ich es sah").
+          ctx.fillStyle = a.schleime.some((x) => x.q === nq && x.r === nr) ? 'rgba(170, 30, 20, 0.9)' : 'rgba(18, 14, 9, 0.75)';
           ctx.fillRect(pz.x - 4 * f, pz.y - 4 * f, 8 * f, 8 * f);
           ctx.fillStyle = '#f2e7d0';
           ctx.fillText(t.toUpperCase(), pz.x, pz.y + f * 0.5);
         }
       }
 
+      // Ist ein Boss wach, aber nicht im Bild: ein roter Pfeil am Rand zeigt zu ihm (Spieltest 9).
+      {
+        const boss = a.schleime.find((x) => x.boss);
+        if (boss && still) {
+          const o = mitte(boss.q, boss.r);
+          const bxp = sx(o.x);
+          const byp = sy(o.y);
+          const rand = 40 * dpr;
+          if (hexDistance(boss, a.pos) > sicht || bxp < rand || bxp > c.width - rand || byp < rand || byp > c.height - rand) {
+            const mx = c.width / 2;
+            const my = c.height / 2;
+            const w = Math.atan2(byp - my, bxp - mx);
+            const r = Math.min((c.width / 2 - rand) / Math.abs(Math.cos(w) || 1e-6), (c.height / 2 - rand) / Math.abs(Math.sin(w) || 1e-6));
+            const px = mx + Math.cos(w) * r;
+            const py = my + Math.sin(w) * r;
+            const k = 7 * f;
+            ctx.fillStyle = `rgba(255, 70, 50, ${0.75 + 0.25 * Math.sin(sek * 5)})`;
+            ctx.beginPath();
+            ctx.moveTo(px + Math.cos(w) * k, py + Math.sin(w) * k);
+            ctx.lineTo(px + Math.cos(w + 2.5) * k, py + Math.sin(w + 2.5) * k);
+            ctx.lineTo(px + Math.cos(w - 2.5) * k, py + Math.sin(w - 2.5) * k);
+            ctx.closePath();
+            ctx.fill();
+            schrift(`${hexDistance(boss, a.pos)}`, px - Math.cos(w) * k * 1.6, py - Math.sin(w) * k * 1.6, '#ff8a6a', 1, 5);
+          }
+        }
+      }
       // Gebannte und taumelnde Gegner: kreisende Sterne ueber dem Kopf (Spieltest 8: "man sieht nicht, wer gebannt ist").
       if (still) {
         for (const x of a.schleime) {
@@ -2434,8 +2471,10 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         const breite = Math.max(...zeilen.map((z) => ctx.measureText(z).width)) + 8 * f;
         const zeileH = 6 * f;
         const hoeheB = zeilen.length * zeileH + 4 * f;
-        const bx = Math.min(c.width - breite - 2 * f, Math.max(2 * f, Math.round(sx(o.x) + 10 * f)));
         const by = Math.min(c.height - hoeheB - 2 * f, Math.max(2 * f, Math.round(sy(o.y) - hoeheB / 2)));
+        // Oben rechts liegt die Karte, links die Werte - die Box bleibt dazwischen (Spieltest 9: abgeschnitten).
+        const rechtsFrei = by < 320 * dpr ? c.width - 210 * dpr : c.width - 2 * f;
+        const bx = Math.min(rechtsFrei - breite, Math.max(180 * dpr, Math.round(sx(o.x) + 10 * f)));
         ctx.fillStyle = 'rgba(18, 13, 8, 0.92)';
         ctx.fillRect(bx, by, breite, hoeheB);
         ctx.strokeStyle = feind?.boss ? '#ff4a3a' : feind ? '#c8a35a' : '#7ab0d8';
@@ -2662,7 +2701,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                     {akt === AKTE ? ' (Endboss)' : ''}: {kills}/{ziel}
                   </span>
                   {a.bossBald != null ? (
-                    <small className="ab-akt-uhr ab-boss-bald">Der Boden bebt! Boss in {Math.max(0, a.bossBald - a.zug)} {a.bossBald - a.zug === 1 ? 'Zug' : 'Zuegen'}</small>
+                    <small className="ab-akt-uhr ab-boss-bald">
+                      {a.bossBald - a.zug <= 0 ? 'Der Boden bebt! Der Boss erwacht jetzt!' : `Der Boden bebt! Boss in ${a.bossBald - a.zug} ${a.bossBald - a.zug === 1 ? 'Zug' : 'Zuegen'}`}
+                    </small>
                   ) : (
                     <small className="ab-akt-uhr">
                       {aktZiel(a) - kills === 1 ? 'noch 1 Gegner' : `noch ${aktZiel(a) - kills} Gegner`} - oder in {zuegeBisBoss(a)} Zuegen
@@ -2814,7 +2855,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           ))}
         </div>
         <div className="ab-verlauf" title="Diesen Zug gedrueckt">
-          {zugTasten.length > 0 ? zugTasten.slice(-12).map((t, i) => <kbd key={i}>{t.toUpperCase()}</kbd>) : <small>Oder ein Feld antippen · S Fokus · G Deckung</small>}
+          {zugTasten.length > 0 ? zugTasten.slice(-12).map((t, i) => <kbd key={i}>{t.toUpperCase()}</kbd>) : <small>Oder ein Feld antippen · S Fokus · G Deckung · T Rasten</small>}
         </div>
       </div>
 
@@ -3013,6 +3054,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               <dd>Ein angesagter Angriff - er trifft im naechsten Takt. Geh weg! Steht ueber dir eine rote Zahl, trifft dich so viel. Wer ins Leere schlaegt, taumelt: freie Hiebe.</dd>
               <dt>Treffen</dt>
               <dd>Wurf + Angriff (+ Fokus) muss die Schwelle erreichen: 4, ab Akt 2 hoeher, Panzer und Elite mehr. Eine 1 verfehlt immer, eine 6 trifft immer.</dd>
+              <dt>Rasten</dt>
+              <dd>T wartet die uebrigen Schritte ab, solange kein Gegner nah ist. Nach zwei Fehlschlaegen in Folge trifft dein naechster Hieb sicher.</dd>
               <dt>Deckung</dt>
               <dd>G: ein Schritt wie Warten - statt Fokus faengt die Deckung beim naechsten Treffer einen Schaden ab.</dd>
               <dt>Fokus</dt>
@@ -3079,7 +3122,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         const o = (a.orte ?? []).find((x) => x.id === a.laden);
         if (!o || hexDistance(o, a.pos) > 1) return null;
         const zu = () => setze(ladenZu(aktuell.current));
-        const ware = vorrat.filter(([id]) => verkaufsPreis(id) > 0);
+        // Spieltest 9: "Nach dem Verkauf rutschen die Zeilen" - jede Zeile bleibt bis zum Schliessen stehen.
+        const jetzt = vorrat.filter(([id]) => verkaufsPreis(id) > 0).map(([id]) => id);
+        if (ladenZeilen.current.laden !== a.laden) ladenZeilen.current = { laden: a.laden ?? null, ids: [] };
+        ladenZeilen.current.ids = [...ladenZeilen.current.ids, ...jetzt.filter((id) => !ladenZeilen.current.ids.includes(id))];
+        const ware = ladenZeilen.current.ids.map((id) => [id, a.inventar[id] ?? 0] as const);
         return (
           <div className="ab-ende ab-legenden-huelle" onClick={zu}>
             <div className="ab-fenster ab-laden" onClick={(e) => e.stopPropagation()}>
@@ -3147,20 +3194,18 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                   <small>Verkaufen</small>
                   {ware.length === 0 && <p className="ab-leer">Nichts, was der Haendler kauft. Ausruestung, Gelee, Kraeuter und Fische nimmt er gern.</p>}
                   {ware.map(([id, n]) => (
-                    <div key={id} className="ab-laden-zeile" {...tippHandler(id, setTipp)}>
+                    <div key={id} className={n > 0 ? 'ab-laden-zeile' : 'ab-laden-zeile weg'} {...tippHandler(id, setTipp)}>
                       <Icon id={id} groesse={20} />
                       <span>
                         {gegenstand(id)?.name}
                         {n > 1 ? ` ×${n}` : ''}
                       </span>
-                      <button className="klein ab-verkaufen" onClick={() => setze(verkaufen(aktuell.current, id))}>
-                        Verkaufen +{verkaufsPreis(id)}
+                      <button className="klein ab-verkaufen" disabled={n === 0} onClick={() => setze(verkaufen(aktuell.current, id))}>
+                        {n === 0 ? 'Verkauft' : `Verkaufen +${verkaufsPreis(id)}`}
                       </button>
-                      {n > 1 && (
-                        <button className="klein" onClick={() => setze(verkaufen(aktuell.current, id, true))}>
-                          Alle +{verkaufsPreis(id) * n}
-                        </button>
-                      )}
+                      <button className="klein" disabled={n <= 1} style={{ visibility: n > 1 ? 'visible' : 'hidden' }} onClick={() => setze(verkaufen(aktuell.current, id, true))}>
+                        Alle +{verkaufsPreis(id) * Math.max(1, n)}
+                      </button>
                     </div>
                   ))}
                 </>

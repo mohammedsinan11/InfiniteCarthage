@@ -282,7 +282,8 @@ describe('Abenteuer', () => {
     expect(maxLebenVon(z)).toBe(7);
     const w = neuesAbenteuer(5, { klasse: 'waldlaeufer', extras: ['kraeuter', 'geldkatze'] });
     expect(w.ausruestung.fuesse).toBe('stiefel');
-    expect(w.inventar['kraut']).toBe(2);
+    // Zwei vom Kraeuterbeutel, eins bekommt jeder.
+    expect(w.inventar['kraut']).toBe(3);
     expect(w.inventar['gold']).toBe(10);
     expect(maxLebenVon(neuesAbenteuer(5, { klasse: 'schwarz' }))).toBe(4);
   });
@@ -341,9 +342,11 @@ describe('Abenteuer', () => {
     b.leben = 99;
     let treffer = 0;
     for (let i = 0; i < 30 && b.phase === 'ziehen' && b.schleime.length; i++) {
+      const sicher = (b.fehlschlaege ?? 0) >= 2;
       b = taste(b, 'd');
       for (const e of b.ereignisse) if (e.art === 'hieb' && e.wer === 'ritter') {
-        expect(e.schaden > 0).toBe(e.wurf + 1 >= 5);
+        // Nach zwei Fehlschlaegen trifft der naechste sicher.
+        expect(e.schaden > 0).toBe(sicher || e.wurf + 1 >= 5);
         if (e.schaden > 0) treffer++;
       }
     }
@@ -833,8 +836,9 @@ describe('Abenteuer', () => {
       throw new Error('kein passender Wurf');
     };
     // Kraeuterwuerfel: eine 1 bringt ein Kraut, sonst nichts.
-    expect(wurfMit('kraeuterwuerfel', true).inventar['kraut']).toBe(1);
-    expect(wurfMit('kraeuterwuerfel', false).inventar['kraut']).toBeUndefined();
+    // (Ein Kraut hat jeder von Anfang an.)
+    expect(wurfMit('kraeuterwuerfel', true).inventar['kraut']).toBe(2);
+    expect(wurfMit('kraeuterwuerfel', false).inventar['kraut']).toBe(1);
     // Schildwuerfel: 1 oder 2 - Schutzwall.
     expect(wurfMit('schildwuerfel', true).bereit).toBe('schutzwall');
     // Heilwuerfel: gerade Zahl heilt ein halbes Herz.

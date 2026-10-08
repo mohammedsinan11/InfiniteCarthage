@@ -117,7 +117,7 @@ export const WUERFEL_EFFEKT: Record<string, readonly number[]> = {
 
 export const GEGENSTAENDE: readonly Gegenstand[] = [
   { id: 'glueckswuerfel', name: 'Glueckswuerfel', slot: 'wuerfel', wuerfelWert: 3, text: 'Einmal je Zug darfst du neu wuerfeln (R) - solange du noch keinen Schritt gegangen bist.' },
-  { id: 'bleiwuerfel', name: 'Bleiwuerfel', slot: 'wuerfel', wuerfelWert: 3, text: 'Schwer und treu: wuerfelt nie unter 3.' },
+  { id: 'bleiwuerfel', name: 'Bleiwuerfel', slot: 'wuerfel', wuerfelWert: 3, text: 'Schwer und treu: dein Schritt-Wurf ist nie unter 3 (nicht beim Zuschlagen).' },
   { id: 'zwillingswuerfel', name: 'Zwillingswuerfel', slot: 'wuerfel', wuerfelWert: 4, text: 'Zwei Wuerfel auf einmal - der hoehere zaehlt.' },
   { id: 'wanderwuerfel', name: 'Wanderwuerfel', slot: 'wuerfel', wuerfelWert: 3, text: 'Acht Seiten: 1 bis 8 Schritte.' },
   { id: 'fluchwuerfel', name: 'Fluchwuerfel', slot: 'wuerfel', wuerfelWert: 2, text: 'Zehn Seiten: 1 bis 10 Schritte - aber eine 1 kostet dich ein Leben.' },
@@ -518,6 +518,8 @@ export type Abenteuer = {
   angeboten?: string[];
   /** Fokus (0 bis FOKUS_MAX): Warten sammelt ihn, der naechste Hieb nutzt ihn, Gehen bricht ihn. */
   fokus?: number;
+  /** Fehlschlaege in Folge - nach zweien trifft der naechste Hieb sicher. */
+  fehlschlaege?: number;
   /** Beim Haendler gekaufte Einzelstuecke ("ortId:id"). */
   gekauft?: string[];
   /** Der Akt (1 bis AKTE): jeder endet mit seinem Boss, der dritte mit dem Endboss. */
@@ -908,7 +910,7 @@ function gibGegenstand(a: Abenteuer, id: string, woher: string): void {
 export type KlasseId = 'ritter' | 'waldlaeufer' | 'zwerg' | 'paladin' | 'schwarz';
 export const KLASSEN: Record<KlasseId, { name: string; figur: string; text: string; leben: number; ausruestung: Partial<Record<Slot, string>>; inventar?: Record<string, number> }> = {
   ritter: { name: 'Ritter', figur: 'kachel', text: 'Ausgewogen: Schwert, 6 Leben.', leben: 6, ausruestung: { waffe: 'schwert' } },
-  waldlaeufer: { name: 'Waldlaeuferin', figur: 'waldlaeufer', text: 'Schnell und weitsichtig: Stiefel und Laterne, aber nur 5 Leben.', leben: 5, ausruestung: { waffe: 'schwert', fuesse: 'stiefel', zubehoer: 'laterne' } },
+  waldlaeufer: { name: 'Waldlaeuferin', figur: 'waldlaeufer', text: 'Schnell und weitsichtig: Stiefel und Laterne, 6 Leben.', leben: 6, ausruestung: { waffe: 'schwert', fuesse: 'stiefel', zubehoer: 'laterne' } },
   zwerg: { name: 'Zwerg', figur: 'zwerg', text: 'Zaeh: Axt (Spalthieb, Holz) und Helm (+1 Herz), 7 Leben.', leben: 6, ausruestung: { waffe: 'axt', kopf: 'helm' } },
   paladin: { name: 'Paladin', figur: 'paladin', text: 'Standhaft: Schild und zwei Kraeuter, 6 Leben.', leben: 6, ausruestung: { waffe: 'schwert', schild: 'schild' }, inventar: { kraut: 2 } },
   schwarz: { name: 'Schwarzer Ritter', figur: 'schwarz', text: 'Fuer Wagemutige: Runenklinge, aber nur 4 Leben.', leben: 4, ausruestung: { waffe: 'runenklinge' } },
@@ -958,7 +960,8 @@ function startAnwenden(a: Abenteuer, o: StartOptionen): void {
   if (o.legenden?.length) a.legenden = o.legenden.filter((x) => LEGENDEN_FREI.includes(x));
   if (o.omen) a.omen = o.omen === true ? omenFuer(a.seed) : o.omen;
   a.ausruestung = { ...a.ausruestung, waffe: null, ...k.ausruestung };
-  a.inventar = { ...k.inventar };
+  // Ein Kraut fuer jeden (auch im Tagesabenteuer) - der erste Notfall ist zu ueberleben.
+  a.inventar = { ...k.inventar, kraut: (k.inventar?.['kraut'] ?? 0) + 1 };
   a.extraHerzen = k.leben - GRUND_LEBEN;
   const extras = o.extras ?? [];
   if (extras.includes('kraeuter')) a.inventar = { ...a.inventar, kraut: (a.inventar['kraut'] ?? 0) + 2 };
@@ -1337,6 +1340,19 @@ export const schrittKosten = (a: Abenteuer, q: number, r: number): number => kos
  * der Spieluhr - danach huepfen die Schleime.
  */
 /**
+ * RASTEN (T). Spieltest 9: "S, S, S ... viele tote Tastendruecke." Wartet die
+ * uebrigen Schritte ab - aber nur, solange kein Gegner naeher als 4 Felder ist.
+ */
+export function rasten(alt: Abenteuer): Abenteuer {
+  if (alt.phase !== 'ziehen' || alt.wahl) return alt;
+  const nah = (x: Abenteuer) => x.schleime.some((s) => hexDistance(s, x.pos) <= 3);
+  if (nah(alt)) return { ...alt, ereignisse: [], log: [...alt.log, 'Zum Rasten sind Gegner zu nah.'].slice(-30) };
+  let a = alt;
+  for (let i = 0; i < 12 && a.phase === 'ziehen' && !a.wahl && !nah(a); i++) a = taste(a, 's');
+  return a;
+}
+
+/**
  * DECKUNG (G). Spieltest 8: "Uebrige Schritte sind nur S, S, S." Wie Warten ein
  * Schritt - aber statt Fokus faengt die Deckung beim naechsten Treffer einen Schaden ab.
  */
@@ -1549,7 +1565,12 @@ function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
   const krit = gegenstand(a.ausruestung.waffe ?? '')?.krit ?? 2;
   // Der Panzer will einen kraeftigeren Hieb; spaetere Akte und Elite auch. Eine 1 verfehlt, eine 6 trifft.
   const noetig = noetigFuer(a, s);
-  const trifft = wurf !== 1 && (wurf === 6 || summeWurf >= noetig);
+  // Spieltest 9: "Drei Einsen in Folge" - nach zwei Fehlschlaegen trifft der naechste sicher; Gebannte verfehlt man nicht mit einer 1.
+  const sicher = (a.fehlschlaege ?? 0) >= 2;
+  const wehrlos = (s.gebannt ?? 0) > a.zeit;
+  const trifft = sicher || ((wurf !== 1 || wehrlos) && (wurf === 6 || summeWurf >= noetig || (wehrlos && wurf === 1 && summeWurf >= noetig - 1)));
+  a.fehlschlaege = trifft ? 0 : (a.fehlschlaege ?? 0) + 1;
+  if (sicher) melde(a, 'Pech gleicht sich aus: dieser Hieb trifft sicher.');
   let schaden = trifft ? (wurf === 6 ? krit : 1) + (fokus >= FOKUS_MAX ? 1 : 0) : 0;
   if (fokus > 0) melde(a, fokus >= FOKUS_MAX ? `Voller Fokus: +${fokus} auf den Wurf und ein Wuchtschlag (+1 Schaden)!` : `Fokus: +${fokus} auf den Wurf.`);
   // Ein geladener Spalthieb legt beim naechsten Treffer zwei drauf.
@@ -1855,7 +1876,7 @@ export function entfessle(a: Abenteuer, f: Faehigkeit, takt: number): void {
     return;
   }
   // Die Axt entfesselt ihren Spalthieb im Wald (oder am Waldrand): ein Scheit Holz.
-  if (f === 'spalthieb' && [a.pos, ...HEX_DIRS.map(([dq, dr]) => ({ q: a.pos.q + dq, r: a.pos.r + dr }))].some((h) => istWald(gelaende(a.seed, h.q, h.r)))) holzSchlagen(a, 1);
+  if (f === 'spalthieb' && a.ausruestung.waffe === 'axt' && [a.pos, ...HEX_DIRS.map(([dq, dr]) => ({ q: a.pos.q + dq, r: a.pos.r + dr }))].some((h) => istWald(gelaende(a.seed, h.q, h.r)))) holzSchlagen(a, 1);
   // Spalthieb und Schutzwall warten auf den naechsten Treffer.
   a.bereit = f;
   a.ereignisse.push({ art: 'faehigkeit', takt, name: f });
@@ -2000,7 +2021,9 @@ function deckungFaengt(a: Abenteuer, schaden: number): number {
   return schaden - 1;
 }
 /** Abwehr: ein Wurf bis zu anderthalbmal der Abwehr prallt ab (Abwehr 1: eine 1, 2: bis 3, 3: bis 4). */
-const abgewehrt = (a: Abenteuer, wurf: number): boolean => wurf <= Math.floor(abwehrVon(a) * 1.5);
+// Spieltest 9: "Ab Abwehr +5 haelt der Schild alles" - hoechstens 1 bis ABWEHR_MAX, Bosse durchschlagen einen Punkt.
+export const ABWEHR_MAX = 3;
+const abgewehrt = (a: Abenteuer, wurf: number, boss = false): boolean => wurf <= Math.min(ABWEHR_MAX, Math.floor(Math.max(0, abwehrVon(a) - (boss ? 1 : 0)) * 1.5));
 /** Mit welcher Augenzahl man einen Gegner trifft (fuer die Anzeige "4+"). */
 /**
  * Was ein Hieb erreichen muss: 4 (Panzer 5), ab Akt 2 einer mehr, ab Akt 3 zwei, Elite einen mehr.
@@ -2013,7 +2036,7 @@ export const trefferAb = (a: Abenteuer, s: Pick<Schleim, 'art'> & { elite?: bool
 export const gegnerWucht = (a: Abenteuer, s: Pick<Schleim, 'boss' | 'gross' | 'elite' | 'bossArt'>): number =>
   s.boss ? BOSS_SCHADEN + ((a.akt ?? 1) >= AKTE && s.bossArt !== 'penta' ? 1 : 0) : (s.gross ? 2 : 1) + ((a.akt ?? 1) >= 3 || s.elite ? 1 : 0);
 /** Wie oft die Abwehr einen Treffer abfaengt, in Augen eines W6. */
-export const abwehrAugen = (a: Abenteuer): number => Math.min(6, Math.floor(abwehrVon(a) * 1.5));
+export const abwehrAugen = (a: Abenteuer): number => Math.min(ABWEHR_MAX, Math.floor(abwehrVon(a) * 1.5));
 
 /** Dornenpanzer: wer trifft, nimmt 1 Schaden. */
 function dornen(a: Abenteuer, s: Schleim, takt: number): void {
@@ -2064,7 +2087,7 @@ function jagtMit(a: Abenteuer, s: Schleim): boolean {
   const jaeger = a.schleime
     .filter((x) => !x.boss && hexDistance(x, a.pos) <= WITTERUNG)
     .sort((x, y) => hexDistance(x, a.pos) - hexDistance(y, a.pos) || x.id - y.id)
-    .slice(0, RUDEL_AKT1);
+    .slice(0, a.zug <= 5 ? 2 : RUDEL_AKT1);
   return jaeger.some((x) => x.id === s.id);
 }
 
@@ -2195,13 +2218,13 @@ function koenigTrifft(a: Abenteuer, s: Schleim, felder: readonly Hex[], takt: nu
   }
   if (schutzwall(a, s, feld, takt, wurf)) return;
   // Der Endboss schlaegt haerter.
-  const schaden = abgewehrt(a, wurf) ? 0 : deckungFaengt(a, BOSS_SCHADEN + ((a.akt ?? 1) >= AKTE && s.bossArt !== 'penta' ? 1 : 0));
+  const schaden = abgewehrt(a, wurf, true) ? 0 : deckungFaengt(a, BOSS_SCHADEN + ((a.akt ?? 1) >= AKTE && s.bossArt !== 'penta' ? 1 : 0));
   a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: 'ritter', feld, wurf, schaden });
   if (schaden > 0) {
     a.leben -= schaden;
     melde(a, `Der ${schleimName(s)} trifft dich: -${schaden} Leben.`);
     dornen(a, s, takt);
-  } else if (abgewehrt(a, wurf)) melde(a, `Dein Schild faengt den ${schleimNameAkk(s)} ab (Wurf ${wurf}).`);
+  } else if (abgewehrt(a, wurf, true)) melde(a, `Dein Schild faengt den ${schleimNameAkk(s)} ab (Wurf ${wurf}).`);
 }
 
 /** Der Koenig handelt (nur jeden zweiten Tick, wie alle grossen Schleime). */
@@ -3487,4 +3510,5 @@ export function abenteuerPunkte(a: Abenteuer): number {
 }
 /** Ruhm fuer das Lager: 10 fuer jedes Abenteuer und ein Zwoelftel der Punkte (Spieltest: "Ruhm kommt zu langsam"). */
 // Spieltest 7: "Ein Sieg kauft das halbe Lager" - ein Zwanzigstel der Punkte.
-export const ruhmFuer = (a: Abenteuer): number => 10 + Math.floor(abenteuerPunkte(a) / 20);
+// Spieltest 9: "Frueher Tod bringt fast nichts" - Niederlagen zaehlen ein Zehntel, Siege ein Zwanzigstel.
+export const ruhmFuer = (a: Abenteuer): number => 10 + Math.floor(abenteuerPunkte(a) / (a.phase === 'sieg' ? 20 : 10)) + 5 * ((a.akt ?? 1) - 1);
