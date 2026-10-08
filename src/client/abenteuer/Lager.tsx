@@ -5,7 +5,7 @@
  * Bestwert je Tag).
  */
 
-import { AKTE, HELDENSTUFE_REGEL, KLASSEN, START_EXTRAS, gegenstand } from '../../abenteuer/regeln';
+import { AKTE, HELDENSTUFE_REGEL, KLASSEN, OMEN, START_EXTRAS, gegenstand, omenFuer } from '../../abenteuer/regeln';
 import type { KlasseId } from '../../abenteuer/regeln';
 import { FigurBild } from './DebugFenster';
 import { ERFOLGE, FREISCHALTUNGEN, freischalten, heute, istFrei } from './meta';
@@ -137,9 +137,13 @@ export function Lager({ meta, onMeta, onAufbruch, onZurueck }: { meta: Meta; onM
           <button className="primary" onClick={() => onAufbruch({ klasse: meta.klasse, stufe: meta.stufe })}>
             Aufbrechen als {KLASSEN[meta.klasse].name}
           </button>
-          <button onClick={() => onAufbruch({ klasse: 'ritter', stufe: 0, tag })} title="Dieselbe Welt fuer alle - heute. Ritter, ohne Mitgift.">
+          <button
+            onClick={() => onAufbruch({ klasse: 'ritter', stufe: 0, tag })}
+            title={`Dieselbe Welt fuer alle - heute. Immer als Ritter, ohne Mitgift und Heldenstufe. Vorzeichen: ${OMEN[omenFuer(tag.seed)].name} - ${OMEN[omenFuer(tag.seed)].text}`}
+          >
             Tagesabenteuer {tag.tag}
             {tagBest ? ` (Bestwert ${tagBest})` : ''}
+            <small className="ab-tag-info">Ritter ohne Mitgift · Vorzeichen: {OMEN[omenFuer(tag.seed)].name}</small>
           </button>
         </div>
         <p className="ab-lager-stat">

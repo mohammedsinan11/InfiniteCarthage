@@ -186,7 +186,7 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
   { id: 'fisch', name: 'Fisch', heilt: 1, text: 'Antippen: 1 Leben zurueck. Stapelt sich.' },
   { id: 'gold', name: 'Gold', text: 'Muenzen - sie stehen ueber dem Inventar. Noch kauft hier niemand etwas.' },
   { id: 'fluchtruhe', name: 'Verfluchte Truhe', text: 'Darin liegt Legendaeres - aber ihre Waechter erwachen, wenn du sie oeffnest.' },
-  { id: 'fluch_oeffnen', name: 'Oeffnen', text: 'Die Waechter erwachen - kaempfe, dann waehle ein Legendaeres.' },
+  { id: 'fluch_oeffnen', name: 'Oeffnen', text: 'Waehle sofort ein Legendaeres - dann erwachen die Waechter.' },
   { id: 'fluch_lassen', name: 'Stehen lassen', text: 'Lieber nicht. Du kannst spaeter wiederkommen.' },
   { id: 'goldfisch', name: 'Goldfisch', text: 'Ein seltener Fang - der Haendler zahlt 8 Gold.' },
   { id: 'extraherz', name: 'Heilung', text: 'Sofort volles Leben.' },
@@ -317,7 +317,8 @@ export const SCHLEIM_NAME: Record<SchleimArt, string> = {
 export type BossArt = 'koenig' | 'schatten' | 'koloss' | 'penta';
 export const BOSS_NAME: Record<BossArt, string> = { koenig: 'Schleimkoenig', schatten: 'Schattenschleim', koloss: 'Gelee-Koloss', penta: 'Pentagrammschleim' };
 const BOSS_FOLGE: readonly BossArt[] = ['koenig', 'schatten', 'koloss'];
-const BOSS_GRUND: Record<BossArt, number> = { koenig: 10, schatten: 14, koloss: 22, penta: 16 };
+// Spieltest: "Bosskaempfe in Akt 1 und 2 ziehen sich" - darum weniger Leben.
+const BOSS_GRUND: Record<BossArt, number> = { koenig: 8, schatten: 11, koloss: 22, penta: 16 };
 
 /** Ein neuer Schleim: die Art aus einer Zahl 0..99 - gut die Haelfte gewoehnlich. */
 function neuerSchleim(id: number, q: number, r: number, zahl: number, fern: boolean): Schleim {
@@ -334,19 +335,21 @@ function neuerSchleim(id: number, q: number, r: number, zahl: number, fern: bool
 /** Die ersten so vielen Ticks kommt kein Nachschub - ein ruhiger Anfang. */
 const NACHSCHUB_RUHE = 8;
 /** Alle wie viele Ticks Nachschub kommt: Akt 1 selten, Akt 3 oft. */
-const nachschubTakt = (a: Pick<Abenteuer, 'akt' | 'heldenstufe'>): number => Math.max(4, [11, 8, 6][(a.akt ?? 1) - 1]! - (a.heldenstufe ?? 0));
+const nachschubTakt = (a: Pick<Abenteuer, 'akt' | 'heldenstufe' | 'omen'>): number =>
+  Math.max(4, [11, 8, 6][(a.akt ?? 1) - 1]! - (a.heldenstufe ?? 0) - (a.omen === 'wildnis' ? 3 : 0));
 /** Welche Art kommt: in Akt 1 vor allem gewoehnliche, spaeter alle. */
 function artZahl(a: Pick<Abenteuer, 'akt'>, rng: Rng): number {
   const akt = a.akt ?? 1;
   return akt === 1 ? 40 + rng.int(60) : akt === 2 ? 10 + rng.int(90) : rng.int(100);
 }
 /** Spaetere Akte und Heldenstufen machen Gegner zaeher; ab Akt 2 gibt es Elite. */
-function staerken(a: Pick<Abenteuer, 'akt' | 'heldenstufe'>, s: Schleim, rng: Rng): Schleim {
+function staerken(a: Pick<Abenteuer, 'akt' | 'heldenstufe' | 'omen'>, s: Schleim, rng: Rng): Schleim {
   const akt = a.akt ?? 1;
   const hs = a.heldenstufe ?? 0;
   let plus = (akt >= 3 ? 1 : 0) + (hs >= 3 ? 1 : 0);
-  const eliteSelten = (akt === 2 ? 8 : 5) / (hs >= 1 ? 2 : 1);
-  if (akt >= 2 && rng.int(Math.max(2, Math.round(eliteSelten))) === 0) {
+  const blut = (a as Pick<Abenteuer, 'omen'>).omen === 'blutmond';
+  const eliteSelten = (akt === 1 ? 7 : akt === 2 ? 8 : 5) / (hs >= 1 ? 2 : 1) / (blut ? 1.6 : 1);
+  if ((akt >= 2 || blut) && rng.int(Math.max(2, Math.round(eliteSelten))) === 0) {
     s.elite = true;
     plus += 2;
   }
@@ -522,6 +525,10 @@ export type Abenteuer = {
   tag?: string;
   /** Im Lager freigeschaltetes Legendaeres, das in diesem Abenteuer vorkommen kann. */
   legenden?: string[];
+  /** Das Vorzeichen dieses Abenteuers (OMEN) - jedes Abenteuer spielt sich etwas anders. */
+  omen?: OmenId;
+  /** Eile: Zuege, die man dem Boss-Zeitplan voraus war - bringt Punkte. */
+  eile?: number;
   /** Beim Haendler geschaerft (Angriff) und verstaerkt (Abwehr) - je hoechstens 2. */
   schmied?: { angriff: number; abwehr: number };
   /** Was zuletzt geschah, neueste zuletzt. */
@@ -658,7 +665,7 @@ export function gelaendeBonus(a: Pick<Abenteuer, 'seed' | 'pos'>, was: 'angriff'
   return b === 'huegel' || b === 'berg' ? 1 : 0;
 }
 export const maxLebenVon = (a: Abenteuer) => GRUND_LEBEN + summe(a, (g) => g.leben) + (a.bonus?.leben ?? 0) + (a.extraHerzen ?? 0);
-export const sichtVon = (a: Abenteuer) => GRUND_SICHT + summe(a, (g) => g.sicht);
+export const sichtVon = (a: Abenteuer) => GRUND_SICHT + summe(a, (g) => g.sicht) - (hatOmen(a, 'nebel') ? 1 : 0);
 const schrittBonus = (a: Abenteuer) => summe(a, (g) => g.schritte);
 export const schrittBonusVon = schrittBonus;
 
@@ -861,7 +868,32 @@ export const KLASSEN: Record<KlasseId, { name: string; figur: string; text: stri
 };
 
 /** Was beim Aufbruch mitkommt: Klasse, freigeschaltete Extras, Heldenstufe, Tagesabenteuer. */
-export type StartOptionen = { klasse?: KlasseId; extras?: string[]; heldenstufe?: number; tag?: string; legenden?: string[] };
+export type StartOptionen = { klasse?: KlasseId; extras?: string[]; heldenstufe?: number; tag?: string; legenden?: string[]; omen?: boolean | OmenId };
+
+/**
+ * VORZEICHEN (OMEN). Spieltest: "Karte, Gegner, Bosse - jedes Abenteuer gleich."
+ * Darum zieht jedes Abenteuer (aus dem Lager) ein Vorzeichen, das die Regeln
+ * etwas verbiegt - mit Risiko kommen mehr Punkte. Der Seed bestimmt es, das
+ * Tagesabenteuer hat also fuer alle dasselbe.
+ */
+export type OmenId = 'goldrausch' | 'blutmond' | 'eile' | 'nebel' | 'segen' | 'wildnis';
+export const OMEN: Record<OmenId, { name: string; text: string; punkte: number }> = {
+  goldrausch: { name: 'Goldrausch', text: 'Alles Gold zaehlt doppelt.', punkte: 1 },
+  blutmond: { name: 'Blutmond', text: 'Elite-Gegner schon ab Akt 1 und oefter. +25 % Punkte.', punkte: 1.25 },
+  eile: { name: 'Eile', text: 'Die Bosse kommen schon nach 10 Zuegen. +20 % Punkte.', punkte: 1.2 },
+  nebel: { name: 'Nebel', text: 'Ein Feld weniger Sicht. +15 % Punkte.', punkte: 1.15 },
+  segen: { name: 'Segen', text: 'Du beginnst mit einer legendaeren Wahl.', punkte: 1 },
+  wildnis: { name: 'Wildnis', text: 'Gegner kommen schneller nach. +15 % Punkte.', punkte: 1.15 },
+};
+export const OMEN_IDS = Object.keys(OMEN) as OmenId[];
+export const omenFuer = (seed: number): OmenId => OMEN_IDS[(seed >>> 0) % 7 % OMEN_IDS.length]!;
+const hatOmen = (a: Pick<Abenteuer, 'omen'>, o: OmenId): boolean => a.omen === o;
+/** Gold dazu - der Goldrausch verdoppelt es. */
+function goldDazu(a: Abenteuer, n: number): number {
+  const gold = hatOmen(a, 'goldrausch') ? n * 2 : n;
+  a.inventar = { ...a.inventar, gold: (a.inventar['gold'] ?? 0) + gold };
+  return gold;
+}
 /** Extras aus dem Lager (mit Ruhm freigeschaltet). */
 export const START_EXTRAS: Record<string, { name: string; text: string }> = {
   kraeuter: { name: 'Kraeuterbeutel', text: 'Du beginnst mit 2 Kraeutern.' },
@@ -877,6 +909,7 @@ function startAnwenden(a: Abenteuer, o: StartOptionen): void {
   a.heldenstufe = o.heldenstufe ?? 0;
   if (o.tag) a.tag = o.tag;
   if (o.legenden?.length) a.legenden = o.legenden.filter((x) => LEGENDEN_FREI.includes(x));
+  if (o.omen) a.omen = o.omen === true ? omenFuer(a.seed) : o.omen;
   a.ausruestung = { ...a.ausruestung, waffe: null, ...k.ausruestung };
   a.inventar = { ...k.inventar };
   a.extraHerzen = k.leben - GRUND_LEBEN;
@@ -892,6 +925,10 @@ function startAnwenden(a: Abenteuer, o: StartOptionen): void {
     a.erkundet = [...neu];
   }
   a.log = [`${k.name}: das Abenteuer beginnt. Akt 1: ${AKT_NAME[0]}. Wuerfle (Enter), um loszuziehen.`];
+  if (a.omen) {
+    a.log.push(`Vorzeichen: ${OMEN[a.omen].name} - ${OMEN[a.omen].text}`);
+    if (a.omen === 'segen') bietWahl(a, 'schatz');
+  }
 }
 
 // --- Hilfen ---------------------------------------------------------------
@@ -952,8 +989,7 @@ function wuerfelWurf(a: Abenteuer): { wurf: number; zusatz: string } {
     a.ereignisse.push({ art: 'fluch', takt: 0 });
     zusatz = ' - der Fluch beisst: -1 Leben';
   } else if (id === 'goldwuerfel' && wurf === 6) {
-    const gold = seite(3);
-    a.inventar = { ...a.inventar, gold: (a.inventar['gold'] ?? 0) + gold };
+    const gold = goldDazu(a, seite(3));
     zusatz = ` - der Goldwuerfel klimpert: +${gold} Gold`;
   }
   a.rng = rng.getState();
@@ -1031,18 +1067,24 @@ export function wuerfeln(alt: Abenteuer): Abenteuer {
   a.ereignisse = [];
   const { wurf, zusatz } = wuerfelWurf(a);
   a.wurf = wurf;
-  a.schritte = a.wurf + schrittBonus(a);
+  // Spieltest: "Eine 1 auf dem roten Feld ist sicherer Schaden." Darum immer mindestens 2 Schritte.
+  a.schritte = Math.max(SCHRITTE_MIN, a.wurf + schrittBonus(a));
   a.pfad = [a.pos];
   a.phase = 'ziehen';
   a.spuren = {};
   a.neuGewuerfelt = false;
-  melde(a, `Gewuerfelt: ${a.wurf}${zusatz}${schrittBonus(a) > 0 ? ` (+${schrittBonus(a)} Stiefel)` : ''} - ${a.schritte} ${a.schritte === 1 ? 'Schritt' : 'Schritte'}.`);
+  melde(
+    a,
+    `Gewuerfelt: ${a.wurf}${zusatz}${schrittBonus(a) > 0 ? ` (+${schrittBonus(a)} Stiefel)` : ''}${a.wurf + schrittBonus(a) < SCHRITTE_MIN ? ' (mindestens 2)' : ''} - ${a.schritte} ${a.schritte === 1 ? 'Schritt' : 'Schritte'}.`,
+  );
   return a;
 }
+/** So viele Schritte gibt jeder Wurf mindestens. */
+export const SCHRITTE_MIN = 2;
 
 /** Glueckswuerfel: neu wuerfeln - einmal je Zug, solange noch kein Schritt getan ist. */
 export const kannNeuWuerfeln = (a: Abenteuer): boolean =>
-  a.phase === 'ziehen' && a.ausruestung.wuerfel === 'glueckswuerfel' && !a.neuGewuerfelt && a.wurf !== null && a.schritte === a.wurf + schrittBonus(a) && a.pfad.length === 1;
+  a.phase === 'ziehen' && a.ausruestung.wuerfel === 'glueckswuerfel' && !a.neuGewuerfelt && a.wurf !== null && a.schritte === Math.max(SCHRITTE_MIN, a.wurf + schrittBonus(a)) && a.pfad.length === 1;
 
 export function neuWuerfeln(alt: Abenteuer): Abenteuer {
   if (!kannNeuWuerfeln(alt)) return alt;
@@ -1051,7 +1093,7 @@ export function neuWuerfeln(alt: Abenteuer): Abenteuer {
   const vorher = a.wurf;
   const { wurf } = wuerfelWurf(a);
   a.wurf = wurf;
-  a.schritte = wurf + schrittBonus(a);
+  a.schritte = Math.max(SCHRITTE_MIN, wurf + schrittBonus(a));
   a.neuGewuerfelt = true;
   melde(a, `Glueckswuerfel: ${vorher} verworfen - neu gewuerfelt: ${wurf}. ${a.schritte} Schritte.`);
   return a;
@@ -1265,7 +1307,7 @@ export function taste(alt: Abenteuer, t: Taste): Abenteuer {
   a.laden = null;
   // Gegen einen Haendler oder Werber laufen: ansprechen - kostet keinen Schritt.
   const ort = ortAuf(a, ziel.q, ziel.r);
-  if (ort) return ansprechen(a, ort.id);
+  if (ort && !(ort.art === 'altar' && ort.benutzt)) return ansprechen(a, ort.id);
   // Ein Wanderer anderer Fraktion steht im Weg - er gruesst.
   const wand = wandererAuf(a, ziel.q, ziel.r);
   if (wand) {
@@ -1285,10 +1327,14 @@ export function taste(alt: Abenteuer, t: Taste): Abenteuer {
   const tier = (a.tiere ?? []).find((t) => t.q === ziel.q && t.r === ziel.r);
   if (tier) {
     if (tier.art === 'schaf') {
-      a.ereignisse.push({ art: 'spruch', takt: 0, wer: tier.id, text: 'Maeh!' });
-      melde(a, 'Das Schaf steht im Weg und bloekt dich an.');
-    } else melde(a, 'Der Schneehase huscht dir zwischen den Beinen weg.');
-    return a;
+      // Spieltest: "Schafe versperren die Flucht" - es trottet zur Seite (tauscht mit dir).
+      a.ereignisse.push({ art: 'gehen', takt: 0, wer: tier.id, von: { q: tier.q, r: tier.r }, nach: { q: a.pos.q, r: a.pos.r } }, { art: 'spruch', takt: 0, wer: tier.id, text: 'Maeh!' });
+      tier.q = a.pos.q;
+      tier.r = a.pos.r;
+    } else {
+      melde(a, 'Der Schneehase huscht dir zwischen den Beinen weg.');
+      return a;
+    }
   }
   const feind = schleimAuf(a, ziel.q, ziel.r);
   if (feind) {
@@ -1449,10 +1495,10 @@ function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
   if (schaden === 0) {
     // Pech gleicht sich aus: ein Fehlschlag gibt einen Punkt Fokus fuer den naechsten Hieb.
     a.fokus = 1;
-    melde(a, `Wurf ${wurf}+${angriffVon(a)}: ${s.art === 'panzer' ? 'prallt am Steinpanzer ab (ab 5)' : 'daneben'} - +1 Fokus fuer den naechsten Hieb.`);
+    melde(a, `Wurf ${wurf}+${angriffVon(a)}${fokus > 0 ? `+${fokus} Fokus` : ''}: ${s.art === 'panzer' ? 'prallt am Steinpanzer ab (ab 5)' : 'daneben'} - +1 Fokus fuer den naechsten Hieb.`);
     return;
   }
-  const vorne = `Wurf ${wurf}+${angriffVon(a)}${spalt ? ', Spalthieb' : ''}`;
+  const vorne = `Wurf ${wurf}+${angriffVon(a)}${fokus > 0 ? `+${fokus} Fokus` : ''}${spalt ? ', Spalthieb' : ''}`;
   verwunde(a, s, schaden, takt, vorne);
   const gefallen = !a.schleime.some((x) => x.id === s.id);
   if (gefallen && hatLegende(a, 'blutdurst') && a.leben < maxLebenVon(a)) {
@@ -1549,8 +1595,7 @@ function verwunde(a: Abenteuer, s: Schleim, schaden: number, takt: number, vorne
   const bisBoss = a.bossErwacht ? '' : ` (${Math.min(a.aktKills, ziel)}/${ziel})`;
   if (s.art === 'bandit' || s.elite) {
     // Banditen und Elite-Schleime lassen Gold fallen.
-    const gold = s.elite ? 4 + (s.id % 3) : 2 + (s.id % 3);
-    a.inventar = { ...a.inventar, gold: (a.inventar['gold'] ?? 0) + gold };
+    const gold = goldDazu(a, s.elite ? 4 + (s.id % 3) : 2 + (s.id % 3));
     melde(a, `${vorne}: der ${schleimName(s)} faellt! +${gold} Gold${bisBoss}.`);
   } else {
     const gelee = s.gross || s.art === 'panzer' || s.art === 'teil' ? 2 : 1;
@@ -1563,7 +1608,15 @@ function verwunde(a: Abenteuer, s: Schleim, schaden: number, takt: number, vorne
 /** Ist der Boss des Akts faellig (und noch keiner da), erwacht er. */
 function bossPruefen(a: Abenteuer, takt: number): void {
   if (a.phase === 'tot' || a.phase === 'sieg' || a.bossErwacht || a.schleime.some((x) => x.boss && x.bossArt !== 'penta')) return;
-  if ((a.aktKills ?? 0) >= aktZiel(a) || bossUngeduldig(a)) bossErwacht(a, takt);
+  if ((a.aktKills ?? 0) >= aktZiel(a)) {
+    // Schneller als der Zeitplan: jeder gesparte Zug bringt Punkte (Spieltest: "Warten ist die sichere, langweilige Loesung").
+    const vorsprung = zuegeBisBoss(a);
+    if (vorsprung > 0) {
+      a.eile = (a.eile ?? 0) + vorsprung;
+      melde(a, `Eile: ${vorsprung} ${vorsprung === 1 ? 'Zug' : 'Zuege'} vor dem Boss-Zeitplan - +${vorsprung * EILE_PUNKTE} Punkte.`);
+    }
+    bossErwacht(a, takt);
+  } else if (bossUngeduldig(a)) bossErwacht(a, takt);
 }
 
 /**
@@ -1571,7 +1624,10 @@ function bossPruefen(a: Abenteuer, takt: number): void {
  * Darum kommt der Boss spaetestens nach AKT_ZUEGE Zuegen im Akt - ungeduldig.
  */
 export const AKT_ZUEGE = 15;
-export const zuegeBisBoss = (a: Pick<Abenteuer, 'zug' | 'aktStart'>): number => Math.max(0, AKT_ZUEGE - (a.zug - (a.aktStart ?? 1)));
+export const zuegeBisBoss = (a: Pick<Abenteuer, 'zug' | 'aktStart' | 'omen'>): number =>
+  Math.max(0, (hatOmen(a, 'eile') ? 10 : AKT_ZUEGE) - (a.zug - (a.aktStart ?? 1)));
+/** Punkte je Zug Vorsprung auf den Boss-Zeitplan. */
+export const EILE_PUNKTE = 8;
 const bossUngeduldig = (a: Abenteuer): boolean => zuegeBisBoss(a) === 0;
 
 /** Heldenstufen veraendern die Regeln - jede Stufe bringt eine dazu. */
@@ -1782,8 +1838,7 @@ function aufheben(a: Abenteuer): void {
   const g = gegenstand(fund);
   // Gold sind Muenzen - eins bis drei auf einmal.
   if (fund === 'gold') {
-    const n = (1 + (hash3i(a.seed, a.pos.q, a.pos.r, SALT_FUND + 9) % 3)) * (hatLegende(a, 'schatzsucher') ? 2 : 1);
-    a.inventar = { ...a.inventar, gold: (a.inventar['gold'] ?? 0) + n };
+    const n = goldDazu(a, (1 + (hash3i(a.seed, a.pos.q, a.pos.r, SALT_FUND + 9) % 3)) * (hatLegende(a, 'schatzsucher') ? 2 : 1));
     melde(a, `${n} ${n === 1 ? 'Goldmuenze' : 'Goldmuenzen'} gefunden.`);
     return;
   }
@@ -2005,7 +2060,9 @@ function koenigTrifft(a: Abenteuer, s: Schleim, felder: readonly Hex[], takt: nu
   const feld = drauf ? { q: a.pos.q, r: a.pos.r } : felder[0]!;
   if (!drauf) {
     a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: null, feld, wurf, schaden: 0 });
-    melde(a, `Ausgewichen! Der ${schleimName(s)} schlaegt ins Leere.`);
+    // Spieltest: "Bosskaempfe sind zaeh" - wer dem Boss ausweicht, bekommt ein Fenster zum Zurueckschlagen.
+    taumeln(a, s);
+    melde(a, `Ausgewichen! Der ${schleimName(s)} schlaegt ins Leere - und taumelt: freie Hiebe!`);
     return;
   }
   if (schutzwall(a, s, feld, takt, wurf)) return;
@@ -2349,8 +2406,8 @@ const SPRUCH = {
   daemon: ['Brennen soll es!', 'Mehr! Gib mir mehr Schleim!', 'Hehehe ... Feuer.'],
   lichtgeist: ['Ich bin bei dir.', 'Das Licht heilt.', 'Fuerchte dich nicht.'],
   wolf: ['Grrrr ...', 'Awuuuh!', '*schnueffelt*'],
-  orden: ['Fuer die Waage!', 'Gruss dir, Ritter.', 'Die Wege sind nicht sicher.', 'Hast du Banditen gesehen?'],
-  jaeger: ['Psst - du verscheuchst das Wild.', 'Heute gibt es Hasenbraten!', 'Der Wald hat Augen.', 'Gute Jagd, Ritter.'],
+  orden: ['Fuer die Waage!', 'Gruss dir, Wanderer.', 'Die Wege sind nicht sicher.', 'Hast du Banditen gesehen?'],
+  jaeger: ['Psst - du verscheuchst das Wild.', 'Heute gibt es Hasenbraten!', 'Der Wald hat Augen.', 'Gute Jagd, Fremder.'],
 } as const;
 
 /** Was der Haendler fuer etwas zahlt - Ausruestung nach ihrem Wert, Beute fuer wenig. */
@@ -3118,8 +3175,9 @@ export function abenteuerPunkte(a: Abenteuer): number {
     ((a.akt ?? 1) - 1) * 100 +
     (a.stufe?.lv ?? 0) * 15 +
     (a.inventar['gold'] ?? 0) +
+    (a.eile ?? 0) * EILE_PUNKTE +
     (a.phase === 'sieg' ? 1000 + Math.max(0, 400 - a.zug * 4) : 0);
-  return Math.round(roh * (1 + 0.3 * (a.heldenstufe ?? 0)));
+  return Math.round(roh * (1 + 0.3 * (a.heldenstufe ?? 0)) * (a.omen ? OMEN[a.omen].punkte : 1));
 }
 /** Ruhm fuer das Lager: 10 fuer jedes Abenteuer und ein Zwoelftel der Punkte (Spieltest: "Ruhm kommt zu langsam"). */
 export const ruhmFuer = (a: Abenteuer): number => 10 + Math.floor(abenteuerPunkte(a) / 12);

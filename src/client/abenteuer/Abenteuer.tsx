@@ -27,6 +27,8 @@ import {
   FRAKTION_FIGUR,
   gelaendeBonus,
   abwehrAugen,
+  OMEN,
+  EILE_PUNKTE,
   gegnerWucht,
   trefferAb,
   zuegeBisBoss,
@@ -290,13 +292,48 @@ function feldBei(x: number, y: number): Hex {
  * versperren den Weg - ausser dem Zielfeld selbst: dann endet der Weg mit dem
  * Hieb auf ihn. Berge kosten zwei.
  */
+/**
+ * Welche Felder der Ritter in diesem Zug noch erreicht (Spieltest: "Zeig, wie weit ich komme").
+ * Ein Schritt geht, solange noch einer uebrig ist - auch auf einen Berg.
+ */
+const erreichbarCache = new WeakMap<Zustand, Set<string>>();
+function erreichbar(a: Zustand): Set<string> {
+  const alt = erreichbarCache.get(a);
+  if (alt) return alt;
+  const erkundet = new Set(a.erkundet);
+  const besetzt = new Set(a.schleime.map((s) => hexKey(s.q, s.r)));
+  const hindernis = new Set((a.orte ?? []).filter((o) => !(o.art === 'altar' && o.benutzt)).map((x) => hexKey(x.q, x.r)));
+  const kosten = new Map<string, number>([[hexKey(a.pos.q, a.pos.r), 0]]);
+  const offen: { h: Hex; k: number }[] = [{ h: a.pos, k: 0 }];
+  while (offen.length > 0) {
+    offen.sort((x, y) => x.k - y.k);
+    const { h, k } = offen.shift()!;
+    if (k > (kosten.get(hexKey(h.q, h.r)) ?? Infinity) || k >= a.schritte) continue;
+    for (const [dq, dr] of HEX_DIRS) {
+      const n = { q: h.q + dq, r: h.r + dr };
+      const nk = hexKey(n.q, n.r);
+      if (!erkundet.has(nk) || !betretbar(a, n.q, n.r) || besetzt.has(nk) || hindernis.has(nk)) continue;
+      const k2 = Math.min(a.schritte, k + schrittKosten(a, n.q, n.r));
+      if (k2 < (kosten.get(nk) ?? Infinity)) {
+        kosten.set(nk, k2);
+        offen.push({ h: n, k: k2 });
+      }
+    }
+  }
+  kosten.delete(hexKey(a.pos.q, a.pos.r));
+  const ergebnis = new Set(kosten.keys());
+  erreichbarCache.set(a, ergebnis);
+  return ergebnis;
+}
+
 function wegZu(a: Zustand, ziel: Hex): Hex[] {
   const zielK = hexKey(ziel.q, ziel.r);
   const erkundet = new Set(a.erkundet);
   if (!erkundet.has(zielK)) return [];
   const besetzt = new Set(a.schleime.map((s) => hexKey(s.q, s.r)));
   // Leute, Tiere und Wanderer stehen im Weg - der Weg fuehrt um sie herum (Spieltest).
-  const hindernis = new Set([...(a.orte ?? []), ...(a.wanderer ?? []), ...(a.tiere ?? [])].map((x) => hexKey(x.q, x.r)));
+  // Schafe und Wanderer machen Platz, erloschene Altaere sind begehbar.
+  const hindernis = new Set([...(a.orte ?? []).filter((o) => !(o.art === 'altar' && o.benutzt)), ...(a.tiere ?? []).filter((t) => t.art !== 'schaf')].map((x) => hexKey(x.q, x.r)));
   const kosten = new Map<string, number>([[hexKey(a.pos.q, a.pos.r), 0]]);
   const vor = new Map<string, Hex>();
   const offen: { h: Hex; k: number }[] = [{ h: a.pos, k: 0 }];
@@ -871,6 +908,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         e.preventDefault();
         const id = heilmittel(jetzt);
         if (id) setze(benutzen(jetzt, id));
+        // Spieltest: "H ohne Kraeuter tut nichts" - sagen, warum.
+        else setze({ ...jetzt, ereignisse: [], log: [...jetzt.log, 'Nichts zum Heilen im Gepaeck - Kraeuter findest du in der Wildnis oder beim Haendler.'] });
         return;
       }
       if ((TASTEN as readonly string[]).includes(k)) {
@@ -1201,6 +1240,33 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         }
       }
       pfeile(a.pfad, '#f2c94c', Math.max(2, f));
+      const feldUmriss = (q: number, r: number) => {
+        const m = mitte(q, r);
+        const ecken = [
+          [0, -11.4],
+          [11.5, -5.7],
+          [11.5, 5.7],
+          [0, 11.4],
+          [-11.5, 5.7],
+          [-11.5, -5.7],
+        ];
+        ctx.beginPath();
+        ecken.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(sx(m.x + x!), sy(m.y + y!)) : ctx.lineTo(sx(m.x + x!), sy(m.y + y!))));
+        ctx.closePath();
+      };
+      // Erreichbare Felder leicht aufgehellt - man sieht, wie weit der Wurf traegt.
+      if (a.phase === 'ziehen' && still && a.schritte > 0) {
+        ctx.fillStyle = 'rgba(255, 236, 170, 0.13)';
+        ctx.strokeStyle = 'rgba(255, 236, 170, 0.28)';
+        ctx.lineWidth = Math.max(1, Math.round(f * 0.5));
+        for (const k of erreichbar(a)) {
+          const [q, r] = k.split(':').map(Number) as [number, number];
+          if (hexDistance({ q, r }, a.pos) > sicht) continue;
+          feldUmriss(q, r);
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
       // Der geplante Weg (Maus oder laufender Weg): Punkte, so weit die Schritte reichen.
       const plan = lauf.current?.ziel ?? zeiger.current;
       if (a.phase === 'ziehen' && plan && still) {
@@ -1216,20 +1282,6 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       }
       // Angesagte Angriffe: das Feld glueht rot, ein roter Pfeil zeigt hinein.
       // Waehrend der Schleim ausholt, waechst der Pfeil heran.
-      const feldUmriss = (q: number, r: number) => {
-        const m = mitte(q, r);
-        const ecken = [
-          [0, -11.4],
-          [11.5, -5.7],
-          [11.5, 5.7],
-          [0, 11.4],
-          [-11.5, 5.7],
-          [-11.5, -5.7],
-        ];
-        ctx.beginPath();
-        ecken.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(sx(m.x + x!), sy(m.y + y!)) : ctx.lineTo(sx(m.x + x!), sy(m.y + y!))));
-        ctx.closePath();
-      };
       // Der Ring des Koenigs: alle Felder um ihn gluehen rot.
       for (const s of a.schleime) {
         if (!s.flaeche) continue;
@@ -2197,7 +2249,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       {
         const jetztMs = performance.now();
         blasen.current = blasen.current.filter((b) => b.bis > jetztMs);
-        for (const b of blasen.current) {
+        // Spieltest: "Sprechblasen verdecken den Kampf" - steht ein Gegner nah, schweigen alle.
+        const kampf = a.schleime.some((x) => hexDistance(x, a.pos) <= 2);
+        for (const b of kampf ? [] : blasen.current) {
           if (b.ab > jetztMs) continue;
           const wo = schleimEnde.get(b.wer) ?? (a.orte ?? []).find((o) => o.id === b.wer);
           if (!wo || hexDistance(wo, a.pos) > sicht + 1) continue;
@@ -2274,7 +2328,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       if (m && mctx) {
         mctx.fillStyle = '#0d0a07';
         mctx.fillRect(0, 0, m.width, m.height);
-        const z = 3;
+        // Gross: naeher heran (Spieltest: "nur der Rahmen wird groesser").
+        const z = miniGrossRef.current ? 5 : 3;
         for (const k of a.erkundet) {
           const [q, rr] = k.split(':').map(Number) as [number, number];
           const x = (q - a.pos.q + (rr - a.pos.r) / 2) * z * 2 + m.width / 2;
@@ -2356,6 +2411,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         extras: x.tag ? [] : aktiveExtras(meta),
         legenden: x.tag ? [] : freieLegenden(meta),
         ...(x.tag ? { tag: x.tag.tag } : {}),
+        omen: true,
       }),
     );
   };
@@ -2413,7 +2469,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           </div>
           {/* Das laufende Stueck: Nummer und Name - wechselt mit der Landschaft. */}
           <div className="ab-track" title={track ? `Stueck ${track.id}: ${track.name} (${BIOM_NAME[track.biom]})` : 'Musik aus'}>
-            {track ? `#${track.id} ${track.name}` : musik ? '...' : 'Musik aus'}
+            {track ? `Musik: ${track.name}` : musik ? '...' : 'Musik aus'}
           </div>
         </div>
         <span className="ab-schild" title={`Leben ${lebenText(a.leben)} von ${maxLeben}`}>
@@ -2478,6 +2534,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                     <i style={{ width: `${(100 * kills) / ziel}%` } as CSSProperties} />
                   </i>
                 </>
+              )}
+              {a.omen && (
+                <small className="ab-omen" title={OMEN[a.omen].text}>
+                  Vorzeichen: <b>{OMEN[a.omen].name}</b> - {OMEN[a.omen].text}
+                </small>
               )}
             </div>
           );
@@ -3021,6 +3082,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               {a.phase === 'sieg' ? `Alle ${AKTE} Akte in ${a.zug} Zuegen` : `Akt ${a.akt ?? 1} von ${AKTE}: ${AKT_NAME[(a.akt ?? 1) - 1]}`}
               {a.tag ? ` · Tagesabenteuer ${a.tag}` : ''}
               {(a.heldenstufe ?? 0) > 0 ? ` · Heldenstufe ${a.heldenstufe}` : ''}
+              {a.omen ? ` · Vorzeichen ${OMEN[a.omen].name}` : ''}
+              {(a.eile ?? 0) > 0 ? ` · Eile +${(a.eile ?? 0) * EILE_PUNKTE}` : ''}
             </p>
             <div className="ab-bilanz-werte">
               <span>
