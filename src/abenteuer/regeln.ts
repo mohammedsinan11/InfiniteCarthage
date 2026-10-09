@@ -905,6 +905,21 @@ function bietWahl(a: Abenteuer, art: WahlArt): void {
   a.ereignisse.push({ art: 'wahl', takt: 0 });
 }
 
+/**
+ * Eine Truhe liegen lassen (Spieltest 16: "drei Mal schwaecher als deins, kein Ausweg").
+ * Fuer Truhen und Schaetze: die Wahl verfaellt, dafuer gibt es ein wenig Gold.
+ */
+export function wahlAblehnen(alt: Abenteuer): Abenteuer {
+  const w = alt.wahl;
+  if (!w || (w.art !== 'truhe' && w.art !== 'schatz')) return alt;
+  const a = structuredClone(alt);
+  a.ereignisse = [];
+  a.wahl = null;
+  const n = goldDazu(a, 3);
+  melde(a, `Du laesst den Inhalt liegen und nimmst nur ein paar Muenzen: +${n} Gold.`);
+  return a;
+}
+
 /** Eine der angebotenen Moeglichkeiten nehmen. */
 export function waehlen(alt: Abenteuer, nr: number): Abenteuer {
   const w = alt.wahl;
@@ -3010,8 +3025,10 @@ export function ansprechen(alt: Abenteuer, ortId: number): Abenteuer {
   const o = (alt.orte ?? []).find((x) => x.id === ortId);
   if (!o || hexDistance(o, alt.pos) > 1 || alt.phase === 'tot') return alt;
   // Spieltest 14: "Im Kampf oeffnet sich staendig der Laden" - nicht, solange Gegner nah sind.
-  if ((o.art === 'haendler' || o.art === 'werber') && alt.schleime.some((x) => hexDistance(x, alt.pos) <= 2)) {
-    return { ...alt, ereignisse: [], log: [...alt.log, `${o.name} winkt ab: "Erst den Kampf, dann das Geschaeft!"`].slice(-30) };
+  // Nur ein Gegner direkt daneben haelt vom Handel ab (Spieltest 16: "der Radius ist zu gross").
+  if ((o.art === 'haendler' || o.art === 'werber') && alt.schleime.some((x) => hexDistance(x, alt.pos) <= 1)) {
+    const text = `${o.name} winkt ab: "Erst den Kampf, dann das Geschaeft!"`;
+    return alt.log[alt.log.length - 1] === text ? alt : { ...alt, ereignisse: [], log: [...alt.log, text].slice(-30) };
   }
   const a = structuredClone(alt);
   a.ereignisse = [{ art: 'treffen', takt: 0, ort: o.id }];

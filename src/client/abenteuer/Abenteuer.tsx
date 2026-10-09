@@ -28,6 +28,7 @@ import {
   gelaendeBonus,
   abwehrAugen,
   OMEN,
+  wahlAblehnen,
   SCHRITTE_MIN,
   gelaende,
   rasten,
@@ -970,7 +971,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         return;
       }
       if (jetzt.wahl) {
-        const nr = ['1', '2', '3'].indexOf(e.key);
+        if (k === 'escape') {
+          setze(wahlAblehnen(jetzt));
+          return;
+        }
+        const nr = ['1', '2', '3', '4'].indexOf(e.key);
         if (nr >= 0) {
           e.preventDefault();
           setze(waehlen(jetzt, nr));
@@ -2009,7 +2014,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           const bxp = sx(o.x);
           const byp = sy(o.y);
           const rand = 40 * dpr;
-          if (hexDistance(boss, a.pos) > sicht || bxp < rand || bxp > c.width - rand || byp < rand || byp > c.height - rand) {
+          // Den Boss sieht man bis zwei Felder ueber die Sicht hinaus - erst dahinter der Pfeil (Spieltest 16).
+          if (hexDistance(boss, a.pos) > sicht + 2 || bxp < rand || bxp > c.width - rand || byp < rand || byp > c.height - rand) {
             const mx = c.width / 2;
             const my = c.height / 2;
             const w = Math.atan2(byp - my, bxp - mx);
@@ -3445,6 +3451,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                 );
               })}
             </div>
+            {(a.wahl.art === 'truhe' || a.wahl.art === 'schatz') && (
+              <button className="klein ab-wahl-weg" onClick={() => setze(wahlAblehnen(aktuell.current))} title="Esc">
+                Liegen lassen (+3 Gold)
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -9405,3 +9405,12 @@ em.off {
   font-size: 11px;
   color: #f6c04a;
 }
+.ab-wahl-weg {
+  align-self: center;
+  margin-top: 4px;
+  opacity: 0.8;
+}
+/* Das Log deckt die Karte weniger ab (Spieltest 16). */
+.ab-log:not(.offen) {
+  background: rgba(23, 18, 12, 0.55);
+}
