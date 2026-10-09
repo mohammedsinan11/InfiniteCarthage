@@ -9398,3 +9398,10 @@ em.off {
 .ab-lager .ab-erfolge {
   margin-bottom: 64px;
 }
+.ab-zustand {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #f6c04a;
+}

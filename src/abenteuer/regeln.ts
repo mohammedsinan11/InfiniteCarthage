@@ -207,7 +207,7 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
   { id: 'extraherz', name: 'Heilung', text: 'Sofort volles Leben.' },
   { id: 'goldsack', name: 'Goldsack', text: '15 Gold auf einmal.' },
   { id: 'holz', name: 'Holz', text: 'Mit der Axt im Wald geschlagen - der Haendler zahlt 2 Gold je Scheit.' },
-  { id: 'gelee', name: 'Schleimgelee', text: 'Was ein Schleim zuruecklaesst - der Beweis deiner Taten.' },
+  { id: 'gelee', name: 'Schleimgelee', text: 'Was ein Schleim zuruecklaesst. Der Haendler zahlt 2 Gold je Stueck, der Alchemist tauscht drei gegen eine Truhe.' },
 ];
 
 export const gegenstand = (id: string): Gegenstand | undefined => GEGENSTAENDE.find((g) => g.id === id);
@@ -1654,7 +1654,19 @@ function nachDemSchritt(a: Abenteuer): Abenteuer {
   a.zug += 1;
   a.wurf = null;
   a.geruht = false;
+  stilleRuftBoss(a);
   return a;
+}
+
+/**
+ * Spieltest 15: "Neun Zuege nur S - keine Gegner mehr, der Boss-Timer laeuft."
+ * Ist weit und breit (10 Felder) kein Gegner, kuendigt sich der Boss an.
+ */
+function stilleRuftBoss(a: Abenteuer): void {
+  if (a.bossErwacht || a.bossBald != null || a.schleime.some((s) => s.boss && s.bossArt !== 'penta')) return;
+  if (a.zug - (a.aktStart ?? 1) < 4 || a.schleime.some((s) => hexDistance(s, a.pos) <= 10)) return;
+  a.bossBald = a.zug + BOSS_VORWARNUNG;
+  melde(a, `Es ist still geworden ... Der Boden bebt! In ${BOSS_VORWARNUNG} Zuegen erwacht der ${BOSS_NAME[naechsterBoss(a)]}.`);
 }
 
 function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
@@ -1695,7 +1707,7 @@ function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
     a.fokus = Math.min(FOKUS_MAX, fokus + 1);
     melde(
       a,
-      `Wurf ${wurf}${wurf === 1 ? ' (eine 1 verfehlt immer)' : `, noetig ${Math.min(6, Math.max(2, noetig - angriffVon(a) - fokus))}+${fokus > 0 ? ' (mit Fokus)' : ''}`}: ${s.art === 'panzer' ? 'prallt am Steinpanzer ab' : 'daneben'} - +1 Fokus fuer den naechsten Hieb.`,
+      `Wurf ${wurf}${wurf === 1 ? ' (eine 1 verfehlt immer)' : `, noetig ${Math.min(6, Math.max(2, noetig - angriffVon(a) - fokus))}+${fokus > 0 ? ' (mit Fokus)' : ''}`}: ${s.art === 'panzer' ? 'prallt am Steinpanzer ab' : 'daneben'} - dein Fokus bleibt und steigt auf ${Math.min(FOKUS_MAX, fokus + 1)}.`,
     );
     return;
   }

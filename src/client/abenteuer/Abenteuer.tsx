@@ -2050,6 +2050,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           ctx.lineTo(px + Math.cos(w - 2.5) * k, py + Math.sin(w - 2.5) * k);
           ctx.closePath();
           ctx.fill();
+          schrift(`${hexDistance(naechster, a.pos)}`, px - Math.cos(w) * k * 2, py - Math.sin(w) * k * 2, '#f6c04a', 0.9, 5);
         }
       }
       // Gebannte und taumelnde Gegner: kreisende Sterne ueber dem Kopf (Spieltest 8: "man sieht nicht, wer gebannt ist").
@@ -2922,6 +2923,13 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               </span>
             ))}
           </div>
+          {/* Fokus und Deckung sichtbar (Spieltest 15: "Zustand schwer zu sehen"). */}
+          {((a.fokus ?? 0) > 0 || a.deckung) && (
+            <small className="ab-zustand">
+              {(a.fokus ?? 0) > 0 && <span title="Fokus: kommt auf deinen naechsten Hieb">Fokus {a.fokus}/3</span>}
+              {a.deckung && <span title="Deckung: der naechste Treffer macht weniger Schaden">Deckung</span>}
+            </small>
+          )}
         </div>
         <div className="ab-fenster ab-ausruestung">
           <span className="ab-titel">Ausruestung</span>
@@ -3227,7 +3235,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               <dt>Lager</dt>
               <dd>Jedes Abenteuer bringt Ruhm: damit schaltest du Klassen, Start-Extras und Legendaeres frei. Ein Sieg oeffnet die naechste Heldenstufe. Jedes Abenteuer hat ein Vorzeichen.</dd>
               <dt>Tasten</dt>
-              <dd>Enter wuerfeln · QEADZX gehen · S warten · 1 Faehigkeit · H heilen · R neu wuerfeln · B beschwoeren · F angeln · L Log · ? diese Hilfe</dd>
+              <dd>Enter wuerfeln · QEADZX gehen · S warten (Fokus) · G Deckung · T Rasten · 1 Faehigkeit · H heilen · R neu wuerfeln · B beschwoeren · F angeln · L Log · ? diese Hilfe</dd>
             </dl>
           </div>
         </div>
