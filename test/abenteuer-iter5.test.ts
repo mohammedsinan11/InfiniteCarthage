@@ -81,7 +81,7 @@ describe('Abenteuer Iteration 6', () => {
       expect(o.ereignis).toBeTruthy();
       const b = structuredClone(a);
       b.pos = { q: o.q + 1, r: o.r };
-      b.inventar = { ...b.inventar, gold: 20 };
+      b.inventar = { ...b.inventar, gold: 20, gelee: 3 };
       const c = ansprechen(b, o.id);
       expect(c.wahl?.art).toBe('ereignis');
       const d = waehlen(c, 0);

@@ -415,6 +415,7 @@ const WAHL_BILD: Record<string, string> = {
   ev_fuellen: 'kraut',
   ev_karte: 'auge',
   ev_omen: 'runenwuerfel',
+  ev_gelee: 'gelee',
 };
 
 /** Bilder fuer Neues, das (noch) kein eigenes hat. */
@@ -1229,7 +1230,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       }
       // Gebannte Schleime: ein violetter Bannring unter ihnen.
       for (const s of a.schleime) {
-        if ((s.gebannt ?? 0) <= a.zeit || hexDistance(s, a.pos) > sicht + 1) continue;
+        // Ringe nur fuer Gegner, die man sieht - sonst verraten sie das Unsichtbare (Spieltest 14).
+        if ((s.gebannt ?? 0) <= a.zeit || hexDistance(s, a.pos) > sicht) continue;
         const m = mitte(s.q, s.r);
         ctx.strokeStyle = `rgba(190, 130, 255, ${0.6 + 0.3 * Math.sin(sek * 5)})`;
         ctx.lineWidth = f;
@@ -1525,7 +1527,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       ];
       for (const s of schleimeImBild) {
         const o0 = ort(s.id);
-        if (hexDistance(feldBei(o0.x, o0.y), a.pos) > sicht) continue;
+        // Ein Boss ist so gross, dass man ihn auch im Nebel zwei Felder weiter sieht (Spieltest 14).
+        if (hexDistance(feldBei(o0.x, o0.y), a.pos) > sicht + (s.boss ? 2 : 0)) continue;
         const o = stoss(s.id, o0.x, o0.y);
         const wu = wucht(s.id);
         const fs = s.gross ? f + Math.max(1, Math.round(f / 2)) : f;
@@ -3175,6 +3178,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               <dd>Ein angesagter Angriff - er trifft im naechsten Takt. Geh weg! Steht ueber dir eine rote Zahl, trifft dich so viel. Wer ins Leere schlaegt, taumelt: freie Hiebe.</dd>
               <dt>Treffen</dt>
               <dd>Zum Zuschlagen wird eigens gewuerfelt (nicht der Schritt-Wuerfel). Wurf + Angriff (+ Fokus) muss die Schwelle erreichen: 4, ab Akt 2 hoeher, Panzer und Elite mehr. Eine 1 verfehlt immer, eine 6 trifft immer.</dd>
+              <dt>Klassen</dt>
+              <dd>Der Zwerg klettert ohne Muehe ueber Berge, die Waldlaeuferin watet durch Sumpf und Bach - je ein Schritt.</dd>
               <dt>Pentagramm</dt>
               <dd>Mit dem Legendaeren Pentagrammmeister: laeufst du in einem Zug eine geschlossene Form, wirkst du einen Zauber - Dreieck Funkenregen, Raute Schutzrune, Fuenfeck Pentagramm, Sechseck Heilkreis, groesser Bannkreis.</dd>
               <dt>Rasten</dt>
