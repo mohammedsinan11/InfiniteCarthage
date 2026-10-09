@@ -550,6 +550,10 @@ export type Abenteuer = {
   eile?: number;
   /** Der Boss ist angekuendigt: in diesem Zug erwacht er (Vorwarnung). */
   bossBald?: number | null;
+  /** Die Schatzkarte des Akts: hier liegt ein Versteck (Spieltest 15: "nichts lockt nach draussen"). */
+  versteck?: Hex | null;
+  /** In welchem Akt der Beutezug schon eine Truhe gab. */
+  beuteAkt?: number;
   /** Deckung (G): der naechste Treffer macht einen Schaden weniger. */
   deckung?: boolean;
   /** Intern: dieses Warten ist Deckung, kein Fokus. */
@@ -771,6 +775,7 @@ export function neuesAbenteuer(seed: number, optionen: StartOptionen = {}): Aben
   ortePlatzieren(a);
   a.schleime = a.schleime.filter((s) => !ortAuf(a, s.q, s.r));
   startAnwenden(a, optionen);
+  if (optionen.omen) versteckLegen(a);
   sehen(a);
   return a;
 }
@@ -815,7 +820,10 @@ function neueGegend(a: Abenteuer): void {
   ortePlatzieren(a);
   a.schleime = a.schleime.filter((s) => !ortAuf(a, s.q, s.r));
   sehen(a);
+  // Uebrige Schritte des Bosszugs verfallen - der neue Akt beginnt mit einem frischen Wurf.
+  a.schritte = 0;
   melde(a, 'Du ziehst weiter - in ein neues Land. Neue Leute, neue Gegner.');
+  versteckLegen(a);
 }
 
 // --- Wahl: 1 aus 3 --------------------------------------------------------
@@ -967,6 +975,12 @@ function gibGegenstand(a: Abenteuer, id: string, woher: string): void {
   }
   a.inventar = { ...a.inventar, [id]: (a.inventar[id] ?? 0) + 1 };
   // Spieltest 13: "Das Flammenschwert lag unbemerkt im Inventar" - Besseres wird gleich angelegt.
+  const klassenWaffe = g.slot === 'waffe' && a.ausruestung.waffe === KLASSEN[a.klasse ?? 'ritter'].ausruestung.waffe && a.klasse !== 'ritter';
+  const ladungWeg = g.slot === 'waffe' && ((a.ladung ?? 0) > 0 || !!a.bereit);
+  if (g.slot && vergleich(a, id) === 1 && (klassenWaffe || ladungWeg)) {
+    melde(a, `${woher}: ${g.name} - besser, liegt im Inventar. Klick zum Anlegen (${ladungWeg ? 'die Ladung deiner Waffe geht dann verloren' : 'deine Klassenwaffe bleibt sonst'}).`);
+    return;
+  }
   if (g.slot && vergleich(a, id) === 1) {
     Object.assign(a, benutzen(a, id));
     melde(a, `${woher}: ${g.name} - besser als deins, sofort angelegt (das alte liegt im Inventar).`);
@@ -1008,7 +1022,7 @@ export const OMEN: Record<OmenId, { name: string; text: string; punkte: number }
   segen: { name: 'Segen', text: 'Du beginnst mit einer legendaeren Wahl.', punkte: 1 },
   wildnis: { name: 'Wildnis', text: 'Gegner kommen schneller nach. +15 % Punkte.', punkte: 1.15 },
   // Spieltest 14: "Vorzeichen aendern nur Zahlen" - zwei, die Regeln aendern.
-  beutezug: { name: 'Beutezug', text: 'Jeder dritte Elite-Gegner laesst eine Truhe zurueck.', punkte: 1 },
+  beutezug: { name: 'Beutezug', text: 'Der erste Elite-Gegner jedes Akts laesst eine Truhe zurueck.', punkte: 1 },
   fruehboss: { name: 'Fruehe Bosse', text: 'Bosse erwachen nach halb so vielen Gegnern - ihre Beute bietet vier Legendaere.', punkte: 1.1 },
 };
 export const OMEN_IDS = Object.keys(OMEN) as OmenId[];
@@ -1787,7 +1801,9 @@ function verwunde(a: Abenteuer, s: Schleim, schaden: number, takt: number, vorne
     // Banditen und Elite-Schleime lassen Gold fallen.
     const gold = goldDazu(a, s.elite ? 4 + (s.id % 3) : 2 + (s.id % 3));
     melde(a, `${vorne}: der ${schleimName(s)} faellt! +${gold} Gold${bisBoss}.`);
-    if (s.elite && hatOmen(a, 'beutezug') && s.id % 3 === 0 && !a.wahl) {
+    // Hoechstens eine Beutezug-Truhe je Akt (Spieltest 15: "sieben Truhen in acht Zuegen").
+    if (s.elite && hatOmen(a, 'beutezug') && a.beuteAkt !== (a.akt ?? 1) && !a.wahl) {
+      a.beuteAkt = a.akt ?? 1;
       melde(a, 'Beutezug: er hinterlaesst eine Truhe!');
       bietWahl(a, 'truhe');
     }
@@ -2019,7 +2035,36 @@ function bossErwacht(a: Abenteuer, takt: number, art: BossArt = naechsterBoss(a)
   );
 }
 
+/**
+ * SCHATZKARTE. Jeder Akt zeigt ein Versteck 10 bis 14 Felder weit (auf der
+ * Uebersichtskarte als X). Wer hingeht, findet eine Truhe zur Wahl und Gold.
+ */
+function versteckLegen(a: Abenteuer): void {
+  const rng = new Rng(hash3i(a.seed, a.pos.q, a.pos.r, 4242));
+  for (let versuch = 0; versuch < 40; versuch++) {
+    const [dq, dr] = HEX_DIRS[rng.int(6)]!;
+    const weit = 10 + rng.int(5);
+    const h = { q: a.pos.q + dq * weit + rng.int(5) - 2, r: a.pos.r + dr * weit + rng.int(5) - 2 };
+    const b = gelaende(a.seed, h.q, h.r);
+    if (!begehbar(b) || kosten(b) > 1 || ortAuf(a, h.q, h.r)) continue;
+    a.versteck = h;
+    melde(a, 'Eine alte Schatzkarte! Ein Versteck ist markiert (X auf der Uebersichtskarte).');
+    return;
+  }
+  a.versteck = null;
+}
+function versteckPruefen(a: Abenteuer): void {
+  const v = a.versteck;
+  if (!v || v.q !== a.pos.q || v.r !== a.pos.r) return;
+  a.versteck = null;
+  const n = goldDazu(a, 8 + 4 * (a.akt ?? 1));
+  melde(a, `Das Versteck! +${n} Gold und eine Truhe.`);
+  a.ereignisse.push({ art: 'fund', takt: 0, id: 'schatz' });
+  if (!a.wahl) bietWahl(a, 'truhe');
+}
+
 function aufheben(a: Abenteuer): void {
+  versteckPruefen(a);
   const fund = fundAuf(a, a.pos.q, a.pos.r);
   if (!fund) return;
   // Herzen werden beim Aufheben gleich verbraucht. Bei vollem Leben bleiben
@@ -2728,7 +2773,7 @@ export function haendlerWaren(a: Abenteuer, o: Ort): { id: string; preis: number
     // Gekauftes bleibt als "verkauft" stehen - die Zeilen verrutschen nicht (Spieltest).
     ...sortiment.map((id) => ({
       id,
-      preis: gegenstand(id)?.legendaer ? 30 + 10 * (akt - 2) : Math.max(6, ausruestungsWert(id) * 3),
+      preis: gegenstand(id)?.legendaer ? 40 + 10 * (akt - 2) : Math.max(6, ausruestungsWert(id) * 3),
       ...((a.gekauft ?? []).includes(`${o.id}:${akt}:${id}`) ? { weg: true } : {}),
     })),
   ];
@@ -3255,7 +3300,8 @@ function fraktionenZiehen(a: Abenteuer, takt: number, rng: Rng, besetzt: (q: num
   a.wanderer = (a.wanderer ?? []).filter((w) => hexDistance(w, a.pos) <= 20);
   // Banditen, die weit weg sind, gehen auch.
   a.schleime = a.schleime.filter((s) => s.art !== 'bandit' || hexDistance(s, a.pos) <= 20);
-  if (a.zeit % FRAKTION_ALLE === 0 && a.wanderer.length + a.schleime.filter((s) => s.art === 'bandit').length < 5) {
+  // Spieltest 15: "fuenf, sechs fremde Ritter im Bosskampf" - hoechstens drei, und keine neuen, solange ein Boss wach ist.
+  if (a.zeit % FRAKTION_ALLE === 0 && !a.schleime.some((s) => s.boss) && a.wanderer.length + a.schleime.filter((s) => s.art === 'bandit').length < 3) {
     const welche = rng.int(3);
     for (let versuch = 0; versuch < 12; versuch++) {
       const [dq, dr] = HEX_DIRS[rng.int(6)]!;
@@ -3515,11 +3561,11 @@ export function benutzen(alt: Abenteuer, id: string): Abenteuer {
     a.leben += plus;
     weg();
     a.ereignisse = [{ art: 'heil', takt: 0, leben: plus }];
-    melde(a, `${g.name}: +${lebenText(plus)} Leben${imKampf ? ' - das kostet einen Schritt' : ''}.`);
+    melde(a, `${g.name}: +${lebenText(plus)} Leben${imKampf ? ' - das kostet einen Schritt (die Gegner warten)' : ''}.`);
     if (imKampf) {
+      // Spieltest 15: "Essen schenkt den Gegnern einen Hieb - unterm Strich null." Es kostet nur noch den Schritt.
       a.schritte = Math.max(0, a.schritte - 1);
       a.fokus = 0;
-      ticken(a, 1);
       return nachDemSchritt(a);
     }
     return a;

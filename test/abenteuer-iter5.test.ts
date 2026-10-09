@@ -166,3 +166,28 @@ describe('Abenteuer Iteration 13', () => {
     expect(s?.leben ?? 0).toBeLessThan(9);
   });
 });
+
+describe('Abenteuer Iteration 17', () => {
+  it('Schatzkarte: jeder Akt hat ein Versteck; wer hingeht, bekommt Truhe und Gold', async () => {
+    const a0 = neuesAbenteuer(9, { omen: true });
+    expect(a0.versteck).toBeTruthy();
+    const v = a0.versteck!;
+    expect(hexDistance(v, a0.pos)).toBeGreaterThanOrEqual(7);
+    // Neben das Versteck stellen und hineingehen.
+    const a = structuredClone(wuerfeln(a0));
+    a.wahl = null;
+    a.schleime = [];
+    const i = HEX_DIRS.findIndex(([dq, dr]) => {
+      const g = gelaende(a.seed, v.q - dq, v.r - dr);
+      return g && !istWasser(g) && g !== 'berg';
+    });
+    const [dq, dr] = HEX_DIRS[i]!;
+    a.pos = { q: v.q - dq, r: v.r - dr };
+    a.schritte = 3;
+    const gold = a.inventar['gold'] ?? 0;
+    const b = taste(a, TASTE_DIR[i]!);
+    expect(b.versteck).toBeNull();
+    expect(b.inventar['gold'] ?? 0).toBeGreaterThan(gold);
+    expect(b.wahl?.art).toBe('truhe');
+  });
+});

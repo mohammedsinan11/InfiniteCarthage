@@ -1988,6 +1988,19 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         }
       }
 
+      // Das Versteck: ein rotes X auf seinem Feld, sobald man es sieht.
+      if (a.versteck && hexDistance(a.versteck, a.pos) <= sicht + 1) {
+        const o = mitte(a.versteck.q, a.versteck.r);
+        const k = 4 * f;
+        ctx.strokeStyle = `rgba(255, 90, 58, ${0.75 + 0.25 * Math.sin(sek * 3)})`;
+        ctx.lineWidth = Math.max(2, f);
+        ctx.beginPath();
+        ctx.moveTo(sx(o.x) - k, sy(o.y) - k);
+        ctx.lineTo(sx(o.x) + k, sy(o.y) + k);
+        ctx.moveTo(sx(o.x) + k, sy(o.y) - k);
+        ctx.lineTo(sx(o.x) - k, sy(o.y) + k);
+        ctx.stroke();
+      }
       // Ist ein Boss wach, aber nicht im Bild: ein roter Pfeil am Rand zeigt zu ihm (Spieltest 9).
       {
         const boss = a.schleime.find((x) => x.boss);
@@ -2014,7 +2027,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             ctx.lineTo(px + Math.cos(w - 2.5) * k, py + Math.sin(w - 2.5) * k);
             ctx.closePath();
             ctx.fill();
-            schrift(`${hexDistance(boss, a.pos)}`, px - Math.cos(w) * k * 1.6, py - Math.sin(w) * k * 1.6, '#ff8a6a', 1, 5);
+            schrift(`Boss ${hexDistance(boss, a.pos)}`, px - Math.cos(w) * k * 2.4, py - Math.sin(w) * k * 2.4, '#ff8a6a', 1, 5);
           }
         }
       }
@@ -2626,6 +2639,19 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         for (const w of a.wanderer ?? []) if (hexDistance(w, a.pos) <= sicht) punkt(w.q, w.r, w.fraktion === 'orden' ? '#dfe9f0' : '#2f7a3a');
         for (const s of a.schleime) if (s.art === 'bandit' && hexDistance(s, a.pos) <= sicht) punkt(s.q, s.r, '#8a2a2a');
         for (const g of a.gefolge ?? []) punkt(g.q, g.r, '#ffffff');
+        // Das Versteck der Schatzkarte: ein rotes X, am Rand festgehalten, wenn es weiter weg liegt.
+        if (a.versteck) {
+          const vx = Math.max(4, Math.min(m.width - 10, (a.versteck.q - a.pos.q + (a.versteck.r - a.pos.r) / 2) * z * 2 + m.width / 2));
+          const vy = Math.max(4, Math.min(m.height - 10, (a.versteck.r - a.pos.r) * z * 1.7 + m.height / 2));
+          mctx.strokeStyle = '#ff5a3a';
+          mctx.lineWidth = 2;
+          mctx.beginPath();
+          mctx.moveTo(vx - 3, vy - 3);
+          mctx.lineTo(vx + 4, vy + 4);
+          mctx.moveTo(vx + 4, vy - 3);
+          mctx.lineTo(vx - 3, vy + 4);
+          mctx.stroke();
+        }
         // Der Koenig steht immer auf der Karte - man soll ihn finden koennen.
         for (const s of a.schleime) {
           if (!s.boss) continue;
@@ -3194,6 +3220,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               <dd>Jeder Schritt und jeder Treffer laedt die Waffe. Voll: Taste 1 loest ihre Faehigkeit aus (nur mit Gegner in Reichweite). Jeder Boss rast ab halbem Leben - dann schlaegt er in jedem Takt.</dd>
               <dt>Gelaende</dt>
               <dd>Wald: +1 Abwehr. Huegel und Berge: +1 Angriff (* in den Werten). Berge und Sumpf kosten mehr Schritte.</dd>
+              <dt>Schatzkarte</dt>
+              <dd>Jeder Akt zeigt ein Versteck - das rote X auf der Uebersichtskarte. Geh hin: Gold und eine Truhe.</dd>
               <dt>Unterwegs</dt>
               <dd>Truhen (1 aus 3), verfluchte Truhen, Altaere, Haendler mit Schmied, Werber fuer Gefolge, goldene "?" sind Begegnungen. Fremde Ritter kaempfen fuer sich - nicht fuer dich.</dd>
               <dt>Lager</dt>

@@ -9394,3 +9394,7 @@ em.off {
 .ab-werte-gitter {
   font-size: 12px;
 }
+/* Die Erfolge im Lager laufen nicht unter die Knoepfe (Spieltest 15). */
+.ab-lager .ab-erfolge {
+  margin-bottom: 64px;
+}

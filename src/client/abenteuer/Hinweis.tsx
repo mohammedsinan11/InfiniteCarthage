@@ -96,6 +96,15 @@ export function Hinweis({ a }: { a: Abenteuer }) {
     if (seit?.id !== tipp.id) setSeit({ id: tipp.id, zug: a.zug });
     else if (a.zug >= seit.zug + 2) merke([tipp.id]);
   });
+  // Esc schliesst den Tipp (Spieltest 15).
+  useEffect(() => {
+    if (!tipp) return;
+    const t = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') merke([tipp.id]);
+    };
+    window.addEventListener('keydown', t);
+    return () => window.removeEventListener('keydown', t);
+  });
   if (!tipp || a.wahl || a.laden != null || a.phase === 'tot' || a.phase === 'sieg') return null;
   const ok = () => merke([tipp.id]);
   // Erfahrene Spieler schalten alle Tipps auf einmal ab.
