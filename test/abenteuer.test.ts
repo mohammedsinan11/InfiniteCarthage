@@ -63,7 +63,7 @@ describe('Abenteuer', () => {
     expect(istWasser(gelaende(b.seed, b.pos.q, b.pos.r))).toBe(false);
   });
 
-  it('Schwerter liegen in Truhen; eine bessere Waffe wandert ins Inventar und leuchtet', () => {
+  it('Schwerter liegen in Truhen; eine bessere Waffe wird gleich angelegt', () => {
     expect(gegenstand('runenklinge')?.krit).toBe(3);
     expect(gegenstand('flammenschwert')?.angriff).toBe(3);
     // Eine Truhe mit einem Schwert finden und hinlaufen.
@@ -76,11 +76,10 @@ describe('Abenteuer', () => {
         const liegt = fundAuf(a0, h.q, h.r);
         if (!liegt || !['axt', 'breitschwert', 'runenklinge', 'flammenschwert'].includes(liegt) || !eben(gelaende(seed, h.q, h.r))) continue;
         const b = taste(imZug(seed), k);
-        // Nicht gleich anlegen - im Inventar leuchtet sie gruen.
-        expect(b.ausruestung.waffe).toBe('schwert');
-        expect(b.inventar[liegt]).toBe(1);
-        expect(vergleich(b, liegt)).toBe(1);
-        expect(vergleich(b, 'schwert')).toBe(0);
+        // Spieltest 13: Bessere Ausruestung wird gleich angelegt, die alte liegt im Inventar.
+        expect(b.ausruestung.waffe).toBe(liegt);
+        expect(b.inventar['schwert']).toBe(1);
+        expect(vergleich(b, 'schwert')).toBe(-1);
         return;
       }
     }

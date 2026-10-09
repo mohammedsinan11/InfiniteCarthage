@@ -129,7 +129,7 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
   { id: 'heilwuerfel', name: 'Heilwuerfel', slot: 'wuerfel', wuerfelWert: 3, text: 'Jede gerade Zahl heilt ein halbes Herz.' },
   { id: 'bannwuerfel', name: 'Bannwuerfel', slot: 'wuerfel', wuerfelWert: 3, text: 'Eine 6 bannt alle Gegner bis 3 Felder fuer zwei Takte.' },
   { id: 'schwert', name: 'Schwert', slot: 'waffe', angriff: 1, ladung: 7, faehigkeit: 'spalthieb', text: '+1 auf jeden Angriffswurf. Ladung 7: Spalthieb - der naechste Treffer macht 2 Schaden mehr.' },
-  { id: 'axt', name: 'Streitaxt', slot: 'waffe', angriff: 2, ladung: 5, faehigkeit: 'spalthieb', text: '+2 auf jeden Angriffswurf. Ladung 5: Spalthieb - der naechste Treffer macht 2 Schaden mehr.' },
+  { id: 'axt', name: 'Streitaxt', slot: 'waffe', angriff: 2, ladung: 6, faehigkeit: 'spalthieb', text: '+2 auf jeden Angriffswurf. Ladung 6: Spalthieb - der naechste Treffer macht 2 Schaden mehr.' },
   { id: 'breitschwert', name: 'Breitschwert', slot: 'waffe', angriff: 2, ladung: 6, faehigkeit: 'schutzwall', text: '+2 auf jeden Angriffswurf. Ladung 6: Schutzwall - der naechste Treffer gegen dich wird abgefangen.' },
   { id: 'runenklinge', name: 'Runenklinge', slot: 'waffe', angriff: 2, krit: 3, ladung: 5, faehigkeit: 'runenblitz', text: '+2 auf jeden Angriffswurf; eine 6 trifft dreifach. Ladung 5: Runenblitz - 2 Schaden am naechsten Gegner (bis 3 Felder).' },
   { id: 'flammenschwert', name: 'Flammenschwert', slot: 'waffe', angriff: 3, ladung: 7, faehigkeit: 'feuerkreis', text: '+3 auf jeden Angriffswurf. Ladung 7: Feuerkreis - alle Gegner rundum nehmen 2 Schaden.' },
@@ -164,7 +164,7 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
     name: 'Pentagrammmeister',
     legendaer: true,
     text:
-      'Legendaer. Schliesst dein Weg in einem Zug eine Form, wirkst du einen Zauber: Dreieck - Funkenregen, Raute - Schutzrune, Fuenfeck - Pentagramm, Sechseck - Heilkreis, groesser - Bannkreis. Wer zu oft zaubert, ruft den Pentagrammschleim - bezwungen schaltet er Stufe 2 frei: die Zauber bleiben 10 Takte als Kreise auf der Karte.',
+      'Legendaer. Laeufst du in einem Zug im Kreis zurueck (Dreieck, Raute, ...), wirkst du einen Zauber - Funken, Schutz, Heilung, Bann. Mehr in der Hilfe (?).',
   },
   {
     id: 'herzcontainer',
@@ -960,6 +960,12 @@ function gibGegenstand(a: Abenteuer, id: string, woher: string): void {
     return;
   }
   a.inventar = { ...a.inventar, [id]: (a.inventar[id] ?? 0) + 1 };
+  // Spieltest 13: "Das Flammenschwert lag unbemerkt im Inventar" - Besseres wird gleich angelegt.
+  if (g.slot && vergleich(a, id) === 1) {
+    Object.assign(a, benutzen(a, id));
+    melde(a, `${woher}: ${g.name} - besser als deins, sofort angelegt (das alte liegt im Inventar).`);
+    return;
+  }
   melde(a, `${woher}: ${g.name} - ins Inventar.`);
 }
 
@@ -1656,11 +1662,11 @@ function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
     a.fokus = Math.min(FOKUS_MAX, fokus + 1);
     melde(
       a,
-      `Wurf ${wurf}${wurf === 1 ? ' (eine 1 verfehlt immer)' : `+${angriffVon(a)}${fokus > 0 ? `+${fokus} Fokus` : ''} = ${summeWurf}, noetig ${noetig}`}: ${s.art === 'panzer' ? 'prallt am Steinpanzer ab' : 'daneben'} - +1 Fokus fuer den naechsten Hieb.`,
+      `Wurf ${wurf}${wurf === 1 ? ' (eine 1 verfehlt immer)' : `, noetig ${Math.min(6, Math.max(2, noetig - angriffVon(a) - fokus))}+${fokus > 0 ? ' (mit Fokus)' : ''}`}: ${s.art === 'panzer' ? 'prallt am Steinpanzer ab' : 'daneben'} - +1 Fokus fuer den naechsten Hieb.`,
     );
     return;
   }
-  const vorne = `Wurf ${wurf}+${angriffVon(a)}${fokus > 0 ? `+${fokus} Fokus` : ''}${spalt ? ', Spalthieb' : ''}`;
+  const vorne = `Wurf ${wurf}${fokus > 0 ? ` mit ${fokus} Fokus` : ''}${spalt ? ', Spalthieb' : ''}`;
   verwunde(a, s, schaden, takt, vorne);
   const gefallen = !a.schleime.some((x) => x.id === s.id);
   if (gefallen && hatLegende(a, 'blutdurst') && a.leben < maxLebenVon(a)) {
@@ -2103,8 +2109,9 @@ const abgewehrt = (a: Abenteuer, wurf: number, boss = false): boolean => wurf <=
  * Was ein Hieb erreichen muss: 4 (Panzer 5), ab Akt 2 einer mehr, ab Akt 3 zwei, Elite einen mehr.
  * Spieltest 8: "Fast alles trifft ab 1+ - der Wurf ist egal." Darum: eine 1 verfehlt immer, eine 6 trifft immer.
  */
+// Spieltest 13: "In Akt 3 treffe ich nur auf 5-6" - ab Akt 2 einer mehr, nicht zwei.
 export const noetigFuer = (a: Pick<Abenteuer, 'akt'>, s: Pick<Schleim, 'art'> & { elite?: boolean }): number =>
-  (s.art === 'panzer' ? 5 : 4) + ((a.akt ?? 1) - 1) + (s.elite ? 1 : 0);
+  (s.art === 'panzer' ? 5 : 4) + ((a.akt ?? 1) >= 2 ? 1 : 0) + (s.elite ? 1 : 0);
 export const trefferAb = (a: Abenteuer, s: Pick<Schleim, 'art'> & { elite?: boolean }): number => Math.min(6, Math.max(2, noetigFuer(a, s) - angriffVon(a)));
 /** So viel Schaden macht ein Gegner, wenn er trifft (fuer Vorschau und Info). */
 export const gegnerWucht = (a: Abenteuer, s: Pick<Schleim, 'boss' | 'gross' | 'elite' | 'bossArt'>): number =>
@@ -2558,7 +2565,7 @@ export type SoeldnerArt = 'zwerg' | 'soeldnerin' | 'waldlaeufer' | 'paladin' | B
 export type BegleiterArt = 'fee' | 'golem' | 'daemon' | 'lichtgeist' | 'wolf';
 export type Soeldner = { id: number; art: SoeldnerArt; name: string; q: number; r: number; leben: number; max: number; lv: number; ep: number; geredet?: number; beschworen?: boolean };
 export type Fraktion = 'orden' | 'jaeger';
-export type Wanderer = { id: number; fraktion: Fraktion; name: string; q: number; r: number; leben: number; max: number; ziel?: Hex; geredet?: number };
+export type Wanderer = { id: number; fraktion: Fraktion; name: string; q: number; r: number; leben: number; max: number; ziel?: Hex; geredet?: number; vorgestellt?: boolean };
 
 export const ORT_NAME: Record<OrtArt, string> = { haendler: 'Haendler', werber: 'Werber', altar: 'Altar', ereignis: 'Begegnung' };
 export const FRAKTION_NAME: Record<Fraktion, string> = { orden: 'Orden der Waage', jaeger: 'Gruenwald-Jaeger' };
@@ -3031,10 +3038,11 @@ export function kaufen(alt: Abenteuer, id: string): Abenteuer {
   a.ereignisse = [];
   if (!HAENDLER_WAREN.some((w) => w.id === id)) a.gekauft = [...(a.gekauft ?? []), `${o.id}:${a.akt ?? 1}:${id}`];
   a.inventar = { ...a.inventar, gold: (a.inventar['gold'] ?? 0) - ware.preis };
-  if (gegenstand(id)?.legendaer) legendaerAnwenden(a, id, 0);
-  else a.inventar = { ...a.inventar, [id]: (a.inventar[id] ?? 0) + 1 };
   if (a.inventar['gold'] === 0) delete a.inventar['gold'];
-  melde(a, `Gekauft: ${gegenstand(id)!.name} fuer ${ware.preis} Gold.`);
+  if (gegenstand(id)?.legendaer) legendaerAnwenden(a, id, 0);
+  else if (gegenstand(id)?.slot) gibGegenstand(a, id, `Gekauft fuer ${ware.preis} Gold`);
+  else a.inventar = { ...a.inventar, [id]: (a.inventar[id] ?? 0) + 1 };
+  if (!gegenstand(id)?.slot) melde(a, `Gekauft: ${gegenstand(id)!.name} fuer ${ware.preis} Gold.`);
   return a;
 }
 
@@ -3235,6 +3243,11 @@ function fraktionenZiehen(a: Abenteuer, takt: number, rng: Rng, besetzt: (q: num
       .filter((s) => !s.boss && hexDistance(s, w) <= 1 && (w.fraktion === 'orden' ? s.art === 'bandit' || greiftAn(s) : greiftAn(s)))
       .sort((x, y) => (y.art === 'bandit' ? 1 : 0) - (x.art === 'bandit' ? 1 : 0) || x.leben - y.leben)[0];
     if (feind) {
+      // Spieltest 13: "Wer ist Ragna?" - beim ersten Kampf in deiner Naehe stellt er sich vor.
+      if (!w.vorgestellt && hexDistance(w, a.pos) <= 5) {
+        w.vorgestellt = true;
+        melde(a, `${w.name} vom ${FRAKTION_NAME[w.fraktion]} kaempft in der Naehe - ein fremder Ritter, nicht dein Gefolge.`);
+      }
       helferSchlaegt(a, w, feind, w.fraktion === 'orden' ? 1 : 0, rng, takt, true);
       continue;
     }

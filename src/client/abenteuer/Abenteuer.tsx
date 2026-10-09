@@ -28,6 +28,7 @@ import {
   gelaendeBonus,
   abwehrAugen,
   OMEN,
+  SCHRITTE_MIN,
   gelaende,
   rasten,
   decken,
@@ -2054,6 +2055,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         if (droht > 0 && still && a.phase !== 'tot') {
           const puls = 0.75 + 0.25 * Math.sin(sek * 8);
           schrift(`-${droht}${droht >= a.leben ? '!' : ''}`, kx - 11 * f, ky - f, droht >= a.leben ? '#ff2a1a' : '#ff6a4a', puls, droht >= a.leben ? 11 : 9);
+          // Toedlich: ein deutliches Wort darunter (Spieltest 13: "von 6 auf 0 ohne Warnung").
+          if (droht >= a.leben) schrift('TOEDLICH - geh weg!', kx, ky - 11 * f, '#ff2a1a', puls, 6);
         }
       }
 
@@ -2507,7 +2510,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               `${schleimName(feind)}${feind.elite ? ' (Elite)' : ''}`,
               `Leben ${feind.leben}${feind.max ? `/${feind.max}` : ''}`,
               `Trifft dich: -${gegnerWucht(a, feind)}${abwehrAugen(a) > 0 ? ` - dein Schild blockt bei Wurf ${abwehrAugen(a) === 1 ? '1' : `1 bis ${abwehrAugen(a)}`} von 6` : ' (kein Schild)'}`,
-              `Du triffst ab ${trefferAb(a, feind)}+ (Augen des Wuerfels)`,
+              (() => {
+                // Mit Fokus und Chance (Spieltest 13: "zwei Schreibweisen fuer dieselbe Regel").
+                const ab = Math.min(6, Math.max(2, trefferAb(a, feind) - (a.fokus ?? 0)));
+                return `Du triffst ab ${ab}+ auf dem Wuerfel (${Math.round(((7 - ab) / 6) * 100)} %)${(a.fokus ?? 0) > 0 ? ' mit Fokus' : ''}`;
+              })(),
             ]
           : wand
             ? [
@@ -3069,6 +3076,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                 <b>
                   {a.schritte} {a.schritte === 1 ? 'Schritt' : 'Schritte'}
                 </b>
+                {a.wurf != null && a.wurf < SCHRITTE_MIN && <small>Wurf {a.wurf} - mindestens {SCHRITTE_MIN}</small>}
                 <span className="ab-schritte" aria-hidden>
                   {Array.from({ length: a.wurf ?? 0 }, (_, i) => (
                     <i key={i} className={i < a.schritte ? 'voll' : ''} />
@@ -3138,6 +3146,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               <dd>Ein angesagter Angriff - er trifft im naechsten Takt. Geh weg! Steht ueber dir eine rote Zahl, trifft dich so viel. Wer ins Leere schlaegt, taumelt: freie Hiebe.</dd>
               <dt>Treffen</dt>
               <dd>Zum Zuschlagen wird eigens gewuerfelt (nicht der Schritt-Wuerfel). Wurf + Angriff (+ Fokus) muss die Schwelle erreichen: 4, ab Akt 2 hoeher, Panzer und Elite mehr. Eine 1 verfehlt immer, eine 6 trifft immer.</dd>
+              <dt>Pentagramm</dt>
+              <dd>Mit dem Legendaeren Pentagrammmeister: laeufst du in einem Zug eine geschlossene Form, wirkst du einen Zauber - Dreieck Funkenregen, Raute Schutzrune, Fuenfeck Pentagramm, Sechseck Heilkreis, groesser Bannkreis.</dd>
               <dt>Rasten</dt>
               <dd>T wartet die uebrigen Schritte ab, solange kein Gegner nah ist. Nach zwei Fehlschlaegen in Folge trifft dein naechster Hieb sicher.</dd>
               <dt>Deckung</dt>

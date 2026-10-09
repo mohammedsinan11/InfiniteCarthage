@@ -1,7 +1,7 @@
 // Iteration 5: Vorzeichen, mindestens zwei Schritte, Eile, Boss taumelt, Schafe tauschen.
 import { describe, it, expect } from 'vitest';
 import { istWasser } from '../src/abenteuer/welt';
-import { abenteuerPunkte, gelaende, neuesAbenteuer, OMEN, OMEN_IDS, omenFuer, sichtVon, taste, wuerfeln, zuegeBisBoss, SCHRITTE_MIN } from '../src/abenteuer/regeln';
+import { abenteuerPunkte, angriffVon, gelaende, neuesAbenteuer, OMEN, OMEN_IDS, omenFuer, sichtVon, taste, wuerfeln, zuegeBisBoss, SCHRITTE_MIN } from '../src/abenteuer/regeln';
 import type { Abenteuer, Taste } from '../src/abenteuer/regeln';
 import { HEX_DIRS, hexDistance } from '../src/core/coords';
 
@@ -120,10 +120,10 @@ describe('Abenteuer Iteration 9', () => {
     const { trefferAb, noetigFuer } = await import('../src/abenteuer/regeln');
     const a = neuesAbenteuer(3);
     expect(noetigFuer({ akt: 1 }, {})).toBe(4);
-    expect(noetigFuer({ akt: 3 }, { elite: true })).toBe(7);
+    expect(noetigFuer({ akt: 3 }, { elite: true })).toBe(6);
     a.ausruestung = { ...a.ausruestung, waffe: 'flammenschwert' };
     expect(trefferAb(a, {})).toBe(2);
-    expect(trefferAb({ ...a, akt: 3 }, { art: 'panzer', elite: true })).toBe(5);
+    expect(trefferAb({ ...a, akt: 3 }, { art: 'panzer', elite: true })).toBe(Math.min(6, Math.max(2, 7 - angriffVon(a))));
   });
 
   it('Deckung (G): ein Schritt ohne Fokus, der naechste Treffer macht einen Schaden weniger', async () => {
