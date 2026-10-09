@@ -1117,6 +1117,14 @@ function w6(a: Abenteuer): number {
 }
 
 const melde = (a: Abenteuer, text: string) => {
+  // Gleiche Zeilen hintereinander werden gezaehlt statt wiederholt (Spieltest 16: "sechsmal dieselbe Zeile").
+  const letzte = a.log[a.log.length - 1] ?? '';
+  const m = /^(.*) \(x(\d+)\)$/.exec(letzte);
+  const basis = m ? m[1] : letzte;
+  if (basis === text) {
+    a.log = [...a.log.slice(0, -1), `${text} (x${(m ? Number(m[2]) : 1) + 1})`];
+    return;
+  }
   a.log = [...a.log, text].slice(-30);
 };
 
@@ -1679,7 +1687,8 @@ function nachDemSchritt(a: Abenteuer): Abenteuer {
  */
 function stilleRuftBoss(a: Abenteuer): void {
   if (a.bossErwacht || a.bossBald != null || a.schleime.some((s) => s.boss && s.bossArt !== 'penta')) return;
-  if (a.zug - (a.aktStart ?? 1) < 4 || a.schleime.some((s) => hexDistance(s, a.pos) <= 10)) return;
+  // Erst nach acht Zuegen im Akt - vorher bleibt Zeit fuer Schatzkarte und Begegnungen (Spieltest 16).
+  if (a.zug - (a.aktStart ?? 1) < 8 || a.schleime.some((s) => hexDistance(s, a.pos) <= 10)) return;
   a.bossBald = a.zug + BOSS_VORWARNUNG;
   melde(a, `Es ist still geworden ... Der Boden bebt! In ${BOSS_VORWARNUNG} Zuegen erwacht der ${BOSS_NAME[naechsterBoss(a)]}.`);
 }

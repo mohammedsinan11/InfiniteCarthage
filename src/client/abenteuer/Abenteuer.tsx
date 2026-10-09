@@ -657,6 +657,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   // Das Lager zeigt sich, wenn kein Abenteuer laeuft - beim allerersten Mal nicht (gleich losspielen).
   const [logOffen, setLogOffen] = useState(false);
   const logRef = useRef<HTMLDivElement | null>(null);
+  // Das Log tritt zurueck, wenn nichts Neues kommt - es verdeckt dann kaum die Karte (Spieltest 16).
+  const [logFrisch, setLogFrisch] = useState(true);
   const [lager, setLager] = useState(() => lade() === null && ladeMeta().laeufe > 0);
   const [hilfeOffen, setHilfeOffen] = useState(false);
   const [schnell, setSchnell] = useState(leseSchnell);
@@ -679,6 +681,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const mini = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => speichere(a), [a]);
+  useEffect(() => {
+    setLogFrisch(true);
+    const t = window.setTimeout(() => setLogFrisch(false), 3500);
+    return () => window.clearTimeout(t);
+  }, [a.log.length, a.log[a.log.length - 1]]);
   // Das offene Log zeigt immer das Neueste unten.
   useEffect(() => {
     if (logOffen && logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
@@ -2427,13 +2434,14 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       }
       // Das Banner, wenn der Koenig erwacht.
       const seitBanner = (jetzt - banner.current) / 1000;
-      if (banner.current > 0 && seitBanner < 3) {
-        const al = seitBanner < 0.3 ? seitBanner / 0.3 : seitBanner > 2.4 ? (3 - seitBanner) / 0.6 : 1;
-        ctx.globalAlpha = al * 0.75;
+      // Kuerzer und im unteren Drittel - es verdeckt nicht das Feld um den Helden (Spieltest 16).
+      if (banner.current > 0 && seitBanner < 2) {
+        const al = seitBanner < 0.25 ? seitBanner / 0.25 : seitBanner > 1.5 ? (2 - seitBanner) / 0.5 : 1;
+        ctx.globalAlpha = al * 0.7;
         ctx.fillStyle = '#120d08';
-        ctx.fillRect(0, c.height * 0.36, c.width, c.height * 0.14);
+        ctx.fillRect(0, c.height * 0.66, c.width, c.height * 0.09);
         ctx.globalAlpha = 1;
-        schrift(bannerText.current, c.width / 2, c.height * 0.43, '#f2c94c', al, w < 700 ? 7 : 9);
+        schrift(bannerText.current, c.width / 2, c.height * 0.705, '#f2c94c', al, w < 700 ? 6 : 8);
       }
       // Sieg: goldenes Konfetti regnet ein paar Sekunden.
       if (a.phase === 'sieg' && banner.current > 0 && seitBanner < 7) {
@@ -3492,7 +3500,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
 
       {/* Was zuletzt geschah. */}
       {/* Spieltest: "das Log ist zu kurz, man verpasst was". Aufklappbar mit L oder dem Knopf. */}
-      <div ref={logRef} className={logOffen ? 'ab-log offen' : 'ab-log'} role="log">
+      <div ref={logRef} className={logOffen ? 'ab-log offen' : logFrisch ? 'ab-log' : 'ab-log still'} role="log">
         {(logOffen ? a.log.slice(-30) : a.log.slice(-6)).map((z, i, alle) => (
           <div key={`${a.log.length}-${i}`} className={logFarbe(z)} style={{ opacity: logOffen ? 1 : 0.4 + (i + 6 - alle.length) * 0.12 } as CSSProperties}>
             {z}
