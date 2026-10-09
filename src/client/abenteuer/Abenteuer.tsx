@@ -1782,7 +1782,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                 ctx.fillStyle = `rgba(150, 220, 255, ${0.5 + 0.3 * Math.sin(sek * 3)})`;
                 ctx.fillRect(sx(m.x) - 3 * f, sy(m.y) - f, 4 * f, f);
               } else {
-                const bild = o.ereignis === 'verletzter' ? 'kachel' : o.ereignis === 'spieler' ? 'zwerg' : 'waldlaeufer';
+                // Nie das Bild einer Klasse, die der Spieler selbst spielen koennte (Spieltest 14: "welcher bin ich?").
+                const bild = o.ereignis === 'verletzter' ? 'soeldnerin' : o.ereignis === 'spieler' ? 'soeldnerin' : 'soeldnerin';
                 malPerson(o.id, { x: m.x, y: m.y, hoch: 0 }, bild, null, false);
               }
               ctx.globalAlpha = 1;
@@ -2012,6 +2013,27 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             ctx.fill();
             schrift(`${hexDistance(boss, a.pos)}`, px - Math.cos(w) * k * 1.6, py - Math.sin(w) * k * 1.6, '#ff8a6a', 1, 5);
           }
+        }
+      }
+      // Ist kein Gegner zu sehen, aber der Akt braucht noch welche: ein gelber Pfeil zum naechsten (Spieltest 14).
+      if (still && !a.bossBald && !a.schleime.some((x) => x.boss) && a.phase !== 'tot' && a.phase !== 'sieg' && !a.schleime.some((x) => hexDistance(x, a.pos) <= sicht)) {
+        const naechster = [...a.schleime].sort((x, y) => hexDistance(x, a.pos) - hexDistance(y, a.pos))[0];
+        if (naechster) {
+          const o = mitte(naechster.q, naechster.r);
+          const mx = c.width / 2;
+          const my = c.height / 2;
+          const w = Math.atan2(sy(o.y) - my, sx(o.x) - mx);
+          const r = Math.min(110 * f, Math.min(c.width, c.height) / 3);
+          const px = sx(ritter.x) + Math.cos(w) * r;
+          const py = sy(ritter.y) + Math.sin(w) * r;
+          const k = 5 * f;
+          ctx.fillStyle = `rgba(246, 192, 74, ${0.6 + 0.3 * Math.sin(sek * 4)})`;
+          ctx.beginPath();
+          ctx.moveTo(px + Math.cos(w) * k, py + Math.sin(w) * k);
+          ctx.lineTo(px + Math.cos(w + 2.5) * k, py + Math.sin(w + 2.5) * k);
+          ctx.lineTo(px + Math.cos(w - 2.5) * k, py + Math.sin(w - 2.5) * k);
+          ctx.closePath();
+          ctx.fill();
         }
       }
       // Gebannte und taumelnde Gegner: kreisende Sterne ueber dem Kopf (Spieltest 8: "man sieht nicht, wer gebannt ist").
@@ -2800,7 +2822,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                     </small>
                   ) : (
                     <small className="ab-akt-uhr">
-                      {aktZiel(a) - kills === 1 ? 'noch 1 Gegner' : `noch ${aktZiel(a) - kills} Gegner`} - oder in {zuegeBisBoss(a)} Zuegen
+                      {a.phase === 'tot' || a.phase === 'sieg'
+                        ? ''
+                        : zuegeBisBoss(a) === 0
+                          ? 'Der Boss kommt!'
+                          : `${aktZiel(a) - kills === 1 ? 'noch 1 Gegner' : `noch ${aktZiel(a) - kills} Gegner`} - oder in ${zuegeBisBoss(a)} ${zuegeBisBoss(a) === 1 ? 'Zug' : 'Zuegen'}`}
                     </small>
                   )}
                   <i className="ab-akt-balken">
@@ -3160,7 +3186,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               <dt>Heilen</dt>
               <dd>H isst ein Kraut. Sind Gegner nah (bis 3 Felder), kostet das einen Schritt - und sie ziehen. Wartest du ohne Gegner in der Naehe, heilst du einmal je Zug +1. Kraeuter werden je Akt teurer.</dd>
               <dt>Waffe</dt>
-              <dd>Treffer laden die Waffe. Voll: Taste 1 loest ihre Faehigkeit aus (nur mit Gegner in Reichweite). Jeder Boss rast ab halbem Leben - dann schlaegt er in jedem Takt.</dd>
+              <dd>Jeder Schritt und jeder Treffer laedt die Waffe. Voll: Taste 1 loest ihre Faehigkeit aus (nur mit Gegner in Reichweite). Jeder Boss rast ab halbem Leben - dann schlaegt er in jedem Takt.</dd>
               <dt>Gelaende</dt>
               <dd>Wald: +1 Abwehr. Huegel und Berge: +1 Angriff (* in den Werten). Berge und Sumpf kosten mehr Schritte.</dd>
               <dt>Unterwegs</dt>

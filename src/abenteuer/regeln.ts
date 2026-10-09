@@ -1917,7 +1917,7 @@ export function faehigkeitNutzen(alt: Abenteuer): Abenteuer {
     // Spieltest 8: "1 tut nichts" - sagen, wie weit die Waffe ist.
     const l = ladungVon(alt);
     if (!l.faehigkeit) return { ...alt, ereignisse: [], log: [...alt.log, 'Deine Waffe hat keine Faehigkeit.'].slice(-30) };
-    return { ...alt, ereignisse: [], log: [...alt.log, `${FAEHIGKEIT_NAME[l.faehigkeit]} laedt noch: ${l.ist}/${l.voll}. Treffer laden die Waffe.`].slice(-30) };
+    return { ...alt, ereignisse: [], log: [...alt.log, `${FAEHIGKEIT_NAME[l.faehigkeit]} laedt noch: ${l.ist}/${l.voll}. Jeder Schritt und jeder Treffer laedt die Waffe.`].slice(-30) };
   }
   const a = structuredClone(alt);
   a.ereignisse = [];
@@ -2519,7 +2519,7 @@ function kolossHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetzt
     // Der grosse Ring: alles bis zwei Felder um ihn - erst drei Felder Abstand rettet.
     s.flaeche = hexesInRange(s, 2).filter((h) => !(h.q === s.q && h.r === s.r));
     a.ereignisse.push({ art: 'ansage', takt, wer: s.id, feld: { q: a.pos.q, r: a.pos.r }, felder: s.flaeche });
-    melde(a, 'Der Gelee-Koloss blaeht sich auf - weg, mindestens drei Felder!');
+    melde(a, 'Der Gelee-Koloss blaeht sich auf - weg, mindestens drei Felder (oder Deckung mit G)!');
     return;
   }
   if (d === 1) {
@@ -2556,7 +2556,7 @@ export type EreignisArt = 'schrein' | 'verletzter' | 'spieler' | 'quelle' | 'seh
 export const EREIGNIS: Record<EreignisArt, { name: string; titel: string; optionen: string[] }> = {
   schrein: { name: 'Schrein', titel: 'Ein vergessener Schrein. Opfergaben liegen darauf.', optionen: ['ev_beten', 'ev_pluendern', 'ev_weiter'] },
   verletzter: { name: 'Verletzter', titel: 'Ein verletzter Wanderer bittet um Hilfe.', optionen: ['ev_helfen', 'ev_ausrauben', 'ev_weiter'] },
-  spieler: { name: 'Spieler', titel: 'Ein Gluecksspieler klappert mit seinen Wuerfeln: "Eine Runde?"', optionen: ['ev_wetten', 'ev_hoch', 'ev_weiter'] },
+  spieler: { name: 'Gluecksspieler', titel: 'Ein Gluecksspieler klappert mit seinen Wuerfeln: "Eine Runde?"', optionen: ['ev_wetten', 'ev_hoch', 'ev_weiter'] },
   quelle: { name: 'Quelle', titel: 'Eine schimmernde Quelle. Das Wasser riecht seltsam.', optionen: ['ev_trinken', 'ev_fuellen', 'ev_weiter'] },
   seherin: { name: 'Seherin', titel: 'Eine Seherin: "Ich sehe, was vor dir liegt - fuer ein paar Muenzen."', optionen: ['ev_karte', 'ev_omen', 'ev_weiter'] },
 };
@@ -2919,6 +2919,10 @@ const wandererAuf = (a: Abenteuer, q: number, r: number) => (a.wanderer ?? []).f
 export function ansprechen(alt: Abenteuer, ortId: number): Abenteuer {
   const o = (alt.orte ?? []).find((x) => x.id === ortId);
   if (!o || hexDistance(o, alt.pos) > 1 || alt.phase === 'tot') return alt;
+  // Spieltest 14: "Im Kampf oeffnet sich staendig der Laden" - nicht, solange Gegner nah sind.
+  if ((o.art === 'haendler' || o.art === 'werber') && alt.schleime.some((x) => hexDistance(x, alt.pos) <= 2)) {
+    return { ...alt, ereignisse: [], log: [...alt.log, `${o.name} winkt ab: "Erst den Kampf, dann das Geschaeft!"`].slice(-30) };
+  }
   const a = structuredClone(alt);
   a.ereignisse = [{ art: 'treffen', takt: 0, ort: o.id }];
   if (o.art === 'ereignis') {
@@ -3232,7 +3236,10 @@ function fraktionenZiehen(a: Abenteuer, takt: number, rng: Rng, besetzt: (q: num
         else {
           const fraktion: Fraktion = welche === 0 ? 'orden' : 'jaeger';
           const leben = fraktion === 'orden' ? 4 : 3;
-          a.wanderer.push({ id, fraktion, name: VORNAMEN[(id * 5 + a.zeit) % VORNAMEN.length]!, q: h.q, r: h.r, leben, max: leben, ziel: { q: a.pos.q - dq * weit, r: a.pos.r - dr * weit } });
+          const vergeben = new Set([...(a.orte ?? []).map((x) => x.name), ...a.wanderer.map((x) => x.name), ...(a.gefolge ?? []).map((x) => x.name)]);
+          let name = VORNAMEN[(id * 5 + a.zeit) % VORNAMEN.length]!;
+          for (let i = 1; i < VORNAMEN.length && vergeben.has(name); i++) name = VORNAMEN[(id * 5 + a.zeit + i) % VORNAMEN.length]!;
+          a.wanderer.push({ id, fraktion, name, q: h.q, r: h.r, leben, max: leben, ziel: { q: a.pos.q - dq * weit, r: a.pos.r - dr * weit } });
         }
         a.ereignisse.push({ art: 'neu', takt, wer: id });
       }
@@ -3324,7 +3331,9 @@ function ticken(a: Abenteuer, takt: number): void {
     if (s.boss) {
       // Spieltest 10: "Der rasende Koloss blaeht sich auf - und trifft, bevor ich weg bin."
       // Eine Ansage loest fruehestens zwei Takte spaeter aus, auch wenn der Boss rast.
-      if ((s.angriff || s.flaeche) && s.angesagt != null && a.zeit - s.angesagt < 2) continue;
+      // Der grosse Ring des Koloss gibt drei Takte (Spieltest 14: "mit zwei Schritten nicht zu schaffen").
+      const frist = s.flaeche && s.flaeche.length >= 10 ? 3 : 2;
+      if ((s.angriff || s.flaeche) && s.angesagt != null && a.zeit - s.angesagt < frist) continue;
       koenigHandelt(a, s, takt, rng, besetzt, neue);
       s.angesagt = s.angriff || s.flaeche ? (s.angesagt ?? a.zeit) : null;
       continue;

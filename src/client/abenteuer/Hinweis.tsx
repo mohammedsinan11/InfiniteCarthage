@@ -89,6 +89,13 @@ export function Hinweis({ a }: { a: Abenteuer }) {
     else if (offenArt) merke(['leute']);
   });
   const tipp = TIPPS.find((t) => !weg.includes(t.id) && t.wann(a));
+  // Ein Tipp, der zwei Zuege lang stand, gilt als gelesen (Spieltest 14: "Tipps decken immer wieder das Feld ab").
+  const [seit, setSeit] = useState<{ id: string; zug: number } | null>(null);
+  useEffect(() => {
+    if (!tipp) return;
+    if (seit?.id !== tipp.id) setSeit({ id: tipp.id, zug: a.zug });
+    else if (a.zug >= seit.zug + 2) merke([tipp.id]);
+  });
   if (!tipp || a.wahl || a.laden != null || a.phase === 'tot' || a.phase === 'sieg') return null;
   const ok = () => merke([tipp.id]);
   // Erfahrene Spieler schalten alle Tipps auf einmal ab.
