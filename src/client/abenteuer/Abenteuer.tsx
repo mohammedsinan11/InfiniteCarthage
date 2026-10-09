@@ -823,9 +823,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       halt();
       // Autoroll: steht noch der Wurf an, erst wuerfeln, dann (wenn der
       // Wuerfel liegt) den Schritt gehen.
+      // Autoroll: steht der Wurf an, nur wuerfeln - eine Taste vom alten Zug wird nicht zum ersten Schritt des neuen (Spieltest 13).
       if (autorollRef.current && aktuell.current.phase === 'wuerfeln' && !rolltRef.current) {
         wirfRef.current();
-        window.setTimeout(() => schritt(t), ROLL_MS + 30);
         return;
       }
       schritt(t);
@@ -2530,6 +2530,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                 : fund
                   ? fundZeilen(fund)
                   : [istWasser(gelaende(a.seed, info.q, info.r)) ? 'Wasser' : 'Unwegsam', 'Hier kommst du nicht hin.'];
+        // Das grosse Bossbild ragt ueber die Nachbarfelder - steht er daneben, sagt die Box es auch (Spieltest 13).
+        const bossNah = a.schleime.find((x) => x.boss && x !== feind && hexDistance(x, info) === 1);
+        if (bossNah) zeilen.push(`Daneben: ${schleimName(bossNah)} (Leben ${bossNah.leben}/${bossNah.max ?? bossNah.leben})`);
         ctx.save();
         ctx.font = `bold ${5 * f}px monospace`;
         ctx.textAlign = 'left';
@@ -2946,7 +2949,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           ))}
         </div>
         <div className="ab-verlauf" title="Diesen Zug gedrueckt">
-          {zugTasten.length > 0 ? zugTasten.slice(-12).map((t, i) => <kbd key={i}>{t.toUpperCase()}</kbd>) : <small>Oder ein Feld antippen · S Fokus · G Deckung · T Rasten</small>}
+          {zugTasten.length > 0 ? zugTasten.slice(-12).map((t, i) => <kbd key={i}>{t.toUpperCase()}</kbd>) : <small>{a.zug >= 4 ? 'Oder ein Feld antippen · S Fokus · G Deckung · T Rasten' : 'Oder ein Feld antippen · S warten'}</small>}
         </div>
       </div>
 
@@ -3484,7 +3487,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                 ))}
                 {a.ausruestung.waffe && (
                   <span>
-                    <Icon id={a.ausruestung.waffe} groesse={16} /> {gegenstand(a.ausruestung.waffe)?.name}
+                    <Icon id={a.ausruestung.waffe} groesse={16} /> {gegenstand(a.ausruestung.waffe)?.name} (Waffe)
                   </span>
                 )}
                 {(a.gefolge ?? []).map((g) => (

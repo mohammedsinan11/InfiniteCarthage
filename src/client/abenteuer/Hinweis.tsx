@@ -6,7 +6,7 @@
  * nichts davon wird erklaert."
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { faehigkeitBereit } from '../../abenteuer/regeln';
 import type { Abenteuer } from '../../abenteuer/regeln';
 import { hexDistance as hexDistanceZu } from '../../core/coords';
@@ -72,10 +72,9 @@ function gesehen(): string[] {
 
 export function Hinweis({ a }: { a: Abenteuer }) {
   const [weg, setWeg] = useState<string[]>(gesehen);
-  const tipp = TIPPS.find((t) => !weg.includes(t.id) && t.wann(a));
-  if (!tipp || a.wahl || a.laden != null || a.phase === 'tot' || a.phase === 'sieg') return null;
-  const ok = () => {
-    const neu = [...weg, tipp.id];
+  const merke = (ids: string[]) => {
+    const neu = [...new Set([...weg, ...ids])];
+    if (neu.length === weg.length) return;
     setWeg(neu);
     try {
       localStorage.setItem(GESEHEN, JSON.stringify(neu));
@@ -83,11 +82,25 @@ export function Hinweis({ a }: { a: Abenteuer }) {
       // ohne Speicher nur fuer jetzt
     }
   };
+  // Wer einen Laden schon geoeffnet hat, braucht den Tipp dazu nicht mehr (Spieltest 13: "kam zu spaet").
+  const offenArt = a.laden != null ? (a.orte ?? []).find((o) => o.id === a.laden)?.art : undefined;
+  useEffect(() => {
+    if (offenArt === 'altar') merke(['altar']);
+    else if (offenArt) merke(['leute']);
+  });
+  const tipp = TIPPS.find((t) => !weg.includes(t.id) && t.wann(a));
+  if (!tipp || a.wahl || a.laden != null || a.phase === 'tot' || a.phase === 'sieg') return null;
+  const ok = () => merke([tipp.id]);
+  // Erfahrene Spieler schalten alle Tipps auf einmal ab.
+  const alleAus = () => merke(TIPPS.map((t) => t.id));
   return (
     <div className="ab-hinweis" role="note">
       <span>{tipp.text}</span>
       <button className="klein" onClick={ok}>
         Verstanden
+      </button>
+      <button className="klein ab-hinweis-aus" onClick={alleAus} title="Keine Tipps mehr zeigen">
+        Tipps aus
       </button>
     </div>
   );

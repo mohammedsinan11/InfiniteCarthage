@@ -676,7 +676,8 @@ export function fundAuf(a: Pick<Abenteuer, 'seed' | 'genommen'>, q: number, r: n
   // Ausruestung liegt offen da - man sieht, was es ist.
   if (h < 2) return TRUHENINHALT[hash3i(a.seed, q, r, SALT_FUND + 1) % TRUHENINHALT.length]!;
   if (h < 3) return 'truhe';
-  if (h === 199) return 'fluchtruhe';
+  // Spieltest 13: "sechs Legendaere je Lauf" - verfluchte Truhen halb so oft.
+  if (h === 199 && hash3i(a.seed, q, r, SALT_FUND + 11) % 2 === 0) return 'fluchtruhe';
   if (h < 8 && (t === 'wald' || t === 'wiese' || t === 'feld' || t === 'dschungel' || t === 'taiga')) return 'kraut';
   if (h < 11) return 'gold';
   if (h < 13) return 'halbherz';
@@ -2094,11 +2095,12 @@ function schleimTrifft(a: Abenteuer, s: Schleim, feld: Hex, takt: number, rng: R
 export const FOKUS_MAX = 3;
 
 /** Deckung faengt einen Schaden ab - und ist dann verbraucht. */
-function deckungFaengt(a: Abenteuer, schaden: number): number {
+function deckungFaengt(a: Abenteuer, schaden: number, wieviel = 1): number {
   if (!a.deckung || schaden <= 0) return schaden;
   a.deckung = false;
-  melde(a, 'Deine Deckung faengt einen Schaden ab.');
-  return schaden - 1;
+  // Gegen Bosse faengt die Deckung zwei ab (Spieltest 13: "mit einem Schritt kommt man nicht aus der Explosion").
+  melde(a, `Deine Deckung faengt ${wieviel === 1 ? 'einen Schaden' : `${wieviel} Schaden`} ab.`);
+  return Math.max(0, schaden - wieviel);
 }
 /** Abwehr: ein Wurf bis zu anderthalbmal der Abwehr prallt ab (Abwehr 1: eine 1, 2: bis 3, 3: bis 4). */
 // Spieltest 9: "Ab Abwehr +5 haelt der Schild alles" - hoechstens 1 bis ABWEHR_MAX, Bosse durchschlagen einen Punkt.
@@ -2314,7 +2316,7 @@ function koenigTrifft(a: Abenteuer, s: Schleim, felder: readonly Hex[], takt: nu
   }
   if (schutzwall(a, s, feld, takt, wurf)) return;
   // Der Endboss schlaegt haerter.
-  const schaden = abgewehrt(a, wurf, true) ? 0 : deckungFaengt(a, BOSS_SCHADEN + ((a.akt ?? 1) >= AKTE && s.bossArt !== 'penta' ? 1 : 0));
+  const schaden = abgewehrt(a, wurf, true) ? 0 : deckungFaengt(a, BOSS_SCHADEN + ((a.akt ?? 1) >= AKTE && s.bossArt !== 'penta' ? 1 : 0), 2);
   a.ereignisse.push({ art: 'hieb', takt, wer: s.id, ziel: 'ritter', feld, wurf, schaden });
   if (schaden > 0) {
     a.leben -= schaden;
@@ -2773,7 +2775,7 @@ function ortePlatzieren(a: Abenteuer): void {
 function ortEntdecken(a: Abenteuer, h: Hex): void {
   const z = hash3i(a.seed, h.q, h.r, SALT_LEUTE + 2) % 260;
   const ereignis = z === 30 || z === 100 || z === 180 || z === 240;
-  if (z !== 7 && z !== 77 && z !== 150 && z !== 200 && !ereignis) return;
+  if (z !== 7 && z !== 77 && z !== 150 && !ereignis) return;
   if (!ortFrei(a, h) || hexDistance(h, a.pos) < 2) return;
   const art: OrtArt = ereignis ? 'ereignis' : z === 7 ? 'haendler' : z === 77 ? 'werber' : 'altar';
   // Spieltest: "Haendler auf jedem Bildschirm" - Laeden sind rar.
@@ -2863,7 +2865,7 @@ function ereignisWaehlen(a: Abenteuer, id: string, ortId: number | undefined): v
     return void melde(a, 'Verloren - die 5 Gold sind weg.');
   }
   if (id === 'ev_hoch') {
-    if (glueck < 50) {
+    if (glueck < 35) {
       melde(a, 'Die Wuerfel fallen fuer dich! Waehle ein Legendaeres.');
       return void bietWahl(a, 'schatz');
     }
@@ -3108,7 +3110,9 @@ function helferSchlaegt(a: Abenteuer, wer: { id: number; name: string }, s: Schl
   a.ereignisse.push({ art: 'hieb', takt, wer: wer.id, ziel: s.id, wurf, schaden });
   if (!schaden) return false;
   const vorher = a.schleime.length;
-  verwunde(a, s, schaden, takt, wer.name, fremd);
+  // Fremde Ritter mit Titel - man sieht, wer fuer wen kaempft (Spieltest 13).
+  const fremdW = fremd ? (a.wanderer ?? []).find((w) => w.id === wer.id) : undefined;
+  verwunde(a, s, schaden, takt, fremdW ? `${fremdW.fraktion === 'orden' ? 'Ordensritter' : 'Jaeger'} ${wer.name}` : wer.name, fremd);
   return a.schleime.length < vorher && !a.schleime.some((x) => x.id === s.id);
 }
 

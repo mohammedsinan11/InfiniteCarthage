@@ -9163,10 +9163,11 @@ em.off {
 }
 .ab-hinweis {
   position: absolute;
-  /* Unten ueber der Faehigkeitenleiste - nicht mehr ueber dem Log (Spieltest 10). */
-  bottom: 112px;
-  left: 50%;
-  transform: translateX(-50%);
+  /* Rechts, ueber dem Wuerfeltisch - nicht ueber dem Kampf in der Mitte (Spieltest 13). */
+  bottom: 275px;
+  flex-wrap: wrap;
+  right: 16px;
+  max-width: 380px !important;
   z-index: 8;
   display: flex;
   align-items: center;
@@ -9381,4 +9382,15 @@ em.off {
 .ab-sieg-abzeichen {
   color: #9ad87a;
   font-style: normal;
+}
+
+.ab-hinweis-aus {
+  opacity: 0.7;
+}
+/* Etwas groessere Schrift in Log und Werten (Spieltest 13: "winzige Schrift"). */
+.ab-log {
+  font-size: 13px !important;
+}
+.ab-werte-gitter {
+  font-size: 12px;
 }
