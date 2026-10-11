@@ -130,6 +130,7 @@ describe('Abenteuer Iteration 9', () => {
     const { decken } = await import('../src/abenteuer/regeln');
     const a = structuredClone(wuerfeln(neuesAbenteuer(13)));
     a.schritte = 4;
+    a.fokus = 0;
     a.leben = 6;
     a.zeit = 10;
     a.schleime = [{ id: 7, q: a.pos.q, r: a.pos.r - 1, leben: 9, gross: false, angriff: { ...a.pos } }];

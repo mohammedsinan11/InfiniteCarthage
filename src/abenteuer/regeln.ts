@@ -1264,10 +1264,17 @@ export function wuerfeln(alt: Abenteuer): Abenteuer {
   if (alt.phase !== 'wuerfeln' || alt.wahl) return alt;
   const a = structuredClone(alt);
   a.ereignisse = [];
-  const { wurf, zusatz } = wuerfelWurf(a);
+  const w0 = wuerfelWurf(a);
+  const wurf = w0.wurf;
+  let zusatz = w0.zusatz;
   a.wurf = wurf;
-  // Spieltest: "Eine 1 auf dem roten Feld ist sicherer Schaden." Darum immer mindestens 2 Schritte.
+  // Spieltest: "Eine 1 auf dem roten Feld ist sicherer Schaden." Darum immer mindestens 3 Schritte -
+  // und ein kleiner Wurf schenkt einen Punkt Fokus (Spieltest 17: "1, 2 und 3 sind sonst dasselbe").
   a.schritte = Math.max(SCHRITTE_MIN, a.wurf + schrittBonus(a));
+  if (a.wurf + schrittBonus(a) < SCHRITTE_MIN && (a.fokus ?? 0) < FOKUS_MAX) {
+    a.fokus = (a.fokus ?? 0) + 1;
+    zusatz += ' - kleiner Wurf: +1 Fokus';
+  }
   a.pfad = [a.pos];
   a.phase = 'ziehen';
   a.spuren = {};
@@ -2655,7 +2662,7 @@ function kolossHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetzt
     // Der grosse Ring: alles bis zwei Felder um ihn - erst drei Felder Abstand rettet.
     s.flaeche = hexesInRange(s, 2).filter((h) => !(h.q === s.q && h.r === s.r));
     a.ereignisse.push({ art: 'ansage', takt, wer: s.id, feld: { q: a.pos.q, r: a.pos.r }, felder: s.flaeche });
-    melde(a, 'Der Gelee-Koloss blaeht sich auf - weg, mindestens drei Felder (oder Deckung mit G)!');
+    melde(a, 'Der Gelee-Koloss blaeht sich auf - in drei Takten platzt er! Weg, mindestens drei Felder (oder Deckung mit G).');
     return;
   }
   if (d === 1) {

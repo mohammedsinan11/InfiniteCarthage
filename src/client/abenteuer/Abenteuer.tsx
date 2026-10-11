@@ -920,7 +920,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     // Nur eine NEUE Gefahr haelt an - wer schon vorher neben einem Gegner stand, laeuft weiter (Spieltest 12).
     const nebenVorher = new Set(a0.schleime.filter((s) => hexDistance(s, a0.pos) === 1).map((s) => s.id));
     const gefahr = neu.schleime.some((s) => hexDistance(s, neu.pos) === 1 && !nebenVorher.has(s.id));
-    if (gefahr && !amZiel && !zielSchleim && neu.phase === 'ziehen') {
+    // Wer auf einem roten Feld steht, flieht - dann haelt der Lauf nicht an (Spieltest 17).
+    const aufRot = neu.schleime.some(
+      (s) => (s.angriff && s.angriff.q === neu.pos.q && s.angriff.r === neu.pos.r) || (s.flaeche ?? []).some((h) => h.q === neu.pos.q && h.r === neu.pos.r),
+    );
+    if (gefahr && !aufRot && !amZiel && !zielSchleim && neu.phase === 'ziehen') {
       halt();
       setze({ ...neu, ereignisse: [], log: [...neu.log, 'Ein Gegner steht neben dir - der Lauf haelt an. Du entscheidest.'].slice(-30) });
       return;
@@ -1038,7 +1042,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         angle();
       } else if (k === ' ' || k === 'enter') {
         e.preventDefault();
-        wirf();
+        // Enter mitten im Zug: sagen, was zu tun ist (Spieltest 17: "keine Rueckmeldung").
+        const j = aktuell.current;
+        if (j.phase === 'ziehen' && !rolltRef.current && j.log[j.log.length - 1] !== 'Erst die Schritte gehen - oder T zum Rasten, S zum Warten.')
+          setze({ ...j, ereignisse: [], log: [...j.log, 'Erst die Schritte gehen - oder T zum Rasten, S zum Warten.'].slice(-30) });
+        else wirf();
       }
     };
     window.addEventListener('keydown', t);
@@ -1900,7 +1908,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       const laeuft = lauf0 !== undefined && p >= lauf0.takt && p < lauf0.takt + 1;
       const haltung: Haltung = schwung >= 0 && schwung < 0.8 ? (schwung < 0.18 ? 'aus' : schwung < 0.45 ? 'hieb' : 'nach') : 'ruhe';
       figuren.push({
-        y: ro.y,
+        // Der Held wird nach allen Nachbarn gezeichnet - kein Bossbild verdeckt ihn (Spieltest 17).
+        y: ro.y + 6,
         mal: () => {
           // Das bist du: ein goldener Ring am Boden (Spieltest: "welcher Ritter bin ich?").
           ctx.strokeStyle = `rgba(242, 201, 76, ${0.55 + 0.25 * Math.sin(sek * 3)})`;

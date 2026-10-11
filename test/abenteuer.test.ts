@@ -12,6 +12,7 @@ function imZug(seed: number, schleime: Abenteuer['schleime'] = [], schritte = 6)
   const a = structuredClone(wuerfeln(neuesAbenteuer(seed)));
   a.schleime = schleime;
   a.schritte = schritte;
+  a.fokus = 0;
   return a;
 }
 
