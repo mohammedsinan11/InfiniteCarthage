@@ -191,6 +191,9 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
   { id: 'fluchtruhe', name: 'Verfluchte Truhe', text: 'Darin liegt Legendaeres - aber ihre Waechter erwachen, wenn du sie oeffnest.' },
   { id: 'fluch_oeffnen', name: 'Oeffnen', text: 'Waehle sofort ein Legendaeres - dann erwachen die Waechter.' },
   { id: 'fluch_lassen', name: 'Stehen lassen', text: 'Lieber nicht. Du kannst spaeter wiederkommen.' },
+  { id: 'rast_gold', name: 'Beutel pruefen', text: '+15 Gold fuer den naechsten Haendler.' },
+  { id: 'rast_kraut', name: 'Kraeuter sammeln', text: 'Zwei Heilkraeuter fuer den Weg.' },
+  { id: 'rast_schleifen', name: 'Klinge schleifen', text: '+1 Angriff fuer den Rest des Abenteuers (wie beim Schmied).' },
   { id: 'ev_beten', name: 'Beten', text: 'Volles Leben.' },
   { id: 'ev_pluendern', name: 'Pluendern', text: '+15 Gold - aber die Waechter des Schreins erwachen (zwei Gegner).' },
   { id: 'ev_weiter', name: 'Weitergehen', text: 'Nichts riskieren.' },
@@ -552,6 +555,10 @@ export type Abenteuer = {
   bossBald?: number | null;
   /** Die Schatzkarte des Akts: hier liegt ein Versteck (Spieltest 15: "nichts lockt nach draussen"). */
   versteck?: Hex | null;
+  /** Schritt-Wuerfe auf 1 oder 2 hintereinander - nach zweien hilft das Glueck (Spieltest 17). */
+  pechWuerfe?: number;
+  /** Entdeckte Orte (Begegnungen, Verstecke) - bringen Punkte. */
+  entdeckt?: number;
   /** In welchem Akt der Beutezug schon eine Truhe gab. */
   beuteAkt?: number;
   /** Deckung (G): der naechste Treffer macht einen Schaden weniger. */
@@ -833,7 +840,7 @@ function neueGegend(a: Abenteuer): void {
  * Truhen, goldene Schaetze und die Beute der Bosse bieten DREI Dinge an, der
  * Spieler waehlt eines. Solange die Wahl offen ist, ruht das Spiel.
  */
-export type WahlArt = 'truhe' | 'schatz' | 'boss' | 'fluch' | 'ereignis';
+export type WahlArt = 'truhe' | 'schatz' | 'boss' | 'fluch' | 'ereignis' | 'rast';
 export type Wahl = { art: WahlArt; titel: string; optionen: string[]; ort?: number };
 
 /**
@@ -933,6 +940,17 @@ export function waehlen(alt: Abenteuer, nr: number): Abenteuer {
     ereignisWaehlen(a, id, w.ort);
     return a;
   }
+  if (w.art === 'rast') {
+    if (id === 'rast_gold') melde(a, `Am Feuer zaehlst du deine Muenzen: +${goldDazu(a, 15)} Gold.`);
+    else if (id === 'rast_kraut') {
+      a.inventar = { ...a.inventar, kraut: (a.inventar['kraut'] ?? 0) + 2 };
+      melde(a, 'Du sammelst Kraeuter am Waldrand: +2 Kraeuter.');
+    } else {
+      a.schmied = { angriff: (a.schmied?.angriff ?? 0) + 1, abwehr: a.schmied?.abwehr ?? 0 };
+      melde(a, 'Du schleifst deine Klinge am Feuer: +1 Angriff.');
+    }
+    return a;
+  }
   if (id === 'fluch_oeffnen') {
     a.genommen = [...a.genommen, hexKey(a.pos.q, a.pos.r)];
     fluchtruheOeffnen(a);
@@ -950,6 +968,11 @@ export function waehlen(alt: Abenteuer, nr: number): Abenteuer {
     melde(a, 'Du waehlst den Goldsack: +15 Gold.');
   } else if (gegenstand(id)?.legendaer) legendaerAnwenden(a, id, 0);
   else gibGegenstand(a, id, 'Aus der Truhe');
+  // Spieltest 17: "Der Aktwechsel ist abrupt" - nach der Bossbeute eine Rast am Lagerfeuer.
+  if (w.art === 'boss' && a.phase !== 'sieg' && !a.wahl) {
+    a.wahl = { art: 'rast', titel: `Rast am Lagerfeuer - vor dir liegt Akt ${a.akt ?? 1}: ${AKT_NAME[(a.akt ?? 1) - 1] ?? ''}. Was tust du?`, optionen: ['rast_gold', 'rast_kraut', 'rast_schleifen'] };
+    a.ereignisse.push({ art: 'wahl', takt: 0 });
+  }
   return a;
 }
 
@@ -1139,6 +1162,12 @@ function wuerfelWurf(a: Abenteuer): { wurf: number; zusatz: string } {
   const seite = (n: number) => 1 + rng.int(n);
   let wurf = seite(WUERFEL_SEITEN[id] ?? 6);
   let zusatz = '';
+  // Nach zwei Wuerfen von 1 oder 2 hintereinander zeigt der naechste mindestens 4 (Spieltest 17: "sechsmal Minimum").
+  if ((a.pechWuerfe ?? 0) >= 2 && wurf < 4) {
+    zusatz = ` (Pech gleicht sich aus: ${wurf} wird 4)`;
+    wurf = 4;
+  }
+  a.pechWuerfe = wurf <= 2 ? (a.pechWuerfe ?? 0) + 1 : 0;
   a.zweiterWurf = null;
   if (id === 'bleiwuerfel' && wurf < 3) {
     zusatz = ` (Blei: ${wurf} wird 3)`;
@@ -1884,6 +1913,8 @@ export const zuegeBisBoss = (a: Pick<Abenteuer, 'zug' | 'aktStart' | 'omen' | 'a
   Math.max(0, (hatOmen(a, 'eile') ? 10 : (a.akt ?? 1) >= 3 ? AKT_ZUEGE - 3 : AKT_ZUEGE) - (a.zug - (a.aktStart ?? 1)));
 /** Punkte je Zug Vorsprung auf den Boss-Zeitplan. */
 export const EILE_PUNKTE = 8;
+/** Punkte je entdeckter Begegnung oder Versteck. */
+export const ENTDECKER_PUNKTE = 25;
 /** Hoechstens so viele Eile-Zuege je Akt. */
 export const EILE_MAX = 6;
 /** So viele Zuege warnt das Beben, bevor der Boss erwacht. */
@@ -2093,6 +2124,7 @@ function versteckPruefen(a: Abenteuer): void {
   const v = a.versteck;
   if (!v || v.q !== a.pos.q || v.r !== a.pos.r) return;
   a.versteck = null;
+  a.entdeckt = (a.entdeckt ?? 0) + 1;
   const n = goldDazu(a, 8 + 4 * (a.akt ?? 1));
   melde(a, `Das Versteck! +${n} Gold und eine Truhe.`);
   a.ereignisse.push({ art: 'fund', takt: 0, id: 'schatz' });
@@ -2935,7 +2967,10 @@ export function ereignisMoeglich(a: Abenteuer, id: string): boolean {
 /** Eine Begegnung waehlen - danach ist sie vorbei. */
 function ereignisWaehlen(a: Abenteuer, id: string, ortId: number | undefined): void {
   // Weitergehen laesst die Begegnung stehen - man kann wiederkommen (Spieltest 11: Seherin ohne Gold).
-  if (ortId !== undefined && id !== 'ev_weiter') a.orte = (a.orte ?? []).map((x) => (x.id === ortId ? { ...x, benutzt: true } : x));
+  if (ortId !== undefined && id !== 'ev_weiter') {
+    a.orte = (a.orte ?? []).map((x) => (x.id === ortId ? { ...x, benutzt: true } : x));
+    a.entdeckt = (a.entdeckt ?? 0) + 1;
+  }
   const gold = a.inventar['gold'] ?? 0;
   const zahle = (n: number) => {
     a.inventar = { ...a.inventar, gold: gold - n };
@@ -3749,6 +3784,8 @@ export function abenteuerPunkte(a: Abenteuer): number {
     (a.stufe?.lv ?? 0) * 15 +
     (a.inventar['gold'] ?? 0) +
     (a.eile ?? 0) * EILE_PUNKTE +
+    // Erkunden lohnt sich: jede Begegnung und jedes Versteck bringt Punkte (Spieltest 17).
+    (a.entdeckt ?? 0) * ENTDECKER_PUNKTE +
     (a.phase === 'sieg' ? 1000 + Math.max(0, 400 - a.zug * 4) : 0);
   return Math.round(roh * (1 + 0.3 * (a.heldenstufe ?? 0)) * (a.omen ? OMEN[a.omen].punkte : 1));
 }

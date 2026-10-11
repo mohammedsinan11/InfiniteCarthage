@@ -9418,3 +9418,17 @@ em.off {
   opacity: 0.35;
   transition: opacity 0.6s;
 }
+.ab-hilfe-teil {
+  display: block;
+  margin-top: 6px;
+  color: #a89878;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 10px;
+}
+.ab-hilfe-mehr summary {
+  margin-top: 10px;
+  cursor: pointer;
+  color: #f2c94c;
+  font-size: 12px;
+}

@@ -229,8 +229,12 @@ describe('Abenteuer', () => {
     expect(d.wahl?.optionen).toHaveLength(3);
     // Solange die Wahl offen ist, ruht das Spiel.
     expect(taste(d, 'd')).toBe(d);
-    const e = waehlen(d, 0);
+    const e0 = waehlen(d, 0);
+    // Danach eine Rast am Lagerfeuer (Spieltest 17).
+    expect(e0.wahl?.art).toBe('rast');
+    const e = waehlen(e0, 1);
     expect(e.wahl).toBeNull();
+    expect(e.inventar['kraut'] ?? 0).toBeGreaterThanOrEqual(2);
     expect(e.legendaer?.length ?? 0).toBeGreaterThan(0);
     expect(naechsterBoss(e)).toBe('koenig');
     // Der neue Akt fuehrt in eine neue Gegend - weit weg, mit vollem Leben.

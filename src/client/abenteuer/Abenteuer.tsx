@@ -417,6 +417,9 @@ const WAHL_BILD: Record<string, string> = {
   ev_karte: 'auge',
   ev_omen: 'runenwuerfel',
   ev_gelee: 'gelee',
+  rast_gold: 'muenze',
+  rast_kraut: 'kraut',
+  rast_schleifen: 'schwert',
 };
 
 /** Bilder fuer Neues, das (noch) kein eigenes hat. */
@@ -661,6 +664,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const [logFrisch, setLogFrisch] = useState(true);
   const [lager, setLager] = useState(() => lade() === null && ladeMeta().laeufe > 0);
   const [hilfeOffen, setHilfeOffen] = useState(false);
+  const invOrdnung = useRef<{ zug: number; ids: string[] }>({ zug: 0, ids: [] });
   const [schnell, setSchnell] = useState(leseSchnell);
   const [abbruchFrage, setAbbruchFrage] = useState<Aufbruch | null>(null);
   const ladenZeilen = useRef<{ laden: number | null; ids: string[] }>({ laden: null, ids: [] });
@@ -2697,6 +2701,10 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const maxLeben = maxLebenVon(a);
   // Gold steht als Muenzen ueber dem Inventar, nicht in einem Fach.
   const vorrat = Object.entries(a.inventar).filter(([id, n]) => n > 0 && id !== 'gold');
+  // Feste Plaetze im Inventar: was weg ist, laesst seinen Platz bis zum naechsten Zug frei (Spieltest 17: "die Faecher rutschen").
+  if (invOrdnung.current.zug !== a.zug) invOrdnung.current = { zug: a.zug, ids: invOrdnung.current.ids.filter((id) => (a.inventar[id] ?? 0) > 0) };
+  for (const [id] of vorrat) if (!invOrdnung.current.ids.includes(id)) invOrdnung.current.ids.push(id);
+  const faecher = invOrdnung.current.ids.map((id) => [id, a.inventar[id] ?? 0] as const);
   const gold = a.inventar['gold'] ?? 0;
   /** Aufbrechen: ein neues Abenteuer mit Klasse, Mitgift und Heldenstufe (oder das Tagesabenteuer). */
   const aufbruch = (x: Aufbruch, bestaetigt = false) => {
@@ -3124,9 +3132,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         <div className="ab-fenster ab-inventar">
           <span className="ab-titel">Inventar</span>
           <div className="ab-gegenstaende">
-            {Array.from({ length: Math.max(FAECHER, vorrat.length) }, (_, i) => {
-              const eintrag = vorrat[i];
-              if (!eintrag) return <span key={`leer${i}`} className="ab-fach" />;
+            {Array.from({ length: Math.max(FAECHER, faecher.length) }, (_, i) => {
+              const eintrag = faecher[i];
+              if (!eintrag || eintrag[1] <= 0) return <span key={`leer${i}`} className="ab-fach" />;
               const [id, n] = eintrag;
               const g = gegenstand(id);
               return (
@@ -3215,6 +3223,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                 ×
               </button>
             </div>
+            {/* Spieltest 17: "die Hilfe ist eine Textwand" - erst das Noetigste, der Rest aufklappbar. */}
+            <small className="ab-hilfe-teil">Grundlagen</small>
             <dl>
               <dt>Ziel</dt>
               <dd>Drei Akte, jeder in einem neuen Land. Erlege Gegner, bis der Boden bebt und der Boss erwacht (Zaehler unter der Karte) - oder er kommt nach einigen Zuegen von selbst. Nach jedem Boss: volles Leben und weiter. Wer schneller ist, bekommt Eile-Punkte. Der dritte Boss ist der Endboss.</dd>
@@ -3224,33 +3234,38 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               <dd>Lauf in einen Gegner, um zuzuschlagen. Die Zahl ueber ihm (z. B. 3+) ist die Augenzahl, die dein Wuerfel mindestens zeigen muss. Maus ueber einen Gegner: alles ueber ihn.</dd>
               <dt>Rote Felder</dt>
               <dd>Ein angesagter Angriff - er trifft im naechsten Takt. Geh weg! Steht ueber dir eine rote Zahl, trifft dich so viel. Wer ins Leere schlaegt, taumelt: freie Hiebe.</dd>
-              <dt>Treffen</dt>
-              <dd>Zum Zuschlagen wird eigens gewuerfelt (nicht der Schritt-Wuerfel). Wurf + Angriff (+ Fokus) muss die Schwelle erreichen: 4, ab Akt 2 hoeher, Panzer und Elite mehr. Eine 1 verfehlt immer, eine 6 trifft immer.</dd>
-              <dt>Klassen</dt>
-              <dd>Der Zwerg klettert ohne Muehe ueber Berge, die Waldlaeuferin watet durch Sumpf und Bach - je ein Schritt.</dd>
-              <dt>Pentagramm</dt>
-              <dd>Mit dem Legendaeren Pentagrammmeister: laeufst du in einem Zug eine geschlossene Form, wirkst du einen Zauber - Dreieck Funkenregen, Raute Schutzrune, Fuenfeck Pentagramm, Sechseck Heilkreis, groesser Bannkreis.</dd>
-              <dt>Rasten</dt>
-              <dd>T wartet die uebrigen Schritte ab, solange kein Gegner nah ist. Nach zwei Fehlschlaegen in Folge trifft dein naechster Hieb sicher.</dd>
-              <dt>Deckung</dt>
-              <dd>G: ein Schritt wie Warten - statt Fokus faengt die Deckung beim naechsten Treffer einen Schaden ab.</dd>
-              <dt>Fokus</dt>
-              <dd>Warten (S) sammelt Fokus (bis 3): er kommt auf deinen naechsten Hieb, voll gibt er +1 Schaden. Gehen bricht ihn, ein Fehlschlag gibt 1.</dd>
               <dt>Heilen</dt>
-              <dd>H isst ein Kraut. Sind Gegner nah (bis 3 Felder), kostet das einen Schritt - und sie ziehen. Wartest du ohne Gegner in der Naehe, heilst du einmal je Zug +1. Kraeuter werden je Akt teurer.</dd>
-              <dt>Waffe</dt>
-              <dd>Jeder Schritt und jeder Treffer laedt die Waffe. Voll: Taste 1 loest ihre Faehigkeit aus (nur mit Gegner in Reichweite). Jeder Boss rast ab halbem Leben - dann schlaegt er in jedem Takt.</dd>
-              <dt>Gelaende</dt>
-              <dd>Wald: +1 Abwehr. Huegel und Berge: +1 Angriff (* in den Werten). Berge und Sumpf kosten mehr Schritte.</dd>
-              <dt>Schatzkarte</dt>
-              <dd>Jeder Akt zeigt ein Versteck - das rote X auf der Uebersichtskarte. Geh hin: Gold und eine Truhe.</dd>
-              <dt>Unterwegs</dt>
-              <dd>Truhen (1 aus 3), verfluchte Truhen, Altaere, Haendler mit Schmied, Werber fuer Gefolge, goldene "?" sind Begegnungen. Fremde Ritter kaempfen fuer sich - nicht fuer dich.</dd>
-              <dt>Lager</dt>
-              <dd>Jedes Abenteuer bringt Ruhm: damit schaltest du Klassen, Start-Extras und Legendaeres frei. Ein Sieg oeffnet die naechste Heldenstufe. Jedes Abenteuer hat ein Vorzeichen.</dd>
+              <dd>H isst ein Kraut. Sind Gegner nah (bis 3 Felder), kostet das einen Schritt (sie warten dabei). Wartest du ohne Gegner in der Naehe, heilst du einmal je Zug +1. Kraeuter werden je Akt teurer.</dd>
               <dt>Tasten</dt>
               <dd>Enter wuerfeln · QEADZX gehen · S warten (Fokus) · G Deckung · T Rasten · 1 Faehigkeit · H heilen · R neu wuerfeln · B beschwoeren · F angeln · L Log · ? diese Hilfe</dd>
             </dl>
+            <details className="ab-hilfe-mehr">
+              <summary>Weitere Regeln (Fokus, Deckung, Waffe, Klassen, Lager ...)</summary>
+              <dl>
+                <dt>Treffen</dt>
+                <dd>Zum Zuschlagen wird eigens gewuerfelt (nicht der Schritt-Wuerfel). Wurf + Angriff (+ Fokus) muss die Schwelle erreichen: 4, ab Akt 2 hoeher, Panzer und Elite mehr. Eine 1 verfehlt immer, eine 6 trifft immer.</dd>
+                <dt>Klassen</dt>
+                <dd>Der Zwerg klettert ohne Muehe ueber Berge, die Waldlaeuferin watet durch Sumpf und Bach - je ein Schritt.</dd>
+                <dt>Pentagramm</dt>
+                <dd>Mit dem Legendaeren Pentagrammmeister: laeufst du in einem Zug eine geschlossene Form, wirkst du einen Zauber - Dreieck Funkenregen, Raute Schutzrune, Fuenfeck Pentagramm, Sechseck Heilkreis, groesser Bannkreis.</dd>
+                <dt>Rasten</dt>
+                <dd>T wartet die uebrigen Schritte ab, solange kein Gegner nah ist. Nach zwei Fehlschlaegen in Folge trifft dein naechster Hieb sicher.</dd>
+                <dt>Deckung</dt>
+                <dd>G: ein Schritt wie Warten - statt Fokus faengt die Deckung beim naechsten Treffer einen Schaden ab.</dd>
+                <dt>Fokus</dt>
+                <dd>Warten (S) sammelt Fokus (bis 3): er kommt auf deinen naechsten Hieb, voll gibt er +1 Schaden. Gehen bricht ihn, ein Fehlschlag gibt 1.</dd>
+                <dt>Waffe</dt>
+                <dd>Jeder Schritt und jeder Treffer laedt die Waffe. Voll: Taste 1 loest ihre Faehigkeit aus (nur mit Gegner in Reichweite). Jeder Boss rast ab halbem Leben - dann schlaegt er in jedem Takt.</dd>
+                <dt>Gelaende</dt>
+                <dd>Wald: +1 Abwehr. Huegel und Berge: +1 Angriff (* in den Werten). Berge und Sumpf kosten mehr Schritte.</dd>
+                <dt>Schatzkarte</dt>
+                <dd>Jeder Akt zeigt ein Versteck - das rote X auf der Uebersichtskarte. Geh hin: Gold und eine Truhe.</dd>
+                <dt>Unterwegs</dt>
+                <dd>Truhen (1 aus 3), verfluchte Truhen, Altaere, Haendler mit Schmied, Werber fuer Gefolge, goldene "?" sind Begegnungen. Fremde Ritter kaempfen fuer sich - nicht fuer dich.</dd>
+                <dt>Lager</dt>
+                <dd>Jedes Abenteuer bringt Ruhm: damit schaltest du Klassen, Start-Extras und Legendaeres frei. Ein Sieg oeffnet die naechste Heldenstufe. Jedes Abenteuer hat ein Vorzeichen.</dd>
+              </dl>
+            </details>
           </div>
         </div>
       )}
