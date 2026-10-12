@@ -747,7 +747,12 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const anim = useRef<Anim>({ start: 0, ev: [] });
   const ansicht = useRef<Ansicht | null>(null);
   const zeiger = useRef<Hex | null>(null);
-  const lauf = useRef<{ ziel: Hex; timer: number } | null>(null);
+  /** Der Gegner unter der Maus - Ziel fuer den Runenblitz. */
+  const feindUnterMaus = (j: Zustand): number | undefined => {
+    const z = zeiger.current;
+    return z ? j.schleime.find((s) => s.q === z.q && s.r === z.r)?.id : undefined;
+  };
+  const lauf = useRef<{ ziel: Hex; timer: number; feind?: number } | null>(null);
   const rolltRef = useRef(false);
   /** Tasten, die waehrend des Rollens kamen. */
   const pufferRef = useRef<Taste[]>([]);
@@ -924,6 +929,12 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     const a0 = aktuell.current;
     // Ein offener Laden oder eine Wahl haelt den Weg an.
     if (!l || a0.phase !== 'ziehen' || a0.laden != null || a0.wahl) return halt();
+    // Ein angeklickter Gegner wird verfolgt, auch wenn er huepft (Spieltest 20: "Klick auf den Boss geht nur einen Schritt").
+    if (l.feind !== undefined) {
+      const f = a0.schleime.find((s) => s.id === l.feind);
+      if (!f) return halt();
+      l.ziel = { q: f.q, r: f.r };
+    }
     const weg = wegZu(a0, l.ziel);
     const naechstes = weg[0];
     if (!naechstes) return halt();
@@ -932,7 +943,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     const neu = schritt(t);
     if (!neu) return halt();
     const amZiel = neu.pos.q === l.ziel.q && neu.pos.r === l.ziel.r;
-    const zielSchleim = a0.schleime.some((s) => s.q === l.ziel.q && s.r === l.ziel.r);
+    const zielSchleim = l.feind !== undefined;
+    // Der Schritt war der Hieb auf den Gegner - dann entscheidet der Spieler weiter.
+    const hieb = zielSchleim && naechstes.q === l.ziel.q && naechstes.r === l.ziel.r;
     // Ein Schleim nebenan haelt den Lauf an - dann entscheidet der Spieler.
     // Nur eine NEUE Gefahr haelt an - wer schon vorher neben einem Gegner stand, laeuft weiter (Spieltest 12).
     const nebenVorher = new Set(a0.schleime.filter((s) => hexDistance(s, a0.pos) === 1).map((s) => s.id));
@@ -946,7 +959,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       setze({ ...neu, ereignisse: [], log: [...neu.log, 'Ein Gegner steht neben dir - der Lauf haelt an. Du entscheidest.'].slice(-30) });
       return;
     }
-    if (amZiel || zielSchleim || neu.phase !== 'ziehen') return halt();
+    if (amZiel || hieb || neu.phase !== 'ziehen') return halt();
     l.timer = window.setTimeout(geheWeiter, (letzterTakt(neu.ereignisse) + 1) * TAKT_MS + 30);
   }, [halt, schritt]);
 
@@ -967,13 +980,24 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       if (a0.phase !== 'ziehen' || rolltRef.current) return;
       const nah = tasteZu(a0.pos, h);
       if (nah) return void schritt(nah);
+      // Ein ferner Ort (Haendler, Begegnung): bis neben ihn laufen (Spieltest 20: "kein Weg" beim Haendler).
+      const fern = ortAuf(a0, h.q, h.r);
+      if (fern && wegZu(a0, h).length === 0) {
+        const wege = HEX_DIRS.map(([dq, dr]) => wegZu(a0, { q: fern.q + dq, r: fern.r + dr })).filter((w) => w.length > 0);
+        const kurz = wege.sort((x, y) => x.length - y.length)[0];
+        if (kurz) {
+          lauf.current = { ziel: kurz[kurz.length - 1]!, timer: 0 };
+          return void geheWeiter();
+        }
+      }
       if (wegZu(a0, h).length === 0) {
         // Sagen, warum nichts passiert (Spieltest 19: "Klick tut nichts").
-        const text = betretbar(a0, h.q, h.r) ? 'Dorthin fuehrt kein Weg.' : 'Dort kommst du nicht hin.';
+        const text = !new Set(a0.erkundet).has(hexKey(h.q, h.r)) ? 'Dort warst du noch nicht - erst erkunden.' : betretbar(a0, h.q, h.r) ? 'Dorthin fuehrt kein Weg.' : 'Dort kommst du nicht hin.';
         if (a0.log[a0.log.length - 1] !== text) setze({ ...a0, ereignisse: [], log: [...a0.log, text].slice(-30) });
         return;
       }
-      lauf.current = { ziel: h, timer: 0 };
+      const feind = a0.schleime.find((s) => s.q === h.q && s.r === h.r);
+      lauf.current = { ziel: h, timer: 0, ...(feind ? { feind: feind.id } : {}) };
       geheWeiter();
     },
     [geheWeiter, halt, schritt, wirf],
@@ -1025,7 +1049,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       }
       if (e.key === '1') {
         e.preventDefault();
-        setze(faehigkeitNutzen(jetzt));
+        setze(faehigkeitNutzen(jetzt, feindUnterMaus(jetzt)));
         return;
       }
       if (k === 'h') {
@@ -3152,7 +3176,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                 className={bereit ? 'ab-faehigkeit voll' : 'ab-faehigkeit'}
                 style={{ '--anteil': Math.min(1, ist / voll), '--ring': '#e8641e' } as CSSProperties}
                 aria-disabled={!bereit}
-                onClick={() => bereit && setze(faehigkeitNutzen(aktuell.current))}
+                onClick={() => bereit && setze(faehigkeitNutzen(aktuell.current, feindUnterMaus(aktuell.current)))}
                 title={`${FAEHIGKEIT_NAME[faehigkeit]} (Taste 1): ${ist}/${voll} - Schritte und Treffer laden die Waffe.`}
               >
                 <span className="ab-faehigkeit-innen">
@@ -3425,8 +3449,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                         <span>
                           {gegenstand(w.id)?.name}
                           {/* Wie in der Truhe: besser oder schwaecher als das Angelegte (Spieltest 19). */}
-                          {!w.weg && gegenstand(w.id)?.slot && (
-                            <small className="ab-vergleich">{v === 1 ? ' besser als deins' : v === -1 ? ' schwaecher als deins' : ' etwa gleich wie deins'}</small>
+                          {/* Die Zeile bleibt auch ausverkauft gleich hoch - sonst rutscht alles unter der Maus (Spieltest 20). */}
+                          {gegenstand(w.id)?.slot && (
+                            <small className="ab-vergleich" style={w.weg ? { visibility: 'hidden' } : undefined}>
+                              {v === 1 ? ' besser als deins' : v === -1 ? ' schwaecher als deins' : ' etwa gleich wie deins'}
+                            </small>
                           )}
                         </span>
                         <button className="klein ab-kaufen" disabled={w.weg || gold < w.preis} onClick={() => setze(kaufen(aktuell.current, w.id))}>

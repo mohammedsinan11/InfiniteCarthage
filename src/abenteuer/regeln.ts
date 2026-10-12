@@ -131,7 +131,7 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
   { id: 'schwert', name: 'Schwert', slot: 'waffe', angriff: 1, ladung: 7, faehigkeit: 'spalthieb', text: '+1 auf jeden Angriffswurf. Ladung 7: Spalthieb - der naechste Treffer macht 2 Schaden mehr.' },
   { id: 'axt', name: 'Streitaxt', slot: 'waffe', angriff: 2, ladung: 6, faehigkeit: 'spalthieb', text: '+2 auf jeden Angriffswurf. Ladung 6: Spalthieb - der naechste Treffer macht 2 Schaden mehr.' },
   { id: 'breitschwert', name: 'Breitschwert', slot: 'waffe', angriff: 2, ladung: 6, faehigkeit: 'schutzwall', text: '+2 auf jeden Angriffswurf. Ladung 6: Schutzwall - der naechste Treffer gegen dich wird abgefangen.' },
-  { id: 'runenklinge', name: 'Runenklinge', slot: 'waffe', angriff: 2, krit: 3, ladung: 5, faehigkeit: 'runenblitz', text: '+2 auf jeden Angriffswurf; eine 6 trifft dreifach. Ladung 5: Runenblitz - 2 Schaden am naechsten Gegner (bis 3 Felder).' },
+  { id: 'runenklinge', name: 'Runenklinge', slot: 'waffe', angriff: 2, krit: 3, ladung: 5, faehigkeit: 'runenblitz', text: '+2 auf jeden Angriffswurf; eine 6 trifft dreifach. Ladung 5: Runenblitz - 2 Schaden am Gegner unter der Maus oder dem naechsten (bis 3 Felder).' },
   { id: 'flammenschwert', name: 'Flammenschwert', slot: 'waffe', angriff: 3, ladung: 7, faehigkeit: 'feuerkreis', text: '+3 auf jeden Angriffswurf. Ladung 7: Feuerkreis - alle Gegner rundum nehmen 2 Schaden.' },
   { id: 'schild', name: 'Schild', slot: 'schild', abwehr: 1, text: 'Schleime brauchen eine Augenzahl mehr, um zu treffen.' },
   { id: 'helm', name: 'Helm', slot: 'kopf', leben: 1, text: '+1 Leben.' },
@@ -1014,6 +1014,12 @@ function fluchtruheOeffnen(a: Abenteuer): void {
 function gibGegenstand(a: Abenteuer, id: string, woher: string): void {
   const g = gegenstand(id);
   if (!g) return;
+  // Verfluchtes legt sich niemand ungefragt an (Spieltest 20: "Fluchwuerfel sofort angelegt").
+  if (id === 'fluchwuerfel') {
+    a.inventar = { ...a.inventar, [id]: (a.inventar[id] ?? 0) + 1 };
+    melde(a, `${woher}: ${g.name} - liegt im Inventar. Klick zum Anlegen, wenn du das Risiko willst.`);
+    return;
+  }
   if (g.slot && a.ausruestung[g.slot] === null) {
     a.ausruestung = { ...a.ausruestung, [g.slot]: id };
     if (g.leben) a.leben += g.leben;
@@ -2056,7 +2062,8 @@ export const faehigkeitBereit = (a: Abenteuer): boolean => {
 };
 
 /** Die geladene Faehigkeit der Waffe ausloesen (Taste 1) - kostet keinen Schritt. */
-export function faehigkeitNutzen(alt: Abenteuer): Abenteuer {
+/** zielId: der Gegner unter der Maus - der Runenblitz trifft ihn, wenn er in Reichweite ist (Spieltest 20). */
+export function faehigkeitNutzen(alt: Abenteuer, zielId?: number): Abenteuer {
   if (alt.phase === 'tot' || alt.phase === 'sieg' || alt.wahl) return alt;
   if (!faehigkeitBereit(alt)) {
     // Spieltest 8: "1 tut nichts" - sagen, wie weit die Waffe ist.
@@ -2074,12 +2081,12 @@ export function faehigkeitNutzen(alt: Abenteuer): Abenteuer {
     return a;
   }
   a.ladung = 0;
-  entfessle(a, f, 0);
+  entfessle(a, f, 0, zielId);
   return a;
 }
 
 /** Die Faehigkeit der Waffe wirkt. */
-export function entfessle(a: Abenteuer, f: Faehigkeit, takt: number): void {
+export function entfessle(a: Abenteuer, f: Faehigkeit, takt: number, zielId?: number): void {
   if (f === 'feuerkreis') {
     const felder = HEX_DIRS.map(([dq, dr]) => ({ q: a.pos.q + dq, r: a.pos.r + dr }));
     a.ereignisse.push({ art: 'faehigkeit', takt, name: f, felder });
@@ -2089,10 +2096,12 @@ export function entfessle(a: Abenteuer, f: Faehigkeit, takt: number): void {
     return;
   }
   if (f === 'runenblitz') {
-    const ziel = a.schleime
-      .filter((s) => hexDistance(s, a.pos) <= 3)
-      // Ein Boss in Reichweite geht vor (Spieltest: "trifft immer die kleinen").
-      .sort((x, y) => (y.boss ? 1 : 0) - (x.boss ? 1 : 0) || hexDistance(x, a.pos) - hexDistance(y, a.pos) || x.leben - y.leben)[0];
+    const inReichweite = a.schleime.filter((s) => hexDistance(s, a.pos) <= 3);
+    const ziel =
+      inReichweite.find((s) => s.id === zielId) ??
+      inReichweite
+        // Ein Boss in Reichweite geht vor (Spieltest: "trifft immer die kleinen"), dann wer den Blitz auch braucht (Spieltest 20).
+        .sort((x, y) => (y.boss ? 1 : 0) - (x.boss ? 1 : 0) || (x.leben <= 1 ? 1 : 0) - (y.leben <= 1 ? 1 : 0) || hexDistance(x, a.pos) - hexDistance(y, a.pos) || x.leben - y.leben)[0];
     a.ereignisse.push({ art: 'faehigkeit', takt, name: f, ...(ziel ? { ziel: ziel.id, felder: [{ q: ziel.q, r: ziel.r }] } : {}) });
     if (!ziel) {
       melde(a, 'Runenblitz! - doch kein Gegner in Reichweite.');
