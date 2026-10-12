@@ -167,10 +167,11 @@ export function Lager({ meta, onMeta, onAufbruch, onZurueck }: { meta: Meta; onM
             {tagBest ? ` (Bestwert ${tagBest})` : ''}
             <small className="ab-tag-info">Ritter ohne Mitgift · Vorzeichen: {OMEN[omenFuer(tag.seed)].name}</small>
           </button>
+          {/* Im klebenden Fuss - sonst lugt die Zeile unter den Knoepfen hervor (Spieltest 19). */}
+          <p className="ab-lager-stat">
+            {meta.laeufe} Abenteuer · {meta.siege} Siege · Bestwert {meta.bester}
+          </p>
         </div>
-        <p className="ab-lager-stat">
-          {meta.laeufe} Abenteuer · {meta.siege} Siege · Bestwert {meta.bester}
-        </p>
       </div>
     </div>
   );

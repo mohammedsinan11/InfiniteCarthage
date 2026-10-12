@@ -967,7 +967,12 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       if (a0.phase !== 'ziehen' || rolltRef.current) return;
       const nah = tasteZu(a0.pos, h);
       if (nah) return void schritt(nah);
-      if (wegZu(a0, h).length === 0) return;
+      if (wegZu(a0, h).length === 0) {
+        // Sagen, warum nichts passiert (Spieltest 19: "Klick tut nichts").
+        const text = betretbar(a0, h.q, h.r) ? 'Dorthin fuehrt kein Weg.' : 'Dort kommst du nicht hin.';
+        if (a0.log[a0.log.length - 1] !== text) setze({ ...a0, ereignisse: [], log: [...a0.log, text].slice(-30) });
+        return;
+      }
       lauf.current = { ziel: h, timer: 0 };
       geheWeiter();
     },
@@ -2571,7 +2576,14 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       const helfer = unter && still && !feind && !wand ? (a.gefolge ?? []).find((g) => g.q === unter.q && g.r === unter.r) : undefined;
       // Spieltest 8: "Info nur fuer Gegner" - auch Orte und Funde am Boden.
       const sichtbar = unter && still && erkundet.has(hexKey(unter.q, unter.r)) && hexDistance(unter, a.pos) <= sicht;
-      const ortH = sichtbar && !feind && !wand && !helfer ? (a.orte ?? []).find((x) => x.q === unter.q && x.r === unter.r) : undefined;
+      // Haendler und Werber ragen mit Bild und Namen ins Feld darueber - auch dort zeigen sie sich (Spieltest 19).
+      const ortH =
+        sichtbar && !feind && !wand && !helfer
+          ? ((a.orte ?? []).find((x) => x.q === unter.q && x.r === unter.r) ??
+            (a.schleime.some((x) => x.q === unter.q && x.r === unter.r) || !betretbar(a, unter.q, unter.r) || fundAuf(a, unter.q, unter.r)
+              ? undefined
+              : (a.orte ?? []).find((x) => (x.art === 'haendler' || x.art === 'werber') && unter.r === x.r - 1 && (unter.q === x.q || unter.q === x.q + 1))))
+          : undefined;
       const fund = sichtbar && !feind && !wand && !helfer && !ortH ? fundAuf(a, unter.q, unter.r) : null;
       const wasser = sichtbar && !feind && !wand && !helfer && !ortH && !fund && unter && !betretbar(a, unter.q, unter.r) ? unter : undefined;
       const info = feind ?? wand ?? helfer ?? ortH ?? (fund && unter ? unter : undefined) ?? wasser;
@@ -3410,9 +3422,15 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                     return (
                       <div key={w.id} className={['ab-laden-zeile', w.weg ? 'weg' : v === 1 ? 'besser' : v === -1 ? 'schlechter' : ''].join(' ')} {...tippHandler(w.id, setTipp)}>
                         <Icon id={w.id} groesse={20} />
-                        <span>{gegenstand(w.id)?.name}</span>
+                        <span>
+                          {gegenstand(w.id)?.name}
+                          {/* Wie in der Truhe: besser oder schwaecher als das Angelegte (Spieltest 19). */}
+                          {!w.weg && gegenstand(w.id)?.slot && (
+                            <small className="ab-vergleich">{v === 1 ? ' besser als deins' : v === -1 ? ' schwaecher als deins' : ' etwa gleich wie deins'}</small>
+                          )}
+                        </span>
                         <button className="klein ab-kaufen" disabled={w.weg || gold < w.preis} onClick={() => setze(kaufen(aktuell.current, w.id))}>
-                          {w.weg ? 'Verkauft' : `Kaufen ${w.preis} Gold`}
+                          {w.weg ? 'Ausverkauft' : `Kaufen ${w.preis} Gold`}
                         </button>
                       </div>
                     );
@@ -3444,7 +3462,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                         {n > 1 ? ` ×${n}` : ''}
                       </span>
                       <button className="klein ab-verkaufen" disabled={n === 0} onClick={() => setze(verkaufen(aktuell.current, id))}>
-                        {n === 0 ? 'Verkauft' : `Verkaufen +${verkaufsPreis(id)}`}
+                        {n === 0 ? 'Weg' : `Verkaufen +${verkaufsPreis(id)}`}
                       </button>
                       <button className="klein" disabled={n <= 1} style={{ visibility: n > 1 ? 'visible' : 'hidden' }} onClick={() => setze(verkaufen(aktuell.current, id, true))}>
                         Alle +{verkaufsPreis(id) * Math.max(1, n)}
@@ -3579,8 +3597,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       {/* Was zuletzt geschah. */}
       {/* Spieltest: "das Log ist zu kurz, man verpasst was". Aufklappbar mit L oder dem Knopf. */}
       <div ref={logRef} className={logOffen ? 'ab-log offen' : logFrisch ? 'ab-log' : 'ab-log still'} role="log">
-        {(logOffen ? a.log.slice(-30) : a.log.slice(-6)).map((z, i, alle) => (
-          <div key={`${a.log.length}-${i}`} className={logFarbe(z)} style={{ opacity: logOffen ? 1 : 0.4 + (i + 6 - alle.length) * 0.12 } as CSSProperties}>
+        {(logOffen ? a.log.slice(-30) : a.log.slice(-4)).map((z, i, alle) => (
+          <div key={`${a.log.length}-${i}`} className={logFarbe(z)} style={{ opacity: logOffen ? 1 : 0.55 + (i + 4 - alle.length) * 0.15 } as CSSProperties}>
             {z}
           </div>
         ))}

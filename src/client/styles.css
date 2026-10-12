@@ -9448,3 +9448,48 @@ em.off {
   line-height: 1.35;
   pointer-events: none;
 }
+
+/* Das ruhende Log laesst Klicks zur Karte durch - auch sein Knopf (Spieltest 19: "Klick aufs Feld klappte das Log auf"). */
+.ab-log.still {
+  opacity: 0.25;
+}
+.ab-log.still .ab-log-knopf {
+  pointer-events: none;
+}
+/* Der Spieltisch hat immer dieselbe Hoehe - sonst springt das Inventar darueber (Spieltest 19). */
+.ab-rechts-unten .ab-tisch {
+  min-height: 133px;
+  box-sizing: border-box;
+  align-content: center;
+}
+@media (max-width: 700px) {
+  .ab-rechts-unten .ab-tisch {
+    min-height: 0;
+  }
+}
+
+.ab-vergleich {
+  display: block;
+  font-size: 10px;
+  color: #b8a888;
+}
+.ab-laden-zeile.besser .ab-vergleich {
+  color: #7fd36a;
+}
+.ab-laden-zeile.schlechter .ab-vergleich {
+  color: #e07a5f;
+}
+
+.ab-lager-knoepfe .ab-lager-stat {
+  flex-basis: 100%;
+  margin: 0;
+  text-align: center;
+}
+.ab-lager.ab-fenster {
+  padding-bottom: 0;
+}
+.ab-lager .ab-lager-knoepfe {
+  bottom: 0;
+  padding-bottom: 12px;
+  background: rgb(23, 18, 12);
+}

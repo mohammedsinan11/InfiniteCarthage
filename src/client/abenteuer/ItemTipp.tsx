@@ -56,7 +56,12 @@ export function ItemTipp({ tipp }: { tipp: Tipp }) {
   // Nur der Beschreibungsteil, der nicht schon als Wert dasteht.
   const text = g.text.replace(/^Legendaer\.\s*/, '');
   return (
-    <div className={g.legendaer ? 'ab-tipp legendaer' : 'ab-tipp'} style={{ left: links, bottom: unten, width: breite }} role="tooltip">
+    // Weit oben (Ausruestung) passt er nicht darueber: dann darunter (Spieltest 19: "Kopf abgeschnitten").
+    <div
+      className={g.legendaer ? 'ab-tipp legendaer' : 'ab-tipp'}
+      style={{ left: links, width: breite, ...(tipp.y < 320 ? { top: tipp.y + 18 } : { bottom: unten }) }}
+      role="tooltip"
+    >
       <b>{g.name}</b>
       <small>{artVon(tipp.id)}</small>
       {statZeilen(tipp.id).map((z, i) => (
