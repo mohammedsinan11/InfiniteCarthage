@@ -423,7 +423,7 @@ const WAHL_BILD: Record<string, string> = {
 };
 
 /** Bilder fuer Neues, das (noch) kein eigenes hat. */
-const BILD_ERSATZ: Record<string, string> = { konter: 'schild', durchschlag: 'breitschwert', hinterhalt: 'kraut' };
+const BILD_ERSATZ: Record<string, string> = { konter: 'schild', durchschlag: 'breitschwert', hinterhalt: 'kraut', goldfisch: 'fisch' };
 function Icon({ id, groesse = 22 }: { id: string; groesse?: number }) {
   const karte = SYMBOL[id] ?? SYMBOL[BILD_ERSATZ[id] ?? ''];
   if (!karte) return null;
@@ -845,7 +845,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       // Autoroll: steht noch der Wurf an, erst wuerfeln, dann (wenn der
       // Wuerfel liegt) den Schritt gehen.
       // Autoroll: steht der Wurf an, nur wuerfeln - eine Taste vom alten Zug wird nicht zum ersten Schritt des neuen (Spieltest 13).
-      if (autorollRef.current && aktuell.current.phase === 'wuerfeln' && !rolltRef.current) {
+      // Ohne Autoroll ebenso: eine Richtungstaste nach dem letzten Schritt wuerfelt - sonst geht sie still verloren (Spieltest 18).
+      if (aktuell.current.phase === 'wuerfeln' && !rolltRef.current && !aktuell.current.wahl && aktuell.current.laden == null) {
         wirfRef.current();
         return;
       }
@@ -955,7 +956,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       const a0 = aktuell.current;
       halt();
       // Einen Haendler oder Werber nebenan antippen: ansprechen - in jeder Phase.
-      const o = ortAuf(a0, h.q, h.r);
+      const o = a0.schleime.some((s) => s.q === h.q && s.r === h.r) ? undefined : ortAuf(a0, h.q, h.r);
       if (o && hexDistance(o, a0.pos) <= 1) return void setze(ansprechen(a0, o.id));
       if (a0.phase === 'wuerfeln') {
         wirf();
@@ -2030,8 +2031,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       }
 
       // Das Versteck: ein rotes X auf seinem Feld, sobald man es sieht.
-      if (a.versteck && hexDistance(a.versteck, a.pos) <= sicht + 1) {
-        const o = mitte(a.versteck.q, a.versteck.r);
+      // Steht jemand darauf, bleibt das X weg - es verdeckte Gegner (Spieltest 18).
+      const vs = a.versteck;
+      const besetztX = vs && (a.schleime.some((x) => x.q === vs.q && x.r === vs.r) || (a.pos.q === vs.q && a.pos.r === vs.r));
+      if (vs && !besetztX && hexDistance(vs, a.pos) <= sicht + 1) {
+        const o = mitte(vs.q, vs.r);
         const k = 4 * f;
         ctx.strokeStyle = `rgba(255, 90, 58, ${0.75 + 0.25 * Math.sin(sek * 3)})`;
         ctx.lineWidth = Math.max(2, f);
@@ -2556,7 +2560,12 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
 
       // Gegner-Info unter der Maus: Name, Leben, wie hart er trifft, ab wann man ihn trifft.
       const unter = zeiger.current;
-      const feind = unter && still ? a.schleime.find((s) => s.q === unter.q && s.r === unter.r && hexDistance(s, a.pos) <= sicht) : undefined;
+      // Der Boss ist groesser als sein Feld: auch der Rand seines Bildes zeigt ihn (Spieltest 18: "Boss-Info fehlt manchmal").
+      const feind =
+        unter && still
+          ? (a.schleime.find((s) => s.q === unter.q && s.r === unter.r && hexDistance(s, a.pos) <= sicht) ??
+            (unter.q === a.pos.q && unter.r === a.pos.r ? undefined : a.schleime.find((s) => s.boss && unter.r === s.r - 1 && (unter.q === s.q || unter.q === s.q + 1) && hexDistance(s, a.pos) <= sicht && !(a.orte ?? []).some((o) => o.q === unter.q && o.r === unter.r))))
+          : undefined;
       // Spieltest: "Fremde Ritter kaempfen mit - wer ist das?" - auch Wanderer und Gefolge zeigen sich.
       const wand = unter && still && !feind ? (a.wanderer ?? []).find((w) => w.q === unter.q && w.r === unter.r && hexDistance(w, a.pos) <= sicht) : undefined;
       const helfer = unter && still && !feind && !wand ? (a.gefolge ?? []).find((g) => g.q === unter.q && g.r === unter.r) : undefined;
@@ -2756,7 +2765,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         extras: x.tag ? [] : aktiveExtras(meta),
         legenden: x.tag ? [] : freieLegenden(meta),
         ...(x.tag ? { tag: x.tag.tag } : {}),
-        omen: true,
+        omen: x.tag ? true : (x.omen ?? true),
       }),
     );
   };

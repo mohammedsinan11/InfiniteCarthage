@@ -1554,7 +1554,8 @@ export function taste(alt: Abenteuer, t: Taste): Abenteuer {
   const ziel = { q: a.pos.q + d[0], r: a.pos.r + d[1] };
   a.laden = null;
   // Gegen einen Haendler oder Werber laufen: ansprechen - kostet keinen Schritt.
-  const ort = ortAuf(a, ziel.q, ziel.r);
+  // Steht dort ein Gegner, gilt der Hieb ihm - nie dem Haendler daneben (Spieltest 18: "Taste zum Boss sprach den Werber an").
+  const ort = schleimAuf(a, ziel.q, ziel.r) ? undefined : ortAuf(a, ziel.q, ziel.r);
   if (ort && !((ort.art === 'altar' || ort.art === 'ereignis') && ort.benutzt)) return ansprechen(a, ort.id);
   // Ein Wanderer anderer Fraktion steht im Weg - er gruesst.
   const wand = wandererAuf(a, ziel.q, ziel.r);
@@ -1800,9 +1801,11 @@ function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
 }
 
 /** Schaden an einem Schleim - stirbt er, zerplatzt er (und der Koenig erwacht vielleicht). */
-function verwunde(a: Abenteuer, s: Schleim, schaden: number, takt: number, vorne: string, fremd = false): void {
+function verwunde(a: Abenteuer, s: Schleim, schaden: number, takt: number, vorne: string, fremd = false, leise = false): void {
   s.leben -= schaden;
   if (s.leben > 0) {
+    // Treffer von Gefolge und fremden Rittern fuellen das Log nicht (Spieltest 18: "wichtige Zeilen gehen unter") - die Zahl ueber dem Gegner zeigt sie.
+    if (leise) return;
     melde(a, `${vorne}: Treffer${schaden > 1 ? ` (${schaden} Schaden)` : ''} - der ${schleimName(s)} wankt.`);
     return;
   }
@@ -1919,9 +1922,9 @@ function bossPruefen(a: Abenteuer, takt: number): void {
 
 /**
  * Spieltest: "In Akt 2 und 3 laeuft man lange herum, um Gegner zu finden."
- * Darum kommt der Boss spaetestens nach AKT_ZUEGE Zuegen im Akt - ungeduldig.
+ * Darum kommt der Boss spaetestens nach AKT_ZUEGE Zuegen im Akt - ungeduldig (Spieltest 18: "60 Zuege sind zu lang" - 13 statt 15).
  */
-export const AKT_ZUEGE = 15;
+export const AKT_ZUEGE = 13;
 export const zuegeBisBoss = (a: Pick<Abenteuer, 'zug' | 'aktStart' | 'omen' | 'akt'>): number =>
   Math.max(0, (hatOmen(a, 'eile') ? 10 : (a.akt ?? 1) >= 3 ? AKT_ZUEGE - 3 : AKT_ZUEGE) - (a.zug - (a.aktStart ?? 1)));
 /** Punkte je Zug Vorsprung auf den Boss-Zeitplan. */
@@ -3281,7 +3284,7 @@ function helferSchlaegt(a: Abenteuer, wer: { id: number; name: string }, s: Schl
   const vorher = a.schleime.length;
   // Fremde Ritter mit Titel - man sieht, wer fuer wen kaempft (Spieltest 13).
   const fremdW = fremd ? (a.wanderer ?? []).find((w) => w.id === wer.id) : undefined;
-  verwunde(a, s, schaden, takt, fremdW ? `${fremdW.fraktion === 'orden' ? 'Ordensritter' : 'Jaeger'} ${wer.name}` : wer.name, fremd);
+  verwunde(a, s, schaden, takt, fremdW ? `${fremdW.fraktion === 'orden' ? 'Ordensritter' : 'Jaeger'} ${wer.name}` : wer.name, fremd, true);
   return a.schleime.length < vorher && !a.schleime.some((x) => x.id === s.id);
 }
 

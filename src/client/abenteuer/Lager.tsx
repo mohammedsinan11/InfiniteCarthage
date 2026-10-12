@@ -5,20 +5,31 @@
  * Bestwert je Tag).
  */
 
-import { AKTE, HELDENSTUFE_REGEL, KLASSEN, OMEN, START_EXTRAS, gegenstand, omenFuer } from '../../abenteuer/regeln';
-import type { KlasseId } from '../../abenteuer/regeln';
+import { useState } from 'react';
+import { AKTE, HELDENSTUFE_REGEL, KLASSEN, OMEN, OMEN_IDS, START_EXTRAS, gegenstand, omenFuer } from '../../abenteuer/regeln';
+import type { KlasseId, OmenId } from '../../abenteuer/regeln';
 import { FigurBild } from './DebugFenster';
 import { ERFOLGE, FREISCHALTUNGEN, freischalten, heute, istFrei } from './meta';
 import type { FreiArt } from './meta';
 import type { Meta } from './meta';
 
-export type Aufbruch = { klasse: KlasseId; stufe: number; tag?: { tag: string; seed: number } };
+export type Aufbruch = { klasse: KlasseId; stufe: number; tag?: { tag: string; seed: number }; omen?: OmenId };
+
+/** Zwei verschiedene Vorzeichen zur Wahl. */
+function zweiOmen(): OmenId[] {
+  const a = OMEN_IDS[Math.floor(Math.random() * OMEN_IDS.length)]!;
+  const rest = OMEN_IDS.filter((o) => o !== a);
+  return [a, rest[Math.floor(Math.random() * rest.length)]!];
+}
 
 export function Lager({ meta, onMeta, onAufbruch, onZurueck }: { meta: Meta; onMeta: (m: Meta) => void; onAufbruch: (x: Aufbruch) => void; onZurueck?: () => void }) {
   const klassen = Object.keys(KLASSEN) as KlasseId[];
   const kosten = (art: FreiArt, id: string) => FREISCHALTUNGEN.find((f) => f.art === art && f.id === id)?.kosten ?? 0;
   const tag = heute();
   const tagBest = meta.tage[tag.tag];
+  // Spieltest 18: "Ich will das Vorzeichen waehlen" - zwei stehen zur Wahl, eines ist gewaehlt.
+  const [omenWahl] = useState(zweiOmen);
+  const [omen, setOmen] = useState<OmenId>(omenWahl[0]!);
   return (
     <div className="ab-ende ab-lager-huelle">
       <div className="ab-fenster ab-lager">
@@ -134,8 +145,18 @@ export function Lager({ meta, onMeta, onAufbruch, onZurueck }: { meta: Meta; onM
           ))}
         </div>
 
+        <small>Vorzeichen fuer das naechste Abenteuer</small>
+        <div className="ab-klassen ab-omen-wahl">
+          {omenWahl.map((o) => (
+            <button key={o} className={['ab-klasse', omen === o ? 'gewaehlt' : ''].filter(Boolean).join(' ')} onClick={() => setOmen(o)}>
+              <b>{OMEN[o].name}</b>
+              <span>{OMEN[o].text}</span>
+            </button>
+          ))}
+        </div>
+
         <div className="ab-lager-knoepfe">
-          <button className="primary" onClick={() => onAufbruch({ klasse: meta.klasse, stufe: meta.stufe })}>
+          <button className="primary" onClick={() => onAufbruch({ klasse: meta.klasse, stufe: meta.stufe, omen })}>
             Aufbrechen als {KLASSEN[meta.klasse].name}
           </button>
           <button
