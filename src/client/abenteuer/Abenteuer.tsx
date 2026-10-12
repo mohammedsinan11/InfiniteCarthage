@@ -3555,6 +3555,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
 
       {lager && (
         <Lager
+          key={`${meta.laeufe}-${a.seed}`}
           meta={meta}
           onMeta={setMeta}
           onAufbruch={aufbruch}

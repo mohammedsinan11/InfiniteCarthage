@@ -15,11 +15,12 @@ import type { Meta } from './meta';
 
 export type Aufbruch = { klasse: KlasseId; stufe: number; tag?: { tag: string; seed: number }; omen?: OmenId };
 
-/** Zwei verschiedene Vorzeichen zur Wahl. */
-function zweiOmen(): OmenId[] {
-  const a = OMEN_IDS[Math.floor(Math.random() * OMEN_IDS.length)]!;
-  const rest = OMEN_IDS.filter((o) => o !== a);
-  return [a, rest[Math.floor(Math.random() * rest.length)]!];
+/** Drei verschiedene Vorzeichen zur Wahl (Spieltest 19: "immer dieselben zwei"). */
+function dreiOmen(): OmenId[] {
+  const rest = [...OMEN_IDS];
+  const wahl: OmenId[] = [];
+  while (wahl.length < 3 && rest.length) wahl.push(rest.splice(Math.floor(Math.random() * rest.length), 1)[0]!);
+  return wahl;
 }
 
 export function Lager({ meta, onMeta, onAufbruch, onZurueck }: { meta: Meta; onMeta: (m: Meta) => void; onAufbruch: (x: Aufbruch) => void; onZurueck?: () => void }) {
@@ -27,8 +28,8 @@ export function Lager({ meta, onMeta, onAufbruch, onZurueck }: { meta: Meta; onM
   const kosten = (art: FreiArt, id: string) => FREISCHALTUNGEN.find((f) => f.art === art && f.id === id)?.kosten ?? 0;
   const tag = heute();
   const tagBest = meta.tage[tag.tag];
-  // Spieltest 18: "Ich will das Vorzeichen waehlen" - zwei stehen zur Wahl, eines ist gewaehlt.
-  const [omenWahl] = useState(zweiOmen);
+  // Spieltest 18: "Ich will das Vorzeichen waehlen" - drei stehen zur Wahl, eines ist gewaehlt.
+  const [omenWahl] = useState(dreiOmen);
   const [omen, setOmen] = useState<OmenId>(omenWahl[0]!);
   return (
     <div className="ab-ende ab-lager-huelle">

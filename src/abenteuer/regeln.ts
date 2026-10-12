@@ -1733,7 +1733,7 @@ function stilleRuftBoss(a: Abenteuer): void {
   // Erst nach acht Zuegen im Akt - vorher bleibt Zeit fuer Schatzkarte und Begegnungen (Spieltest 16).
   if (a.zug - (a.aktStart ?? 1) < 8 || a.schleime.some((s) => hexDistance(s, a.pos) <= 10)) return;
   a.bossBald = a.zug + BOSS_VORWARNUNG;
-  melde(a, `Es ist still geworden ... Der Boden bebt! In ${BOSS_VORWARNUNG} Zuegen erwacht der ${BOSS_NAME[naechsterBoss(a)]}.`);
+  melde(a, `Es ist still geworden ... Der Boden bebt! In ${BOSS_VORWARNUNG} Zuegen erwacht der ${BOSS_NAME[naechsterBoss(a)]}.${nochOffen(a)}`);
 }
 
 function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
@@ -1915,7 +1915,7 @@ function bossPruefen(a: Abenteuer, takt: number): void {
       melde(a, `Eile: ${vorsprung} ${vorsprung === 1 ? 'Zug' : 'Zuege'} vor dem Boss-Zeitplan - +${vorsprung * EILE_PUNKTE} Punkte.`);
     }
     a.bossBald = a.zug + BOSS_VORWARNUNG;
-    melde(a, `Der Boden bebt! In ${BOSS_VORWARNUNG} Zuegen erwacht der ${BOSS_NAME[naechsterBoss(a)]} - heile dich und mach dich bereit.`);
+    melde(a, `Der Boden bebt! In ${BOSS_VORWARNUNG} Zuegen erwacht der ${BOSS_NAME[naechsterBoss(a)]} - heile dich und mach dich bereit.${nochOffen(a)}`);
     a.ereignisse.push({ art: 'wuerfelEffekt', takt, text: 'Der Boden bebt!' });
   } else if (bossUngeduldig(a)) bossErwacht(a, takt);
 }
@@ -1925,6 +1925,21 @@ function bossPruefen(a: Abenteuer, takt: number): void {
  * Darum kommt der Boss spaetestens nach AKT_ZUEGE Zuegen im Akt - ungeduldig (Spieltest 18: "60 Zuege sind zu lang" - 13 statt 15).
  */
 export const AKT_ZUEGE = 13;
+/**
+ * Was in dieser Gegend noch wartet - nach dem Boss zieht der Held weiter (Spieltest 17/19:
+ * "Ich wusste nicht, dass die Orte mit dem Akt verloren sind").
+ */
+function nochOffen(a: Abenteuer): string {
+  const ereignisse = (a.orte ?? []).filter((o) => o.art === 'ereignis' && !o.benutzt).length;
+  const altaere = (a.orte ?? []).filter((o) => o.art === 'altar' && !o.benutzt).length;
+  const teile = [
+    ereignisse ? `${ereignisse} ${ereignisse === 1 ? 'Begegnung' : 'Begegnungen'}` : '',
+    altaere ? `${altaere} ${altaere === 1 ? 'Altar' : 'Altaere'}` : '',
+    a.versteck ? 'das Versteck (X)' : '',
+  ].filter(Boolean);
+  return teile.length ? ` Noch offen hier: ${teile.join(', ')} - nach dem Boss geht es in eine neue Gegend.` : '';
+}
+
 export const zuegeBisBoss = (a: Pick<Abenteuer, 'zug' | 'aktStart' | 'omen' | 'akt'>): number =>
   Math.max(0, (hatOmen(a, 'eile') ? 10 : (a.akt ?? 1) >= 3 ? AKT_ZUEGE - 3 : AKT_ZUEGE) - (a.zug - (a.aktStart ?? 1)));
 /** Punkte je Zug Vorsprung auf den Boss-Zeitplan. */
