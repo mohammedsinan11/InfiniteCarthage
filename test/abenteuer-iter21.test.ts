@@ -19,3 +19,34 @@ describe('Abenteuer Iteration 21', () => {
     expect(gefunden).toBe(true);
   });
 });
+
+describe('Abenteuer Iteration 25', () => {
+  it('Eine Begegnung zu entdecken haelt den Boss zwei Zuege hin', async () => {
+    const { ansprechen, waehlen, zuegeBisBoss, ENTDECKER_ZUEGE } = await import('../src/abenteuer/regeln');
+    for (let seed = 1; seed < 60; seed++) {
+      const a = structuredClone(neuesAbenteuer(seed));
+      const o = (a.orte ?? []).find((x) => x.art === 'ereignis');
+      if (!o) continue;
+      a.pos = { q: o.q + 1, r: o.r };
+      a.schleime = [];
+      a.inventar = { ...a.inventar, gold: 50 };
+      const b = ansprechen(a, o.id);
+      if (!b.wahl) continue;
+      const nr = b.wahl.optionen.findIndex((x) => x !== 'ev_weiter');
+      const c = waehlen(b, nr);
+      expect(zuegeBisBoss(c)).toBe(zuegeBisBoss(a) + ENTDECKER_ZUEGE);
+      return;
+    }
+    throw new Error('keine Begegnung gefunden');
+  });
+
+  it('Eine Wahl auf dem letzten Schritt beendet danach den Zug', async () => {
+    const { waehlen } = await import('../src/abenteuer/regeln');
+    const a = structuredClone(wuerfeln(neuesAbenteuer(5)));
+    a.schritte = 0;
+    a.wahl = { art: 'rast', titel: 'Rast', optionen: ['rast_gold', 'rast_kraut', 'rast_schleifen'] };
+    const b = waehlen(a, 0);
+    expect(b.wahl).toBeNull();
+    expect(b.phase).toBe('wuerfeln');
+  });
+});

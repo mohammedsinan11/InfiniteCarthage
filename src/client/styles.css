@@ -9493,3 +9493,12 @@ em.off {
   padding-bottom: 12px;
   background: rgb(23, 18, 12);
 }
+/* Die Uebersicht waechst nicht mit langen Zeilen (Spieltest 19: "Panel springt"). */
+.ab-mini:not(.gross) {
+  width: 196px;
+  box-sizing: border-box;
+}
+/* Das Ende liegt ueber dem aufgeklappten Log (Spieltest 19). */
+.ab-ende {
+  z-index: 20;
+}

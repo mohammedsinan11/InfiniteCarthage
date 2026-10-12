@@ -634,7 +634,8 @@ export const naechsterBoss = (a: Pick<Abenteuer, 'koenige' | 'akt'> & { seed?: n
   const tausch = a.seed !== undefined && (a.seed >>> 0) % 2 === 1 && a.akt <= 2;
   return tausch ? (a.akt === 1 ? 'schatten' : 'koenig') : (AKT_BOSS[a.akt - 1] ?? 'koloss');
 };
-const AKT_BOSS_LEBEN = [8, 11, 19];
+// Spieltest 19: "Der Endboss ist ein Lebensschwamm" - 16 statt 19.
+const AKT_BOSS_LEBEN = [8, 11, 16];
 const bossGrund = (a: Pick<Abenteuer, 'akt'>, art: BossArt): number =>
   art === 'penta' ? BOSS_GRUND.penta : a.akt !== undefined ? (AKT_BOSS_LEBEN[a.akt - 1] ?? BOSS_GRUND[art]) : BOSS_GRUND[art];
 const BOSS_SCHADEN = 2;
@@ -924,11 +925,19 @@ export function wahlAblehnen(alt: Abenteuer): Abenteuer {
   a.wahl = null;
   const n = goldDazu(a, 3);
   melde(a, `Du laesst den Inhalt liegen und nimmst nur ein paar Muenzen: +${n} Gold.`);
-  return a;
+  return a.wahl ? a : nachDemSchritt(a);
 }
 
-/** Eine der angebotenen Moeglichkeiten nehmen. */
+/**
+ * Eine der angebotenen Moeglichkeiten nehmen. Fiel die Wahl auf den letzten Schritt,
+ * endet danach der Zug (Spieltest 19: "0 Schritte, aber Enter sagt: erst die Schritte gehen").
+ */
 export function waehlen(alt: Abenteuer, nr: number): Abenteuer {
+  const a = waehlenInnen(alt, nr);
+  return a === alt || a.wahl ? a : nachDemSchritt(a);
+}
+
+function waehlenInnen(alt: Abenteuer, nr: number): Abenteuer {
   const w = alt.wahl;
   const id = w?.optionen[nr];
   if (!w || !id) return alt;
@@ -2151,11 +2160,23 @@ function versteckLegen(a: Abenteuer): void {
   }
   a.versteck = null;
 }
+/** Zeit, die eine Entdeckung dem Boss abringt. */
+export const ENTDECKER_ZUEGE = 2;
+/**
+ * Etwas entdeckt: Punkte - und der Boss laesst sich Zeit (Spieltest 19: "Der Boss-Timer
+ * draengt, das X und ferne Begegnungen lohnen nicht").
+ */
+function entdecken(a: Abenteuer): void {
+  a.entdeckt = (a.entdeckt ?? 0) + 1;
+  if (a.bossErwacht || a.bossBald != null || a.schleime.some((s) => s.boss && s.bossArt !== 'penta')) return;
+  a.aktStart = (a.aktStart ?? 1) + ENTDECKER_ZUEGE;
+  melde(a, `Entdeckt! Der Boss laesst sich ${ENTDECKER_ZUEGE} Zuege mehr Zeit.`);
+}
 function versteckPruefen(a: Abenteuer): void {
   const v = a.versteck;
   if (!v || v.q !== a.pos.q || v.r !== a.pos.r) return;
   a.versteck = null;
-  a.entdeckt = (a.entdeckt ?? 0) + 1;
+  entdecken(a);
   const n = goldDazu(a, 8 + 4 * (a.akt ?? 1));
   melde(a, `Das Versteck! +${n} Gold und eine Truhe.`);
   a.ereignisse.push({ art: 'fund', takt: 0, id: 'schatz' });
@@ -3001,7 +3022,7 @@ function ereignisWaehlen(a: Abenteuer, id: string, ortId: number | undefined): v
   // Weitergehen laesst die Begegnung stehen - man kann wiederkommen (Spieltest 11: Seherin ohne Gold).
   if (ortId !== undefined && id !== 'ev_weiter') {
     a.orte = (a.orte ?? []).map((x) => (x.id === ortId ? { ...x, benutzt: true } : x));
-    a.entdeckt = (a.entdeckt ?? 0) + 1;
+    entdecken(a);
   }
   const gold = a.inventar['gold'] ?? 0;
   const zahle = (n: number) => {
