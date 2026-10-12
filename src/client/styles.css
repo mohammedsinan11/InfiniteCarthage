@@ -9432,3 +9432,19 @@ em.off {
   color: #f2c94c;
   font-size: 12px;
 }
+
+/* Sofort-Tooltip fuer Werte und Knoepfe im Abenteuer (Spieltest 18). */
+.ab-titel-tipp {
+  position: fixed;
+  z-index: 60;
+  width: max-content;
+  max-width: 280px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(20, 16, 12, 0.94);
+  border: 1px solid rgba(232, 200, 120, 0.5);
+  color: #f3e6c8;
+  font-size: 13px;
+  line-height: 1.35;
+  pointer-events: none;
+}

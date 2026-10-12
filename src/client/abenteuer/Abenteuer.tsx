@@ -650,6 +650,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const [musik, setMusik] = useState(musikAn);
   const [laut, setLaut] = useState(lautstaerke);
   const [tipp, setTipp] = useState<Tipp>(null);
+  /** Erklaerung zu Werten und Knoepfen - sofort sichtbar statt des traegen Browser-Titels (Spieltest 18). */
+  const [titelTipp, setTitelTipp] = useState<{ text: string; x: number; y: number; unten: number } | null>(null);
   const [legendenOffen, setLegendenOffen] = useState(false);
   // Fortschritt ueber die Abenteuer (Ruhm, Freischaltungen) und das Lager.
   const [meta, setMetaState] = useState<Meta>(ladeMeta);
@@ -2768,7 +2770,23 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const zeigtSchritte = a.phase === 'ziehen' && !rollt;
 
   return (
-    <div className="abenteuer">
+    <div
+      className="abenteuer"
+      onPointerOver={(e) => {
+        if (e.pointerType !== 'mouse') return;
+        const el = (e.target as HTMLElement).closest?.('[title], [data-titel]') as HTMLElement | null;
+        if (!el || el.tagName === 'CANVAS') return setTitelTipp(null);
+        const t = el.getAttribute('title');
+        if (t) {
+          el.setAttribute('data-titel', t);
+          el.removeAttribute('title');
+        }
+        const text = el.getAttribute('data-titel') ?? '';
+        const r = el.getBoundingClientRect();
+        setTitelTipp(text ? { text, x: r.left + r.width / 2, y: r.top, unten: r.bottom } : null);
+      }}
+      onPointerLeave={() => setTitelTipp(null)}
+    >
       <canvas
         ref={canvas}
         className="ab-karte"
@@ -2941,7 +2959,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               {
                 id: 'schwert',
                 wert: `+${angriffVon(a)}${gelaendeBonus(a, 'angriff') ? '*' : ''}`,
-                titel: `Angriff +${angriffVon(a)}${gelaendeBonus(a, 'angriff') ? ' (* davon +1 vom Huegel - nur solange du hier stehst)' : ''}: Wurf + Angriff muss 4 erreichen. Du triffst Schleime mit einer ${Math.max(1, 4 - angriffVon(a))} oder mehr (${Math.round((100 * (7 - Math.max(1, 4 - angriffVon(a)))) / 6)} %), Panzer ab ${Math.max(1, 5 - angriffVon(a))}. Warten (S) gibt Fokus.`,
+                titel: `Angriff +${angriffVon(a)}${gelaendeBonus(a, 'angriff') ? ' (* davon +1 vom Huegel - nur solange du hier stehst)' : ''}: Wurf + Angriff muss 4 erreichen. Du triffst Schleime mit einer ${Math.max(2, 4 - angriffVon(a))} oder mehr (${Math.round((100 * (7 - Math.max(2, 4 - angriffVon(a)))) / 6)} %), Panzer ab ${Math.max(2, 5 - angriffVon(a))} - eine 1 verfehlt immer. Warten (S) gibt Fokus.`,
               },
               {
                 id: 'schild',
@@ -2971,7 +2989,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
           {/* Fokus und Deckung sichtbar (Spieltest 15: "Zustand schwer zu sehen"). */}
           {((a.fokus ?? 0) > 0 || a.deckung) && (
             <small className="ab-zustand">
-              {(a.fokus ?? 0) > 0 && <span title="Fokus: kommt auf deinen naechsten Hieb">Fokus {a.fokus}/3</span>}
+              {(a.fokus ?? 0) > 0 && <span title={`Fokus ${a.fokus}/3: +${a.fokus} auf den Wurf deines naechsten Hiebs${(a.fokus ?? 0) >= 3 ? ", voll: +1 Schaden" : ""}. Sammeln mit S (Warten), Gehen bricht ihn.`}>Fokus {a.fokus}/3</span>}
               {a.deckung && <span title="Deckung: der naechste Treffer macht weniger Schaden">Deckung</span>}
             </small>
           )}
@@ -3535,6 +3553,19 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       )}
 
       <ItemTipp tipp={tipp} />
+      {titelTipp && !tipp && (
+        <div
+          className="ab-titel-tipp"
+          role="tooltip"
+          style={{
+            left: Math.max(8, Math.min(titelTipp.x - 140, window.innerWidth - 288)),
+            // Oben am Rand ist kein Platz: dann unter dem Element.
+            ...(titelTipp.y < 160 ? { top: titelTipp.unten + 8 } : { bottom: window.innerHeight - titelTipp.y + 8 }),
+          }}
+        >
+          {titelTipp.text}
+        </div>
+      )}
 
       {/* Was zuletzt geschah. */}
       {/* Spieltest: "das Log ist zu kurz, man verpasst was". Aufklappbar mit L oder dem Knopf. */}
