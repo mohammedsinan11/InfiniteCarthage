@@ -173,7 +173,7 @@ describe('Abenteuer Iteration 17', () => {
     const a0 = neuesAbenteuer(9, { omen: true });
     expect(a0.versteck).toBeTruthy();
     const v = a0.versteck!;
-    expect(hexDistance(v, a0.pos)).toBeGreaterThanOrEqual(7);
+    expect(hexDistance(v, a0.pos)).toBeGreaterThanOrEqual(4);
     // Neben das Versteck stellen und hineingehen.
     const a = structuredClone(wuerfeln(a0));
     a.wahl = null;

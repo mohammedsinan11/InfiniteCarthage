@@ -269,6 +269,8 @@ export function vergleich(a: Abenteuer, id: string): 1 | -1 | 0 | null {
   // Der Funkenwuerfel nuetzt nur mit einer Waffe, die eine Faehigkeit hat.
   const wert = (x: string) => (x === 'funkenwuerfel' && !ladungVon(a).faehigkeit ? 0 : ausruestungsWert(x));
   const d = wert(id) - wert(jetzt);
+  // Wuerfel sind eher anders als besser - ein kleiner Unterschied heisst "etwa gleich" (Spieltest 20: "Runenwuerfel schwaecher?").
+  if (g.slot === 'wuerfel' && Math.abs(d) <= 1) return 0;
   return d > 0 ? 1 : d < 0 ? -1 : 0;
 }
 
@@ -904,9 +906,10 @@ function bietWahl(a: Abenteuer, art: WahlArt): void {
     // Was in diesem Abenteuer schon angeboten wurde, kommt erst wieder, wenn nichts anderes bleibt (Spieltest).
     const alle = legendaerPool(a);
     const frisch = alle.filter((x) => !(a.angeboten ?? []).includes(x));
-    const pool = frisch.length >= 3 ? frisch : alle;
-    // Ist der Pool klein, fuellen Herzcontainer auf - die gibt es immer.
-    const optionen = dreiAus(a, pool.length >= 4 ? pool : [...pool, 'herzcontainer', 'extraherz', 'goldsack'], art === 'boss' && hatOmen(a, 'fruehboss') ? 4 : 3);
+    const n = art === 'boss' && hatOmen(a, 'fruehboss') ? 4 : 3;
+    // Frisches kommt immer zuerst - aufgefuellt aus dem Rest (Spieltest 20: "Solo-Leveling in fuenf von sechs Beuten").
+    const fuellung = [...alle.filter((x) => !frisch.includes(x)), 'herzcontainer', 'extraherz', 'goldsack'];
+    const optionen = frisch.length >= n ? dreiAus(a, frisch.length >= 4 ? frisch : [...frisch, 'herzcontainer'], n) : [...dreiAus(a, frisch, frisch.length), ...dreiAus(a, fuellung, n - frisch.length)];
     a.angeboten = [...new Set([...(a.angeboten ?? []), ...optionen])];
     a.wahl = { art, titel: art === 'boss' ? 'Die Beute des Bosses - waehle ein Legendaeres.' : 'Ein goldener Schatz! Waehle ein Legendaeres.', optionen };
   }
@@ -1527,7 +1530,12 @@ export const schrittKosten = (a: Pick<Abenteuer, 'seed' | 'klasse'>, q: number, 
 export function rasten(alt: Abenteuer): Abenteuer {
   if (alt.phase !== 'ziehen' || alt.wahl) return alt;
   const nah = (x: Abenteuer) => x.schleime.some((s) => hexDistance(s, x.pos) <= 3);
-  if (nah(alt)) return { ...alt, ereignisse: [], log: [...alt.log, 'Zum Rasten sind Gegner zu nah.'].slice(-30) };
+  if (nah(alt)) {
+    // Im Nebel sagen, dass man den Gegner nur hoert (Spieltest 20: "Gegner zu nah - aber keiner zu sehen").
+    const gesehen = alt.schleime.some((s) => hexDistance(s, alt.pos) <= Math.min(3, sichtVon(alt)));
+    const text = gesehen ? 'Zum Rasten sind Gegner zu nah.' : 'Zum Rasten ist es zu unruhig - im Nebel schleicht ein Gegner ganz nah.';
+    return { ...alt, ereignisse: [], log: [...alt.log, text].slice(-30) };
+  }
   let a = alt;
   for (let i = 0; i < 12 && a.phase === 'ziehen' && !a.wahl && !nah(a); i++) a = taste(a, 's');
   return a;
@@ -1789,7 +1797,7 @@ function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
     a.fokus = Math.min(FOKUS_MAX, fokus + 1);
     melde(
       a,
-      `Wurf ${wurf}${wurf === 1 ? ' (eine 1 verfehlt immer)' : `, noetig ${Math.min(6, Math.max(2, noetig - angriffVon(a) - fokus))}+${fokus > 0 ? ' (mit Fokus)' : ''}`}: ${s.art === 'panzer' ? 'prallt am Steinpanzer ab' : 'daneben'} - dein Fokus bleibt und steigt auf ${Math.min(FOKUS_MAX, fokus + 1)}.`,
+      `Wurf ${wurf}${wurf === 1 ? ' (eine 1 verfehlt immer)' : `, noetig ${Math.min(6, Math.max(2, noetig - angriffVon(a) - fokus))}+${fokus > 0 ? ' (mit Fokus)' : ''}`}: ${s.art === 'panzer' ? 'prallt am Steinpanzer ab' : 'daneben'} - dein Fokus bleibt und steigt auf ${Math.min(FOKUS_MAX, fokus + 1)}${a.bereit === 'spalthieb' ? ', der Spalthieb bleibt geladen' : ''}.`,
     );
     return;
   }
@@ -2159,7 +2167,8 @@ function versteckLegen(a: Abenteuer): void {
   const rng = new Rng(hash3i(a.seed, a.pos.q, a.pos.r, 4242));
   for (let versuch = 0; versuch < 40; versuch++) {
     const [dq, dr] = HEX_DIRS[rng.int(6)]!;
-    const weit = 10 + rng.int(5);
+    // Naeher als frueher (10-14): sonst laesst der Boss-Timer keine Zeit dafuer (Spieltest 19/20).
+    const weit = 6 + rng.int(4);
     const h = { q: a.pos.q + dq * weit + rng.int(5) - 2, r: a.pos.r + dr * weit + rng.int(5) - 2 };
     const b = gelaende(a.seed, h.q, h.r);
     if (!begehbar(b) || kosten(b) > 1 || ortAuf(a, h.q, h.r)) continue;
@@ -2438,7 +2447,8 @@ function schleimHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetz
     return;
   }
   // Der Spuckschleim: in Linie und mit Abstand spuckt er.
-  if (s.art === 'spuck' && d >= 2 && d <= 3) {
+  // Nur wen der Held sieht, der spuckt (Spieltest 20: "Treffer aus dem Nebel").
+  if (s.art === 'spuck' && d >= 2 && d <= Math.min(3, sichtVon(a))) {
     const dir = linieZum(s, a.pos);
     if (dir !== null) {
       const [dq, dr] = HEX_DIRS[dir]!;
