@@ -1014,7 +1014,7 @@ function gibGegenstand(a: Abenteuer, id: string, woher: string): void {
   a.inventar = { ...a.inventar, [id]: (a.inventar[id] ?? 0) + 1 };
   // Spieltest 13: "Das Flammenschwert lag unbemerkt im Inventar" - Besseres wird gleich angelegt.
   const klassenWaffe = g.slot === 'waffe' && a.ausruestung.waffe === KLASSEN[a.klasse ?? 'ritter'].ausruestung.waffe && a.klasse !== 'ritter';
-  const ladungWeg = g.slot === 'waffe' && ((a.ladung ?? 0) > 0 || !!a.bereit);
+  const ladungWeg = g.slot === 'waffe' && (g.faehigkeit ?? null) !== ladungVon(a).faehigkeit && ((a.ladung ?? 0) > 0 || !!a.bereit);
   if (g.slot && vergleich(a, id) === 1 && (klassenWaffe || ladungWeg)) {
     melde(a, `${woher}: ${g.name} - besser, liegt im Inventar. Klick zum Anlegen (${ladungWeg ? 'die Ladung deiner Waffe geht dann verloren' : 'deine Klassenwaffe bleibt sonst'}).`);
     return;
@@ -1268,6 +1268,12 @@ export function wuerfeln(alt: Abenteuer): Abenteuer {
   const wurf = w0.wurf;
   let zusatz = w0.zusatz;
   a.wurf = wurf;
+  // Faellt der Endboss schon durch den Wurf (Runenfunken) oder der Held durch den Fluch, ist das Abenteuer aus
+  // (Spieltest 18: "Endboss zerfiel durch Runenfunken - und stand wieder auf").
+  if (a.phase === 'sieg' || a.phase === 'tot') {
+    melde(a, `Gewuerfelt: ${a.wurf}${zusatz}.`);
+    return a;
+  }
   // Spieltest: "Eine 1 auf dem roten Feld ist sicherer Schaden." Darum immer mindestens 3 Schritte -
   // und ein kleiner Wurf schenkt einen Punkt Fokus (Spieltest 17: "1, 2 und 3 sind sonst dasselbe").
   a.schritte = Math.max(SCHRITTE_MIN, a.wurf + schrittBonus(a));
@@ -2950,7 +2956,8 @@ function waechterRufen(a: Abenteuer, n0: number): void {
     const h = plaetze.splice(rng.int(plaetze.length), 1)[0]!;
     const id = a.naechsteId++;
     const s = staerken(a, neuerSchleim(id, h.q, h.r, artZahl(a, rng), false), rng);
-    if (i === 0 && !s.elite) {
+    // Im ersten Akt keine Elite (Spieltest 18: "Elite-Waechter in Zug 3 zerlegt Neulinge").
+    if (i === 0 && !s.elite && (a.akt ?? 1) >= 2) {
       s.elite = true;
       s.leben += 2;
       s.max = s.leben;
@@ -3652,14 +3659,16 @@ export function benutzen(alt: Abenteuer, id: string): Abenteuer {
   }
   if (g.slot) {
     const vorher = a.ausruestung[g.slot];
+    const faehigkeitVorher = ladungVon(a).faehigkeit;
     weg();
     if (vorher) a.inventar = { ...a.inventar, [vorher]: (a.inventar[vorher] ?? 0) + 1 };
     a.ausruestung = { ...a.ausruestung, [g.slot]: id };
-    if (g.slot === 'waffe') {
+    // Gleiche Faehigkeit: die Ladung bleibt (Spieltest 18: "gleiche Axt angelegt, volle Ladung weg").
+    if (g.slot === 'waffe' && (g.faehigkeit ?? null) !== faehigkeitVorher) {
       if ((a.ladung ?? 0) > 0 || a.bereit) melde(a, 'Waffe gewechselt - die Ladung der alten Waffe ist verloren.');
       a.ladung = 0;
       a.bereit = null;
-    }
+    } else if (g.slot === 'waffe') a.ladung = Math.min(a.ladung ?? 0, g.ladung ?? 0);
     a.leben = Math.min(maxLebenVon(a), a.leben + (g.leben ?? 0));
     melde(a, `${g.name} angelegt${vorher ? `, ${gegenstand(vorher)?.name} ins Inventar` : ''}.`);
     return a;

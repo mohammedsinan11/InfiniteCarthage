@@ -747,6 +747,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const zeiger = useRef<Hex | null>(null);
   const lauf = useRef<{ ziel: Hex; timer: number } | null>(null);
   const rolltRef = useRef(false);
+  /** Tasten, die waehrend des Rollens kamen. */
+  const pufferRef = useRef<Taste[]>([]);
   const wirfRef = useRef<() => void>(() => undefined);
   const tippeRef = useRef<(h: Hex) => void>(() => undefined);
   const blick = useRef<1 | -1>(1);
@@ -823,6 +825,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     (t: Taste) => {
       setGedrueckt((g) => ({ taste: t, n: (g?.n ?? 0) + 1 }));
       const alt = aktuell.current;
+      // Tasten waehrend der Wuerfel rollt gehen nicht verloren - sie folgen danach (Spieltest 18).
+      if (rolltRef.current && alt.phase === 'ziehen' && pufferRef.current.length < 3) pufferRef.current.push(t);
       if (alt.phase !== 'ziehen' || rolltRef.current) return null;
       setZugTasten((z) => [...z, t]);
       const neu = taste(alt, t);
@@ -831,6 +835,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     },
     [setze],
   );
+  const schrittRef = useRef(schritt);
+  schrittRef.current = schritt;
   const drueck = useCallback(
     (t: Taste) => {
       halt();
@@ -870,9 +876,13 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     halt();
     rolltRef.current = true;
     setRollt(true);
+    pufferRef.current = [];
     window.setTimeout(() => {
       rolltRef.current = false;
       setRollt(false);
+      const puffer = pufferRef.current;
+      pufferRef.current = [];
+      for (const t of puffer) if (aktuell.current.phase === 'ziehen' && !aktuell.current.wahl) schrittRef.current(t);
     }, ROLL_MS + 10);
     setWurfNr((n) => n + 1);
     setze(neuWuerfeln(alt));
@@ -883,9 +893,13 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     halt();
     rolltRef.current = true;
     setRollt(true);
+    pufferRef.current = [];
     window.setTimeout(() => {
       rolltRef.current = false;
       setRollt(false);
+      const puffer = pufferRef.current;
+      pufferRef.current = [];
+      for (const t of puffer) if (aktuell.current.phase === 'ziehen' && !aktuell.current.wahl) schrittRef.current(t);
     }, ROLL_MS + 10);
     setWurfNr((n) => n + 1);
     setZugTasten([]);
@@ -3485,7 +3499,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             </div>
             {(a.wahl.art === 'truhe' || a.wahl.art === 'schatz') && (
               <button className="klein ab-wahl-weg" onClick={() => setze(wahlAblehnen(aktuell.current))} title="Esc">
-                Liegen lassen (+3 Gold)
+                <kbd>Esc</kbd> Liegen lassen (+3 Gold)
               </button>
             )}
           </div>
