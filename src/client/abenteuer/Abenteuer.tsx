@@ -135,7 +135,7 @@ import { Hinweis } from './Hinweis';
 
 // Die Stellschrauben der Welt aus dem Debugfenster gelten ab dem Laden.
 ladeWeltEinstellung();
-import { ALTAR, BANNER, BEGLEITER_BILD, GELEEKOLOSS, HASE, PENTASCHLEIM, SCHAF, SCHATTENSCHLEIM, STAND } from './symbole';
+import { ALTAR, BANNER, BEGLEITER_BILD, GELEEKOLOSS, HASE, PENTASCHLEIM, RAMMSCHLEIM, SCHAF, SCHATTENSCHLEIM, STAND } from './symbole';
 import { RITTER_HAND, RITTER_KOERPER, RITTER_SCHRITT, SCHLEIMKOENIG, SCHLEIM_BILD, SYMBOL, WAFFE, WAFFE_GRIFF, zeichnePixel } from './symbole';
 import { LAUT_STUFEN, beiTrack, klang, laufenderTrack, lautstaerke, setzeBiom, setzeLautstaerke } from './musik';
 import { BIOM_NAME } from './musik';
@@ -1732,7 +1732,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             }
             if (s.boss) {
               // Die Bosse: eigene Bilder, deutlich groesser als ein Feld-Schleim; der Koloss am groessten.
-              const bild = s.bossArt === 'schatten' ? SCHATTENSCHLEIM : s.bossArt === 'koloss' ? GELEEKOLOSS : s.bossArt === 'penta' ? PENTASCHLEIM : SCHLEIMKOENIG;
+              const bild = s.bossArt === 'schatten' ? SCHATTENSCHLEIM : s.bossArt === 'koloss' ? GELEEKOLOSS : s.bossArt === 'penta' ? PENTASCHLEIM : s.bossArt === 'ramm' ? RAMMSCHLEIM : SCHLEIMKOENIG;
               const kf = Math.max(1, Math.round(f * (s.bossArt === 'koloss' ? 1.5 : 1.35)));
               const kb = bild[0]!.length;
               ctx.save();
@@ -2667,6 +2667,16 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                 const ab = Math.min(6, Math.max(2, trefferAb(a, feind) - (a.fokus ?? 0)));
                 return `Du triffst ab ${ab}+ auf dem Wuerfel (${Math.round(((7 - ab) / 6) * 100)} %)${(a.fokus ?? 0) > 0 ? ' mit Fokus' : ''}`;
               })(),
+              // Jeder Boss hat sein Muster - in einer Zeile (Spieltest 21: "Bosse lesen").
+              ...(feind.bossArt === 'ramm'
+                ? ['Rast in gerader Linie: tritt heraus - kracht er', 'gegen Wasser oder Berg, ist er lange benommen.']
+                : feind.bossArt === 'koloss'
+                  ? ['Blaeht sich auf: 3 Felder weg oder Deckung (G).']
+                  : feind.bossArt === 'schatten'
+                    ? ['Springt durch die Schatten neben dich.']
+                    : feind.bossArt === 'koenig'
+                      ? ['Jedes dritte Mal schlaegt er den Ring um sich.']
+                      : []),
             ]
           : wand
             ? [

@@ -294,6 +294,21 @@ export const SCHATTENSCHLEIM: Pixelkarte = [
   '..kkkkkkkkkkk..',
 ];
 
+/** Der Rammschleim: rot-braun, mit zwei Knochenhoernern nach vorn (Spieltest 21: neuer Boss). */
+export const RAMMSCHLEIM: Pixelkarte = [
+  'hh...........hh',
+  '.hH.........Hh.',
+  '..hH.kkkkk.Hh..',
+  '...kkrrrrrkk...',
+  '..krrrrrrrrRk..',
+  '.krhcrrrrrchRk.',
+  '.krrrrrrrrrrRk.',
+  'krrrrkkkkkrrrRk',
+  'krrrrrrrrrrrRRk',
+  'kRrrRrrRrrRrRRk',
+  '.kkkkkkkkkkkkk.',
+];
+
 /** Der Pentagrammschleim: violett, mit goldenem Pentagramm auf dem Leib und spitzer Kapuze. */
 export const PENTASCHLEIM: Pixelkarte = [
   '.......k.......',

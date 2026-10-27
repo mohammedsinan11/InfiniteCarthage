@@ -302,6 +302,8 @@ export type Schleim = {
   angesagt?: number | null;
   /** Der Endboss rast (ab halbem Leben). */
   rast?: boolean;
+  /** Rammschleim: am Ende seiner angesagten Linie steht ein Hindernis. */
+  rammWand?: boolean | null;
 };
 
 export type Phase = 'wuerfeln' | 'ziehen' | 'tot' | 'sieg';
@@ -336,11 +338,11 @@ export const SCHLEIM_NAME: Record<SchleimArt, string> = {
  * Pentagrammmeister zu oft benutzt (PENTA_BOSS_NACH Zauber). Bezwungen
  * schaltet er Stufe 2 frei: die Zauber bleiben als Kreise auf der Karte.
  */
-export type BossArt = 'koenig' | 'schatten' | 'koloss' | 'penta';
-export const BOSS_NAME: Record<BossArt, string> = { koenig: 'Schleimkoenig', schatten: 'Schattenschleim', koloss: 'Gelee-Koloss', penta: 'Pentagrammschleim' };
+export type BossArt = 'koenig' | 'schatten' | 'koloss' | 'penta' | 'ramm';
+export const BOSS_NAME: Record<BossArt, string> = { koenig: 'Schleimkoenig', schatten: 'Schattenschleim', koloss: 'Gelee-Koloss', penta: 'Pentagrammschleim', ramm: 'Rammschleim' };
 const BOSS_FOLGE: readonly BossArt[] = ['koenig', 'schatten', 'koloss'];
 // Spieltest: "Bosskaempfe in Akt 1 und 2 ziehen sich" - darum weniger Leben.
-const BOSS_GRUND: Record<BossArt, number> = { koenig: 8, schatten: 11, koloss: 19, penta: 16 };
+const BOSS_GRUND: Record<BossArt, number> = { koenig: 8, schatten: 11, koloss: 19, penta: 16, ramm: 10 };
 
 /** Ein neuer Schleim: die Art aus einer Zahl 0..99 - gut die Haelfte gewoehnlich. */
 function neuerSchleim(id: number, q: number, r: number, zahl: number, fern: boolean): Schleim {
@@ -636,7 +638,10 @@ export const koenigLeben = (a: Pick<Abenteuer, 'koenige' | 'akt' | 'heldenstufe'
 export const naechsterBoss = (a: Pick<Abenteuer, 'koenige' | 'akt'> & { seed?: number }): BossArt => {
   if (a.akt === undefined) return BOSS_FOLGE[(a.koenige ?? 0) % BOSS_FOLGE.length]!;
   const tausch = a.seed !== undefined && (a.seed >>> 0) % 2 === 1 && a.akt <= 2;
-  return tausch ? (a.akt === 1 ? 'schatten' : 'koenig') : (AKT_BOSS[a.akt - 1] ?? 'koloss');
+  const art = tausch ? (a.akt === 1 ? 'schatten' : 'koenig') : (AKT_BOSS[a.akt - 1] ?? 'koloss');
+  // Spieltest 21: "Immer dieselben drei Bosse" - in zwei von drei Abenteuern ersetzt der Rammschleim einen der ersten beiden.
+  const ramm = a.seed !== undefined && a.akt <= 2 ? Math.floor((a.seed >>> 0) / 2) % 3 : -1;
+  return a.akt <= 2 && ramm === a.akt - 1 ? 'ramm' : art;
 };
 // Spieltest 19: "Der Endboss ist ein Lebensschwamm" - 16 statt 19.
 const AKT_BOSS_LEBEN = [8, 11, 16];
@@ -2549,6 +2554,7 @@ function koenigHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetzt
   if (s.bossArt === 'schatten') return schattenHandelt(a, s, takt, rng, besetzt);
   if (s.bossArt === 'koloss') return kolossHandelt(a, s, takt, rng, besetzt, neue);
   if (s.bossArt === 'penta') return pentaHandelt(a, s, takt, rng, besetzt);
+  if (s.bossArt === 'ramm') return rammHandelt(a, s, takt, rng, besetzt);
   // Erst die Ansage einloesen.
   if (s.flaeche) {
     const felder = s.flaeche;
@@ -2676,6 +2682,91 @@ function schattenHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, beset
     s.flaeche = [1, 2, 3].map((k) => ({ q: s.q + dq * k, r: s.r + dr * k }));
     a.ereignisse.push({ art: 'ansage', takt, wer: s.id, feld: { q: a.pos.q, r: a.pos.r }, felder: s.flaeche });
     melde(a, 'Der Schattenschleim zielt eine dunkle Linie - tritt heraus!');
+    return;
+  }
+  bossZieht(a, s, takt, besetzt);
+}
+
+/**
+ * Der Rammschleim (Spieltest 21: "mehr Bossmuster, Kaempfe um die Stellung"):
+ * sagt einen Ansturm in gerader Linie an (bis RAMM_WEITE Felder, bis zum
+ * ersten Hindernis). Dann rast er die Linie entlang. Wer darauf steht, wird
+ * getroffen; wer ausweicht, laesst ihn ins Leere laufen - kracht er dabei
+ * gegen Wasser, Berg oder einen anderen, taumelt er doppelt so lange.
+ * Also: stell dich vor ein Hindernis und tritt im letzten Moment zur Seite.
+ */
+const RAMM_WEITE = 5;
+function rammLinie(a: Abenteuer, s: Schleim, dir: number, besetzt: (q: number, r: number) => boolean): { felder: Hex[]; wand: boolean } {
+  const [dq, dr] = HEX_DIRS[dir]!;
+  const felder: Hex[] = [];
+  for (let k = 1; k <= RAMM_WEITE; k++) {
+    const h = { q: s.q + dq * k, r: s.r + dr * k };
+    const istHeld = h.q === a.pos.q && h.r === a.pos.r;
+    if (!begehbar(gelaende(a.seed, h.q, h.r)) || (!istHeld && besetzt(h.q, h.r))) return { felder, wand: true };
+    felder.push(h);
+  }
+  return { felder, wand: false };
+}
+/** In welcher der sechs Richtungen der Ritter in gerader Linie liegt (2 bis RAMM_WEITE Felder). */
+function rammRichtung(s: Hex, ziel: Hex): number | null {
+  for (let i = 0; i < 6; i++) {
+    const [dq, dr] = HEX_DIRS[i]!;
+    for (let k = 2; k <= RAMM_WEITE; k++) if (s.q + dq * k === ziel.q && s.r + dr * k === ziel.r) return i;
+  }
+  return null;
+}
+function rammHandelt(a: Abenteuer, s: Schleim, takt: number, rng: Rng, besetzt: (q: number, r: number) => boolean): void {
+  // Der angesagte Ansturm: die Linie entlang.
+  if (s.flaeche && s.flaeche.length > 0) {
+    const felder = s.flaeche;
+    s.flaeche = null;
+    const wand = !!s.rammWand;
+    s.rammWand = null;
+    const getroffen = felder.findIndex((h) => h.q === a.pos.q && h.r === a.pos.r);
+    // Er rast bis vor den Helden - oder bis ans Ende der Linie.
+    const bis = getroffen >= 0 ? felder.slice(0, getroffen) : felder;
+    const frei = bis.filter((h) => !besetzt(h.q, h.r));
+    const ende = frei[frei.length - 1];
+    a.ereignisse.push({ art: 'stampf', takt, wer: s.id, felder });
+    if (ende) {
+      a.ereignisse.push({ art: 'gehen', takt, wer: s.id, von: { q: s.q, r: s.r }, nach: ende });
+      s.q = ende.q;
+      s.r = ende.r;
+    }
+    if (getroffen >= 0) {
+      koenigTrifft(a, s, [{ q: a.pos.q, r: a.pos.r }], takt, rng);
+      return;
+    }
+    taumeln(a, s);
+    if (wand) {
+      // Gegen die Wand: doppelt so lange benommen.
+      s.gebannt = Math.max(s.gebannt ?? 0, a.zeit + 6);
+      melde(a, 'Der Rammschleim kracht gegen das Hindernis - er ist lange benommen: freie Hiebe!');
+    } else melde(a, 'Ausgewichen! Der Rammschleim rast ins Leere - und taumelt.');
+    return;
+  }
+  if (s.angriff) {
+    const feld = s.angriff;
+    s.angriff = null;
+    koenigTrifft(a, s, [feld], takt, rng);
+    return;
+  }
+  const d = hexDistance(s, a.pos);
+  const dir = rammRichtung(s, a.pos);
+  if (dir !== null) {
+    const { felder, wand } = rammLinie(a, s, dir, besetzt);
+    if (felder.some((h) => h.q === a.pos.q && h.r === a.pos.r)) {
+      s.flaeche = felder;
+      s.rammWand = wand;
+      a.ereignisse.push({ art: 'ansage', takt, wer: s.id, feld: { q: a.pos.q, r: a.pos.r }, felder });
+      melde(a, `Der Rammschleim scharrt - gleich rast er los! Tritt aus der Linie${wand ? ' (am Ende steht ein Hindernis: er wird dagegen krachen)' : ''}.`);
+      return;
+    }
+  }
+  if (d === 1) {
+    s.angriff = { q: a.pos.q, r: a.pos.r };
+    a.ereignisse.push({ art: 'ansage', takt, wer: s.id, feld: s.angriff });
+    melde(a, 'Der Rammschleim senkt den Kopf - weich aus!');
     return;
   }
   bossZieht(a, s, takt, besetzt);

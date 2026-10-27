@@ -50,3 +50,58 @@ describe('Abenteuer Iteration 25', () => {
     expect(b.phase).toBe('wuerfeln');
   });
 });
+
+describe('Abenteuer Iteration 29: Rammschleim', () => {
+  it('ersetzt in zwei von drei Abenteuern einen der ersten beiden Bosse', async () => {
+    const { naechsterBoss } = await import('../src/abenteuer/regeln');
+    let mit = 0;
+    for (let seed = 0; seed < 60; seed++) {
+      const b1 = naechsterBoss({ akt: 1, seed, koenige: 0 });
+      const b2 = naechsterBoss({ akt: 2, seed, koenige: 1 });
+      expect(b1).not.toBe(b2);
+      expect(naechsterBoss({ akt: 3, seed, koenige: 2 })).toBe('koloss');
+      if (b1 === 'ramm' || b2 === 'ramm') mit++;
+    }
+    expect(mit).toBe(40);
+  });
+
+  it('sagt einen Ansturm an; wer ausweicht, laesst ihn ins Leere rasen und taumeln', async () => {
+    const { gelaende, taste, betretbar } = await import('../src/abenteuer/regeln');
+    const { HEX_DIRS } = await import('../src/core/coords');
+    const eben = (a: { seed: number }, q: number, r: number) => {
+      const g = gelaende(a.seed, q, r);
+      return g === 'wiese' || g === 'wald' || g === 'huegel' || g === 'steppe' || g === 'schnee' || g === 'sand';
+    };
+    for (let seed = 1; seed < 80; seed++) {
+      const a0 = structuredClone(wuerfeln(neuesAbenteuer(seed)));
+      // Eine Linie aus vier ebenen Feldern ab dem Helden nach rechts (d), daneben ein ebenes Fluchtfeld.
+      const linie = [0, 1, 2, 3].map((k) => ({ q: a0.pos.q + k, r: a0.pos.r }));
+      if (!linie.every((h) => eben(a0, h.q, h.r))) continue;
+      const [fq, fr] = HEX_DIRS[5]!;
+      const flucht = { q: a0.pos.q + fq, r: a0.pos.r + fr };
+      if (!betretbar(a0, flucht.q, flucht.r) || !eben(a0, flucht.q, flucht.r)) continue;
+      let a = a0;
+      a.schleime = [{ id: 99, q: a.pos.q + 3, r: a.pos.r, leben: 10, max: 10, gross: true, boss: true, bossArt: 'ramm', zaehler: 0 }];
+      a.orte = [];
+      a.wanderer = [];
+      a.gefolge = [];
+      a.tiere = [];
+      a.schritte = 30;
+      a.leben = 50;
+      for (let i = 0; i < 8 && !a.schleime[0]?.flaeche; i++) a = taste(a, 's');
+      const boss = a.schleime.find((x) => x.id === 99)!;
+      if (!boss.flaeche) continue;
+      expect(boss.flaeche.some((h) => h.q === a.pos.q && h.r === a.pos.r)).toBe(true);
+      // Aus der Linie treten, dann warten, bis er rast.
+      const tasteFlucht = (['e', 'd', 'x', 'z', 'a', 'q'] as const).find((t, i) => i === 5)!;
+      a = taste(a, tasteFlucht);
+      for (let i = 0; i < 6 && a.schleime.find((x) => x.id === 99)?.flaeche; i++) a = taste(a, 's');
+      const nach = a.schleime.find((x) => x.id === 99)!;
+      expect(nach.flaeche ?? null).toBeNull();
+      expect(nach.q === a0.pos.q + 3 && nach.r === a0.pos.r).toBe(false);
+      expect((nach.gebannt ?? 0) > a.zeit).toBe(true);
+      return;
+    }
+    throw new Error('kein passendes Gelaende gefunden');
+  });
+});
