@@ -640,7 +640,7 @@ export const AKTE = 3;
 // Spieltest 22: "Akt 2 und 3 ziehen sich" - sieben statt acht.
 export const AKT_ZIEL: readonly number[] = [7, 7, 7];
 export const AKT_BOSS: readonly BossArt[] = ['koenig', 'schatten', 'koloss'];
-export const AKT_NAME: readonly string[] = ['Der Aufbruch', 'Schatten im Land', 'Der Gelee-Koloss'];
+export const AKT_NAME: readonly string[] = ['Der Aufbruch', 'Schatten im Land', 'Das letzte Land'];
 /** Wie viele Gegner der Boss dieses Akts verlangt. */
 export const aktZiel = (a: Pick<Abenteuer, 'akt'> & { omen?: OmenId }): number => {
   const z = AKT_ZIEL[(a.akt ?? 1) - 1] ?? 10;
@@ -658,8 +658,10 @@ export const naechsterBoss = (a: Pick<Abenteuer, 'koenige' | 'akt'> & { seed?: n
   const tausch = a.seed !== undefined && (a.seed >>> 0) % 2 === 1 && a.akt <= 2;
   const art = tausch ? (a.akt === 1 ? 'schatten' : 'koenig') : (AKT_BOSS[a.akt - 1] ?? 'koloss');
   // Spieltest 21: "Immer dieselben drei Bosse" - in zwei von drei Abenteuern ersetzt der Rammschleim einen der ersten beiden.
-  const ramm = a.seed !== undefined && a.akt <= 2 ? Math.floor((a.seed >>> 0) / 2) % 3 : -1;
-  return a.akt <= 2 && ramm === a.akt - 1 ? 'ramm' : art;
+  const ramm = a.seed !== undefined ? Math.floor((a.seed >>> 0) / 2) % 3 : -1;
+  if (a.akt <= 2) return ramm === a.akt - 1 ? 'ramm' : art;
+  // Spieltest 22: "Immer der Gelee-Koloss am Ende" - wer ihn vorher nicht traf, hat in jedem zweiten Abenteuer den Rammschleim als Endboss.
+  return a.akt === AKTE && ramm === 2 && Math.floor((a.seed! >>> 0) / 6) % 2 === 1 ? 'ramm' : art;
 };
 // Spieltest 19: "Der Endboss ist ein Lebensschwamm" - 16 statt 19.
 const AKT_BOSS_LEBEN = [8, 11, 16];

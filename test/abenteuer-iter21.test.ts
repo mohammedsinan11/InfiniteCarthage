@@ -55,14 +55,20 @@ describe('Abenteuer Iteration 29: Rammschleim', () => {
   it('ersetzt in zwei von drei Abenteuern einen der ersten beiden Bosse', async () => {
     const { naechsterBoss } = await import('../src/abenteuer/regeln');
     let mit = 0;
+    let end = 0;
     for (let seed = 0; seed < 60; seed++) {
       const b1 = naechsterBoss({ akt: 1, seed, koenige: 0 });
       const b2 = naechsterBoss({ akt: 2, seed, koenige: 1 });
       expect(b1).not.toBe(b2);
-      expect(naechsterBoss({ akt: 3, seed, koenige: 2 })).toBe('koloss');
+      const b3 = naechsterBoss({ akt: 3, seed, koenige: 2 });
+      expect(['koloss', 'ramm']).toContain(b3);
+      // Kein Boss zweimal im selben Abenteuer.
+      expect(new Set([b1, b2, b3]).size).toBe(3);
       if (b1 === 'ramm' || b2 === 'ramm') mit++;
+      if (b3 === 'ramm') end++;
     }
     expect(mit).toBe(40);
+    expect(end).toBeGreaterThan(5);
   });
 
   it('sagt einen Ansturm an; wer ausweicht, laesst ihn ins Leere rasen und taumeln', async () => {
