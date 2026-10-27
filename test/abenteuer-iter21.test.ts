@@ -68,9 +68,9 @@ describe('Abenteuer Iteration 29: Rammschleim', () => {
   it('sagt einen Ansturm an; wer ausweicht, laesst ihn ins Leere rasen und taumeln', async () => {
     const { gelaende, taste, betretbar } = await import('../src/abenteuer/regeln');
     const { HEX_DIRS } = await import('../src/core/coords');
-    const eben = (a: { seed: number }, q: number, r: number) => {
+    const eben = (a: Parameters<typeof betretbar>[0], q: number, r: number) => {
       const g = gelaende(a.seed, q, r);
-      return g === 'wiese' || g === 'wald' || g === 'huegel' || g === 'steppe' || g === 'schnee' || g === 'sand';
+      return betretbar(a, q, r) && g !== 'berg' && g !== 'sumpf' && g !== 'fluss';
     };
     for (let seed = 1; seed < 80; seed++) {
       const a0 = structuredClone(wuerfeln(neuesAbenteuer(seed)));
