@@ -199,8 +199,8 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
   { id: 'ev_weiter', name: 'Weitergehen', text: 'Nichts riskieren.' },
   { id: 'ev_helfen', name: 'Helfen', text: 'Ein Herz kostet es dich - zum Dank darfst du aus seinem Gepaeck waehlen.' },
   { id: 'ev_ausrauben', name: 'Ausrauben', text: '+8 Gold. Niemand sieht es ... hoffentlich.' },
-  { id: 'ev_wetten', name: 'Wetten (5 Gold)', text: 'Die Haelfte der Zeit gewinnst du 12 Gold.' },
-  { id: 'ev_hoch', name: 'Hoch wetten (1 Herz)', text: 'Gewinnst du, waehlst du ein Legendaeres. Verlierst du, verlierst du 1 Leben.' },
+  { id: 'ev_wetten', name: 'Wetten (5 Gold)', text: 'Chance 50 %: du gewinnst 12 Gold.' },
+  { id: 'ev_hoch', name: 'Hoch wetten (1 Herz)', text: 'Chance 35 %: du waehlst ein Legendaeres. Sonst verlierst du 1 Leben.' },
   { id: 'ev_trinken', name: 'Trinken', text: 'Heilung, volle Ladung - oder Gift. Wer weiss?' },
   { id: 'ev_fuellen', name: 'Flasche fuellen', text: 'Zwei Kraeuter fuer spaeter.' },
   { id: 'ev_gelee', name: 'Drei Gelee geben', text: 'Er braut dir etwas: eine Truhe zur Wahl und 10 Gold. (Komm wieder, wenn du nicht genug hast.)' },
@@ -367,10 +367,20 @@ function artZahl(a: Pick<Abenteuer, 'akt'>, rng: Rng): number {
   return akt === 1 ? 40 + rng.int(60) : akt === 2 ? 10 + rng.int(90) : rng.int(100);
 }
 /** Spaetere Akte und Heldenstufen machen Gegner zaeher; ab Akt 2 gibt es Elite. */
-function staerken(a: Pick<Abenteuer, 'akt' | 'heldenstufe' | 'omen'>, s: Schleim, rng: Rng): Schleim {
+/**
+ * Wie weit der Held dem Akt voraus ist (Spieltest 22: "Ab Akt 2 rollt man alles platt").
+ * Angriff und Abwehr ueber dem, was der Akt erwartet - je zwei Punkte ein Leben mehr fuer die Gegner.
+ */
+export function vorsprung(a: Abenteuer): number {
+  const akt = a.akt ?? 1;
+  if (akt < 2) return 0;
+  const ohneGelaende = angriffVon(a) + abwehrVon(a) - gelaendeBonus(a, 'angriff') - gelaendeBonus(a, 'abwehr');
+  return Math.max(0, Math.floor((ohneGelaende - 2 * akt) / 2));
+}
+function staerken(a: Abenteuer, s: Schleim, rng: Rng): Schleim {
   const akt = a.akt ?? 1;
   const hs = a.heldenstufe ?? 0;
-  let plus = (akt >= 3 ? 1 : 0) + (hs >= 3 ? 1 : 0);
+  let plus = (akt >= 3 ? 1 : 0) + (hs >= 3 ? 1 : 0) + Math.min(2, vorsprung(a));
   const blut = (a as Pick<Abenteuer, 'omen'>).omen === 'blutmond';
   const eliteSelten = (akt === 1 ? 7 : akt === 2 ? 8 : 5) / (hs >= 1 ? 2 : 1) / (blut ? 1.6 : 1);
   if ((akt >= 2 || blut) && rng.int(Math.max(2, Math.round(eliteSelten))) === 0) {
@@ -1789,7 +1799,6 @@ function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
   if (sicher && wurf !== 1) melde(a, 'Pech gleicht sich aus: dieser Hieb trifft sicher.');
   const ausDemWald = hatLegende(a, 'hinterhalt') && istWald(gelaende(a.seed, a.pos.q, a.pos.r));
   let schaden = trifft ? (wurf === 6 ? krit : 1) + (fokus >= FOKUS_MAX ? 1 : 0) + (s.boss && wehrlos ? 1 : 0) + (ausDemWald ? 1 : 0) : streif ? 1 : 0;
-  if (streif) melde(a, 'Wurf 1 - doch deine Wucht streift ihn: 1 Schaden.');
   // Durchschlag: mit vollem Fokus trifft der Hieb auch den Gegner dahinter.
   if (trifft && fokus >= FOKUS_MAX && hatLegende(a, 'durchschlag')) {
     const hinter = schleimAuf(a, s.q + (s.q - a.pos.q), s.r + (s.r - a.pos.r));
@@ -1814,7 +1823,7 @@ function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
     );
     return;
   }
-  const vorne = `Wurf ${wurf}${fokus > 0 ? ` mit ${fokus} Fokus` : ''}${spalt ? ', Spalthieb' : ''}`;
+  const vorne = `Wurf ${wurf}${streif ? ' - Streifhieb dank Wucht' : ''}${fokus > 0 ? ` mit ${fokus} Fokus` : ''}${spalt ? ', Spalthieb' : ''}`;
   verwunde(a, s, schaden, takt, vorne);
   const gefallen = !a.schleime.some((x) => x.id === s.id);
   if (gefallen && hatLegende(a, 'blutdurst') && a.leben < maxLebenVon(a)) {
@@ -2163,7 +2172,8 @@ function bossErwacht(a: Abenteuer, takt: number, art: BossArt = naechsterBoss(a)
   if (!ort) return;
   const id = a.naechsteId++;
   const hs = a.heldenstufe ?? 0;
-  const leben = art === 'penta' ? BOSS_GRUND.penta : Math.round((bossGrund(a, art) + 2 * hs) * (hs >= 2 ? 4 / 3 : 1));
+  // Wer weit voraus ist, trifft einen zaeheren Boss (Spieltest 22).
+  const leben = art === 'penta' ? BOSS_GRUND.penta : Math.round((bossGrund(a, art) + 2 * hs + 2 * vorsprung(a)) * (hs >= 2 ? 4 / 3 : 1));
   a.schleime.push({ id, q: ort.q, r: ort.r, leben, max: leben, gross: true, boss: true, bossArt: art, zaehler: 0 });
   if (art === 'penta') a.pentaGerufen = true;
   else a.bossErwacht = true;

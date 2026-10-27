@@ -57,7 +57,7 @@ const TIPPS: readonly Tipp[] = [
   {
     id: 'ereignis',
     wann: (a) => (a.orte ?? []).some((o) => o.art === 'ereignis' && !o.benutzt && hexDistanceZu(o, a.pos) <= 3),
-    text: 'Ein goldenes "?" ist eine Begegnung: lauf hinein und entscheide - Belohnung oder Risiko. Jede gibt es nur einmal - und jede Entdeckung haelt den Boss 2 Zuege hin.',
+    text: 'Ein goldenes "?" ist eine Begegnung: lauf hinein und entscheide - Belohnung oder Risiko. Jede gibt es nur einmal - und jede Entdeckung haelt den Boss 2 Zuege hin (solange der Boden noch nicht bebt).',
   },
   { id: 'akt2', wann: (a) => (a.akt ?? 1) >= 2, text: 'Akt 2! Die Gegner werden zaeher, golden umrandete Elite-Gegner lassen Gold fallen. Beim Haendler schaerft der Schmied deine Waffe. Tipp: im Wald hast du +1 Abwehr, auf Huegeln +1 Angriff.' },
 ];

@@ -687,6 +687,10 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const mini = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => speichere(a), [a]);
+  const wahlOffen = !!a.wahl;
+  useEffect(() => {
+    if (wahlOffen) wahlSeit.current = performance.now();
+  }, [wahlOffen]);
   useEffect(() => {
     setLogFrisch(true);
     const t = window.setTimeout(() => setLogFrisch(false), 3500);
@@ -754,6 +758,9 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   };
   const lauf = useRef<{ ziel: Hex; timer: number; feind?: number } | null>(null);
   const rolltRef = useRef(false);
+  /** Seit wann die offene Wahl steht - Klicks davor gehoerten noch zum Spielfeld (Spieltest 22). */
+  const wahlSeit = useRef(0);
+  const wahlBereit = () => performance.now() - wahlSeit.current > 350;
   /** Tasten, die waehrend des Rollens kamen. */
   const pufferRef = useRef<Taste[]>([]);
   const wirfRef = useRef<() => void>(() => undefined);
@@ -943,6 +950,13 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     if (!naechstes) return halt();
     const t = tasteZu(a0.pos, naechstes);
     if (!t) return halt();
+    // Ist ein Gegner in den Weg gehuepft, haelt der Lauf an - kein ungewollter Hieb (Spieltest 22).
+    const imWeg = a0.schleime.find((s) => s.q === naechstes.q && s.r === naechstes.r);
+    if (imWeg && imWeg.id !== l.feind) {
+      halt();
+      setze({ ...a0, ereignisse: [], log: [...a0.log, 'Ein Gegner steht im Weg - der Lauf haelt an. Du entscheidest.'].slice(-30) });
+      return;
+    }
     const neu = schritt(t);
     if (!neu) return halt();
     const amZiel = neu.pos.q === l.ziel.q && neu.pos.r === l.ziel.r;
@@ -1056,7 +1070,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         const nr = ['1', '2', '3', '4'].indexOf(e.key);
         if (nr >= 0) {
           e.preventDefault();
-          setze(waehlen(jetzt, nr));
+          if (wahlBereit()) setze(waehlen(jetzt, nr));
         }
         return;
       }
@@ -3584,7 +3598,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                     key={id}
                     className={['ab-wahl-karte', g?.legendaer ? 'legendaer' : '', v === 1 ? 'besser' : v === -1 ? 'schlechter' : ''].filter(Boolean).join(' ')}
                     disabled={a.wahl!.art === 'ereignis' && !ereignisMoeglich(a, id)}
-                    onClick={() => setze(waehlen(aktuell.current, nr))}
+                    onClick={() => wahlBereit() && setze(waehlen(aktuell.current, nr))}
                   >
                     <kbd>{nr + 1}</kbd>
                     <Icon id={WAHL_BILD[id] ?? id} groesse={40} />
