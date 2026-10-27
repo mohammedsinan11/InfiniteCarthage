@@ -146,17 +146,19 @@ export function Lager({ meta, onMeta, onAufbruch, onZurueck }: { meta: Meta; onM
           ))}
         </div>
 
-        <small>Vorzeichen fuer das naechste Abenteuer</small>
-        <div className="ab-klassen ab-omen-wahl">
-          {omenWahl.map((o) => (
-            <button key={o} className={['ab-klasse', omen === o ? 'gewaehlt' : ''].filter(Boolean).join(' ')} onClick={() => setOmen(o)}>
-              <b>{OMEN[o].name}</b>
-              <span>{OMEN[o].text}</span>
-            </button>
-          ))}
-        </div>
-
         <div className="ab-lager-knoepfe">
+          {/* Die Vorzeichen stehen im klebenden Fuss neben dem Aufbruch - sonst uebersieht man sie (Spieltest 22). */}
+          <div className="ab-lager-omen">
+            <small>Vorzeichen fuer das naechste Abenteuer</small>
+            <div className="ab-omen-wahl">
+              {omenWahl.map((o) => (
+                <button key={o} className={['ab-omen', omen === o ? 'gewaehlt' : ''].filter(Boolean).join(' ')} onClick={() => setOmen(o)}>
+                  <b>{OMEN[o].name}</b>
+                  <span>{OMEN[o].text}</span>
+                </button>
+              ))}
+            </div>
+          </div>
           <button className="primary" onClick={() => onAufbruch({ klasse: meta.klasse, stufe: meta.stufe, omen })}>
             Aufbrechen als {KLASSEN[meta.klasse].name}
           </button>

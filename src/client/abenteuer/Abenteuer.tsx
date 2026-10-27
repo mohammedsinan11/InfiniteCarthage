@@ -24,6 +24,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
   FAEHIGKEIT_NAME,
+  FAEHIGKEIT_TEXT,
   FRAKTION_FIGUR,
   gelaendeBonus,
   abwehrAugen,
@@ -638,7 +639,8 @@ type Ansicht = {
 };
 
 export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
-  const [a, setA] = useState<Zustand>(() => lade() ?? neuesAbenteuer(neuerSeed(), { omen: true }));
+  // Das allererste Abenteuer bekommt ein freundliches Vorzeichen (Spieltest 22: "Fruehe Bosse im ersten Lauf").
+  const [a, setA] = useState<Zustand>(() => lade() ?? neuesAbenteuer(neuerSeed(), { omen: ladeMeta().laeufe === 0 ? (['segen', 'goldrausch', 'beutezug'] as const)[Math.floor(Math.random() * 3)]! : true }));
   const [geladen, setGeladen] = useState(false);
   const [gedrueckt, setGedrueckt] = useState<{
     taste: Taste;
@@ -754,7 +756,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   /** Der Gegner unter der Maus - Ziel fuer den Runenblitz. */
   const feindUnterMaus = (j: Zustand): number | undefined => {
     const z = zeiger.current;
-    return z ? j.schleime.find((s) => s.q === z.q && s.r === z.r)?.id : undefined;
+    if (!z) return undefined;
+    return (j.schleime.find((s) => s.q === z.q && s.r === z.r) ?? j.schleime.find((s) => s.boss && z.r === s.r - 1 && (z.q === s.q || z.q === s.q + 1)))?.id;
   };
   const lauf = useRef<{ ziel: Hex; timer: number; feind?: number } | null>(null);
   const rolltRef = useRef(false);
@@ -959,6 +962,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     }
     const neu = schritt(t);
     if (!neu) return halt();
+    // Nichts bewegt, nichts verbraucht (z. B. Hermes ohne Landefeld): anhalten statt endlos (Spieltest 22).
+    if (neu.pos.q === a0.pos.q && neu.pos.r === a0.pos.r && neu.schritte === a0.schritte && neu.zug === a0.zug) return halt();
     const amZiel = neu.pos.q === l.ziel.q && neu.pos.r === l.ziel.r;
     const zielSchleim = l.feind !== undefined;
     // Der Schritt war der Hieb auf den Gegner - dann entscheidet der Spieler weiter.
@@ -2631,8 +2636,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
       // Der Boss ist groesser als sein Feld: auch der Rand seines Bildes zeigt ihn (Spieltest 18: "Boss-Info fehlt manchmal").
       const feind =
         unter && still
-          ? (a.schleime.find((s) => s.q === unter.q && s.r === unter.r && hexDistance(s, a.pos) <= sicht) ??
-            (unter.q === a.pos.q && unter.r === a.pos.r ? undefined : a.schleime.find((s) => s.boss && unter.r === s.r - 1 && (unter.q === s.q || unter.q === s.q + 1) && hexDistance(s, a.pos) <= sicht && !(a.orte ?? []).some((o) => o.q === unter.q && o.r === unter.r))))
+          ? (a.schleime.find((s) => s.q === unter.q && s.r === unter.r && (hexDistance(s, a.pos) <= sicht || (s.boss && erkundet.has(hexKey(s.q, s.r))))) ??
+            (unter.q === a.pos.q && unter.r === a.pos.r ? undefined : a.schleime.find((s) => s.boss && unter.r === s.r - 1 && (unter.q === s.q || unter.q === s.q + 1) && !(a.orte ?? []).some((o) => o.q === unter.q && o.r === unter.r))))
           : undefined;
       // Spieltest: "Fremde Ritter kaempfen mit - wer ist das?" - auch Wanderer und Gefolge zeigen sich.
       const wand = unter && still && !feind ? (a.wanderer ?? []).find((w) => w.q === unter.q && w.r === unter.r && hexDistance(w, a.pos) <= sicht) : undefined;
@@ -3230,7 +3235,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                 style={{ '--anteil': Math.min(1, ist / voll), '--ring': '#e8641e' } as CSSProperties}
                 aria-disabled={!bereit}
                 onClick={() => bereit && setze(faehigkeitNutzen(aktuell.current, feindUnterMaus(aktuell.current)))}
-                title={`${FAEHIGKEIT_NAME[faehigkeit]} (Taste 1): ${ist}/${voll} - Schritte und Treffer laden die Waffe.`}
+                title={`${FAEHIGKEIT_NAME[faehigkeit]} (Taste 1): ${FAEHIGKEIT_TEXT[faehigkeit]}. Ladung ${ist}/${voll} - Schritte und Treffer laden die Waffe.`}
               >
                 <span className="ab-faehigkeit-innen">
                   <Icon id={a.ausruestung.waffe ?? 'schwert'} groesse={28} />

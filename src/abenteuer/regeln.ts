@@ -56,6 +56,13 @@ export const FAEHIGKEIT_NAME: Record<Faehigkeit, string> = {
   spalthieb: 'Spalthieb',
   schutzwall: 'Schutzwall',
 };
+/** Was die Faehigkeit tut - fuer den Knopf (Spieltest 22: "der Tooltip sagt nicht, was sie tut"). */
+export const FAEHIGKEIT_TEXT: Record<Faehigkeit, string> = {
+  feuerkreis: 'alle Gegner rund um dich nehmen 2 Schaden',
+  runenblitz: 'ein Blitz trifft den Gegner unter der Maus (oder den naechsten) bis 3 Felder weit: 2 Schaden',
+  spalthieb: 'dein naechster Treffer macht 2 Schaden mehr',
+  schutzwall: 'der naechste Treffer gegen dich wird abgefangen',
+};
 
 export type Gegenstand = {
   id: string;
@@ -360,7 +367,7 @@ function neuerSchleim(id: number, q: number, r: number, zahl: number, fern: bool
 const NACHSCHUB_RUHE = 8;
 /** Alle wie viele Ticks Nachschub kommt: Akt 1 selten, Akt 3 oft. */
 const nachschubTakt = (a: Pick<Abenteuer, 'akt' | 'heldenstufe' | 'omen'>): number =>
-  Math.max(4, [11, 8, 6][(a.akt ?? 1) - 1]! - Math.max(0, (a.heldenstufe ?? 0) - 1) - (a.omen === 'wildnis' ? 3 : 0));
+  Math.max(4, [11, 8, 7][(a.akt ?? 1) - 1]! - Math.max(0, (a.heldenstufe ?? 0) - 1) - (a.omen === 'wildnis' ? 3 : 0));
 /** Welche Art kommt: in Akt 1 vor allem gewoehnliche, spaeter alle. */
 function artZahl(a: Pick<Abenteuer, 'akt'>, rng: Rng): number {
   const akt = a.akt ?? 1;
@@ -630,7 +637,8 @@ export const BOSS_LEBEN = 10;
  */
 export const AKTE = 3;
 // Spieltest 14: "Akt 1 und 2 sind nach sechs Kills vorbei - keine Zeit zum Erkunden."
-export const AKT_ZIEL: readonly number[] = [7, 8, 8];
+// Spieltest 22: "Akt 2 und 3 ziehen sich" - sieben statt acht.
+export const AKT_ZIEL: readonly number[] = [7, 7, 7];
 export const AKT_BOSS: readonly BossArt[] = ['koenig', 'schatten', 'koloss'];
 export const AKT_NAME: readonly string[] = ['Der Aufbruch', 'Schatten im Land', 'Der Gelee-Koloss'];
 /** Wie viele Gegner der Boss dieses Akts verlangt. */
@@ -1647,7 +1655,7 @@ export function taste(alt: Abenteuer, t: Taste): Abenteuer {
     let landung: Hex | null = null;
     for (let k = HERMES_WEITE; k >= 1 && !landung; k--) {
       const h = { q: a.pos.q + d[0] * k, r: a.pos.r + d[1] * k };
-      if (betretbar(a, h.q, h.r) && !schleimAuf(a, h.q, h.r) && !ortAuf(a, h.q, h.r) && !wandererAuf(a, h.q, h.r) && !soeldnerAuf(a, h.q, h.r)) landung = h;
+      if (betretbar(a, h.q, h.r) && !schleimAuf(a, h.q, h.r) && !(ortAuf(a, h.q, h.r) && !ortAuf(a, h.q, h.r)!.benutzt) && !wandererAuf(a, h.q, h.r) && !soeldnerAuf(a, h.q, h.r)) landung = h;
     }
     if (!landung) {
       melde(a, 'Kein freies Feld zum Huepfen.');

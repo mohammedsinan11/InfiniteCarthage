@@ -9502,3 +9502,42 @@ em.off {
 .ab-ende {
   z-index: 20;
 }
+
+/* Vorzeichen im Fuss des Lagers: kompakt, drei nebeneinander. */
+.ab-lager-omen {
+  flex-basis: 100%;
+}
+.ab-lager-omen small {
+  display: block;
+  color: #a89878;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.ab-lager-omen .ab-omen-wahl {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.ab-omen {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 6px;
+  text-align: left;
+  background: #1a120c;
+  border: 2px solid #3f2818;
+  color: #e8dcc0;
+}
+.ab-omen span {
+  font-size: 10px;
+  color: #b8a888;
+}
+.ab-omen.gewaehlt {
+  border-color: #f2c94c;
+  box-shadow: 0 0 8px rgba(242, 201, 76, 0.4);
+}
+@media (max-width: 700px) {
+  .ab-lager-omen .ab-omen-wahl {
+    grid-template-columns: 1fr;
+  }
+}
