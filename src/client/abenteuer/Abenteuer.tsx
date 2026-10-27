@@ -778,7 +778,10 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
   const miniGrossRef = useRef(false);
   miniGrossRef.current = miniGross;
 
-  const setze = useCallback((neu: Zustand) => {
+  const setze = useCallback((neu0: Zustand) => {
+    // Das meiste Gold merken - fuer den Erfolg Pfeffersack (Spieltest 21: "71 Gold, kein Erfolg").
+    const gold0 = neu0.inventar['gold'] ?? 0;
+    const neu = gold0 > (neu0.goldHoechst ?? 0) ? { ...neu0, goldHoechst: gold0 } : neu0;
     // Die Info-Box gilt dem Feld unter der Maus - zieht die Kamera weiter, verschwindet sie (Spieltest 10).
     if (neu.pos.q !== aktuell.current.pos.q || neu.pos.r !== aktuell.current.pos.r) zeiger.current = null;
     aktuell.current = neu;
@@ -988,6 +991,20 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         if (kurz) {
           lauf.current = { ziel: kurz[kurz.length - 1]!, timer: 0 };
           return void geheWeiter();
+        }
+      }
+      // Ein sichtbares, aber unerkundetes Ziel (Boss, X): so nah wie moeglich heranlaufen (Spieltest 21).
+      if (wegZu(a0, h).length === 0 && !new Set(a0.erkundet).has(hexKey(h.q, h.r))) {
+        const bekannt = new Set(a0.erkundet);
+        const rand = hexesInRange(h, 6)
+          .filter((x) => bekannt.has(hexKey(x.q, x.r)) && !(x.q === a0.pos.q && x.r === a0.pos.r))
+          .sort((x, y) => hexDistance(x, h) - hexDistance(y, h) || hexDistance(x, a0.pos) - hexDistance(y, a0.pos));
+        for (const x of rand.slice(0, 12)) {
+          if (hexDistance(x, h) >= hexDistance(a0.pos, h)) break;
+          if (wegZu(a0, x).length > 0) {
+            lauf.current = { ziel: x, timer: 0 };
+            return void geheWeiter();
+          }
         }
       }
       if (wegZu(a0, h).length === 0) {
@@ -1697,6 +1714,14 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
             const sw = s.boss ? 10 * f : 3 * fs;
             ctx.fillRect(sx(o.x) - sw, sy(o.y) + 3 * f, 2 * sw, f);
+            // Jeder Gegner: ein roter Ring am Boden - im Wald und Nebel sonst kaum zu sehen (Spieltest 21).
+            if (!s.elite && !s.boss && alpha > 0.3) {
+              ctx.strokeStyle = 'rgba(255, 74, 58, 0.55)';
+              ctx.lineWidth = f;
+              ctx.beginPath();
+              ctx.ellipse(sx(o.x), sy(o.y) + 3 * f, 7 * f, 3 * f, 0, 0, Math.PI * 2);
+              ctx.stroke();
+            }
             // Elite: ein goldener, flackernder Ring.
             if (s.elite && alpha > 0.3) {
               ctx.strokeStyle = `rgba(246, 192, 74, ${0.6 + 0.3 * Math.sin(sek * 6 + s.id)})`;
@@ -2669,8 +2694,11 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
         const hoeheB = zeilen.length * zeileH + 4 * f;
         const by = Math.min(c.height - hoeheB - 2 * f, Math.max(2 * f, Math.round(sy(o.y) - hoeheB / 2)));
         // Oben rechts liegt die Karte, links die Werte - die Box bleibt dazwischen (Spieltest 9: abgeschnitten).
-        const rechtsFrei = by < 320 * dpr ? c.width - 210 * dpr : c.width - 2 * f;
-        const bx = Math.min(rechtsFrei - breite, Math.max(180 * dpr, Math.round(sx(o.x) + 10 * f)));
+        // Unten rechts liegen Inventar und Spieltisch (Spieltest 21: "Info-Box unter dem Inventar").
+        const rechtsFrei = by < 320 * dpr ? c.width - 210 * dpr : by + hoeheB > c.height - 280 * dpr ? c.width - 270 * dpr : c.width - 2 * f;
+        const rechtsDaneben = Math.round(sx(o.x) + 10 * f);
+        // Passt sie rechts nicht hin, steht sie links vom Ziel - nie ueber ihm.
+        const bx = rechtsDaneben + breite <= rechtsFrei ? Math.max(180 * dpr, rechtsDaneben) : Math.max(180 * dpr, Math.round(sx(o.x) - 10 * f - breite));
         ctx.fillStyle = 'rgba(18, 13, 8, 0.92)';
         ctx.fillRect(bx, by, breite, hoeheB);
         ctx.strokeStyle = feind?.boss ? '#ff4a3a' : feind ? '#c8a35a' : '#7ab0d8';
@@ -2806,7 +2834,8 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
     );
   };
   // Gleich nochmal: dieselbe Klasse und Heldenstufe.
-  const nochmal = () => aufbruch({ klasse: a.klasse ?? meta.klasse, stufe: a.heldenstufe ?? 0 });
+  // Nach einem Sieg mit frisch freigeschalteter Stufe geht es eine hoeher (meta.stufe).
+  const nochmal = () => aufbruch({ klasse: a.klasse ?? meta.klasse, stufe: a.tag ? meta.stufe : Math.max(a.heldenstufe ?? 0, a.phase === 'sieg' ? meta.stufe : 0) });
   const tonUmschalten = () => {
     setzeMusik(!musik);
     setMusik(!musik);
@@ -2956,7 +2985,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
                   </span>
                   {a.bossBald != null ? (
                     <small className="ab-akt-uhr ab-boss-bald">
-                      {a.bossBald - a.zug <= 0 ? 'Der Boden bebt! Der Boss erwacht jetzt!' : `Der Boden bebt! Boss in ${a.bossBald - a.zug} ${a.bossBald - a.zug === 1 ? 'Zug' : 'Zuegen'}`}
+                      {a.bossBald - a.zug <= 0 ? 'Der Boden bebt! Der Boss erwacht jetzt!' : `Der Boden bebt! Boss erwacht zu Zug ${a.bossBald}`}
                     </small>
                   ) : (
                     <small className="ab-akt-uhr">
@@ -3004,7 +3033,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               {
                 id: 'schwert',
                 wert: `+${angriffVon(a)}${gelaendeBonus(a, 'angriff') ? '*' : ''}`,
-                titel: `Angriff +${angriffVon(a)}${gelaendeBonus(a, 'angriff') ? ' (* davon +1 vom Huegel - nur solange du hier stehst)' : ''}: Wurf + Angriff muss 4 erreichen. Du triffst Schleime mit einer ${Math.max(2, 4 - angriffVon(a))} oder mehr (${Math.round((100 * (7 - Math.max(2, 4 - angriffVon(a)))) / 6)} %), Panzer ab ${Math.max(2, 5 - angriffVon(a))} - eine 1 verfehlt immer. Warten (S) gibt Fokus.`,
+                titel: `Angriff +${angriffVon(a)}${gelaendeBonus(a, 'angriff') ? ' (* davon +1 vom Huegel - nur solange du hier stehst)' : ''}: Wurf + Angriff muss 4 erreichen. Du triffst Schleime mit einer ${Math.max(2, 4 - angriffVon(a))} oder mehr (${Math.round((100 * (7 - Math.max(2, 4 - angriffVon(a)))) / 6)} %), Panzer ab ${Math.max(2, 5 - angriffVon(a))} - eine 1 verfehlt${angriffVon(a) >= 3 ? ', streift aber dank deiner Wucht (1 Schaden)' : ' immer (ab Angriff +3 streift sie)'}. Warten (S) gibt Fokus.`,
               },
               {
                 id: 'schild',
@@ -3329,7 +3358,7 @@ export function Abenteuer({ onZurueck }: { onZurueck: () => void }) {
               <summary>Weitere Regeln (Fokus, Deckung, Waffe, Klassen, Lager ...)</summary>
               <dl>
                 <dt>Treffen</dt>
-                <dd>Zum Zuschlagen wird eigens gewuerfelt (nicht der Schritt-Wuerfel). Wurf + Angriff (+ Fokus) muss die Schwelle erreichen: 4, ab Akt 2 hoeher, Panzer und Elite mehr. Eine 1 verfehlt immer, eine 6 trifft immer.</dd>
+                <dd>Zum Zuschlagen wird eigens gewuerfelt (nicht der Schritt-Wuerfel). Wurf + Angriff (+ Fokus) muss die Schwelle erreichen: 4, ab Akt 2 hoeher, Panzer und Elite mehr. Eine 1 verfehlt - ausser du hast Angriff und Fokus zusammen 3+, dann streift sie (1 Schaden; nicht am Panzer). Eine 6 trifft immer.</dd>
                 <dt>Klassen</dt>
                 <dd>Der Zwerg klettert ohne Muehe ueber Berge, die Waldlaeuferin watet durch Sumpf und Bach - je ein Schritt.</dd>
                 <dt>Pentagramm</dt>

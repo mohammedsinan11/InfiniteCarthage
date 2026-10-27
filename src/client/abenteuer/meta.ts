@@ -94,7 +94,7 @@ export const ERFOLGE: readonly { id: string; name: string; text: string; ruhm: n
   { id: 'allein', name: 'Einsamer Wolf', text: 'Gewinne ohne Gefolge.', ruhm: 50, pruefe: (a) => a.phase === 'sieg' && (a.gefolge ?? []).length === 0 && (a.angeheuert ?? []).length === 0 },
   { id: 'schnell', name: 'Eilbote', text: 'Gewinne in hoechstens 60 Zuegen.', ruhm: 50, pruefe: (a) => a.phase === 'sieg' && a.zug <= 60 },
   { id: 'jaeger', name: 'Schleimjaeger', text: 'Erlege 50 Gegner in einem Abenteuer.', ruhm: 30, pruefe: (a) => a.erschlagen >= 50 },
-  { id: 'reich', name: 'Pfeffersack', text: 'Besitze 60 Gold auf einmal.', ruhm: 20, pruefe: (a) => (a.inventar['gold'] ?? 0) >= 60 },
+  { id: 'reich', name: 'Pfeffersack', text: 'Besitze 60 Gold auf einmal.', ruhm: 20, pruefe: (a) => Math.max(a.goldHoechst ?? 0, a.inventar['gold'] ?? 0) >= 60 },
   { id: 'pentagramm', name: 'Erzmagier', text: 'Erreiche Pentagrammmeister Stufe 3.', ruhm: 40, pruefe: (a) => (a.pentaStufe ?? 1) >= 3 },
   { id: 'schwarz', name: 'Schwarze Legende', text: 'Gewinne als Schwarzer Ritter.', ruhm: 80, pruefe: (a) => a.phase === 'sieg' && a.klasse === 'schwarz' },
   { id: 'held2', name: 'Bewaehrt', text: 'Gewinne auf Heldenstufe 2.', ruhm: 60, pruefe: (a) => a.phase === 'sieg' && (a.heldenstufe ?? 0) >= 2 },
@@ -115,7 +115,7 @@ export function belohne(m0: Meta, a: Abenteuer, ruhm: number): Meta {
     plus += e.ruhm;
   }
   const stufeNeu = a.phase === 'sieg' && (a.heldenstufe ?? 0) + 1 > m.stufeMax && (a.heldenstufe ?? 0) + 1 <= 5;
-  if (stufeNeu) neu.push(`Heldenstufe ${(a.heldenstufe ?? 0) + 1} ist im Lager waehlbar`);
+  if (stufeNeu) neu.push(`Heldenstufe ${(a.heldenstufe ?? 0) + 1} freigeschaltet - das naechste Abenteuer beginnt darauf (im Lager einstellbar)`);
   return {
     ...m,
     ruhm: m.ruhm + plus,
@@ -123,6 +123,8 @@ export function belohne(m0: Meta, a: Abenteuer, ruhm: number): Meta {
     siege: m.siege + (a.phase === 'sieg' ? 1 : 0),
     bester: Math.max(m.bester, punkte),
     stufeMax: stufeNeu ? (a.heldenstufe ?? 0) + 1 : m.stufeMax,
+    // Wer gewinnt, zieht naechstes Mal gleich eine Stufe hoeher los - im Lager wieder einstellbar (Spieltest 21: "Normal ist zu leicht").
+    stufe: stufeNeu ? (a.heldenstufe ?? 0) + 1 : m.stufe,
     tage: a.tag ? { ...m.tage, [a.tag]: Math.max(m.tage[a.tag] ?? 0, punkte) } : m.tage,
     erfolge: [...m.erfolge, ...ERFOLGE.filter((e) => !m.erfolge.includes(e.id) && e.pruefe(a, m)).map((e) => e.id)],
     siegKlassen: a.phase === 'sieg' ? [...new Set([...m.siegKlassen, a.klasse ?? 'ritter'])] : m.siegKlassen,

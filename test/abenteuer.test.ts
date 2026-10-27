@@ -803,8 +803,8 @@ describe('Abenteuer', () => {
     };
     const wuerfe = (id: string | null) => Array.from({ length: 80 }, (_, i) => mit(id, i + 1));
     expect(neuesAbenteuer(1).ausruestung.wuerfel).toBeNull();
-    // Blei: nie unter 3.
-    expect(Math.min(...wuerfe('bleiwuerfel').map((a) => a.wurf!))).toBeGreaterThanOrEqual(3);
+    // Blei: nie unter 4.
+    expect(Math.min(...wuerfe('bleiwuerfel').map((a) => a.wurf!))).toBeGreaterThanOrEqual(4);
     // Wanderwuerfel: auch 7 und 8.
     const wander = wuerfe('wanderwuerfel').map((a) => a.wurf!);
     expect(Math.max(...wander)).toBe(8);

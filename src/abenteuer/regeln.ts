@@ -88,7 +88,7 @@ export type Gegenstand = {
  * WUERFEL ALS AUSRUESTUNG - ein eigener Platz. Ohne Wuerfel wirft der Ritter
  * einen gewoehnlichen W6. Jeder Wuerfel wirft anders:
  *   glueckswuerfel  W6 - einmal je Zug neu wuerfeln, solange man nicht ging
- *   bleiwuerfel     W6, aber nie unter 3
+ *   bleiwuerfel     W6, aber nie unter 4 (Spieltest 21: "nie unter 3" nuetzte nichts mehr)
  *   zwillingswuerfel zwei W6, der hoehere zaehlt
  *   wanderwuerfel   W8
  *   fluchwuerfel    W10 - eine 1 kostet ein Leben
@@ -117,7 +117,7 @@ export const WUERFEL_EFFEKT: Record<string, readonly number[]> = {
 
 export const GEGENSTAENDE: readonly Gegenstand[] = [
   { id: 'glueckswuerfel', name: 'Glueckswuerfel', slot: 'wuerfel', wuerfelWert: 3, text: 'Einmal je Zug darfst du neu wuerfeln (R) - solange du noch keinen Schritt gegangen bist.' },
-  { id: 'bleiwuerfel', name: 'Bleiwuerfel', slot: 'wuerfel', wuerfelWert: 3, text: 'Schwer und treu: dein Schritt-Wurf ist nie unter 3 (nicht beim Zuschlagen).' },
+  { id: 'bleiwuerfel', name: 'Bleiwuerfel', slot: 'wuerfel', wuerfelWert: 3, text: 'Schwer und treu: dein Schritt-Wurf ist nie unter 4 (nicht beim Zuschlagen).' },
   { id: 'zwillingswuerfel', name: 'Zwillingswuerfel', slot: 'wuerfel', wuerfelWert: 4, text: 'Zwei Wuerfel auf einmal - der hoehere zaehlt.' },
   { id: 'wanderwuerfel', name: 'Wanderwuerfel', slot: 'wuerfel', wuerfelWert: 3, text: 'Acht Seiten: 1 bis 8 Schritte.' },
   { id: 'fluchwuerfel', name: 'Fluchwuerfel', slot: 'wuerfel', wuerfelWert: 2, text: 'Zehn Seiten: 1 bis 10 Schritte - aber eine 1 kostet dich ein Leben.' },
@@ -133,7 +133,7 @@ export const GEGENSTAENDE: readonly Gegenstand[] = [
   { id: 'breitschwert', name: 'Breitschwert', slot: 'waffe', angriff: 2, ladung: 6, faehigkeit: 'schutzwall', text: '+2 auf jeden Angriffswurf. Ladung 6: Schutzwall - der naechste Treffer gegen dich wird abgefangen.' },
   { id: 'runenklinge', name: 'Runenklinge', slot: 'waffe', angriff: 2, krit: 3, ladung: 5, faehigkeit: 'runenblitz', text: '+2 auf jeden Angriffswurf; eine 6 trifft dreifach. Ladung 5: Runenblitz - 2 Schaden am Gegner unter der Maus oder dem naechsten (bis 3 Felder).' },
   { id: 'flammenschwert', name: 'Flammenschwert', slot: 'waffe', angriff: 3, ladung: 7, faehigkeit: 'feuerkreis', text: '+3 auf jeden Angriffswurf. Ladung 7: Feuerkreis - alle Gegner rundum nehmen 2 Schaden.' },
-  { id: 'schild', name: 'Schild', slot: 'schild', abwehr: 1, text: 'Schleime brauchen eine Augenzahl mehr, um zu treffen.' },
+  { id: 'schild', name: 'Schild', slot: 'schild', abwehr: 1, text: 'Abwehr +1: Hiebe mit Wurf 1 prallen ab (mehr Abwehr: mehr Augen).' },
   { id: 'helm', name: 'Helm', slot: 'kopf', leben: 1, text: '+1 Leben.' },
   { id: 'ruestung', name: 'Kettenhemd', slot: 'koerper', leben: 2, text: '+2 Leben.' },
   { id: 'stiefel', name: 'Reitstiefel', slot: 'fuesse', schritte: 1, text: '+1 Schritt je Wurf.' },
@@ -541,6 +541,8 @@ export type Abenteuer = {
   aktStart?: number;
   /** Eine offene Wahl (1 aus 3): Truhe, Schatz, Bossbeute, Altar. Solange sie offen ist, ruht das Spiel. */
   wahl?: Wahl | null;
+  /** Das meiste Gold auf einmal in diesem Abenteuer (Erfolg Pfeffersack). */
+  goldHoechst?: number;
   /** Die Klasse des Helden (Lager). */
   klasse?: KlasseId;
   /** Heldenstufe (Schwierigkeit, im Lager gewaehlt): Gegner zaeher und zahlreicher, mehr Punkte. */
@@ -844,7 +846,8 @@ function neueGegend(a: Abenteuer): void {
  * Spieler waehlt eines. Solange die Wahl offen ist, ruht das Spiel.
  */
 export type WahlArt = 'truhe' | 'schatz' | 'boss' | 'fluch' | 'ereignis' | 'rast';
-export type Wahl = { art: WahlArt; titel: string; optionen: string[]; ort?: number };
+/** feld: wo die verfluchte Truhe steht - der Held kann (Hermes-Stiefel) schon weiter sein. */
+export type Wahl = { art: WahlArt; titel: string; optionen: string[]; ort?: number; feld?: Hex };
 
 /**
  * SYNERGIEN - was gut zusammenpasst (Spieltest: "kaum Synergien sichtbar").
@@ -964,7 +967,9 @@ function waehlenInnen(alt: Abenteuer, nr: number): Abenteuer {
     return a;
   }
   if (id === 'fluch_oeffnen') {
-    a.genommen = [...a.genommen, hexKey(a.pos.q, a.pos.r)];
+    // Das Feld der Truhe, nicht das des Helden (Spieltest 21: "mit Hermes-Stiefeln immer wieder zu oeffnen").
+    const f = w.feld ?? a.pos;
+    a.genommen = [...a.genommen, hexKey(f.q, f.r)];
     fluchtruheOeffnen(a);
     return a;
   }
@@ -1094,7 +1099,7 @@ function goldDazu(a: Abenteuer, n: number): number {
 export const START_EXTRAS: Record<string, { name: string; text: string }> = {
   kraeuter: { name: 'Kraeuterbeutel', text: 'Du beginnst mit 2 Kraeutern.' },
   geldkatze: { name: 'Geldkatze', text: 'Du beginnst mit 10 Gold.' },
-  bleiwuerfel: { name: 'Bleiwuerfel', text: 'Du beginnst mit dem Bleiwuerfel (nie unter 3).' },
+  bleiwuerfel: { name: 'Bleiwuerfel', text: 'Du beginnst mit dem Bleiwuerfel (nie unter 4).' },
   herz: { name: 'Starkes Herz', text: 'Ein Herz mehr von Anfang an.' },
   karte: { name: 'Alte Karte', text: 'Du siehst zu Beginn die Gegend bis 7 Felder.' },
 };
@@ -1187,9 +1192,9 @@ function wuerfelWurf(a: Abenteuer): { wurf: number; zusatz: string } {
   }
   a.pechWuerfe = wurf <= 2 ? (a.pechWuerfe ?? 0) + 1 : 0;
   a.zweiterWurf = null;
-  if (id === 'bleiwuerfel' && wurf < 3) {
-    zusatz = ` (Blei: ${wurf} wird 3)`;
-    wurf = 3;
+  if (id === 'bleiwuerfel' && wurf < 4) {
+    zusatz = ` (Blei: ${wurf} wird 4)`;
+    wurf = 4;
   } else if (id === 'zwillingswuerfel') {
     let zweiter = seite(6);
     // Glueckspilz gilt fuer jeden der beiden.
@@ -1756,7 +1761,7 @@ function stilleRuftBoss(a: Abenteuer): void {
   // Erst nach acht Zuegen im Akt - vorher bleibt Zeit fuer Schatzkarte und Begegnungen (Spieltest 16).
   if (a.zug - (a.aktStart ?? 1) < 8 || a.schleime.some((s) => hexDistance(s, a.pos) <= 10)) return;
   a.bossBald = a.zug + BOSS_VORWARNUNG;
-  melde(a, `Es ist still geworden ... Der Boden bebt! In ${BOSS_VORWARNUNG} Zuegen erwacht der ${BOSS_NAME[naechsterBoss(a)]}.${nochOffen(a)}`);
+  melde(a, `Es ist still geworden ... Der Boden bebt! Zu Beginn von Zug ${a.bossBald} erwacht der ${BOSS_NAME[naechsterBoss(a)]}.${nochOffen(a)}`);
 }
 
 function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
@@ -1773,10 +1778,13 @@ function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
   const sicher = (a.fehlschlaege ?? 0) >= 2;
   const wehrlos = (s.gebannt ?? 0) > a.zeit;
   const trifft = sicher || ((wurf !== 1 || wehrlos) && (wurf === 6 || summeWurf >= noetig || (wehrlos && wurf === 1 && summeWurf >= noetig - 1)));
-  a.fehlschlaege = trifft ? 0 : (a.fehlschlaege ?? 0) + 1;
+  // Streifhieb: wer stark genug ist (Angriff und Fokus zusammen 3+), streift auch mit einer 1 (Spieltest 21: "1en verfehlen auch mit +5").
+  const streif = !trifft && wurf === 1 && angriffVon(a) + fokus >= 3 && s.art !== 'panzer';
+  a.fehlschlaege = trifft || streif ? 0 : (a.fehlschlaege ?? 0) + 1;
   if (sicher && wurf !== 1) melde(a, 'Pech gleicht sich aus: dieser Hieb trifft sicher.');
   const ausDemWald = hatLegende(a, 'hinterhalt') && istWald(gelaende(a.seed, a.pos.q, a.pos.r));
-  let schaden = trifft ? (wurf === 6 ? krit : 1) + (fokus >= FOKUS_MAX ? 1 : 0) + (s.boss && wehrlos ? 1 : 0) + (ausDemWald ? 1 : 0) : 0;
+  let schaden = trifft ? (wurf === 6 ? krit : 1) + (fokus >= FOKUS_MAX ? 1 : 0) + (s.boss && wehrlos ? 1 : 0) + (ausDemWald ? 1 : 0) : streif ? 1 : 0;
+  if (streif) melde(a, 'Wurf 1 - doch deine Wucht streift ihn: 1 Schaden.');
   // Durchschlag: mit vollem Fokus trifft der Hieb auch den Gegner dahinter.
   if (trifft && fokus >= FOKUS_MAX && hatLegende(a, 'durchschlag')) {
     const hinter = schleimAuf(a, s.q + (s.q - a.pos.q), s.r + (s.r - a.pos.r));
@@ -1808,6 +1816,8 @@ function angreifen(a: Abenteuer, s: Schleim, takt: number): void {
     const plus = Math.min(0.5, maxLebenVon(a) - a.leben);
     a.leben += plus;
     a.ereignisse.push({ art: 'heil', takt, leben: plus });
+    // Sichtbar machen, dass es wirkt (Spieltest 21: "Blutdurst heilt nicht?").
+    melde(a, `Blutdurst: +${lebenText(plus)} Leben.`);
   }
   if (gefallen && hatLegende(a, 'jagdfieber') && a.phase === 'ziehen') {
     a.schritte += 1;
@@ -1938,7 +1948,7 @@ function bossPruefen(a: Abenteuer, takt: number): void {
       melde(a, `Eile: ${vorsprung} ${vorsprung === 1 ? 'Zug' : 'Zuege'} vor dem Boss-Zeitplan - +${vorsprung * EILE_PUNKTE} Punkte.`);
     }
     a.bossBald = a.zug + BOSS_VORWARNUNG;
-    melde(a, `Der Boden bebt! In ${BOSS_VORWARNUNG} Zuegen erwacht der ${BOSS_NAME[naechsterBoss(a)]} - heile dich und mach dich bereit.${nochOffen(a)}`);
+    melde(a, `Der Boden bebt! Zu Beginn von Zug ${a.bossBald} erwacht der ${BOSS_NAME[naechsterBoss(a)]} - heile dich und mach dich bereit.${nochOffen(a)}`);
     a.ereignisse.push({ art: 'wuerfelEffekt', takt, text: 'Der Boden bebt!' });
   } else if (bossUngeduldig(a)) bossErwacht(a, takt);
 }
@@ -1960,7 +1970,9 @@ function nochOffen(a: Abenteuer): string {
     altaere ? `${altaere} ${altaere === 1 ? 'Altar' : 'Altaere'}` : '',
     a.versteck ? 'das Versteck (X)' : '',
   ].filter(Boolean);
-  return teile.length ? ` Noch offen hier: ${teile.join(', ')} - nach dem Boss geht es in eine neue Gegend.` : '';
+  if (!teile.length) return '';
+  // Im letzten Akt gibt es kein Danach (Spieltest 21).
+  return (a.akt ?? 1) >= AKTE ? ` Noch offen hier: ${teile.join(', ')} - jetzt oder nie.` : ` Noch offen hier: ${teile.join(', ')} - nach dem Boss geht es in eine neue Gegend.`;
 }
 
 export const zuegeBisBoss = (a: Pick<Abenteuer, 'zug' | 'aktStart' | 'omen' | 'akt'>): number =>
@@ -2222,7 +2234,7 @@ function aufheben(a: Abenteuer): void {
   }
   // Die verfluchte Truhe fragt erst (Spieltest: "sie hat mich ohne Warnung getoetet").
   if (fund === 'fluchtruhe') {
-    a.wahl = { art: 'fluch', titel: 'Eine verfluchte Truhe: zwei Waechter (einer Elite) erwachen, wenn du sie oeffnest. Darin liegt Legendaeres.', optionen: ['fluch_oeffnen', 'fluch_lassen'] };
+    a.wahl = { art: 'fluch', titel: 'Eine verfluchte Truhe: zwei Waechter (einer Elite) erwachen, wenn du sie oeffnest. Darin liegt Legendaeres.', optionen: ['fluch_oeffnen', 'fluch_lassen'], feld: { q: a.pos.q, r: a.pos.r } };
     a.ereignisse.push({ art: 'wahl', takt: 0 });
     return;
   }
@@ -2608,7 +2620,8 @@ function bossLoestEin(a: Abenteuer, s: Schleim, takt: number, rng: Rng): boolean
  * BOSS_FERN Felder) oder steckt er fest (Wasser, Berge im Weg), holt er auf:
  * er taucht ein paar Felder vor dem Ritter wieder auf.
  */
-const BOSS_FERN = 8;
+// Spieltest 21: "Der Endboss sass acht Felder weg und jagte nicht" - der traege Koloss holt frueher auf.
+const BOSS_FERN = 6;
 function bossZieht(a: Abenteuer, s: Schleim, takt: number, besetzt: (q: number, r: number) => boolean): void {
   let ziel: Hex | null = null;
   for (const [dq, dr] of HEX_DIRS) {
@@ -2618,9 +2631,9 @@ function bossZieht(a: Abenteuer, s: Schleim, takt: number, besetzt: (q: number, 
   }
   const d = hexDistance(s, a.pos);
   if (d > BOSS_FERN || (!ziel && d > 3)) {
-    // Aufholen: das freie Feld 4 bis 6 Schritte vor dem Ritter, das auf seiner Seite liegt.
-    const nah = hexesInRange(a.pos, 6)
-      .filter((h) => hexDistance(h, a.pos) >= 4 && begehbar(gelaende(a.seed, h.q, h.r)) && !besetzt(h.q, h.r))
+    // Aufholen: das freie Feld 3 bis 4 Schritte vor dem Ritter, das auf seiner Seite liegt.
+    const nah = hexesInRange(a.pos, 4)
+      .filter((h) => hexDistance(h, a.pos) >= 3 && begehbar(gelaende(a.seed, h.q, h.r)) && !besetzt(h.q, h.r))
       .sort((x, y) => hexDistance(x, s) - hexDistance(y, s))[0];
     if (nah) {
       a.ereignisse.push({ art: 'gehen', takt, wer: s.id, von: { q: s.q, r: s.r }, nach: nah, blink: true });
@@ -2998,7 +3011,13 @@ function neuerOrt(a: Abenteuer, h: Hex, art: OrtArt): Ort {
   let name = MAENNER[start]!;
   for (let i = 0; i < MAENNER.length && vergeben.has(name); i++) name = MAENNER[(start + i) % MAENNER.length]!;
   const o: Ort = { id: a.naechsteId++, q: h.q, r: h.r, art, name };
-  if (art === 'ereignis') o.ereignis = EREIGNIS_ARTEN[hash3i(a.seed, h.q, h.r, SALT_LEUTE + 3) % EREIGNIS_ARTEN.length]!;
+  if (art === 'ereignis') {
+    // Nicht zweimal dieselbe Begegnung in der Gegend (Spieltest 21: "zwei Alchemisten am Start").
+    const da = new Set((a.orte ?? []).filter((x) => x.art === 'ereignis' && hexDistance(x, h) < 30).map((x) => x.ereignis));
+    const s0 = hash3i(a.seed, h.q, h.r, SALT_LEUTE + 3) % EREIGNIS_ARTEN.length;
+    o.ereignis = EREIGNIS_ARTEN[s0]!;
+    for (let i = 0; i < EREIGNIS_ARTEN.length && da.has(o.ereignis); i++) o.ereignis = EREIGNIS_ARTEN[(s0 + i) % EREIGNIS_ARTEN.length]!;
+  }
   return o;
 }
 
